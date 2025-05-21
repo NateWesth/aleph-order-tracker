@@ -8,6 +8,8 @@ import { StrictMode } from "react";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
+import ClientDashboard from "./pages/ClientDashboard";
+import AdminDashboard from "./pages/AdminDashboard";
 
 // Create a client
 const queryClient = new QueryClient();
@@ -22,6 +24,8 @@ function App() {
           <Routes>
             <Route path="/auth" element={<Auth />} />
             <Route path="/home" element={<Index />} />
+            <Route path="/client-dashboard" element={<ClientDashboard />} />
+            <Route path="/admin-dashboard" element={<AdminDashboard />} />
             <Route path="/" element={<Navigate to="/auth" replace />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />

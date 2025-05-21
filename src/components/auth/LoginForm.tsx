@@ -51,7 +51,14 @@ const LoginForm = () => {
           title: "Login successful",
           description: `Welcome back! You're logged in as a ${values.userType}.`,
         });
-        navigate("/");
+        
+        // Redirect to appropriate dashboard based on user type
+        if (values.userType === "admin") {
+          navigate("/admin-dashboard");
+        } else {
+          navigate("/client-dashboard");
+        }
+        
         setIsLoading(false);
       }, 1000);
       
