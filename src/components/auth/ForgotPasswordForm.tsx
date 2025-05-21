@@ -8,9 +8,13 @@ import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { Mail } from "lucide-react";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 const forgotPasswordSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address" }),
+  userType: z.enum(["client", "admin"], {
+    required_error: "Please select a user type",
+  })
 });
 
 type ForgotPasswordValues = z.infer<typeof forgotPasswordSchema>;
@@ -27,6 +31,7 @@ const ForgotPasswordForm = ({ onSuccess }: ForgotPasswordFormProps) => {
     resolver: zodResolver(forgotPasswordSchema),
     defaultValues: {
       email: "",
+      userType: "client"
     },
   });
 
@@ -35,7 +40,7 @@ const ForgotPasswordForm = ({ onSuccess }: ForgotPasswordFormProps) => {
     
     try {
       // This is where you would integrate with your authentication service
-      console.log("Password reset email requested for:", values.email);
+      console.log("Password reset email requested for:", values.email, "User type:", values.userType);
       
       // Simulating a successful password reset email
       setTimeout(() => {
@@ -68,6 +73,38 @@ const ForgotPasswordForm = ({ onSuccess }: ForgotPasswordFormProps) => {
         <p className="text-sm text-gray-600 mb-4">
           Enter your email address and we'll send you a link to reset your password.
         </p>
+        
+        <FormField
+          control={form.control}
+          name="userType"
+          render={({ field }) => (
+            <FormItem className="space-y-3">
+              <FormLabel>Account type</FormLabel>
+              <FormControl>
+                <RadioGroup
+                  onValueChange={field.onChange}
+                  value={field.value}
+                  className="flex space-x-4"
+                >
+                  <FormItem className="flex items-center space-x-2">
+                    <FormControl>
+                      <RadioGroupItem value="client" />
+                    </FormControl>
+                    <FormLabel className="font-normal cursor-pointer">Client</FormLabel>
+                  </FormItem>
+                  <FormItem className="flex items-center space-x-2">
+                    <FormControl>
+                      <RadioGroupItem value="admin" />
+                    </FormControl>
+                    <FormLabel className="font-normal cursor-pointer">Admin</FormLabel>
+                  </FormItem>
+                </RadioGroup>
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        
         <FormField
           control={form.control}
           name="email"

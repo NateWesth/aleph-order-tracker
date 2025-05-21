@@ -11,10 +11,14 @@ import { useToast } from "@/hooks/use-toast";
 import { Mail, Lock } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import ForgotPasswordForm from "./ForgotPasswordForm";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 const loginFormSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address" }),
   password: z.string().min(8, { message: "Password must be at least 8 characters" }),
+  userType: z.enum(["client", "admin"], {
+    required_error: "Please select a user type",
+  })
 });
 
 type LoginFormValues = z.infer<typeof loginFormSchema>;
@@ -30,6 +34,7 @@ const LoginForm = () => {
     defaultValues: {
       email: "",
       password: "",
+      userType: "client"
     },
   });
 
@@ -44,7 +49,7 @@ const LoginForm = () => {
       setTimeout(() => {
         toast({
           title: "Login successful",
-          description: "Welcome back!",
+          description: `Welcome back! You're logged in as a ${values.userType}.`,
         });
         navigate("/");
         setIsLoading(false);
@@ -69,6 +74,37 @@ const LoginForm = () => {
     <>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <FormField
+            control={form.control}
+            name="userType"
+            render={({ field }) => (
+              <FormItem className="space-y-3">
+                <FormLabel>Login as</FormLabel>
+                <FormControl>
+                  <RadioGroup
+                    onValueChange={field.onChange}
+                    value={field.value}
+                    className="flex space-x-4"
+                  >
+                    <FormItem className="flex items-center space-x-2">
+                      <FormControl>
+                        <RadioGroupItem value="client" />
+                      </FormControl>
+                      <FormLabel className="font-normal cursor-pointer">Client</FormLabel>
+                    </FormItem>
+                    <FormItem className="flex items-center space-x-2">
+                      <FormControl>
+                        <RadioGroupItem value="admin" />
+                      </FormControl>
+                      <FormLabel className="font-normal cursor-pointer">Admin</FormLabel>
+                    </FormItem>
+                  </RadioGroup>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          
           <FormField
             control={form.control}
             name="email"
