@@ -11,7 +11,7 @@ import {
   SidebarMenuButton,
   SidebarFooter
 } from "@/components/ui/sidebar";
-import { Home, FileText, ListOrdered, Progress, Settings, Files } from "lucide-react";
+import { Home, FileText, ListOrdered, BarChart2, Settings, Files } from "lucide-react";
 
 const ClientDashboard = () => {
   const navigate = useNavigate();
@@ -47,7 +47,7 @@ const ClientDashboard = () => {
               </SidebarMenuItem>
               <SidebarMenuItem>
                 <SidebarMenuButton tooltip="Progress">
-                  <Progress />
+                  <BarChart2 />
                   <span>Progress</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
