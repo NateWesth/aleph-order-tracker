@@ -19,12 +19,12 @@
     --primary-foreground: 210 40% 98%;
 
     --secondary: 285 100% 50%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary-foreground: 210 40% 98%;
 
     --muted: 210 40% 96.1%;
     --muted-foreground: 215.4 16.3% 46.9%;
 
-    --accent: 120 100% 50%;
+    --accent: 87 100% 50%;
     --accent-foreground: 222.2 47.4% 11.2%;
 
     --destructive: 0 84.2% 60.2%;
@@ -36,14 +36,14 @@
 
     --radius: 0.5rem;
 
-    --sidebar-background: 0 0% 98%;
+    --sidebar-background: 195 100% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary: 195 100% 50%;
     --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent: 87 100% 95%;
     --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-border: 195 75% 90%;
+    --sidebar-ring: 195 100% 60%;
   }
 
   .dark {
@@ -66,7 +66,7 @@
     --muted: 217.2 32.6% 17.5%;
     --muted-foreground: 215 20.2% 65.1%;
 
-    --accent: 120 100% 50%;
+    --accent: 87 100% 50%;
     --accent-foreground: 210 40% 98%;
 
     --destructive: 0 62.8% 30.6%;
@@ -77,12 +77,12 @@
     --ring: 212.7 26.8% 83.9%;
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary: 195 100% 50%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent: 87 100% 15%;
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-ring: 195 100% 60%;
   }
 }
 
@@ -94,6 +94,22 @@
   body {
     @apply bg-background text-foreground;
     font-family: 'Inter', sans-serif;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply text-aleph-blue font-bold;
+  }
+
+  h1 {
+    @apply text-3xl md:text-4xl;
+  }
+
+  h2 {
+    @apply text-2xl md:text-3xl;
+  }
+
+  h3 {
+    @apply text-xl md:text-2xl;
   }
 }
 
@@ -126,3 +142,38 @@
 .bg-aleph-magenta { background-color: #FF00C8; }
 .bg-aleph-green { background-color: #C8FF00; }
 .bg-aleph-orange { background-color: #FF8000; }
+
+/* Additional utility classes for buttons and components */
+.btn-aleph-blue {
+  @apply bg-aleph-blue text-white hover:bg-blue-500 transition-colors;
+}
+
+.btn-aleph-magenta {
+  @apply bg-aleph-magenta text-white hover:bg-pink-600 transition-colors;
+}
+
+.btn-aleph-green {
+  @apply bg-aleph-green text-gray-800 hover:bg-lime-400 transition-colors;
+}
+
+.btn-aleph-orange {
+  @apply bg-aleph-orange text-white hover:bg-orange-500 transition-colors;
+}
+
+/* Toolbar and header styles */
+.header-aleph {
+  @apply bg-gradient-to-r from-aleph-blue to-aleph-magenta text-white shadow-md;
+}
+
+.toolbar-aleph {
+  @apply bg-white border-b border-aleph-blue/20 shadow-sm;
+}
+
+/* Focus and active states */
+.ring-aleph-blue {
+  @apply focus:ring-2 focus:ring-aleph-blue focus:ring-opacity-50;
+}
+
+.ring-aleph-magenta {
+  @apply focus:ring-2 focus:ring-aleph-magenta focus:ring-opacity-50;
+}

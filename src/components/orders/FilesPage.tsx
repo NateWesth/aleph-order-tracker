@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import { File, Download, Printer, Search } from "lucide-react";
+import { File, Download, Printer, Search, Plus } from "lucide-react";
 
 // Define the order file interface
 interface OrderFile {
@@ -61,22 +61,22 @@ export default function FilesPage({ isAdmin }: FilesPageProps) {
   return (
     <div className="container mx-auto p-4">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-        <h1 className="text-2xl font-bold">Files Repository</h1>
+        <h1 className="text-2xl font-bold text-aleph-blue">Files Repository</h1>
         
         <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
           <div className="relative flex-grow">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-aleph-blue" />
             <input
               type="text"
               placeholder="Search files..."
-              className="pl-10 pr-4 py-2 border rounded-md w-full"
+              className="pl-10 pr-4 py-2 border rounded-md w-full focus:ring-2 focus:ring-aleph-blue focus:border-aleph-blue"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
           
           <select
-            className="border rounded-md px-3 py-2"
+            className="border rounded-md px-3 py-2 focus:ring-2 focus:ring-aleph-blue focus:border-aleph-blue"
             value={filterType || ''}
             onChange={(e) => setFilterType(e.target.value || null)}
           >
@@ -90,15 +90,24 @@ export default function FilesPage({ isAdmin }: FilesPageProps) {
         </div>
       </div>
 
+      {isAdmin && (
+        <div className="mb-6">
+          <Button className="flex items-center gap-2">
+            <Plus size={18} />
+            <span>Upload File</span>
+          </Button>
+        </div>
+      )}
+
       {/* Files Grid */}
       <div className="bg-white rounded-lg shadow">
-        <div className="p-4 border-b">
-          <h2 className="text-lg font-semibold">All Files</h2>
+        <div className="p-4 border-b border-aleph-blue/10">
+          <h2 className="text-lg font-semibold text-aleph-blue">All Files</h2>
         </div>
 
         {filteredFiles.length === 0 ? (
           <div className="p-8 text-center">
-            <File className="h-12 w-12 mx-auto text-gray-300" />
+            <File className="h-12 w-12 mx-auto text-aleph-blue opacity-30" />
             <p className="mt-2 text-gray-500">No files found</p>
             {(searchTerm || filterType) && (
               <Button 
@@ -115,9 +124,9 @@ export default function FilesPage({ isAdmin }: FilesPageProps) {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
             {filteredFiles.map((file) => (
-              <div key={file.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+              <div key={file.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow border-aleph-blue/10">
                 <div className="flex items-start">
-                  <File className="h-10 w-10 text-blue-500 mr-3 flex-shrink-0" />
+                  <File className="h-10 w-10 text-aleph-blue mr-3 flex-shrink-0" />
                   <div className="flex-grow min-w-0">
                     <h3 className="font-medium truncate" title={file.name}>{file.name}</h3>
                     <p className="text-sm text-gray-600">
@@ -137,7 +146,7 @@ export default function FilesPage({ isAdmin }: FilesPageProps) {
                   <Button 
                     variant="outline" 
                     size="sm" 
-                    className="flex items-center space-x-1"
+                    className="flex items-center space-x-1 border-aleph-blue text-aleph-blue hover:bg-aleph-blue/10"
                     onClick={() => handleFileAction(file, 'download')}
                   >
                     <Download className="h-4 w-4" />
@@ -146,7 +155,7 @@ export default function FilesPage({ isAdmin }: FilesPageProps) {
                   <Button 
                     variant="outline" 
                     size="sm" 
-                    className="flex items-center space-x-1"
+                    className="flex items-center space-x-1 border-aleph-magenta text-aleph-magenta hover:bg-aleph-magenta/10"
                     onClick={() => handleFileAction(file, 'print')}
                   >
                     <Printer className="h-4 w-4" />

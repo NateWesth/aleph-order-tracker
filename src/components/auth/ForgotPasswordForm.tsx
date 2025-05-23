@@ -88,13 +88,13 @@ const ForgotPasswordForm = ({ onSuccess }: ForgotPasswordFormProps) => {
                 >
                   <FormItem className="flex items-center space-x-2">
                     <FormControl>
-                      <RadioGroupItem value="client" />
+                      <RadioGroupItem value="client" className="text-aleph-blue border-aleph-blue" />
                     </FormControl>
                     <FormLabel className="font-normal cursor-pointer">Client</FormLabel>
                   </FormItem>
                   <FormItem className="flex items-center space-x-2">
                     <FormControl>
-                      <RadioGroupItem value="admin" />
+                      <RadioGroupItem value="admin" className="text-aleph-magenta border-aleph-magenta" />
                     </FormControl>
                     <FormLabel className="font-normal cursor-pointer">Admin</FormLabel>
                   </FormItem>
@@ -112,8 +112,8 @@ const ForgotPasswordForm = ({ onSuccess }: ForgotPasswordFormProps) => {
             <FormItem>
               <FormLabel>Email</FormLabel>
               <FormControl>
-                <div className="flex items-center border rounded-md focus-within:ring-2 focus-within:ring-ring focus-within:border-input">
-                  <Mail className="w-4 h-4 ml-3 text-gray-500" />
+                <div className="flex items-center border rounded-md focus-within:ring-2 focus-within:ring-aleph-blue focus-within:border-aleph-blue">
+                  <Mail className="w-4 h-4 ml-3 text-aleph-blue" />
                   <Input placeholder="your@email.com" className="border-0 focus-visible:ring-0" {...field} />
                 </div>
               </FormControl>
@@ -122,7 +122,7 @@ const ForgotPasswordForm = ({ onSuccess }: ForgotPasswordFormProps) => {
           )}
         />
         
-        <Button type="submit" className="w-full bg-company-blue hover:bg-company-darkblue" disabled={isLoading}>
+        <Button type="submit" className="w-full" disabled={isLoading}>
           {isLoading ? "Sending..." : "Send Reset Link"}
         </Button>
       </form>
