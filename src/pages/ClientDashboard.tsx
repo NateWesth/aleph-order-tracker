@@ -13,6 +13,11 @@ import {
   SidebarFooter
 } from "@/components/ui/sidebar";
 import { Home, FileText, ListOrdered, BarChart2, Settings, Files } from "lucide-react";
+import OrdersPage from "@/components/orders/OrdersPage";
+import ProgressPage from "@/components/orders/ProgressPage";
+import ProcessingPage from "@/components/orders/ProcessingPage";
+import CompletedPage from "@/components/orders/CompletedPage";
+import FilesPage from "@/components/orders/FilesPage";
 
 const ClientDashboard = () => {
   const navigate = useNavigate();
@@ -156,7 +161,7 @@ const ClientDashboard = () => {
                 <div 
                   className="absolute inset-0 opacity-5 bg-no-repeat bg-center"
                   style={{
-                    backgroundImage: 'url("/favicon.ico")',
+                    backgroundImage: 'url("/lovable-uploads/favicon.png")',
                     backgroundSize: '50%',
                     zIndex: 0
                   }}
@@ -166,45 +171,25 @@ const ClientDashboard = () => {
                   <p className="text-xl text-gray-600">Thank you for choosing Aleph Engineering and Supplies</p>
                 </div>
               </div>
+            ) : activeView === "orders" ? (
+              <OrdersPage isAdmin={false} />
+            ) : activeView === "progress" ? (
+              <ProgressPage isAdmin={false} />
+            ) : activeView === "processing" ? (
+              <ProcessingPage isAdmin={false} />
+            ) : activeView === "invoicing" ? (
+              <div className="text-center p-8">
+                <h2 className="text-2xl font-bold mb-4">Invoicing</h2>
+                <p>Invoicing functionality will be implemented here.</p>
+              </div>
+            ) : activeView === "completed" ? (
+              <CompletedPage isAdmin={false} />
+            ) : activeView === "files" ? (
+              <FilesPage isAdmin={false} />
             ) : (
-              <div className="max-w-6xl mx-auto">
-                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                  <div className="bg-white p-6 rounded-lg shadow-md">
-                    <h2 className="text-xl font-semibold mb-4">My Projects</h2>
-                    <p className="text-gray-600 mb-4">View and manage your active projects</p>
-                    <Button className="w-full bg-company-blue hover:bg-company-darkblue">View Projects</Button>
-                  </div>
-                  
-                  <div className="bg-white p-6 rounded-lg shadow-md">
-                    <h2 className="text-xl font-semibold mb-4">Support Tickets</h2>
-                    <p className="text-gray-600 mb-4">Check the status of your support requests</p>
-                    <Button className="w-full bg-company-blue hover:bg-company-darkblue">View Tickets</Button>
-                  </div>
-                  
-                  <div className="bg-white p-6 rounded-lg shadow-md">
-                    <h2 className="text-xl font-semibold mb-4">My Account</h2>
-                    <p className="text-gray-600 mb-4">Update your profile and preferences</p>
-                    <Button className="w-full bg-company-blue hover:bg-company-darkblue">Account Settings</Button>
-                  </div>
-                </div>
-                
-                <div className="mt-8 bg-white p-6 rounded-lg shadow-md">
-                  <h2 className="text-xl font-semibold mb-4">Recent Activity</h2>
-                  <div className="space-y-4">
-                    <div className="pb-4 border-b">
-                      <p className="font-medium">Project proposal approved</p>
-                      <p className="text-sm text-gray-500">Yesterday, 2:30 PM</p>
-                    </div>
-                    <div className="pb-4 border-b">
-                      <p className="font-medium">Support ticket #1234 updated</p>
-                      <p className="text-sm text-gray-500">May 19, 10:15 AM</p>
-                    </div>
-                    <div className="pb-4 border-b">
-                      <p className="font-medium">New message from support team</p>
-                      <p className="text-sm text-gray-500">May 18, 9:45 AM</p>
-                    </div>
-                  </div>
-                </div>
+              <div className="text-center p-8">
+                <h2 className="text-2xl font-bold mb-4">Page Not Found</h2>
+                <p>The requested page could not be found.</p>
               </div>
             )}
           </main>
