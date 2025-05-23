@@ -112,7 +112,7 @@ const ForgotPasswordForm = ({ onSuccess }: ForgotPasswordFormProps) => {
             <FormItem>
               <FormLabel>Email</FormLabel>
               <FormControl>
-                <div className="flex items-center border rounded-md focus-within:ring-2 focus-within:ring-aleph-blue focus-within:border-aleph-blue">
+                <div className="flex items-center border rounded-md focus-within:ring-2 focus-within:ring-aleph-blue">
                   <Mail className="w-4 h-4 ml-3 text-aleph-blue" />
                   <Input placeholder="your@email.com" className="border-0 focus-visible:ring-0" {...field} />
                 </div>
