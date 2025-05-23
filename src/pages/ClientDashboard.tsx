@@ -130,7 +130,7 @@ const ClientDashboard = () => {
           <header className="bg-white shadow-sm p-4">
             <div className="max-w-7xl mx-auto flex justify-between items-center">
               <div className="flex items-center">
-                <h1 className="text-2xl font-bold text-company-blue">Aleph Engineering and Supplies</h1>
+                <h1 className="text-2xl font-bold text-aleph-blue">Aleph Engineering and Supplies</h1>
               </div>
               <div className="flex items-center gap-4">
                 <Button 
@@ -145,7 +145,7 @@ const ClientDashboard = () => {
                 <Button 
                   variant="outline" 
                   onClick={handleLogout}
-                  className="border-company-blue text-company-blue hover:bg-company-blue hover:text-white"
+                  className="border-aleph-blue text-aleph-blue hover:bg-aleph-blue hover:text-white"
                 >
                   Logout
                 </Button>
@@ -161,13 +161,13 @@ const ClientDashboard = () => {
                 <div 
                   className="absolute inset-0 opacity-5 bg-no-repeat bg-center"
                   style={{
-                    backgroundImage: 'url("/lovable-uploads/favicon.png")',
+                    backgroundImage: 'url("/lovable-uploads/e1088147-889e-43f6-bdf0-271189b88913.png")',
                     backgroundSize: '50%',
                     zIndex: 0
                   }}
                 ></div>
                 <div className="text-center relative z-10">
-                  <h1 className="text-4xl md:text-6xl font-bold text-company-blue mb-4">Welcome, {clientName}</h1>
+                  <h1 className="text-4xl md:text-6xl font-bold text-aleph-blue mb-4">Welcome, {clientName}</h1>
                   <p className="text-xl text-gray-600">Thank you for choosing Aleph Engineering and Supplies</p>
                 </div>
               </div>

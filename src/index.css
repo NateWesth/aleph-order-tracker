@@ -14,16 +14,17 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
 
-    --primary: 217 91.2% 59.8%;
+    /* Updated colors based on the Aleph logo */
+    --primary: 195 100% 50%;
     --primary-foreground: 210 40% 98%;
 
-    --secondary: 210 40% 96.1%;
+    --secondary: 285 100% 50%;
     --secondary-foreground: 222.2 47.4% 11.2%;
 
     --muted: 210 40% 96.1%;
     --muted-foreground: 215.4 16.3% 46.9%;
 
-    --accent: 210 40% 96.1%;
+    --accent: 120 100% 50%;
     --accent-foreground: 222.2 47.4% 11.2%;
 
     --destructive: 0 84.2% 60.2%;
@@ -55,16 +56,17 @@
     --popover: 222.2 84% 4.9%;
     --popover-foreground: 210 40% 98%;
 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    /* Updated colors for dark mode based on the Aleph logo */
+    --primary: 195 100% 50%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 217.2 32.6% 17.5%;
+    --secondary: 285 100% 50%;
     --secondary-foreground: 210 40% 98%;
 
     --muted: 217.2 32.6% 17.5%;
     --muted-foreground: 215 20.2% 65.1%;
 
-    --accent: 217.2 32.6% 17.5%;
+    --accent: 120 100% 50%;
     --accent-foreground: 210 40% 98%;
 
     --destructive: 0 62.8% 30.6%;
@@ -95,8 +97,9 @@
   }
 }
 
+/* Updated gradient to match the Aleph logo colors */
 .hero-gradient {
-  background: linear-gradient(to right, #0EA5E9, #3B82F6);
+  background: linear-gradient(to right, #00C8FF, #FF00C8, #C8FF00, #FF8000);
 }
 
 .animate-in {
@@ -112,3 +115,14 @@
 .fade-in-delay-2 { animation-delay: 0.2s; opacity: 0; }
 .fade-in-delay-3 { animation-delay: 0.3s; opacity: 0; }
 .fade-in-delay-4 { animation-delay: 0.4s; opacity: 0; }
+
+/* Add custom color classes based on the Aleph logo */
+.text-aleph-blue { color: #00C8FF; }
+.text-aleph-magenta { color: #FF00C8; }
+.text-aleph-green { color: #C8FF00; }
+.text-aleph-orange { color: #FF8000; }
+
+.bg-aleph-blue { background-color: #00C8FF; }
+.bg-aleph-magenta { background-color: #FF00C8; }
+.bg-aleph-green { background-color: #C8FF00; }
+.bg-aleph-orange { background-color: #FF8000; }

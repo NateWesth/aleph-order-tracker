@@ -64,11 +64,19 @@ export default {
 					ring: 'hsl(var(--sidebar-ring))'
 				},
 				company: {
-					blue: '#0EA5E9',
-					darkblue: '#0C4A6E',
+					blue: '#00C8FF',
+					darkblue: '#0067A5',
 					gray: '#64748B',
 					lightgray: '#F1F5F9',
-					accent: '#3B82F6'
+					accent: '#C8FF00',
+					magenta: '#FF00C8',
+					orange: '#FF8000',
+				},
+				aleph: {
+					blue: '#00C8FF',
+					magenta: '#FF00C8',
+					green: '#C8FF00',
+					orange: '#FF8000',
 				}
 			},
 			borderRadius: {
