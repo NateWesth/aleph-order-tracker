@@ -10,6 +10,7 @@ import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import ClientDashboard from "./pages/ClientDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
+import Settings from "./pages/Settings";
 
 function App() {
   // Create a client
@@ -27,6 +28,7 @@ function App() {
               <Route path="/home" element={<Index />} />
               <Route path="/client-dashboard" element={<ClientDashboard />} />
               <Route path="/admin-dashboard" element={<AdminDashboard />} />
+              <Route path="/settings" element={<Settings />} />
               <Route path="/" element={<Navigate to="/auth" replace />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />

@@ -1,4 +1,3 @@
-
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -137,7 +136,7 @@ const ClientDashboard = () => {
                   variant="ghost" 
                   size="icon" 
                   className="rounded-full"
-                  onClick={() => navigate("/account-settings")}
+                  onClick={() => navigate("/settings")}
                 >
                   <Settings className="h-5 w-5" />
                   <span className="sr-only">Account settings</span>
