@@ -97,7 +97,7 @@
   }
 
   h1, h2, h3, h4, h5, h6 {
-    @apply text-red-600 font-bold;
+    @apply text-aleph-blue font-bold;
   }
 
   h1 {
