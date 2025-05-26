@@ -36,6 +36,8 @@ interface Order {
   dueDate: Date;
   items: OrderItem[];
   status: 'pending' | 'received' | 'in-progress' | 'processing' | 'completed';
+  reference?: string;
+  attention?: string;
 }
 
 // Mock orders data
@@ -43,13 +45,15 @@ const mockOrders: Order[] = [
   {
     id: "1",
     orderNumber: "ORD-2024-001",
-    companyName: "ABC Construction",
+    companyName: "Pro Process",
     orderDate: new Date(2024, 0, 15),
     dueDate: new Date(2024, 1, 15),
     status: "in-progress",
+    reference: "MATTHEW",
+    attention: "Stores",
     items: [
-      { id: "1", name: "Steel Beams", quantity: 10, description: "Heavy duty steel beams for construction" },
-      { id: "2", name: "Concrete Mix", quantity: 50, description: "Premium concrete mix bags" },
+      { id: "1", name: "BOSCH Angle grinder (ZAPPPAAG005)", quantity: 2, description: "Professional angle grinder" },
+      { id: "2", name: "Safety Equipment Set", quantity: 1, description: "Complete safety gear package" },
     ]
   },
   {
@@ -59,6 +63,8 @@ const mockOrders: Order[] = [
     orderDate: new Date(2024, 0, 20),
     dueDate: new Date(2024, 1, 20),
     status: "processing",
+    reference: "JOHN",
+    attention: "Warehouse",
     items: [
       { id: "3", name: "Welding Equipment", quantity: 3, description: "Professional welding equipment set" },
       { id: "4", name: "Safety Helmets", quantity: 25, description: "Industrial safety helmets" },
@@ -75,12 +81,8 @@ export default function DeliveryNotePage() {
 
   // Generate delivery note number
   const generateDeliveryNoteNumber = () => {
-    const date = new Date();
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-    return `DN-${year}${month}${day}-${random}`;
+    const random = Math.floor(Math.random() * 100000).toString().padStart(6, '0');
+    return random;
   };
 
   // Create delivery note
@@ -140,7 +142,7 @@ export default function DeliveryNotePage() {
     });
   };
 
-  // Generate HTML for delivery note
+  // Generate HTML for delivery note matching the reference format
   const generateDeliveryNoteHTML = () => {
     if (!selectedOrder) return '';
     
@@ -151,63 +153,190 @@ export default function DeliveryNotePage() {
       <!DOCTYPE html>
       <html>
         <head>
-          <title>Delivery Note - ${deliveryNoteNumber}</title>
+          <title>Delivery Note ${deliveryNoteNumber}</title>
           <style>
-            body { font-family: Arial, sans-serif; margin: 20px; }
-            .header { text-align: center; margin-bottom: 30px; }
-            .company-name { font-size: 24px; font-weight: bold; color: #1e40af; }
-            .document-title { font-size: 20px; margin: 20px 0; }
-            .info-section { margin: 20px 0; }
-            .info-row { display: flex; justify-content: space-between; margin: 10px 0; }
-            .info-label { font-weight: bold; }
-            table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-            th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
-            th { background-color: #f5f5f5; font-weight: bold; }
-            .footer { margin-top: 40px; text-align: center; color: #666; }
+            body { 
+              font-family: Arial, sans-serif; 
+              margin: 20px; 
+              background: white;
+            }
+            .header { 
+              display: flex;
+              justify-content: space-between;
+              align-items: flex-start;
+              margin-bottom: 30px; 
+            }
+            .logo-section {
+              flex: 1;
+            }
+            .company-name { 
+              font-size: 24px; 
+              font-weight: bold; 
+              color: #1e40af; 
+              margin-bottom: 5px;
+            }
+            .company-tagline {
+              font-size: 12px;
+              color: #666;
+              margin-bottom: 10px;
+            }
+            .contact-info {
+              font-size: 10px;
+              line-height: 1.3;
+            }
+            .delivery-note-title { 
+              font-size: 16px; 
+              font-weight: bold;
+              text-align: center;
+              border: 2px solid black;
+              padding: 8px;
+              margin: 20px 0;
+            }
+            .info-section { 
+              margin: 20px 0; 
+            }
+            .info-row { 
+              display: flex; 
+              margin: 8px 0; 
+            }
+            .info-label { 
+              font-weight: bold; 
+              width: 120px;
+              text-decoration: underline;
+            }
+            .info-value {
+              flex: 1;
+            }
+            .delivery-section {
+              margin: 20px 0;
+            }
+            .date-section {
+              text-align: right;
+              margin: 20px 0;
+            }
+            table { 
+              width: 100%; 
+              border-collapse: collapse; 
+              margin: 20px 0; 
+            }
+            th, td { 
+              border: 1px solid black; 
+              padding: 8px; 
+              text-align: left; 
+            }
+            th { 
+              background-color: #f5f5f5; 
+              font-weight: bold; 
+              text-align: center;
+            }
+            .description-col {
+              width: 60%;
+            }
+            .qty-col {
+              width: 13%;
+              text-align: center;
+            }
+            .comments-section {
+              margin-top: 20px;
+            }
+            .signature-section {
+              margin-top: 30px;
+            }
+            .signature-line {
+              border-bottom: 1px solid black;
+              width: 300px;
+              height: 30px;
+              margin-top: 10px;
+            }
           </style>
         </head>
         <body>
           <div class="header">
-            <div class="company-name">Aleph Engineering and Supplies</div>
-            <div class="document-title">DELIVERY NOTE</div>
+            <div class="logo-section">
+              <div class="company-name">Aleph</div>
+              <div class="company-tagline">ENGINEERING & SUPPLIES</div>
+              <div class="contact-info">
+                Unit F<br>
+                4 Skew Road<br>
+                Anderbolt<br>
+                Boksburg<br>
+                needs@alepheng.co.za<br>
+                072 887 6908
+              </div>
+            </div>
           </div>
+          
+          <div class="delivery-note-title">Delivery Note ${deliveryNoteNumber}</div>
           
           <div class="info-section">
             <div class="info-row">
-              <span><span class="info-label">Delivery Note Number:</span> ${deliveryNoteNumber}</span>
-              <span><span class="info-label">Date:</span> ${deliveryDate}</span>
+              <span class="info-label">Delivery To:</span>
+              <span class="info-value">${selectedOrder.companyName}</span>
             </div>
             <div class="info-row">
-              <span><span class="info-label">Order Number:</span> ${selectedOrder.orderNumber}</span>
-              <span><span class="info-label">Order Date:</span> ${format(selectedOrder.orderDate, 'dd/MM/yyyy')}</span>
+              <span class="info-label">Reference No:</span>
+              <span class="info-value">${selectedOrder.reference || 'N/A'}</span>
             </div>
             <div class="info-row">
-              <span><span class="info-label">Customer:</span> ${selectedOrder.companyName}</span>
+              <span class="info-label">Att:</span>
+              <span class="info-value">${selectedOrder.attention || 'N/A'}</span>
+            </div>
+          </div>
+
+          <div class="delivery-section">
+            <div class="info-row">
+              <span class="info-label">Delivery of the following:</span>
+            </div>
+          </div>
+
+          <div class="date-section">
+            <div class="info-row">
+              <span style="margin-left: auto;"><span class="info-label">Date:</span> ${deliveryDate}</span>
             </div>
           </div>
           
           <table>
             <thead>
               <tr>
-                <th>Item</th>
-                <th>Description</th>
-                <th>Quantity</th>
+                <th class="description-col">Description</th>
+                <th class="qty-col">QTY Ordered</th>
+                <th class="qty-col">QTY Delivered</th>
+                <th class="qty-col">Balance</th>
               </tr>
             </thead>
             <tbody>
               ${selectedOrder.items.map(item => `
                 <tr>
                   <td>${item.name}</td>
-                  <td>${item.description || 'N/A'}</td>
-                  <td>${item.quantity}</td>
+                  <td style="text-align: center;">${item.quantity}</td>
+                  <td style="text-align: center;"></td>
+                  <td style="text-align: center;"></td>
+                </tr>
+              `).join('')}
+              ${Array.from({length: Math.max(0, 10 - selectedOrder.items.length)}, () => `
+                <tr>
+                  <td>&nbsp;</td>
+                  <td>&nbsp;</td>
+                  <td>&nbsp;</td>
+                  <td>&nbsp;</td>
                 </tr>
               `).join('')}
             </tbody>
           </table>
           
-          <div class="footer">
-            <p>This document was automatically generated by Aleph Engineering and Supplies system.</p>
-            <p>Generated on ${format(new Date(), 'dd/MM/yyyy HH:mm')}</p>
+          <div class="comments-section">
+            <div class="info-label">COMMENTS:</div>
+            <div class="info-row">
+              <span class="info-label">Date:</span>
+              <div class="signature-line"></div>
+            </div>
+          </div>
+
+          <div class="signature-section">
+            <div class="info-row">
+              <span class="info-label">Signature:</span>
+              <div class="signature-line"></div>
+            </div>
           </div>
         </body>
       </html>
@@ -298,55 +427,100 @@ export default function DeliveryNotePage() {
               <DialogTitle>Delivery Note Preview - {selectedOrder.orderNumber}</DialogTitle>
             </DialogHeader>
             
-            <div className="space-y-6">
-              <div className="text-center border-b pb-4">
-                <h2 className="text-2xl font-bold text-aleph-blue">Aleph Engineering and Supplies</h2>
-                <h3 className="text-xl font-semibold mt-2">DELIVERY NOTE</h3>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-6 p-4 bg-white border">
+              {/* Header section matching reference */}
+              <div className="flex justify-between items-start">
                 <div>
-                  <p className="text-sm text-gray-500">Delivery Note Number</p>
-                  <p className="font-medium">{generateDeliveryNoteNumber()}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500">Date</p>
-                  <p className="font-medium">{format(new Date(), 'dd/MM/yyyy')}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500">Order Number</p>
-                  <p className="font-medium">{selectedOrder.orderNumber}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500">Order Date</p>
-                  <p className="font-medium">{format(selectedOrder.orderDate, 'dd/MM/yyyy')}</p>
-                </div>
-                <div className="col-span-2">
-                  <p className="text-sm text-gray-500">Customer</p>
-                  <p className="font-medium">{selectedOrder.companyName}</p>
+                  <h2 className="text-2xl font-bold text-aleph-blue">Aleph</h2>
+                  <p className="text-sm text-gray-600 font-medium">ENGINEERING & SUPPLIES</p>
+                  <div className="text-xs mt-2 leading-tight">
+                    <div>Unit F</div>
+                    <div>4 Skew Road</div>
+                    <div>Anderbolt</div>
+                    <div>Boksburg</div>
+                    <div className="text-blue-600">needs@alepheng.co.za</div>
+                    <div>072 887 6908</div>
+                  </div>
                 </div>
               </div>
               
-              <div>
-                <h4 className="font-medium mb-3">Items Delivered</h4>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Item</TableHead>
-                      <TableHead>Description</TableHead>
-                      <TableHead>Quantity</TableHead>
+              {/* Delivery Note Title */}
+              <div className="text-center border-2 border-black p-2">
+                <h3 className="text-lg font-bold">Delivery Note {generateDeliveryNoteNumber()}</h3>
+              </div>
+              
+              {/* Order Information */}
+              <div className="space-y-2">
+                <div className="flex">
+                  <span className="font-bold underline w-32">Delivery To:</span>
+                  <span>{selectedOrder.companyName}</span>
+                </div>
+                <div className="flex">
+                  <span className="font-bold underline w-32">Reference No:</span>
+                  <span>{selectedOrder.reference || 'N/A'}</span>
+                </div>
+                <div className="flex">
+                  <span className="font-bold underline w-32">Att:</span>
+                  <span>{selectedOrder.attention || 'N/A'}</span>
+                </div>
+              </div>
+
+              <div className="flex">
+                <span className="font-bold underline">Delivery of the following:</span>
+              </div>
+
+              <div className="flex justify-end">
+                <div className="flex">
+                  <span className="font-bold underline">Date:</span>
+                  <span className="ml-2">{format(new Date(), 'dd/MM/yyyy')}</span>
+                </div>
+              </div>
+              
+              {/* Items Table */}
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="border border-black text-center font-bold">Description</TableHead>
+                    <TableHead className="border border-black text-center font-bold w-24">QTY Ordered</TableHead>
+                    <TableHead className="border border-black text-center font-bold w-24">QTY Delivered</TableHead>
+                    <TableHead className="border border-black text-center font-bold w-24">Balance</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {selectedOrder.items.map((item) => (
+                    <TableRow key={item.id}>
+                      <TableCell className="border border-black">{item.name}</TableCell>
+                      <TableCell className="border border-black text-center">{item.quantity}</TableCell>
+                      <TableCell className="border border-black text-center"></TableCell>
+                      <TableCell className="border border-black text-center"></TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {selectedOrder.items.map((item) => (
-                      <TableRow key={item.id}>
-                        <TableCell className="font-medium">{item.name}</TableCell>
-                        <TableCell>{item.description || 'N/A'}</TableCell>
-                        <TableCell>{item.quantity}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                  ))}
+                  {/* Add empty rows to match reference format */}
+                  {Array.from({length: Math.max(0, 8 - selectedOrder.items.length)}, (_, index) => (
+                    <TableRow key={`empty-${index}`}>
+                      <TableCell className="border border-black">&nbsp;</TableCell>
+                      <TableCell className="border border-black">&nbsp;</TableCell>
+                      <TableCell className="border border-black">&nbsp;</TableCell>
+                      <TableCell className="border border-black">&nbsp;</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+
+              {/* Comments and Signature sections */}
+              <div className="space-y-4">
+                <div>
+                  <div className="font-bold underline mb-2">COMMENTS:</div>
+                  <div className="flex items-center">
+                    <span className="font-bold underline mr-4">Date:</span>
+                    <div className="border-b border-black w-64 h-6"></div>
+                  </div>
+                </div>
+                
+                <div className="flex items-center">
+                  <span className="font-bold underline mr-4">Signature:</span>
+                  <div className="border-b border-black w-64 h-8"></div>
+                </div>
               </div>
 
               <div className="flex justify-end space-x-4 pt-4 border-t">
