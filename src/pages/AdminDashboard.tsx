@@ -1,3 +1,4 @@
+
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -11,13 +12,14 @@ import {
   SidebarMenuButton,
   SidebarFooter
 } from "@/components/ui/sidebar";
-import { Home, FileText, ListOrdered, BarChart2, Settings, Files, Building2, Users } from "lucide-react";
+import { Home, FileText, ListOrdered, BarChart2, Settings, Files, Building2, Users, Truck } from "lucide-react";
 import OrdersPage from "@/components/orders/OrdersPage";
 import ProgressPage from "@/components/orders/ProgressPage";
 import ProcessingPage from "@/components/orders/ProcessingPage";
 import CompletedPage from "@/components/orders/CompletedPage";
 import FilesPage from "@/components/orders/FilesPage";
 import ClientCompaniesPage from "@/components/admin/ClientCompaniesPage";
+import DeliveryNotePage from "@/components/admin/DeliveryNotePage";
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -92,6 +94,16 @@ const AdminDashboard = () => {
                 >
                   <FileText />
                   <span>Invoicing</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton 
+                  tooltip="Delivery Notes"
+                  onClick={() => handleMenuClick("delivery-notes")}
+                  className={activeView === "delivery-notes" ? "bg-slate-200" : ""}
+                >
+                  <Truck />
+                  <span>Delivery Notes</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
@@ -200,6 +212,8 @@ const AdminDashboard = () => {
                 <h2 className="text-2xl font-bold mb-4">Invoicing</h2>
                 <p>Invoicing functionality will be implemented here.</p>
               </div>
+            ) : activeView === "delivery-notes" ? (
+              <DeliveryNotePage />
             ) : activeView === "completed" ? (
               <CompletedPage isAdmin={true} />
             ) : activeView === "files" ? (
