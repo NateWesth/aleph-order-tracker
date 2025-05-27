@@ -41,16 +41,16 @@ const AdminDashboard = () => {
   
   return (
     <SidebarProvider>
-      <div className="min-h-screen w-full flex bg-slate-50">
+      <div className="min-h-screen w-full flex bg-slate-50 dark:bg-gray-900">
         {/* Sidebar */}
-        <Sidebar>
+        <Sidebar className="dark:bg-gray-800">
           <SidebarContent>
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton 
                   tooltip="Home" 
                   onClick={() => handleMenuClick("home")}
-                  className={activeView === "home" ? "bg-slate-200" : ""}
+                  className={`sidebar-hover ${activeView === "home" ? "sidebar-active" : ""}`}
                 >
                   <Home />
                   <span>Home</span>
@@ -60,7 +60,7 @@ const AdminDashboard = () => {
                 <SidebarMenuButton 
                   tooltip="Orders"
                   onClick={() => handleMenuClick("orders")}
-                  className={activeView === "orders" ? "bg-slate-200" : ""}
+                  className={`sidebar-hover ${activeView === "orders" ? "sidebar-active" : ""}`}
                 >
                   <ListOrdered />
                   <span>Orders</span>
@@ -70,7 +70,7 @@ const AdminDashboard = () => {
                 <SidebarMenuButton 
                   tooltip="Progress"
                   onClick={() => handleMenuClick("progress")}
-                  className={activeView === "progress" ? "bg-slate-200" : ""}
+                  className={`sidebar-hover ${activeView === "progress" ? "sidebar-active" : ""}`}
                 >
                   <BarChart2 />
                   <span>Progress</span>
@@ -80,7 +80,7 @@ const AdminDashboard = () => {
                 <SidebarMenuButton 
                   tooltip="Processing"
                   onClick={() => handleMenuClick("processing")}
-                  className={activeView === "processing" ? "bg-slate-200" : ""}
+                  className={`sidebar-hover ${activeView === "processing" ? "sidebar-active" : ""}`}
                 >
                   <FileText />
                   <span>Processing</span>
@@ -90,7 +90,7 @@ const AdminDashboard = () => {
                 <SidebarMenuButton 
                   tooltip="Invoicing"
                   onClick={() => handleMenuClick("invoicing")}
-                  className={activeView === "invoicing" ? "bg-slate-200" : ""}
+                  className={`sidebar-hover ${activeView === "invoicing" ? "sidebar-active" : ""}`}
                 >
                   <FileText />
                   <span>Invoicing</span>
@@ -100,7 +100,7 @@ const AdminDashboard = () => {
                 <SidebarMenuButton 
                   tooltip="Delivery Notes"
                   onClick={() => handleMenuClick("delivery-notes")}
-                  className={activeView === "delivery-notes" ? "bg-slate-200" : ""}
+                  className={`sidebar-hover ${activeView === "delivery-notes" ? "sidebar-active" : ""}`}
                 >
                   <Truck />
                   <span>Delivery Notes</span>
@@ -110,7 +110,7 @@ const AdminDashboard = () => {
                 <SidebarMenuButton 
                   tooltip="Completed"
                   onClick={() => handleMenuClick("completed")}
-                  className={activeView === "completed" ? "bg-slate-200" : ""}
+                  className={`sidebar-hover ${activeView === "completed" ? "sidebar-active" : ""}`}
                 >
                   <FileText />
                   <span>Completed</span>
@@ -124,7 +124,7 @@ const AdminDashboard = () => {
                 <SidebarMenuButton 
                   tooltip="Files"
                   onClick={() => handleMenuClick("files")}
-                  className={activeView === "files" ? "bg-slate-200" : ""}
+                  className={`sidebar-hover ${activeView === "files" ? "sidebar-active" : ""}`}
                 >
                   <Files />
                   <span>Files</span>
@@ -134,7 +134,7 @@ const AdminDashboard = () => {
                 <SidebarMenuButton 
                   tooltip="Companies"
                   onClick={() => handleMenuClick("companies")}
-                  className={activeView === "companies" ? "bg-slate-200" : ""}
+                  className={`sidebar-hover ${activeView === "companies" ? "sidebar-active" : ""}`}
                 >
                   <Building2 />
                   <span>Companies</span>
@@ -144,7 +144,7 @@ const AdminDashboard = () => {
                 <SidebarMenuButton 
                   tooltip="Users"
                   onClick={() => handleMenuClick("users")}
-                  className={activeView === "users" ? "bg-slate-200" : ""}
+                  className={`sidebar-hover ${activeView === "users" ? "sidebar-active" : ""}`}
                 >
                   <Users />
                   <span>Users</span>
@@ -157,16 +157,16 @@ const AdminDashboard = () => {
         {/* Main content */}
         <div className="flex-1 flex flex-col">
           {/* Header */}
-          <header className="bg-white shadow-sm p-4">
+          <header className="bg-white dark:bg-gray-800 shadow-sm p-4">
             <div className="max-w-7xl mx-auto flex justify-between items-center">
               <div className="flex items-center">
-                <h1 className="text-2xl font-bold text-aleph-blue">Aleph Engineering and Supplies - Admin</h1>
+                <h1 className="text-2xl font-bold text-aleph-green">Aleph Engineering and Supplies - Admin</h1>
               </div>
               <div className="flex items-center gap-4">
                 <Button 
                   variant="ghost" 
                   size="icon" 
-                  className="rounded-full"
+                  className="rounded-full sidebar-hover"
                   onClick={() => navigate("/settings")}
                 >
                   <Settings className="h-5 w-5" />
@@ -175,7 +175,7 @@ const AdminDashboard = () => {
                 <Button 
                   variant="outline" 
                   onClick={handleLogout}
-                  className="border-aleph-blue text-aleph-blue hover:bg-aleph-blue hover:text-white"
+                  className="border-aleph-green text-aleph-green hover:bg-aleph-green hover:text-white dark:border-aleph-green dark:text-aleph-green"
                 >
                   Logout
                 </Button>
@@ -197,8 +197,8 @@ const AdminDashboard = () => {
                   }}
                 ></div>
                 <div className="text-center relative z-10">
-                  <h1 className="text-4xl md:text-6xl font-bold text-aleph-blue mb-4">Admin Dashboard</h1>
-                  <p className="text-xl text-gray-600">Welcome to Aleph Engineering and Supplies Admin Portal</p>
+                  <h1 className="text-4xl md:text-6xl font-bold text-aleph-green mb-4">Admin Dashboard</h1>
+                  <p className="text-xl text-gray-600 dark:text-gray-400">Welcome to Aleph Engineering and Supplies Admin Portal</p>
                 </div>
               </div>
             ) : activeView === "orders" ? (
@@ -209,8 +209,8 @@ const AdminDashboard = () => {
               <ProcessingPage isAdmin={true} />
             ) : activeView === "invoicing" ? (
               <div className="text-center p-8">
-                <h2 className="text-2xl font-bold mb-4">Invoicing</h2>
-                <p>Invoicing functionality will be implemented here.</p>
+                <h2 className="text-2xl font-bold mb-4 text-aleph-green">Invoicing</h2>
+                <p className="dark:text-gray-400">Invoicing functionality will be implemented here.</p>
               </div>
             ) : activeView === "delivery-notes" ? (
               <DeliveryNotePage />
@@ -222,13 +222,13 @@ const AdminDashboard = () => {
               <ClientCompaniesPage />
             ) : activeView === "users" ? (
               <div className="text-center p-8">
-                <h2 className="text-2xl font-bold mb-4">User Management</h2>
-                <p>User management functionality will be implemented here.</p>
+                <h2 className="text-2xl font-bold mb-4 text-aleph-green">User Management</h2>
+                <p className="dark:text-gray-400">User management functionality will be implemented here.</p>
               </div>
             ) : (
               <div className="text-center p-8">
-                <h2 className="text-2xl font-bold mb-4">Page Not Found</h2>
-                <p>The requested page could not be found.</p>
+                <h2 className="text-2xl font-bold mb-4 text-aleph-green">Page Not Found</h2>
+                <p className="dark:text-gray-400">The requested page could not be found.</p>
               </div>
             )}
           </main>

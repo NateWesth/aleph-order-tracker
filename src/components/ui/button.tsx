@@ -6,11 +6,11 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 btn-hover",
   {
     variants: {
       variant: {
-        default: "bg-aleph-blue text-primary-foreground hover:bg-blue-400",
+        default: "bg-aleph-green text-primary-foreground hover:bg-green-500",
         destructive:
           "bg-destructive text-destructive-foreground hover:bg-destructive/90",
         outline:
@@ -18,11 +18,11 @@ const buttonVariants = cva(
         secondary:
           "bg-aleph-magenta text-secondary-foreground hover:bg-aleph-magenta/80",
         accent: 
-          "bg-aleph-green text-gray-800 hover:bg-aleph-green/80",
+          "bg-aleph-accent text-white hover:bg-aleph-accent/80",
         warning:
           "bg-aleph-orange text-white hover:bg-aleph-orange/80",
         ghost: "hover:bg-accent hover:text-accent-foreground",
-        link: "text-aleph-blue underline-offset-4 hover:underline",
+        link: "text-aleph-green underline-offset-4 hover:underline",
       },
       size: {
         default: "h-10 px-4 py-2",

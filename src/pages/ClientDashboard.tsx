@@ -1,3 +1,4 @@
+
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -40,16 +41,16 @@ const ClientDashboard = () => {
   
   return (
     <SidebarProvider>
-      <div className="min-h-screen w-full flex bg-slate-50">
+      <div className="min-h-screen w-full flex bg-slate-50 dark:bg-gray-900">
         {/* Sidebar */}
-        <Sidebar>
+        <Sidebar className="dark:bg-gray-800">
           <SidebarContent>
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton 
                   tooltip="Home" 
                   onClick={() => handleMenuClick("home")}
-                  className={activeView === "home" ? "bg-slate-200" : ""}
+                  className={`sidebar-hover ${activeView === "home" ? "sidebar-active" : ""}`}
                 >
                   <Home />
                   <span>Home</span>
@@ -59,7 +60,7 @@ const ClientDashboard = () => {
                 <SidebarMenuButton 
                   tooltip="Orders"
                   onClick={() => handleMenuClick("orders")}
-                  className={activeView === "orders" ? "bg-slate-200" : ""}
+                  className={`sidebar-hover ${activeView === "orders" ? "sidebar-active" : ""}`}
                 >
                   <ListOrdered />
                   <span>Orders</span>
@@ -69,7 +70,7 @@ const ClientDashboard = () => {
                 <SidebarMenuButton 
                   tooltip="Progress"
                   onClick={() => handleMenuClick("progress")}
-                  className={activeView === "progress" ? "bg-slate-200" : ""}
+                  className={`sidebar-hover ${activeView === "progress" ? "sidebar-active" : ""}`}
                 >
                   <BarChart2 />
                   <span>Progress</span>
@@ -79,7 +80,7 @@ const ClientDashboard = () => {
                 <SidebarMenuButton 
                   tooltip="Processing"
                   onClick={() => handleMenuClick("processing")}
-                  className={activeView === "processing" ? "bg-slate-200" : ""}
+                  className={`sidebar-hover ${activeView === "processing" ? "sidebar-active" : ""}`}
                 >
                   <FileText />
                   <span>Processing</span>
@@ -89,7 +90,7 @@ const ClientDashboard = () => {
                 <SidebarMenuButton 
                   tooltip="Invoicing"
                   onClick={() => handleMenuClick("invoicing")}
-                  className={activeView === "invoicing" ? "bg-slate-200" : ""}
+                  className={`sidebar-hover ${activeView === "invoicing" ? "sidebar-active" : ""}`}
                 >
                   <FileText />
                   <span>Invoicing</span>
@@ -99,7 +100,7 @@ const ClientDashboard = () => {
                 <SidebarMenuButton 
                   tooltip="Completed"
                   onClick={() => handleMenuClick("completed")}
-                  className={activeView === "completed" ? "bg-slate-200" : ""}
+                  className={`sidebar-hover ${activeView === "completed" ? "sidebar-active" : ""}`}
                 >
                   <FileText />
                   <span>Completed</span>
@@ -113,7 +114,7 @@ const ClientDashboard = () => {
                 <SidebarMenuButton 
                   tooltip="Files"
                   onClick={() => handleMenuClick("files")}
-                  className={activeView === "files" ? "bg-slate-200" : ""}
+                  className={`sidebar-hover ${activeView === "files" ? "sidebar-active" : ""}`}
                 >
                   <Files />
                   <span>Files</span>
@@ -126,16 +127,16 @@ const ClientDashboard = () => {
         {/* Main content */}
         <div className="flex-1 flex flex-col">
           {/* Header */}
-          <header className="bg-white shadow-sm p-4">
+          <header className="bg-white dark:bg-gray-800 shadow-sm p-4">
             <div className="max-w-7xl mx-auto flex justify-between items-center">
               <div className="flex items-center">
-                <h1 className="text-2xl font-bold text-aleph-blue">Aleph Engineering and Supplies</h1>
+                <h1 className="text-2xl font-bold text-aleph-green">Aleph Engineering and Supplies</h1>
               </div>
               <div className="flex items-center gap-4">
                 <Button 
                   variant="ghost" 
                   size="icon" 
-                  className="rounded-full"
+                  className="rounded-full sidebar-hover"
                   onClick={() => navigate("/settings")}
                 >
                   <Settings className="h-5 w-5" />
@@ -144,7 +145,7 @@ const ClientDashboard = () => {
                 <Button 
                   variant="outline" 
                   onClick={handleLogout}
-                  className="border-aleph-blue text-aleph-blue hover:bg-aleph-blue hover:text-white"
+                  className="border-aleph-green text-aleph-green hover:bg-aleph-green hover:text-white dark:border-aleph-green dark:text-aleph-green"
                 >
                   Logout
                 </Button>
@@ -166,8 +167,8 @@ const ClientDashboard = () => {
                   }}
                 ></div>
                 <div className="text-center relative z-10">
-                  <h1 className="text-4xl md:text-6xl font-bold text-aleph-blue mb-4">Welcome, {clientName}</h1>
-                  <p className="text-xl text-gray-600">Thank you for choosing Aleph Engineering and Supplies</p>
+                  <h1 className="text-4xl md:text-6xl font-bold text-aleph-green mb-4">Welcome, {clientName}</h1>
+                  <p className="text-xl text-gray-600 dark:text-gray-400">Thank you for choosing Aleph Engineering and Supplies</p>
                 </div>
               </div>
             ) : activeView === "orders" ? (
@@ -178,8 +179,8 @@ const ClientDashboard = () => {
               <ProcessingPage isAdmin={false} />
             ) : activeView === "invoicing" ? (
               <div className="text-center p-8">
-                <h2 className="text-2xl font-bold mb-4">Invoicing</h2>
-                <p>Invoicing functionality will be implemented here.</p>
+                <h2 className="text-2xl font-bold mb-4 text-aleph-green">Invoicing</h2>
+                <p className="dark:text-gray-400">Invoicing functionality will be implemented here.</p>
               </div>
             ) : activeView === "completed" ? (
               <CompletedPage isAdmin={false} />
@@ -187,8 +188,8 @@ const ClientDashboard = () => {
               <FilesPage isAdmin={false} />
             ) : (
               <div className="text-center p-8">
-                <h2 className="text-2xl font-bold mb-4">Page Not Found</h2>
-                <p>The requested page could not be found.</p>
+                <h2 className="text-2xl font-bold mb-4 text-aleph-green">Page Not Found</h2>
+                <p className="dark:text-gray-400">The requested page could not be found.</p>
               </div>
             )}
           </main>
