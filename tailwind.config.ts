@@ -80,7 +80,7 @@ export default {
 				},
 				hover: {
 					light: '#EC4899',
-					dark: '#FF69B4'
+					dark: '#F472B6'
 				}
 			},
 			borderRadius: {

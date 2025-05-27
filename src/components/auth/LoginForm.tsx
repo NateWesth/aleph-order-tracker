@@ -86,7 +86,7 @@ const LoginForm = () => {
             name="userType"
             render={({ field }) => (
               <FormItem className="space-y-3">
-                <FormLabel>Login as</FormLabel>
+                <FormLabel className="dark:text-gray-200">Login as</FormLabel>
                 <FormControl>
                   <RadioGroup
                     onValueChange={field.onChange}
@@ -97,13 +97,13 @@ const LoginForm = () => {
                       <FormControl>
                         <RadioGroupItem value="client" />
                       </FormControl>
-                      <FormLabel className="font-normal cursor-pointer">Client</FormLabel>
+                      <FormLabel className="font-normal cursor-pointer dark:text-gray-200">Client</FormLabel>
                     </FormItem>
                     <FormItem className="flex items-center space-x-2">
                       <FormControl>
                         <RadioGroupItem value="admin" />
                       </FormControl>
-                      <FormLabel className="font-normal cursor-pointer">Admin</FormLabel>
+                      <FormLabel className="font-normal cursor-pointer dark:text-gray-200">Admin</FormLabel>
                     </FormItem>
                   </RadioGroup>
                 </FormControl>
@@ -117,11 +117,11 @@ const LoginForm = () => {
             name="email"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Email</FormLabel>
+                <FormLabel className="dark:text-gray-200">Email</FormLabel>
                 <FormControl>
-                  <div className="flex items-center border rounded-md focus-within:ring-2 focus-within:ring-ring focus-within:border-input">
-                    <Mail className="w-4 h-4 ml-3 text-gray-500" />
-                    <Input placeholder="your@email.com" className="border-0 focus-visible:ring-0" {...field} />
+                  <div className="flex items-center border rounded-md focus-within:ring-2 focus-within:ring-ring focus-within:border-input dark:border-gray-600">
+                    <Mail className="w-4 h-4 ml-3 text-gray-500 dark:text-gray-400" />
+                    <Input placeholder="your@email.com" className="border-0 focus-visible:ring-0 dark:bg-gray-800 dark:text-gray-200" {...field} />
                   </div>
                 </FormControl>
                 <FormMessage />
@@ -134,11 +134,11 @@ const LoginForm = () => {
             name="password"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Password</FormLabel>
+                <FormLabel className="dark:text-gray-200">Password</FormLabel>
                 <FormControl>
-                  <div className="flex items-center border rounded-md focus-within:ring-2 focus-within:ring-ring focus-within:border-input">
-                    <Lock className="w-4 h-4 ml-3 text-gray-500" />
-                    <Input type="password" placeholder="••••••••" className="border-0 focus-visible:ring-0" {...field} />
+                  <div className="flex items-center border rounded-md focus-within:ring-2 focus-within:ring-ring focus-within:border-input dark:border-gray-600">
+                    <Lock className="w-4 h-4 ml-3 text-gray-500 dark:text-gray-400" />
+                    <Input type="password" placeholder="••••••••" className="border-0 focus-visible:ring-0 dark:bg-gray-800 dark:text-gray-200" {...field} />
                   </div>
                 </FormControl>
                 <FormMessage />
@@ -150,23 +150,27 @@ const LoginForm = () => {
             <button
               type="button"
               onClick={() => setForgotPasswordOpen(true)}
-              className="text-sm text-company-blue hover:text-company-darkblue hover:underline"
+              className="text-sm text-aleph-green hover:text-green-500 hover:underline"
             >
               Forgot password?
             </button>
           </div>
           
-          <Button type="submit" className="w-full bg-company-blue hover:bg-company-darkblue" disabled={isLoading}>
+          <Button 
+            type="submit" 
+            className="w-full bg-aleph-green hover:bg-green-500 border border-gray-400 dark:border-gray-400" 
+            disabled={isLoading}
+          >
             {isLoading ? "Logging in..." : "Login"}
           </Button>
         </form>
       </Form>
 
       <Dialog open={forgotPasswordOpen} onOpenChange={setForgotPasswordOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md dark:bg-gray-800 dark:border-gray-700">
           <DialogHeader>
-            <DialogTitle>Reset your password</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="dark:text-gray-200">Reset your password</DialogTitle>
+            <DialogDescription className="dark:text-gray-400">
               We'll send you instructions to reset your password
             </DialogDescription>
           </DialogHeader>

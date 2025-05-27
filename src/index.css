@@ -47,42 +47,42 @@
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 80%;
+    --background: 0 0% 0%;
+    --foreground: 0 0% 85%;
 
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 80%;
+    --card: 0 0% 25%;
+    --card-foreground: 0 0% 85%;
 
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 80%;
+    --popover: 0 0% 0%;
+    --popover-foreground: 0 0% 85%;
 
-    /* Keep green colors in dark mode */
-    --primary: 142 71% 45%;
+    /* Bright green colors in dark mode */
+    --primary: 120 100% 50%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 142 71% 55%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 120 100% 50%;
+    --secondary-foreground: 0 0% 100%;
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --muted: 0 0% 15%;
+    --muted-foreground: 0 0% 65%;
 
-    --accent: 142 76% 36%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 120 100% 40%;
+    --accent-foreground: 0 0% 100%;
 
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 80%;
-    --sidebar-primary: 142 71% 45%;
+    --border: 0 0% 15%;
+    --input: 0 0% 15%;
+    --ring: 120 100% 50%;
+    --sidebar-background: 0 0% 5%;
+    --sidebar-foreground: 0 0% 85%;
+    --sidebar-primary: 120 100% 50%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 142 71% 15%;
-    --sidebar-accent-foreground: 240 4.8% 80%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 142 71% 60%;
+    --sidebar-accent: 0 0% 10%;
+    --sidebar-accent-foreground: 0 0% 85%;
+    --sidebar-border: 0 0% 10%;
+    --sidebar-ring: 120 100% 50%;
   }
 }
 
@@ -115,7 +115,7 @@
 
 /* Updated gradient to match green theme */
 .hero-gradient {
-  background: linear-gradient(to right, #22C55E, #FF00C8, #16A34A, #FF8000);
+  background: linear-gradient(to right, #00FF00, #FF00C8, #00FF00, #FF8000);
 }
 
 .animate-in {
@@ -132,20 +132,54 @@
 .fade-in-delay-3 { animation-delay: 0.3s; opacity: 0; }
 .fade-in-delay-4 { animation-delay: 0.4s; opacity: 0; }
 
-/* Updated color classes to green theme */
-.text-aleph-green { color: #22C55E; }
+/* Updated color classes to bright green theme in dark mode */
+.text-aleph-green { 
+  color: #22C55E; 
+}
+.dark .text-aleph-green { 
+  color: #00FF00; 
+}
+
 .text-aleph-magenta { color: #FF00C8; }
-.text-aleph-accent { color: #16A34A; }
+.text-aleph-accent { 
+  color: #16A34A; 
+}
+.dark .text-aleph-accent { 
+  color: #00FF00; 
+}
+
 .text-aleph-orange { color: #FF8000; }
 
-.bg-aleph-green { background-color: #22C55E; }
+.bg-aleph-green { 
+  background-color: #22C55E; 
+}
+.dark .bg-aleph-green { 
+  background-color: #00FF00; 
+}
+
 .bg-aleph-magenta { background-color: #FF00C8; }
-.bg-aleph-accent { background-color: #16A34A; }
+.bg-aleph-accent { 
+  background-color: #16A34A; 
+}
+.dark .bg-aleph-accent { 
+  background-color: #00FF00; 
+}
+
 .bg-aleph-orange { background-color: #FF8000; }
 
-/* Updated button styles for green theme */
+/* Updated button styles for bright green theme in dark mode */
 .btn-aleph-green {
-  @apply bg-aleph-green text-white hover:bg-green-500 transition-colors;
+  @apply bg-aleph-green text-white transition-colors;
+}
+.btn-aleph-green:hover {
+  background-color: #00FF00;
+}
+.dark .btn-aleph-green {
+  background-color: #00FF00;
+  color: #000000;
+}
+.dark .btn-aleph-green:hover {
+  background-color: #00DD00;
 }
 
 .btn-aleph-magenta {
@@ -153,16 +187,29 @@
 }
 
 .btn-aleph-accent {
-  @apply bg-aleph-accent text-white hover:bg-green-600 transition-colors;
+  @apply bg-aleph-accent text-white transition-colors;
+}
+.btn-aleph-accent:hover {
+  background-color: #00FF00;
+}
+.dark .btn-aleph-accent {
+  background-color: #00FF00;
+  color: #000000;
+}
+.dark .btn-aleph-accent:hover {
+  background-color: #00DD00;
 }
 
 .btn-aleph-orange {
   @apply bg-aleph-orange text-white hover:bg-orange-500 transition-colors;
 }
 
-/* Toolbar and header styles updated to green */
+/* Toolbar and header styles updated to bright green in dark mode */
 .header-aleph {
   @apply bg-gradient-to-r from-aleph-green to-aleph-magenta text-white shadow-md;
+}
+.dark .header-aleph {
+  background: linear-gradient(to right, #00FF00, #FF00C8);
 }
 
 .toolbar-aleph {
@@ -171,48 +218,57 @@
 
 /* Dark mode specific styles */
 .dark .toolbar-aleph {
-  @apply bg-gray-900 border-aleph-green/20;
+  @apply bg-black border-aleph-green/20;
 }
 
-/* Hover states with pink colors */
+/* Hover states with pink colors - no background highlight */
 .sidebar-hover {
   @apply transition-colors duration-200;
 }
 
 .sidebar-hover:hover {
-  @apply text-hover-light;
+  @apply text-pink-600;
+  background-color: transparent !important;
 }
 
 .dark .sidebar-hover:hover {
-  @apply text-hover-dark;
+  @apply text-pink-400;
+  background-color: transparent !important;
 }
 
-/* Active/selected state */
+/* Active/selected state - stays pink */
 .sidebar-active {
-  @apply text-hover-light bg-slate-200;
+  @apply text-pink-600;
+  background-color: transparent !important;
 }
 
 .dark .sidebar-active {
-  @apply text-hover-dark bg-gray-800;
+  @apply text-pink-400;
+  background-color: transparent !important;
 }
 
-/* Button hover states */
+/* Button hover states - no background highlight */
 .btn-hover {
   @apply transition-colors duration-200;
 }
 
 .btn-hover:hover {
-  @apply text-hover-light;
+  @apply text-pink-600;
+  background-color: transparent !important;
 }
 
 .dark .btn-hover:hover {
-  @apply text-hover-dark;
+  @apply text-pink-400;
+  background-color: transparent !important;
 }
 
-/* Focus states - Fixed to avoid circular dependencies */
+/* Focus states */
 .ring-aleph-green {
   @apply focus:ring-2 focus:ring-opacity-50;
   --tw-ring-color: #22C55E;
+}
+.dark .ring-aleph-green {
+  --tw-ring-color: #00FF00;
 }
 
 .ring-aleph-magenta {

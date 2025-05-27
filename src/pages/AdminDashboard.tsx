@@ -41,9 +41,9 @@ const AdminDashboard = () => {
   
   return (
     <SidebarProvider>
-      <div className="min-h-screen w-full flex bg-slate-50 dark:bg-gray-900">
+      <div className="min-h-screen w-full flex bg-black dark:bg-black">
         {/* Sidebar */}
-        <Sidebar className="dark:bg-gray-800">
+        <Sidebar className="dark:bg-black bg-white">
           <SidebarContent>
             <SidebarMenu>
               <SidebarMenuItem>
@@ -157,7 +157,7 @@ const AdminDashboard = () => {
         {/* Main content */}
         <div className="flex-1 flex flex-col">
           {/* Header */}
-          <header className="bg-white dark:bg-gray-800 shadow-sm p-4">
+          <header className="bg-white dark:bg-black shadow-sm p-4">
             <div className="max-w-7xl mx-auto flex justify-between items-center">
               <div className="flex items-center">
                 <h1 className="text-2xl font-bold text-aleph-green">Aleph Engineering and Supplies - Admin</h1>
@@ -175,7 +175,7 @@ const AdminDashboard = () => {
                 <Button 
                   variant="outline" 
                   onClick={handleLogout}
-                  className="border-aleph-green text-aleph-green hover:bg-aleph-green hover:text-white dark:border-aleph-green dark:text-aleph-green"
+                  className="border-aleph-green text-aleph-green hover:bg-aleph-green hover:text-white dark:border-aleph-green dark:text-aleph-green sidebar-hover"
                 >
                   Logout
                 </Button>
@@ -183,10 +183,10 @@ const AdminDashboard = () => {
             </div>
           </header>
 
-          {/* Dashboard content */}
-          <main className="flex-1 p-4 md:p-8">
+          {/* Dashboard content - Always white background */}
+          <main className="flex-1 p-4 md:p-8 bg-white">
             {activeView === "home" ? (
-              <div className="flex items-center justify-center h-full relative">
+              <div className="flex items-center justify-center h-full relative bg-white">
                 {/* Faded background logo */}
                 <div 
                   className="absolute inset-0 opacity-5 bg-no-repeat bg-center"
@@ -198,37 +198,51 @@ const AdminDashboard = () => {
                 ></div>
                 <div className="text-center relative z-10">
                   <h1 className="text-4xl md:text-6xl font-bold text-aleph-green mb-4">Admin Dashboard</h1>
-                  <p className="text-xl text-gray-600 dark:text-gray-400">Welcome to Aleph Engineering and Supplies Admin Portal</p>
+                  <p className="text-xl text-gray-600">Welcome to Aleph Engineering and Supplies Admin Portal</p>
                 </div>
               </div>
             ) : activeView === "orders" ? (
-              <OrdersPage isAdmin={true} />
+              <div className="bg-white min-h-full">
+                <OrdersPage isAdmin={true} />
+              </div>
             ) : activeView === "progress" ? (
-              <ProgressPage isAdmin={true} />
+              <div className="bg-white min-h-full">
+                <ProgressPage isAdmin={true} />
+              </div>
             ) : activeView === "processing" ? (
-              <ProcessingPage isAdmin={true} />
+              <div className="bg-white min-h-full">
+                <ProcessingPage isAdmin={true} />
+              </div>
             ) : activeView === "invoicing" ? (
-              <div className="text-center p-8">
+              <div className="text-center p-8 bg-white min-h-full">
                 <h2 className="text-2xl font-bold mb-4 text-aleph-green">Invoicing</h2>
-                <p className="dark:text-gray-400">Invoicing functionality will be implemented here.</p>
+                <p className="text-gray-600">Invoicing functionality will be implemented here.</p>
               </div>
             ) : activeView === "delivery-notes" ? (
-              <DeliveryNotePage />
+              <div className="bg-white min-h-full">
+                <DeliveryNotePage />
+              </div>
             ) : activeView === "completed" ? (
-              <CompletedPage isAdmin={true} />
+              <div className="bg-white min-h-full">
+                <CompletedPage isAdmin={true} />
+              </div>
             ) : activeView === "files" ? (
-              <FilesPage isAdmin={true} />
+              <div className="bg-white min-h-full">
+                <FilesPage isAdmin={true} />
+              </div>
             ) : activeView === "companies" ? (
-              <ClientCompaniesPage />
+              <div className="bg-white min-h-full">
+                <ClientCompaniesPage />
+              </div>
             ) : activeView === "users" ? (
-              <div className="text-center p-8">
+              <div className="text-center p-8 bg-white min-h-full">
                 <h2 className="text-2xl font-bold mb-4 text-aleph-green">User Management</h2>
-                <p className="dark:text-gray-400">User management functionality will be implemented here.</p>
+                <p className="text-gray-600">User management functionality will be implemented here.</p>
               </div>
             ) : (
-              <div className="text-center p-8">
+              <div className="text-center p-8 bg-white min-h-full">
                 <h2 className="text-2xl font-bold mb-4 text-aleph-green">Page Not Found</h2>
-                <p className="dark:text-gray-400">The requested page could not be found.</p>
+                <p className="text-gray-600">The requested page could not be found.</p>
               </div>
             )}
           </main>
