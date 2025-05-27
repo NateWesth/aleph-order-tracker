@@ -221,7 +221,7 @@
   @apply bg-black border-aleph-green/20;
 }
 
-/* Hover states with pink colors - no background highlight */
+/* Hover states with pink colors - no background highlight - WORKS IN BOTH LIGHT AND DARK MODE */
 .sidebar-hover {
   @apply transition-colors duration-200;
 }
@@ -236,7 +236,7 @@
   background-color: transparent !important;
 }
 
-/* Active/selected state - stays pink */
+/* Active/selected state - stays pink in both modes */
 .sidebar-active {
   @apply text-pink-600;
   background-color: transparent !important;
@@ -247,7 +247,7 @@
   background-color: transparent !important;
 }
 
-/* Button hover states - no background highlight */
+/* Button hover states - pink text in both light and dark mode */
 .btn-hover {
   @apply transition-colors duration-200;
 }
