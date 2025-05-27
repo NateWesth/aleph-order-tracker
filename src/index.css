@@ -56,17 +56,17 @@
     --popover: 0 0% 0%;
     --popover-foreground: 0 0% 85%;
 
-    /* Bright green colors in dark mode */
-    --primary: 120 100% 50%;
+    /* Bright green colors in dark mode - slightly less shocking but brighter than light mode */
+    --primary: 120 100% 55%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 120 100% 50%;
+    --secondary: 120 100% 55%;
     --secondary-foreground: 0 0% 100%;
 
     --muted: 0 0% 15%;
     --muted-foreground: 0 0% 65%;
 
-    --accent: 120 100% 40%;
+    --accent: 120 100% 45%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 62.8% 30.6%;
@@ -74,15 +74,15 @@
 
     --border: 0 0% 15%;
     --input: 0 0% 15%;
-    --ring: 120 100% 50%;
+    --ring: 120 100% 55%;
     --sidebar-background: 0 0% 5%;
     --sidebar-foreground: 0 0% 85%;
-    --sidebar-primary: 120 100% 50%;
+    --sidebar-primary: 120 100% 55%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 0 0% 10%;
     --sidebar-accent-foreground: 0 0% 85%;
     --sidebar-border: 0 0% 10%;
-    --sidebar-ring: 120 100% 50%;
+    --sidebar-ring: 120 100% 55%;
   }
 }
 
@@ -132,12 +132,20 @@
 .fade-in-delay-3 { animation-delay: 0.3s; opacity: 0; }
 .fade-in-delay-4 { animation-delay: 0.4s; opacity: 0; }
 
-/* Updated color classes to bright green theme in dark mode */
+/* Updated color classes - less shocking green in dark mode but brighter than light mode */
 .text-aleph-green { 
   color: #22C55E; 
 }
 .dark .text-aleph-green { 
-  color: #00FF00; 
+  color: #22FF22; 
+}
+
+/* Login screen specific green - keep unchanged in dark mode */
+.auth-green {
+  color: #22C55E;
+}
+.dark .auth-green {
+  color: #00FF00;
 }
 
 .text-aleph-magenta { color: #FF00C8; }
@@ -145,7 +153,7 @@
   color: #16A34A; 
 }
 .dark .text-aleph-accent { 
-  color: #00FF00; 
+  color: #22FF22; 
 }
 
 .text-aleph-orange { color: #FF8000; }
@@ -154,7 +162,7 @@
   background-color: #22C55E; 
 }
 .dark .bg-aleph-green { 
-  background-color: #00FF00; 
+  background-color: #22FF22; 
 }
 
 .bg-aleph-magenta { background-color: #FF00C8; }
@@ -162,24 +170,24 @@
   background-color: #16A34A; 
 }
 .dark .bg-aleph-accent { 
-  background-color: #00FF00; 
+  background-color: #22FF22; 
 }
 
 .bg-aleph-orange { background-color: #FF8000; }
 
-/* Updated button styles for bright green theme in dark mode */
+/* Updated button styles for less shocking green in dark mode */
 .btn-aleph-green {
   @apply bg-aleph-green text-white transition-colors;
 }
 .btn-aleph-green:hover {
-  background-color: #00FF00;
+  background-color: #22FF22;
 }
 .dark .btn-aleph-green {
-  background-color: #00FF00;
+  background-color: #22FF22;
   color: #000000;
 }
 .dark .btn-aleph-green:hover {
-  background-color: #00DD00;
+  background-color: #11DD11;
 }
 
 .btn-aleph-magenta {
@@ -190,26 +198,26 @@
   @apply bg-aleph-accent text-white transition-colors;
 }
 .btn-aleph-accent:hover {
-  background-color: #00FF00;
+  background-color: #22FF22;
 }
 .dark .btn-aleph-accent {
-  background-color: #00FF00;
+  background-color: #22FF22;
   color: #000000;
 }
 .dark .btn-aleph-accent:hover {
-  background-color: #00DD00;
+  background-color: #11DD11;
 }
 
 .btn-aleph-orange {
   @apply bg-aleph-orange text-white hover:bg-orange-500 transition-colors;
 }
 
-/* Toolbar and header styles updated to bright green in dark mode */
+/* Toolbar and header styles updated to less shocking green in dark mode */
 .header-aleph {
   @apply bg-gradient-to-r from-aleph-green to-aleph-magenta text-white shadow-md;
 }
 .dark .header-aleph {
-  background: linear-gradient(to right, #00FF00, #FF00C8);
+  background: linear-gradient(to right, #22FF22, #FF00C8);
 }
 
 .toolbar-aleph {
@@ -268,7 +276,7 @@
   --tw-ring-color: #22C55E;
 }
 .dark .ring-aleph-green {
-  --tw-ring-color: #00FF00;
+  --tw-ring-color: #22FF22;
 }
 
 .ring-aleph-magenta {

@@ -1,4 +1,3 @@
-
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -156,8 +155,8 @@ const AdminDashboard = () => {
 
         {/* Main content */}
         <div className="flex-1 flex flex-col">
-          {/* Header - same darkness as toolbar in dark mode */}
-          <header className="bg-white dark:bg-black shadow-sm p-4">
+          {/* Header - slightly lighter black in dark mode */}
+          <header className="bg-white dark:bg-gray-900 shadow-sm p-4">
             <div className="max-w-7xl mx-auto flex justify-between items-center">
               <div className="flex items-center">
                 <h1 className="text-2xl font-bold text-aleph-green">Aleph Engineering and Supplies - Admin</h1>
