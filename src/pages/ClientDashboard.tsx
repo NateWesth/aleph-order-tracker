@@ -1,4 +1,3 @@
-
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -41,9 +40,9 @@ const ClientDashboard = () => {
   
   return (
     <SidebarProvider>
-      <div className="min-h-screen w-full flex bg-black dark:bg-black">
+      <div className="min-h-screen w-full flex bg-black dark:bg-gray-950">
         {/* Sidebar */}
-        <Sidebar className="dark:bg-black bg-white">
+        <Sidebar className="dark:bg-gray-900 bg-white">
           <SidebarContent>
             <SidebarMenu>
               <SidebarMenuItem>
@@ -127,7 +126,7 @@ const ClientDashboard = () => {
         {/* Main content */}
         <div className="flex-1 flex flex-col">
           {/* Header */}
-          <header className="bg-white dark:bg-black shadow-sm p-4">
+          <header className="bg-white dark:bg-gray-900 shadow-sm p-4">
             <div className="max-w-7xl mx-auto flex justify-between items-center">
               <div className="flex items-center">
                 <h1 className="text-2xl font-bold text-aleph-green">Aleph Engineering and Supplies</h1>
@@ -153,10 +152,10 @@ const ClientDashboard = () => {
             </div>
           </header>
 
-          {/* Dashboard content - Always white background */}
-          <main className="flex-1 p-4 md:p-8 bg-white">
+          {/* Dashboard content - White in light mode, dark grey in dark mode */}
+          <main className="flex-1 p-4 md:p-8 bg-white dark:bg-gray-800">
             {activeView === "home" ? (
-              <div className="flex items-center justify-center h-full relative bg-white">
+              <div className="flex items-center justify-center h-full relative bg-white dark:bg-gray-800">
                 {/* Faded background logo */}
                 <div 
                   className="absolute inset-0 opacity-5 bg-no-repeat bg-center"
@@ -168,38 +167,38 @@ const ClientDashboard = () => {
                 ></div>
                 <div className="text-center relative z-10">
                   <h1 className="text-4xl md:text-6xl font-bold text-aleph-green mb-4">Welcome, {clientName}</h1>
-                  <p className="text-xl text-gray-600">Thank you for choosing Aleph Engineering and Supplies</p>
+                  <p className="text-xl text-gray-600 dark:text-gray-300">Thank you for choosing Aleph Engineering and Supplies</p>
                 </div>
               </div>
             ) : activeView === "orders" ? (
-              <div className="bg-white min-h-full">
+              <div className="bg-white dark:bg-gray-800 min-h-full">
                 <OrdersPage isAdmin={false} />
               </div>
             ) : activeView === "progress" ? (
-              <div className="bg-white min-h-full">
+              <div className="bg-white dark:bg-gray-800 min-h-full">
                 <ProgressPage isAdmin={false} />
               </div>
             ) : activeView === "processing" ? (
-              <div className="bg-white min-h-full">
+              <div className="bg-white dark:bg-gray-800 min-h-full">
                 <ProcessingPage isAdmin={false} />
               </div>
             ) : activeView === "invoicing" ? (
-              <div className="text-center p-8 bg-white min-h-full">
+              <div className="text-center p-8 bg-white dark:bg-gray-800 min-h-full">
                 <h2 className="text-2xl font-bold mb-4 text-aleph-green">Invoicing</h2>
-                <p className="text-gray-600">Invoicing functionality will be implemented here.</p>
+                <p className="text-gray-600 dark:text-gray-300">Invoicing functionality will be implemented here.</p>
               </div>
             ) : activeView === "completed" ? (
-              <div className="bg-white min-h-full">
+              <div className="bg-white dark:bg-gray-800 min-h-full">
                 <CompletedPage isAdmin={false} />
               </div>
             ) : activeView === "files" ? (
-              <div className="bg-white min-h-full">
+              <div className="bg-white dark:bg-gray-800 min-h-full">
                 <FilesPage isAdmin={false} />
               </div>
             ) : (
-              <div className="text-center p-8 bg-white min-h-full">
+              <div className="text-center p-8 bg-white dark:bg-gray-800 min-h-full">
                 <h2 className="text-2xl font-bold mb-4 text-aleph-green">Page Not Found</h2>
-                <p className="text-gray-600">The requested page could not be found.</p>
+                <p className="text-gray-600 dark:text-gray-300">The requested page could not be found.</p>
               </div>
             )}
           </main>
