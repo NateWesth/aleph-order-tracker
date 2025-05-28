@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -23,7 +22,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
-import { CalendarIcon, Plus, Trash } from "lucide-react";
+import { CalendarIcon, Plus, Trash, Download, FileText, Printer } from "lucide-react";
 import { format } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
 import {
@@ -31,6 +30,12 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 
 // Define the order item interface
@@ -157,6 +162,24 @@ export default function OrdersPage({ isAdmin, companyCode }: OrdersPageProps) {
     });
   };
 
+  // Handle file download
+  const handleDownload = (fileType: 'pdf' | 'excel', order: Order) => {
+    // In a real app, this would download the actual file
+    toast({
+      title: "Download Started",
+      description: `Downloading order #${order.orderNumber} as ${fileType.toUpperCase()}`,
+    });
+  };
+
+  // Handle file print
+  const handlePrint = (order: Order) => {
+    // In a real app, this would open the print dialog
+    toast({
+      title: "Print",
+      description: `Printing order #${order.orderNumber}`,
+    });
+  };
+
   // Handle order receive (admin only)
   const handleReceiveOrder = (orderId: string) => {
     if (!isAdmin) return;
@@ -229,17 +252,57 @@ export default function OrdersPage({ isAdmin, companyCode }: OrdersPageProps) {
                       Due: {format(order.dueDate, 'MMM d, yyyy')}
                     </p>
                   </div>
-                  {isAdmin && (
+                  <div className="flex items-center gap-2">
+                    {/* Download/Print options */}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm" onClick={(e) => e.stopPropagation()}>
+                          <Download className="h-4 w-4 mr-2" />
+                          Download
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent>
+                        <DropdownMenuItem onClick={(e) => {
+                          e.stopPropagation();
+                          handleDownload('pdf', order);
+                        }}>
+                          <FileText className="h-4 w-4 mr-2" />
+                          Download as PDF
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={(e) => {
+                          e.stopPropagation();
+                          handleDownload('excel', order);
+                        }}>
+                          <FileText className="h-4 w-4 mr-2" />
+                          Download as Excel
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                    
                     <Button 
                       variant="outline" 
+                      size="sm"
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleReceiveOrder(order.id);
+                        handlePrint(order);
                       }}
                     >
-                      Receive Order
+                      <Printer className="h-4 w-4 mr-2" />
+                      Print
                     </Button>
-                  )}
+                    
+                    {isAdmin && (
+                      <Button 
+                        variant="outline" 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleReceiveOrder(order.id);
+                        }}
+                      >
+                        Receive Order
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </div>
             ))
@@ -384,7 +447,34 @@ export default function OrdersPage({ isAdmin, companyCode }: OrdersPageProps) {
         {selectedOrder && (
           <DialogContent className="max-w-3xl">
             <DialogHeader>
-              <DialogTitle>Order #{selectedOrder.orderNumber}</DialogTitle>
+              <DialogTitle className="flex items-center justify-between">
+                Order #{selectedOrder.orderNumber}
+                <div className="flex items-center gap-2">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm">
+                        <Download className="h-4 w-4 mr-2" />
+                        Download
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent>
+                      <DropdownMenuItem onClick={() => handleDownload('pdf', selectedOrder)}>
+                        <FileText className="h-4 w-4 mr-2" />
+                        Download as PDF
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleDownload('excel', selectedOrder)}>
+                        <FileText className="h-4 w-4 mr-2" />
+                        Download as Excel
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                  
+                  <Button variant="outline" size="sm" onClick={() => handlePrint(selectedOrder)}>
+                    <Printer className="h-4 w-4 mr-2" />
+                    Print
+                  </Button>
+                </div>
+              </DialogTitle>
             </DialogHeader>
             
             <div className="space-y-4">

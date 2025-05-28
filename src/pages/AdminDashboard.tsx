@@ -1,3 +1,4 @@
+
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -87,16 +88,6 @@ const AdminDashboard = () => {
               </SidebarMenuItem>
               <SidebarMenuItem>
                 <SidebarMenuButton 
-                  tooltip="Invoicing"
-                  onClick={() => handleMenuClick("invoicing")}
-                  className={`sidebar-hover ${activeView === "invoicing" ? "sidebar-active" : ""}`}
-                >
-                  <FileText />
-                  <span>Invoicing</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton 
                   tooltip="Delivery Notes"
                   onClick={() => handleMenuClick("delivery-notes")}
                   className={`sidebar-hover ${activeView === "delivery-notes" ? "sidebar-active" : ""}`}
@@ -155,8 +146,8 @@ const AdminDashboard = () => {
 
         {/* Main content */}
         <div className="flex-1 flex flex-col">
-          {/* Header - slightly lighter black in dark mode */}
-          <header className="bg-white dark:bg-gray-900 shadow-sm p-4">
+          {/* Header - light grey in light mode */}
+          <header className="toolbar-aleph p-4">
             <div className="max-w-7xl mx-auto flex justify-between items-center">
               <div className="flex items-center">
                 <h1 className="text-2xl font-bold text-aleph-green">Aleph Engineering and Supplies - Admin</h1>
@@ -211,11 +202,6 @@ const AdminDashboard = () => {
             ) : activeView === "processing" ? (
               <div className="bg-white dark:bg-gray-800 min-h-full">
                 <ProcessingPage isAdmin={true} />
-              </div>
-            ) : activeView === "invoicing" ? (
-              <div className="text-center p-8 bg-white dark:bg-gray-800 min-h-full">
-                <h2 className="text-2xl font-bold mb-4 text-aleph-green">Invoicing</h2>
-                <p className="text-gray-600 dark:text-gray-300">Invoicing functionality will be implemented here.</p>
               </div>
             ) : activeView === "delivery-notes" ? (
               <div className="bg-white dark:bg-gray-800 min-h-full">

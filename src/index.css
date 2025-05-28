@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -211,7 +212,7 @@
   @apply bg-aleph-orange text-white hover:bg-orange-500 transition-colors;
 }
 
-/* Toolbar and header styles updated to less shocking green in dark mode */
+/* Toolbar and header styles updated to light grey in light mode */
 .header-aleph {
   @apply bg-gradient-to-r from-aleph-green to-aleph-magenta text-white shadow-md;
 }
@@ -220,7 +221,7 @@
 }
 
 .toolbar-aleph {
-  @apply bg-white border-b border-aleph-green/20 shadow-sm;
+  @apply bg-gray-100 border-b border-gray-200 shadow-sm;
 }
 
 /* Dark mode specific styles */
