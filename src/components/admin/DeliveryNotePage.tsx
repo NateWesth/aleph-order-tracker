@@ -19,55 +19,136 @@ import {
 import { format } from "date-fns";
 import { Search, Download, Printer } from "lucide-react";
 
-// Define the order item interface
+// Define the order item interface with completion tracking
 interface OrderItem {
   id: string;
   name: string;
   quantity: number;
+  delivered?: number;
+  completed: boolean;
   description?: string;
 }
 
-// Define the order interface
+// Define the company interface
+interface Company {
+  id: string;
+  name: string;
+  code: string;
+  contactPerson: string;
+  email: string;
+  phone: string;
+  address: string;
+  vatNumber: string;
+  logo?: string;
+}
+
+// Define the order interface with company details
 interface Order {
   id: string;
   orderNumber: string;
   companyName: string;
+  company?: Company;
   orderDate: Date;
   dueDate: Date;
   items: OrderItem[];
   status: 'pending' | 'received' | 'in-progress' | 'processing' | 'completed';
   reference?: string;
   attention?: string;
+  progress?: number;
+  progressStage?: 'awaiting-stock' | 'packing' | 'out-for-delivery' | 'completed';
 }
 
-// Mock orders data
+// Mock companies data with logos and details
+const mockCompanies: Company[] = [
+  {
+    id: "1",
+    name: "Pro Process",
+    code: "PROPROC",
+    contactPerson: "Matthew Smith",
+    email: "matthew@proprocess.com",
+    phone: "011 234 5678",
+    address: "123 Industrial Street, Johannesburg, 2000",
+    vatNumber: "4123456789",
+    logo: "/lovable-uploads/e1088147-889e-43f6-bdf0-271189b88913.png"
+  },
+  {
+    id: "2",
+    name: "XYZ Industries",
+    code: "XYZIND",
+    contactPerson: "John Doe",
+    email: "john@xyzindustries.com",
+    phone: "011 987 6543",
+    address: "456 Manufacturing Ave, Pretoria, 0001",
+    vatNumber: "4987654321"
+  }
+];
+
+// Mock orders data with all statuses
 const mockOrders: Order[] = [
   {
     id: "1",
     orderNumber: "ORD-2024-001",
     companyName: "Pro Process",
+    company: mockCompanies[0],
     orderDate: new Date(2024, 0, 15),
     dueDate: new Date(2024, 1, 15),
     status: "in-progress",
     reference: "MATTHEW",
     attention: "Stores",
+    progress: 75,
+    progressStage: "out-for-delivery",
     items: [
-      { id: "1", name: "BOSCH Angle grinder (ZAPPPAAG005)", quantity: 2, description: "Professional angle grinder" },
-      { id: "2", name: "Safety Equipment Set", quantity: 1, description: "Complete safety gear package" },
+      { id: "1", name: "BOSCH Angle grinder (ZAPPPAAG005)", quantity: 2, delivered: 2, completed: true, description: "Professional angle grinder" },
+      { id: "2", name: "Safety Equipment Set", quantity: 1, delivered: 0, completed: false, description: "Complete safety gear package" },
     ]
   },
   {
     id: "2",
     orderNumber: "ORD-2024-002",
     companyName: "XYZ Industries",
+    company: mockCompanies[1],
     orderDate: new Date(2024, 0, 20),
     dueDate: new Date(2024, 1, 20),
     status: "processing",
     reference: "JOHN",
     attention: "Warehouse",
+    progress: 100,
+    progressStage: "completed",
     items: [
-      { id: "3", name: "Welding Equipment", quantity: 3, description: "Professional welding equipment set" },
-      { id: "4", name: "Safety Helmets", quantity: 25, description: "Industrial safety helmets" },
+      { id: "3", name: "Welding Equipment", quantity: 3, delivered: 3, completed: true, description: "Professional welding equipment set" },
+      { id: "4", name: "Safety Helmets", quantity: 25, delivered: 25, completed: true, description: "Industrial safety helmets" },
+    ]
+  },
+  {
+    id: "3",
+    orderNumber: "ORD-2024-003",
+    companyName: "Pro Process",
+    company: mockCompanies[0],
+    orderDate: new Date(2024, 0, 25),
+    dueDate: new Date(2024, 1, 25),
+    status: "received",
+    reference: "SARAH",
+    attention: "Operations",
+    progress: 25,
+    progressStage: "awaiting-stock",
+    items: [
+      { id: "5", name: "Industrial Drill Set", quantity: 5, delivered: 0, completed: false, description: "Heavy duty industrial drills" },
+      { id: "6", name: "Measurement Tools", quantity: 10, delivered: 0, completed: false, description: "Precision measurement tools" },
+    ]
+  },
+  {
+    id: "4",
+    orderNumber: "ORD-2024-004",
+    companyName: "XYZ Industries",
+    company: mockCompanies[1],
+    orderDate: new Date(2024, 0, 30),
+    dueDate: new Date(2024, 2, 15),
+    status: "pending",
+    reference: "MICHAEL",
+    attention: "Procurement",
+    items: [
+      { id: "7", name: "Power Supply Units", quantity: 3, delivered: 0, completed: false, description: "Industrial power supply units" },
+      { id: "8", name: "Electrical Components", quantity: 50, delivered: 0, completed: false, description: "Various electrical components" },
     ]
   },
 ];
@@ -85,7 +166,7 @@ export default function DeliveryNotePage() {
     return random;
   };
 
-  // Create delivery note
+  // Create delivery note and auto-fill quantities from progress data
   const createDeliveryNote = (order: Order) => {
     setSelectedOrder(order);
     setShowDeliveryNote(true);
@@ -148,6 +229,7 @@ export default function DeliveryNotePage() {
     
     const deliveryNoteNumber = generateDeliveryNoteNumber();
     const deliveryDate = format(new Date(), 'dd/MM/yyyy');
+    const company = selectedOrder.company;
     
     return `
       <!DOCTYPE html>
@@ -183,6 +265,16 @@ export default function DeliveryNotePage() {
             .contact-info {
               font-size: 10px;
               line-height: 1.3;
+            }
+            .client-info {
+              font-size: 11px;
+              line-height: 1.4;
+              margin-top: 15px;
+            }
+            .client-logo {
+              max-width: 80px;
+              max-height: 80px;
+              margin-bottom: 10px;
             }
             .delivery-note-title { 
               font-size: 16px; 
@@ -264,6 +356,18 @@ export default function DeliveryNotePage() {
                 072 887 6908
               </div>
             </div>
+            
+            ${company?.logo ? `
+            <div>
+              <img src="${company.logo}" alt="${company.name} Logo" class="client-logo">
+              <div class="client-info">
+                ${company.name}<br>
+                ${company.address.split(',').join('<br>')}<br>
+                VAT: ${company.vatNumber}<br>
+                Tel: ${company.phone}
+              </div>
+            </div>
+            ` : ''}
           </div>
           
           <div class="delivery-note-title">Delivery Note ${deliveryNoteNumber}</div>
@@ -305,14 +409,17 @@ export default function DeliveryNotePage() {
               </tr>
             </thead>
             <tbody>
-              ${selectedOrder.items.map(item => `
+              ${selectedOrder.items.map(item => {
+                const delivered = item.delivered || 0;
+                const balance = item.quantity - delivered;
+                return `
                 <tr>
                   <td>${item.name}</td>
                   <td style="text-align: center;">${item.quantity}</td>
-                  <td style="text-align: center;"></td>
-                  <td style="text-align: center;"></td>
+                  <td style="text-align: center;">${delivered}</td>
+                  <td style="text-align: center;">${balance}</td>
                 </tr>
-              `).join('')}
+              `}).join('')}
               ${Array.from({length: Math.max(0, 10 - selectedOrder.items.length)}, () => `
                 <tr>
                   <td>&nbsp;</td>
@@ -343,7 +450,7 @@ export default function DeliveryNotePage() {
     `;
   };
 
-  // Filter orders based on search term
+  // Filter orders based on search term - include all orders instead of just filtered by status
   const filteredOrders = orders.filter(order => 
     order.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
     order.companyName.toLowerCase().includes(searchTerm.toLowerCase())
@@ -365,7 +472,7 @@ export default function DeliveryNotePage() {
         </div>
       </div>
 
-      {/* Orders List */}
+      {/* Orders List - showing ALL orders */}
       <div className="bg-white rounded-lg shadow">
         <div className="p-4 border-b">
           <h2 className="text-lg font-semibold">Select Order for Delivery Note</h2>
@@ -377,13 +484,14 @@ export default function DeliveryNotePage() {
               <TableHead>Company</TableHead>
               <TableHead>Order Date</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead>Progress</TableHead>
               <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filteredOrders.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center text-gray-500">
+                <TableCell colSpan={6} className="text-center text-gray-500">
                   No orders found.
                 </TableCell>
               </TableRow>
@@ -391,17 +499,39 @@ export default function DeliveryNotePage() {
               filteredOrders.map(order => (
                 <TableRow key={order.id}>
                   <TableCell className="font-medium">{order.orderNumber}</TableCell>
-                  <TableCell>{order.companyName}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      {order.company?.logo && (
+                        <img 
+                          src={order.company.logo} 
+                          alt={`${order.companyName} logo`} 
+                          className="h-6 w-6 rounded object-cover" 
+                        />
+                      )}
+                      {order.companyName}
+                    </div>
+                  </TableCell>
                   <TableCell>{format(order.orderDate, 'MMM d, yyyy')}</TableCell>
                   <TableCell>
                     <span className={`px-2 py-1 rounded text-xs font-medium ${
                       order.status === 'completed' ? 'bg-green-100 text-green-800' :
                       order.status === 'in-progress' ? 'bg-blue-100 text-blue-800' :
                       order.status === 'processing' ? 'bg-yellow-100 text-yellow-800' :
+                      order.status === 'received' ? 'bg-purple-100 text-purple-800' :
                       'bg-gray-100 text-gray-800'
                     }`}>
                       {order.status.replace('-', ' ')}
                     </span>
+                  </TableCell>
+                  <TableCell>
+                    {order.progressStage && (
+                      <span className="text-sm">
+                        {order.progressStage === 'awaiting-stock' ? 'Awaiting Stock' :
+                        order.progressStage === 'packing' ? 'Packing' :
+                        order.progressStage === 'out-for-delivery' ? 'Out for Delivery' :
+                        order.progressStage === 'completed' ? 'Completed' : ''}
+                      </span>
+                    )}
                   </TableCell>
                   <TableCell>
                     <Button 
@@ -428,7 +558,7 @@ export default function DeliveryNotePage() {
             </DialogHeader>
             
             <div className="space-y-6 p-4 bg-white border">
-              {/* Header section matching reference */}
+              {/* Header section with company details */}
               <div className="flex justify-between items-start">
                 <div>
                   <h2 className="text-2xl font-bold text-aleph-blue">Aleph</h2>
@@ -442,6 +572,24 @@ export default function DeliveryNotePage() {
                     <div>072 887 6908</div>
                   </div>
                 </div>
+
+                {selectedOrder.company?.logo && (
+                  <div className="text-right">
+                    <img 
+                      src={selectedOrder.company.logo} 
+                      alt={`${selectedOrder.companyName} logo`} 
+                      className="h-12 w-auto ml-auto mb-2" 
+                    />
+                    <div className="text-xs text-right">
+                      <div className="font-semibold">{selectedOrder.company.name}</div>
+                      {selectedOrder.company.address.split(',').map((line, index) => (
+                        <div key={index}>{line.trim()}</div>
+                      ))}
+                      <div>VAT: {selectedOrder.company.vatNumber}</div>
+                      <div>Tel: {selectedOrder.company.phone}</div>
+                    </div>
+                  </div>
+                )}
               </div>
               
               {/* Delivery Note Title */}
@@ -476,7 +624,7 @@ export default function DeliveryNotePage() {
                 </div>
               </div>
               
-              {/* Items Table */}
+              {/* Items Table - Using quantities from progress tracking */}
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -487,14 +635,19 @@ export default function DeliveryNotePage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {selectedOrder.items.map((item) => (
-                    <TableRow key={item.id}>
-                      <TableCell className="border border-black">{item.name}</TableCell>
-                      <TableCell className="border border-black text-center">{item.quantity}</TableCell>
-                      <TableCell className="border border-black text-center"></TableCell>
-                      <TableCell className="border border-black text-center"></TableCell>
-                    </TableRow>
-                  ))}
+                  {selectedOrder.items.map((item) => {
+                    const delivered = item.delivered || 0;
+                    const balance = item.quantity - delivered;
+                    
+                    return (
+                      <TableRow key={item.id}>
+                        <TableCell className="border border-black">{item.name}</TableCell>
+                        <TableCell className="border border-black text-center">{item.quantity}</TableCell>
+                        <TableCell className="border border-black text-center">{delivered}</TableCell>
+                        <TableCell className="border border-black text-center">{balance}</TableCell>
+                      </TableRow>
+                    );
+                  })}
                   {/* Add empty rows to match reference format */}
                   {Array.from({length: Math.max(0, 8 - selectedOrder.items.length)}, (_, index) => (
                     <TableRow key={`empty-${index}`}>

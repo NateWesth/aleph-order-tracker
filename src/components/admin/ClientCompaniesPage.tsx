@@ -18,12 +18,13 @@ import {
   FormMessage 
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
-import { Building2, Plus, Copy } from "lucide-react";
+import { Building2, Plus, Copy, Upload } from "lucide-react";
 
-// Define the company interface
+// Define the company interface with expanded fields
 interface Company {
   id: string;
   name: string;
@@ -31,16 +32,21 @@ interface Company {
   contactPerson: string;
   email: string;
   phone: string;
+  address: string;
+  vatNumber: string;
+  logo?: string;
   createdAt: Date;
   userCount: number;
 }
 
-// Form schema for new companies
+// Form schema for new companies with expanded fields
 const newCompanySchema = z.object({
   name: z.string().min(1, "Company name is required"),
   contactPerson: z.string().min(1, "Contact person name is required"),
   email: z.string().email("Invalid email address"),
   phone: z.string().min(1, "Phone number is required"),
+  address: z.string().min(1, "Company address is required"),
+  vatNumber: z.string().min(1, "VAT number is required"),
 });
 
 type NewCompanyFormValues = z.infer<typeof newCompanySchema>;
@@ -50,6 +56,8 @@ export default function ClientCompaniesPage() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [isNewCompanyDialogOpen, setIsNewCompanyDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedLogo, setSelectedLogo] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
 
   const form = useForm<NewCompanyFormValues>({
     resolver: zodResolver(newCompanySchema),
@@ -58,18 +66,32 @@ export default function ClientCompaniesPage() {
       contactPerson: "",
       email: "",
       phone: "",
+      address: "",
+      vatNumber: "",
     },
   });
 
   // Generate a unique company code
   const generateCompanyCode = () => {
-    // Generate a random alphanumeric code (6 characters)
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     let result = '';
     for (let i = 0; i < 6; i++) {
       result += chars.charAt(Math.floor(Math.random() * chars.length));
     }
     return result;
+  };
+
+  // Handle logo file selection
+  const handleLogoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setSelectedLogo(file);
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setLogoPreview(e.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   // Handle form submission
@@ -81,13 +103,18 @@ export default function ClientCompaniesPage() {
       contactPerson: data.contactPerson,
       email: data.email,
       phone: data.phone,
+      address: data.address,
+      vatNumber: data.vatNumber,
+      logo: logoPreview || undefined,
       createdAt: new Date(),
-      userCount: 0, // Initially no users
+      userCount: 0,
     };
 
     setCompanies([...companies, newCompany]);
     setIsNewCompanyDialogOpen(false);
     form.reset();
+    setSelectedLogo(null);
+    setLogoPreview(null);
 
     toast({
       title: "Company Added",
@@ -107,6 +134,8 @@ export default function ClientCompaniesPage() {
   // Reset form when dialog closes
   const handleDialogClose = () => {
     form.reset();
+    setSelectedLogo(null);
+    setLogoPreview(null);
     setIsNewCompanyDialogOpen(false);
   };
 
@@ -152,6 +181,9 @@ export default function ClientCompaniesPage() {
                 Contact Details
               </th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Business Details
+              </th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Users
               </th>
               <th scope="col" className="relative px-6 py-3">
@@ -162,7 +194,7 @@ export default function ClientCompaniesPage() {
           <tbody className="bg-white divide-y divide-gray-200">
             {filteredCompanies.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-6 py-4 text-center text-gray-500">
+                <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
                   No companies found.
                 </td>
               </tr>
@@ -172,7 +204,11 @@ export default function ClientCompaniesPage() {
               <tr key={company.id}>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center">
-                    <Building2 className="h-6 w-6 text-gray-400 mr-2" />
+                    {company.logo ? (
+                      <img src={company.logo} alt={`${company.name} logo`} className="h-8 w-8 rounded object-cover mr-2" />
+                    ) : (
+                      <Building2 className="h-6 w-6 text-gray-400 mr-2" />
+                    )}
                     <div>
                       <div className="font-medium">{company.name}</div>
                       <div className="text-xs text-gray-500">
@@ -200,6 +236,10 @@ export default function ClientCompaniesPage() {
                   <div className="text-sm text-gray-500">{company.phone}</div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="text-sm">{company.address}</div>
+                  <div className="text-sm text-gray-500">VAT: {company.vatNumber}</div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
                   <div className="text-sm">
                     {company.userCount} {company.userCount === 1 ? 'user' : 'users'}
                   </div>
@@ -217,35 +257,75 @@ export default function ClientCompaniesPage() {
 
       {/* New Company Dialog */}
       <Dialog open={isNewCompanyDialogOpen} onOpenChange={handleDialogClose}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add New Client Company</DialogTitle>
           </DialogHeader>
           
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              {/* Company Logo Upload */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Company Logo (Optional)</label>
+                <div className="flex items-center space-x-4">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleLogoUpload}
+                    className="hidden"
+                    id="logo-upload"
+                  />
+                  <label
+                    htmlFor="logo-upload"
+                    className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-md cursor-pointer hover:bg-gray-50"
+                  >
+                    <Upload className="h-4 w-4" />
+                    Upload Logo
+                  </label>
+                  {logoPreview && (
+                    <img src={logoPreview} alt="Logo preview" className="h-12 w-12 rounded object-cover" />
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Company Name</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="Enter company name" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="contactPerson"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Contact Person</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="Enter contact name" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
               <FormField
                 control={form.control}
-                name="name"
+                name="address"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Company Name</FormLabel>
+                    <FormLabel>Company Address</FormLabel>
                     <FormControl>
-                      <Input {...field} placeholder="Enter company name" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={form.control}
-                name="contactPerson"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Contact Person</FormLabel>
-                    <FormControl>
-                      <Input {...field} placeholder="Enter contact name" />
+                      <Textarea {...field} placeholder="Enter complete company address" rows={3} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -255,18 +335,18 @@ export default function ClientCompaniesPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
-                  name="email"
+                  name="vatNumber"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Email</FormLabel>
+                      <FormLabel>VAT Number</FormLabel>
                       <FormControl>
-                        <Input {...field} placeholder="Enter email address" />
+                        <Input {...field} placeholder="Enter VAT number" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-                
+
                 <FormField
                   control={form.control}
                   name="phone"
@@ -282,10 +362,25 @@ export default function ClientCompaniesPage() {
                 />
               </div>
 
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="Enter email address" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               <div className="bg-gray-50 p-3 rounded-md">
                 <p className="text-sm text-gray-600">
                   A unique company code will be automatically generated when you add this company.
                   Client users will need this code to link their account to this company during registration.
+                  All company details including logo, address, and VAT number will appear on orders for this company.
                 </p>
               </div>
 

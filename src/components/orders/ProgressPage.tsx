@@ -20,26 +20,105 @@ interface OrderItem {
   completed: boolean;
 }
 
-// Define the order interface
+// Define the company interface
+interface Company {
+  id: string;
+  name: string;
+  code: string;
+  contactPerson: string;
+  email: string;
+  phone: string;
+  address: string;
+  vatNumber: string;
+  logo?: string;
+}
+
+// Define the order interface with company details
 interface Order {
   id: string;
   orderNumber: string;
   companyName: string;
+  company?: Company;
   orderDate: Date;
   dueDate: Date;
   items: OrderItem[];
   status: 'pending' | 'received' | 'in-progress' | 'processing' | 'completed';
   progress?: number;
   progressStage?: 'awaiting-stock' | 'packing' | 'out-for-delivery' | 'completed';
+  reference?: string;
+  attention?: string;
 }
 
 interface ProgressPageProps {
   isAdmin: boolean;
 }
 
+// Mock companies data with logos and details
+const mockCompanies: Company[] = [
+  {
+    id: "1",
+    name: "Pro Process",
+    code: "PROPROC",
+    contactPerson: "Matthew Smith",
+    email: "matthew@proprocess.com",
+    phone: "011 234 5678",
+    address: "123 Industrial Street, Johannesburg, 2000",
+    vatNumber: "4123456789",
+    logo: "/lovable-uploads/e1088147-889e-43f6-bdf0-271189b88913.png"
+  },
+  {
+    id: "2",
+    name: "XYZ Industries",
+    code: "XYZIND",
+    contactPerson: "John Doe",
+    email: "john@xyzindustries.com",
+    phone: "011 987 6543",
+    address: "456 Manufacturing Ave, Pretoria, 0001",
+    vatNumber: "4987654321"
+  }
+];
+
+// Mock orders data
+const mockOrders: Order[] = [
+  {
+    id: "1",
+    orderNumber: "ORD-2024-001",
+    companyName: "Pro Process",
+    company: mockCompanies[0],
+    orderDate: new Date(2024, 0, 15),
+    dueDate: new Date(2024, 1, 15),
+    status: "in-progress",
+    reference: "MATTHEW",
+    attention: "Stores",
+    progress: 50,
+    progressStage: "packing",
+    items: [
+      { id: "1", name: "BOSCH Angle grinder (ZAPPPAAG005)", quantity: 2, delivered: 1, completed: true },
+      { id: "2", name: "Safety Equipment Set", quantity: 1, delivered: 0, completed: false },
+    ]
+  },
+  {
+    id: "2",
+    orderNumber: "ORD-2024-002",
+    companyName: "XYZ Industries",
+    company: mockCompanies[1],
+    orderDate: new Date(2024, 0, 20),
+    dueDate: new Date(2024, 1, 20),
+    status: "received",
+    progress: 25,
+    progressStage: "awaiting-stock",
+    reference: "JOHN",
+    attention: "Warehouse",
+    items: [
+      { id: "3", name: "Welding Equipment", quantity: 3, delivered: 0, completed: false },
+      { id: "4", name: "Safety Helmets", quantity: 25, delivered: 0, completed: false },
+    ]
+  },
+];
+
 export default function ProgressPage({ isAdmin }: ProgressPageProps) {
   const { toast } = useToast();
-  const [orders, setOrders] = useState<Order[]>([]);
+  const [orders, setOrders] = useState<Order[]>(mockOrders);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
   // Progress stages with corresponding percentage values
@@ -127,7 +206,10 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
           ...order,
           items: order.items.map(item => {
             if (item.id === itemId) {
-              return { ...item, completed: !item.completed };
+              // Mark as completed and update delivered quantities
+              const completed = !item.completed;
+              const delivered = completed ? item.quantity : 0;
+              return { ...item, completed, delivered };
             }
             return item;
           })
@@ -135,6 +217,11 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
       }
       return order;
     }));
+
+    toast({
+      title: "Item Status Updated",
+      description: "Delivery quantities have been adjusted according to completion status.",
+    });
   };
 
   // Check if all items in an order are completed
@@ -156,8 +243,17 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
           });
           return order;
         }
+        
+        // Update all items to be fully delivered
+        const updatedItems = order.items.map(item => ({
+          ...item,
+          completed: true,
+          delivered: item.quantity
+        }));
+        
         return {
           ...order,
+          items: updatedItems,
           status: 'processing',
           progress: 100,
           progressStage: 'completed'
@@ -168,7 +264,7 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
 
     toast({
       title: "Order Completed",
-      description: "Order has been moved to processing.",
+      description: "Order has been moved to processing with all items marked as delivered.",
     });
   };
 
@@ -203,7 +299,16 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
                 <div className="space-y-2">
                   <div className="flex justify-between">
                     <div>
-                      <h3 className="font-medium">Order #{order.orderNumber}</h3>
+                      <div className="flex items-center gap-2">
+                        {order.company?.logo && (
+                          <img 
+                            src={order.company.logo} 
+                            alt={`${order.companyName} logo`} 
+                            className="h-6 w-6 rounded object-cover" 
+                          />
+                        )}
+                        <h3 className="font-medium">Order #{order.orderNumber}</h3>
+                      </div>
                       <p className="text-sm text-gray-600">{order.companyName}</p>
                       <p className="text-sm text-gray-600">
                         Due: {format(order.dueDate, 'MMM d, yyyy')}
@@ -249,7 +354,18 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
         {selectedOrder && (
           <DialogContent className="max-w-3xl">
             <DialogHeader>
-              <DialogTitle>Order #{selectedOrder.orderNumber} Details</DialogTitle>
+              <DialogTitle>
+                <div className="flex items-center gap-2">
+                  {selectedOrder.company?.logo && (
+                    <img 
+                      src={selectedOrder.company.logo} 
+                      alt={`${selectedOrder.companyName} logo`} 
+                      className="h-6 w-6 rounded object-cover" 
+                    />
+                  )}
+                  Order #{selectedOrder.orderNumber} Details
+                </div>
+              </DialogTitle>
             </DialogHeader>
             
             <div className="space-y-4">
@@ -257,16 +373,27 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
                 <div>
                   <p className="text-sm text-gray-500">Company</p>
                   <p>{selectedOrder.companyName}</p>
+                  {selectedOrder.company && (
+                    <div className="mt-2 text-xs text-gray-600">
+                      <p>{selectedOrder.company.address}</p>
+                      <p>VAT: {selectedOrder.company.vatNumber}</p>
+                      <p>Tel: {selectedOrder.company.phone}</p>
+                    </div>
+                  )}
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500">Order Date</p>
-                  <p>{format(selectedOrder.orderDate, 'MMM d, yyyy')}</p>
+                  <div className="space-y-1">
+                    <div>
+                      <p className="text-sm text-gray-500">Order Date</p>
+                      <p>{format(selectedOrder.orderDate, 'MMM d, yyyy')}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500">Due Date</p>
+                      <p>{format(selectedOrder.dueDate, 'MMM d, yyyy')}</p>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm text-gray-500">Due Date</p>
-                  <p>{format(selectedOrder.dueDate, 'MMM d, yyyy')}</p>
-                </div>
-                <div>
+                <div className="col-span-2">
                   <p className="text-sm text-gray-500">Progress</p>
                   <div className="flex items-center space-x-2">
                     <Progress value={selectedOrder.progress || 0} className="flex-grow h-2" />
@@ -316,19 +443,22 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
                             />
                           </div>
                         )}
-                        {item.delivered && (
+                        {item.delivered !== undefined && (
                           <div className="text-sm">
                             Delivered: {item.delivered}
                           </div>
                         )}
-                        <div>
-                          <input
-                            type="checkbox"
-                            checked={item.completed}
-                            onChange={() => isAdmin && toggleItemCompletion(selectedOrder.id, item.id)}
-                            disabled={!isAdmin}
-                            className="ml-2"
-                          />
+                        <div className="flex items-center">
+                          <label className="inline-flex items-center cursor-pointer mr-2">
+                            <span className="mr-2 text-sm font-medium">Complete</span>
+                            <input
+                              type="checkbox"
+                              checked={item.completed}
+                              onChange={() => isAdmin && toggleItemCompletion(selectedOrder.id, item.id)}
+                              disabled={!isAdmin}
+                              className="rounded border-gray-300 text-aleph-green focus:ring-aleph-green"
+                            />
+                          </label>
                         </div>
                       </div>
                     </div>
@@ -337,7 +467,11 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
               </div>
 
               {isAdmin && (
-                <div className="flex justify-end">
+                <div className="flex justify-between pt-4">
+                  <div className="text-sm text-gray-500">
+                    <p>Note: Marking an item as complete will automatically set delivered quantity to match ordered quantity.</p>
+                    <p>These quantities will be used on delivery notes.</p>
+                  </div>
                   <Button 
                     onClick={() => completeOrder(selectedOrder.id)}
                     disabled={!areAllItemsCompleted(selectedOrder)}
