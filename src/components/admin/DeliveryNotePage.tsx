@@ -255,8 +255,8 @@ export default function DeliveryNotePage() {
               align-items: flex-start;
             }
             .aleph-logo {
-              max-width: 120px;
-              max-height: 60px;
+              max-width: 180px;
+              max-height: 120px;
               margin-bottom: 10px;
             }
             .contact-info {
@@ -275,8 +275,8 @@ export default function DeliveryNotePage() {
               color: black;
             }
             .client-logo {
-              max-width: 80px;
-              max-height: 80px;
+              max-width: 150px;
+              max-height: 120px;
               margin-bottom: 10px;
               margin-left: auto;
               display: block;
@@ -574,7 +574,7 @@ export default function DeliveryNotePage() {
                   <img 
                     src="/lovable-uploads/4c615bdd-48d0-4893-a843-01d2335af67a.png" 
                     alt="Aleph Engineering & Supplies" 
-                    className="h-12 w-auto mb-2" 
+                    className="h-24 w-auto mb-2" 
                   />
                   <div className="text-xs leading-tight text-black">
                     <div>Unit F</div>
@@ -591,7 +591,7 @@ export default function DeliveryNotePage() {
                     <img 
                       src={selectedOrder.company.logo} 
                       alt={`${selectedOrder.companyName} logo`} 
-                      className="h-12 w-auto ml-auto mb-2" 
+                      className="h-24 w-auto ml-auto mb-2" 
                     />
                   )}
                   <div className="text-xs text-right text-black">
