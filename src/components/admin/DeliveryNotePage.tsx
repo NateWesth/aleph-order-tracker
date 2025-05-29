@@ -255,31 +255,36 @@ export default function DeliveryNotePage() {
               align-items: flex-start;
             }
             .aleph-logo {
-              max-width: 180px;
-              max-height: 120px;
-              margin-bottom: 10px;
+              width: 80mm;
+              height: 40mm;
+              margin-bottom: 5px;
+              background: transparent;
+              object-fit: contain;
             }
             .contact-info {
-              font-size: 10px;
-              line-height: 1.3;
+              font-size: 9px;
+              line-height: 1.2;
               color: black;
+              margin-top: 2px;
             }
             .client-section {
               flex: 1;
               text-align: right;
             }
             .client-info {
-              font-size: 11px;
-              line-height: 1.4;
-              margin-top: 15px;
+              font-size: 9px;
+              line-height: 1.2;
+              margin-top: 5px;
               color: black;
             }
             .client-logo {
-              max-width: 150px;
-              max-height: 120px;
-              margin-bottom: 10px;
+              width: 80mm;
+              height: 40mm;
+              margin-bottom: 5px;
               margin-left: auto;
               display: block;
+              background: transparent;
+              object-fit: contain;
             }
             .delivery-note-title { 
               font-size: 16px; 
@@ -321,9 +326,11 @@ export default function DeliveryNotePage() {
             }
             th, td { 
               border: 1px solid black; 
-              padding: 8px; 
+              padding: 2px 4px; 
               text-align: left; 
               color: black;
+              height: 5mm;
+              line-height: 1.1;
             }
             th { 
               background-color: #f5f5f5; 
@@ -332,10 +339,10 @@ export default function DeliveryNotePage() {
               color: black;
             }
             .description-col {
-              width: 60%;
+              width: 10.5cm;
             }
             .qty-col {
-              width: 13%;
+              width: 17mm;
               text-align: center;
             }
             .comments-section {
@@ -574,7 +581,7 @@ export default function DeliveryNotePage() {
                   <img 
                     src="/lovable-uploads/4c615bdd-48d0-4893-a843-01d2335af67a.png" 
                     alt="Aleph Engineering & Supplies" 
-                    className="h-24 w-auto mb-2" 
+                    className="w-32 h-16 mb-1 object-contain bg-transparent" 
                   />
                   <div className="text-xs leading-tight text-black">
                     <div>Unit F</div>
@@ -591,7 +598,7 @@ export default function DeliveryNotePage() {
                     <img 
                       src={selectedOrder.company.logo} 
                       alt={`${selectedOrder.companyName} logo`} 
-                      className="h-24 w-auto ml-auto mb-2" 
+                      className="w-32 h-16 ml-auto mb-1 object-contain bg-transparent" 
                     />
                   )}
                   <div className="text-xs text-right text-black">
@@ -642,10 +649,10 @@ export default function DeliveryNotePage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="border border-black text-center font-bold text-black bg-gray-100">Description</TableHead>
-                    <TableHead className="border border-black text-center font-bold w-24 text-black bg-gray-100">QTY Ordered</TableHead>
-                    <TableHead className="border border-black text-center font-bold w-24 text-black bg-gray-100">QTY Delivered</TableHead>
-                    <TableHead className="border border-black text-center font-bold w-24 text-black bg-gray-100">Balance</TableHead>
+                    <TableHead className="border border-black text-center font-bold text-black bg-gray-100 w-[10.5cm]">Description</TableHead>
+                    <TableHead className="border border-black text-center font-bold w-[17mm] text-black bg-gray-100">QTY Ordered</TableHead>
+                    <TableHead className="border border-black text-center font-bold w-[17mm] text-black bg-gray-100">QTY Delivered</TableHead>
+                    <TableHead className="border border-black text-center font-bold w-[17mm] text-black bg-gray-100">Balance</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -654,21 +661,21 @@ export default function DeliveryNotePage() {
                     const balance = item.quantity - delivered;
                     
                     return (
-                      <TableRow key={item.id}>
-                        <TableCell className="border border-black text-black">{item.name}</TableCell>
-                        <TableCell className="border border-black text-center text-black">{item.quantity}</TableCell>
-                        <TableCell className="border border-black text-center text-black">{delivered}</TableCell>
-                        <TableCell className="border border-black text-center text-black">{balance}</TableCell>
+                      <TableRow key={item.id} className="h-[5mm]">
+                        <TableCell className="border border-black text-black p-1 text-xs">{item.name}</TableCell>
+                        <TableCell className="border border-black text-center text-black p-1 text-xs">{item.quantity}</TableCell>
+                        <TableCell className="border border-black text-center text-black p-1 text-xs">{delivered}</TableCell>
+                        <TableCell className="border border-black text-center text-black p-1 text-xs">{balance}</TableCell>
                       </TableRow>
                     );
                   })}
                   {/* Add empty rows to match reference format */}
                   {Array.from({length: Math.max(0, 8 - selectedOrder.items.length)}, (_, index) => (
-                    <TableRow key={`empty-${index}`}>
-                      <TableCell className="border border-black">&nbsp;</TableCell>
-                      <TableCell className="border border-black">&nbsp;</TableCell>
-                      <TableCell className="border border-black">&nbsp;</TableCell>
-                      <TableCell className="border border-black">&nbsp;</TableCell>
+                    <TableRow key={`empty-${index}`} className="h-[5mm]">
+                      <TableCell className="border border-black p-1">&nbsp;</TableCell>
+                      <TableCell className="border border-black p-1">&nbsp;</TableCell>
+                      <TableCell className="border border-black p-1">&nbsp;</TableCell>
+                      <TableCell className="border border-black p-1">&nbsp;</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
