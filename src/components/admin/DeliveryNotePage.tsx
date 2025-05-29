@@ -249,40 +249,39 @@ export default function DeliveryNotePage() {
               margin-bottom: 30px; 
             }
             .logo-section {
-              flex: 1;
               display: flex;
-              flex-direction: column;
               align-items: flex-start;
+              margin-left: -10px;
             }
             .aleph-logo {
-              width: 80mm;
-              height: 40mm;
-              margin-bottom: 5px;
+              width: 40mm;
+              height: 80mm;
+              margin-right: 15px;
               background: transparent;
               object-fit: contain;
             }
-            .contact-info {
+            .admin-contact-info {
               font-size: 9px;
               line-height: 1.2;
               color: black;
-              margin-top: 2px;
+              margin-top: 5px;
             }
             .client-section {
-              flex: 1;
-              text-align: right;
+              display: flex;
+              align-items: flex-start;
+              margin-right: -10px;
             }
             .client-info {
               font-size: 9px;
               line-height: 1.2;
               margin-top: 5px;
               color: black;
+              text-align: right;
+              margin-right: 15px;
             }
             .client-logo {
-              width: 80mm;
-              height: 40mm;
-              margin-bottom: 5px;
-              margin-left: auto;
-              display: block;
+              width: 40mm;
+              height: 80mm;
               background: transparent;
               object-fit: contain;
             }
@@ -293,6 +292,13 @@ export default function DeliveryNotePage() {
               border: 2px solid black;
               padding: 8px;
               margin: 20px 0;
+              color: black;
+            }
+            .copy-title {
+              font-size: 14px;
+              font-weight: bold;
+              text-align: center;
+              margin: 10px 0;
               color: black;
             }
             .info-section { 
@@ -326,11 +332,12 @@ export default function DeliveryNotePage() {
             }
             th, td { 
               border: 1px solid black; 
-              padding: 2px 4px; 
+              padding: 1px 4px; 
               text-align: left; 
               color: black;
-              height: 5mm;
-              line-height: 1.1;
+              height: 4mm;
+              line-height: 1.0;
+              font-size: 10px;
             }
             th { 
               background-color: #f5f5f5; 
@@ -345,25 +352,42 @@ export default function DeliveryNotePage() {
               width: 17mm;
               text-align: center;
             }
-            .comments-section {
-              margin-top: 20px;
-            }
             .signature-section {
-              margin-top: 30px;
+              margin-top: 40px;
+              position: absolute;
+              bottom: 80px;
+              left: 20px;
+              right: 20px;
+            }
+            .signature-row {
+              display: flex;
+              align-items: center;
+              margin-bottom: 10px;
+            }
+            .signature-label {
+              font-weight: bold;
+              text-decoration: underline;
+              margin-right: 15px;
+              color: black;
+              font-size: 10px;
             }
             .signature-line {
               border-bottom: 1px solid black;
-              width: 300px;
-              height: 30px;
-              margin-top: 10px;
+              width: 200px;
+              height: 20px;
+              margin-right: 30px;
+            }
+            .page-break {
+              page-break-before: always;
             }
           </style>
         </head>
         <body>
+          <!-- Original Delivery Note -->
           <div class="header">
             <div class="logo-section">
               <img src="/lovable-uploads/4c615bdd-48d0-4893-a843-01d2335af67a.png" alt="Aleph Engineering & Supplies" class="aleph-logo">
-              <div class="contact-info">
+              <div class="admin-contact-info">
                 Unit F<br>
                 4 Skew Road<br>
                 Anderbolt<br>
@@ -374,9 +398,6 @@ export default function DeliveryNotePage() {
             </div>
             
             <div class="client-section">
-              ${company?.logo ? `
-                <img src="${company.logo}" alt="${company.name} Logo" class="client-logo">
-              ` : ''}
               <div class="client-info">
                 <strong>${company?.name || selectedOrder.companyName}</strong><br>
                 ${company?.address ? company.address.split(',').join('<br>') + '<br>' : ''}
@@ -384,6 +405,9 @@ export default function DeliveryNotePage() {
                 ${company?.phone ? 'Tel: ' + company.phone + '<br>' : ''}
                 ${company?.email ? company.email : ''}
               </div>
+              ${company?.logo ? `
+                <img src="${company.logo}" alt="${company.name} Logo" class="client-logo">
+              ` : ''}
             </div>
           </div>
           
@@ -437,29 +461,109 @@ export default function DeliveryNotePage() {
                   <td style="text-align: center;">${balance}</td>
                 </tr>
               `}).join('')}
-              ${Array.from({length: Math.max(0, 10 - selectedOrder.items.length)}, () => `
-                <tr>
-                  <td>&nbsp;</td>
-                  <td>&nbsp;</td>
-                  <td>&nbsp;</td>
-                  <td>&nbsp;</td>
-                </tr>
-              `).join('')}
             </tbody>
           </table>
           
-          <div class="comments-section">
-            <div class="info-label">COMMENTS:</div>
-            <div class="info-row">
-              <span class="info-label">Date:</span>
+          <div class="signature-section">
+            <div class="signature-row">
+              <span class="signature-label">Date:</span>
+              <div class="signature-line"></div>
+              <span class="signature-label">Signature:</span>
               <div class="signature-line"></div>
             </div>
           </div>
 
-          <div class="signature-section">
-            <div class="info-row">
-              <span class="info-label">Signature:</span>
-              <div class="signature-line"></div>
+          <!-- Copy Delivery Note -->
+          <div class="page-break">
+            <div class="copy-title">COPY</div>
+            
+            <div class="header">
+              <div class="logo-section">
+                <img src="/lovable-uploads/4c615bdd-48d0-4893-a843-01d2335af67a.png" alt="Aleph Engineering & Supplies" class="aleph-logo">
+                <div class="admin-contact-info">
+                  Unit F<br>
+                  4 Skew Road<br>
+                  Anderbolt<br>
+                  Boksburg<br>
+                  needs@alepheng.co.za<br>
+                  072 887 6908
+                </div>
+              </div>
+              
+              <div class="client-section">
+                <div class="client-info">
+                  <strong>${company?.name || selectedOrder.companyName}</strong><br>
+                  ${company?.address ? company.address.split(',').join('<br>') + '<br>' : ''}
+                  ${company?.vatNumber ? 'VAT: ' + company.vatNumber + '<br>' : ''}
+                  ${company?.phone ? 'Tel: ' + company.phone + '<br>' : ''}
+                  ${company?.email ? company.email : ''}
+                </div>
+                ${company?.logo ? `
+                  <img src="${company.logo}" alt="${company.name} Logo" class="client-logo">
+                ` : ''}
+              </div>
+            </div>
+            
+            <div class="delivery-note-title">Delivery Note ${deliveryNoteNumber}</div>
+            
+            <div class="info-section">
+              <div class="info-row">
+                <span class="info-label">Delivery To:</span>
+                <span class="info-value">${selectedOrder.companyName}</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">Reference No:</span>
+                <span class="info-value">${selectedOrder.orderNumber}</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">Att:</span>
+                <span class="info-value">${selectedOrder.attention || 'N/A'}</span>
+              </div>
+            </div>
+
+            <div class="delivery-section">
+              <div class="info-row">
+                <span class="info-label">Delivery of the following:</span>
+              </div>
+            </div>
+
+            <div class="date-section">
+              <div class="info-row">
+                <span style="margin-left: auto;"><span class="info-label">Date:</span> ${deliveryDate}</span>
+              </div>
+            </div>
+            
+            <table>
+              <thead>
+                <tr>
+                  <th class="description-col">Description</th>
+                  <th class="qty-col">QTY Ordered</th>
+                  <th class="qty-col">QTY Delivered</th>
+                  <th class="qty-col">Balance</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${selectedOrder.items.map(item => {
+                  const delivered = item.delivered || 0;
+                  const balance = item.quantity - delivered;
+                  return `
+                  <tr>
+                    <td>${item.name}</td>
+                    <td style="text-align: center;">${item.quantity}</td>
+                    <td style="text-align: center;">${delivered}</td>
+                    <td style="text-align: center;">${balance}</td>
+                  </tr>
+                `}).join('')}
+              </tbody>
+            </table>
+            
+            <div class="signature-section">
+              <div class="signature-row">
+                <span class="signature-label">Date:</span>
+                <div class="signature-line"></div>
+                <span class="signature-label">Signature:</span>
+                <div class="signature-line"></div>
+              </div>
             </div>
           </div>
         </body>
@@ -577,13 +681,13 @@ export default function DeliveryNotePage() {
             <div className="space-y-6 p-4 bg-white border">
               {/* Header section with company details */}
               <div className="flex justify-between items-start">
-                <div className="flex flex-col items-start">
+                <div className="flex items-start -ml-2">
                   <img 
                     src="/lovable-uploads/4c615bdd-48d0-4893-a843-01d2335af67a.png" 
                     alt="Aleph Engineering & Supplies" 
-                    className="w-32 h-16 mb-1 object-contain bg-transparent" 
+                    className="w-16 h-32 mr-4 object-contain bg-transparent" 
                   />
-                  <div className="text-xs leading-tight text-black">
+                  <div className="text-xs leading-tight text-black mt-1">
                     <div>Unit F</div>
                     <div>4 Skew Road</div>
                     <div>Anderbolt</div>
@@ -593,15 +697,8 @@ export default function DeliveryNotePage() {
                   </div>
                 </div>
 
-                <div className="text-right">
-                  {selectedOrder.company?.logo && (
-                    <img 
-                      src={selectedOrder.company.logo} 
-                      alt={`${selectedOrder.companyName} logo`} 
-                      className="w-32 h-16 ml-auto mb-1 object-contain bg-transparent" 
-                    />
-                  )}
-                  <div className="text-xs text-right text-black">
+                <div className="flex items-start -mr-2">
+                  <div className="text-xs text-right text-black mr-4 mt-1">
                     <div className="font-semibold">{selectedOrder.company?.name || selectedOrder.companyName}</div>
                     {selectedOrder.company?.address && selectedOrder.company.address.split(',').map((line, index) => (
                       <div key={index}>{line.trim()}</div>
@@ -610,6 +707,13 @@ export default function DeliveryNotePage() {
                     {selectedOrder.company?.phone && <div>Tel: {selectedOrder.company.phone}</div>}
                     {selectedOrder.company?.email && <div>{selectedOrder.company.email}</div>}
                   </div>
+                  {selectedOrder.company?.logo && (
+                    <img 
+                      src={selectedOrder.company.logo} 
+                      alt={`${selectedOrder.companyName} logo`} 
+                      className="w-16 h-32 object-contain bg-transparent" 
+                    />
+                  )}
                 </div>
               </div>
               
@@ -661,7 +765,7 @@ export default function DeliveryNotePage() {
                     const balance = item.quantity - delivered;
                     
                     return (
-                      <TableRow key={item.id} className="h-[5mm]">
+                      <TableRow key={item.id} className="h-[4mm]">
                         <TableCell className="border border-black text-black p-1 text-xs">{item.name}</TableCell>
                         <TableCell className="border border-black text-center text-black p-1 text-xs">{item.quantity}</TableCell>
                         <TableCell className="border border-black text-center text-black p-1 text-xs">{delivered}</TableCell>
@@ -669,31 +773,20 @@ export default function DeliveryNotePage() {
                       </TableRow>
                     );
                   })}
-                  {/* Add empty rows to match reference format */}
-                  {Array.from({length: Math.max(0, 8 - selectedOrder.items.length)}, (_, index) => (
-                    <TableRow key={`empty-${index}`} className="h-[5mm]">
-                      <TableCell className="border border-black p-1">&nbsp;</TableCell>
-                      <TableCell className="border border-black p-1">&nbsp;</TableCell>
-                      <TableCell className="border border-black p-1">&nbsp;</TableCell>
-                      <TableCell className="border border-black p-1">&nbsp;</TableCell>
-                    </TableRow>
-                  ))}
                 </TableBody>
               </Table>
 
-              {/* Comments and Signature sections */}
-              <div className="space-y-4">
-                <div>
-                  <div className="font-bold underline mb-2 text-black">COMMENTS:</div>
+              {/* Signature section moved to bottom */}
+              <div className="mt-16 space-y-4">
+                <div className="flex items-center space-x-8">
                   <div className="flex items-center">
-                    <span className="font-bold underline mr-4 text-black">Date:</span>
-                    <div className="border-b border-black w-64 h-6"></div>
+                    <span className="font-bold underline mr-4 text-black text-sm">Date:</span>
+                    <div className="border-b border-black w-48 h-6"></div>
                   </div>
-                </div>
-                
-                <div className="flex items-center">
-                  <span className="font-bold underline mr-4 text-black">Signature:</span>
-                  <div className="border-b border-black w-64 h-8"></div>
+                  <div className="flex items-center">
+                    <span className="font-bold underline mr-4 text-black text-sm">Signature:</span>
+                    <div className="border-b border-black w-48 h-6"></div>
+                  </div>
                 </div>
               </div>
 
