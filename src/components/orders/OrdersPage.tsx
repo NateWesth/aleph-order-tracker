@@ -194,6 +194,16 @@ export default function OrdersPage({ isAdmin, companyCode }: OrdersPageProps) {
     });
   };
 
+  // Download or view a file
+  const handleFileAction = (file: OrderFile, action: 'download' | 'view') => {
+    toast({
+      title: action === 'download' ? "Downloading File" : "Opening File",
+      description: `${action === 'download' ? 'Downloading' : 'Opening'} ${file.name}...`,
+    });
+    
+    window.open(file.url, '_blank');
+  };
+
   // Handle order receive (admin only)
   const handleReceiveOrder = (orderId: string) => {
     if (!isAdmin) return;
