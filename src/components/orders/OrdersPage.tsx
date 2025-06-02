@@ -19,10 +19,17 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
-import { CalendarIcon, Plus, Trash, Download, FileText, Printer } from "lucide-react";
+import { CalendarIcon, Plus, Trash, Download, FileText, Printer, Upload, File, Eye } from "lucide-react";
 import { format } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
 import {
@@ -47,6 +54,16 @@ interface OrderItem {
   completed: boolean;
 }
 
+// Define the order file interface
+interface OrderFile {
+  id: string;
+  name: string;
+  url: string;
+  type: 'invoice' | 'quote' | 'purchase-order' | 'proof-of-payment' | 'delivery-note' | 'other';
+  uploadedBy: 'admin' | 'client';
+  uploadDate: Date;
+}
+
 // Define the order interface
 interface Order {
   id: string;
@@ -58,12 +75,7 @@ interface Order {
   status: 'pending' | 'received' | 'in-progress' | 'processing' | 'completed';
   progress?: number;
   progressStage?: 'awaiting-stock' | 'packing' | 'out-for-delivery' | 'completed';
-  files?: {
-    id: string;
-    name: string;
-    url: string;
-    type: 'invoice' | 'quote' | 'purchase-order' | 'proof-of-payment';
-  }[];
+  files?: OrderFile[];
 }
 
 // Form schema for new orders
@@ -92,6 +104,9 @@ export default function OrdersPage({ isAdmin, companyCode }: OrdersPageProps) {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [newItemName, setNewItemName] = useState("");
   const [newItemQuantity, setNewItemQuantity] = useState(1);
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [fileType, setFileType] = useState<'invoice' | 'quote' | 'purchase-order' | 'proof-of-payment' | 'delivery-note' | 'other'>('other');
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
 
   const form = useForm<NewOrderFormValues>({
     resolver: zodResolver(newOrderSchema),
@@ -112,6 +127,107 @@ export default function OrdersPage({ isAdmin, companyCode }: OrdersPageProps) {
   useEffect(() => {
     localStorage.setItem('pendingOrders', JSON.stringify(orders));
   }, [orders]);
+
+  // Handle file selection
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const files = Array.from(e.target.files).slice(0, 3);
+      setSelectedFiles(files);
+    }
+  };
+
+  // Upload files to order
+  const handleFileUpload = () => {
+    if (!selectedOrder || selectedFiles.length === 0) return;
+
+    const newFiles: OrderFile[] = selectedFiles.map(file => ({
+      id: `file-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      name: file.name,
+      url: URL.createObjectURL(file),
+      type: fileType,
+      uploadedBy: isAdmin ? 'admin' : 'client',
+      uploadDate: new Date()
+    }));
+
+    const updatedOrders = orders.map(order => {
+      if (order.id === selectedOrder.id) {
+        return {
+          ...order,
+          files: [...(order.files || []), ...newFiles]
+        };
+      }
+      return order;
+    });
+
+    setOrders(updatedOrders);
+    localStorage.setItem('pendingOrders', JSON.stringify(updatedOrders));
+
+    setSelectedOrder({
+      ...selectedOrder,
+      files: [...(selectedOrder.files || []), ...newFiles]
+    });
+
+    setUploadDialogOpen(false);
+    setSelectedFiles([]);
+    
+    toast({
+      title: "Files Uploaded",
+      description: `${newFiles.length} file(s) have been uploaded successfully.`,
+    });
+  };
+
+  // Handle file download
+  const handleDownload = (fileType: 'pdf' | 'excel', order: Order) => {
+    // In a real app, this would download the actual file
+    toast({
+      title: "Download Started",
+      description: `Downloading order #${order.orderNumber} as ${fileType.toUpperCase()}`,
+    });
+  };
+
+  // Handle file print
+  const handlePrint = (order: Order) => {
+    // In a real app, this would open the print dialog
+    toast({
+      title: "Print",
+      description: `Printing order #${order.orderNumber}`,
+    });
+  };
+
+  // Handle order receive (admin only)
+  const handleReceiveOrder = (orderId: string) => {
+    if (!isAdmin) return;
+
+    const orderToReceive = orders.find(order => order.id === orderId);
+    if (!orderToReceive) return;
+
+    const receivedOrder = { 
+      ...orderToReceive, 
+      status: 'received' as const, 
+      progress: 0, 
+      progressStage: 'awaiting-stock' as const 
+    };
+
+    // Remove from pending orders
+    const remainingOrders = orders.filter(order => order.id !== orderId);
+    setOrders(remainingOrders);
+    localStorage.setItem('pendingOrders', JSON.stringify(remainingOrders));
+
+    // Add to progress orders
+    const existingProgressOrders = JSON.parse(localStorage.getItem('progressOrders') || '[]');
+    const updatedProgressOrders = [...existingProgressOrders, receivedOrder];
+    localStorage.setItem('progressOrders', JSON.stringify(updatedProgressOrders));
+
+    // Add to delivery orders
+    const existingDeliveryOrders = JSON.parse(localStorage.getItem('deliveryOrders') || '[]');
+    const updatedDeliveryOrders = [...existingDeliveryOrders, receivedOrder];
+    localStorage.setItem('deliveryOrders', JSON.stringify(updatedDeliveryOrders));
+
+    toast({
+      title: "Order Received",
+      description: "Order has been moved to progress tracking and delivery notes.",
+    });
+  };
 
   // Add a new item to the form
   const addItem = () => {
@@ -176,59 +292,6 @@ export default function OrdersPage({ isAdmin, companyCode }: OrdersPageProps) {
     });
   };
 
-  // Handle file download
-  const handleDownload = (fileType: 'pdf' | 'excel', order: Order) => {
-    // In a real app, this would download the actual file
-    toast({
-      title: "Download Started",
-      description: `Downloading order #${order.orderNumber} as ${fileType.toUpperCase()}`,
-    });
-  };
-
-  // Handle file print
-  const handlePrint = (order: Order) => {
-    // In a real app, this would open the print dialog
-    toast({
-      title: "Print",
-      description: `Printing order #${order.orderNumber}`,
-    });
-  };
-
-  // Handle order receive (admin only)
-  const handleReceiveOrder = (orderId: string) => {
-    if (!isAdmin) return;
-
-    const orderToReceive = orders.find(order => order.id === orderId);
-    if (!orderToReceive) return;
-
-    const receivedOrder = { 
-      ...orderToReceive, 
-      status: 'received' as const, 
-      progress: 0, 
-      progressStage: 'awaiting-stock' as const 
-    };
-
-    // Remove from pending orders
-    const remainingOrders = orders.filter(order => order.id !== orderId);
-    setOrders(remainingOrders);
-    localStorage.setItem('pendingOrders', JSON.stringify(remainingOrders));
-
-    // Add to progress orders
-    const existingProgressOrders = JSON.parse(localStorage.getItem('progressOrders') || '[]');
-    const updatedProgressOrders = [...existingProgressOrders, receivedOrder];
-    localStorage.setItem('progressOrders', JSON.stringify(updatedProgressOrders));
-
-    // Add to delivery orders
-    const existingDeliveryOrders = JSON.parse(localStorage.getItem('deliveryOrders') || '[]');
-    const updatedDeliveryOrders = [...existingDeliveryOrders, receivedOrder];
-    localStorage.setItem('deliveryOrders', JSON.stringify(updatedDeliveryOrders));
-
-    toast({
-      title: "Order Received",
-      description: "Order has been moved to progress tracking and delivery notes.",
-    });
-  };
-
   // Reset form when dialog closes
   const handleDialogClose = () => {
     form.reset();
@@ -284,6 +347,11 @@ export default function OrdersPage({ isAdmin, companyCode }: OrdersPageProps) {
                     <p className="text-sm text-gray-600">
                       Due: {format(order.dueDate, 'MMM d, yyyy')}
                     </p>
+                    {order.files && order.files.length > 0 && (
+                      <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded mt-1 inline-block">
+                        {order.files.length} Files
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     {/* Download/Print options */}
@@ -575,9 +643,132 @@ export default function OrdersPage({ isAdmin, companyCode }: OrdersPageProps) {
                   ))}
                 </div>
               </div>
+
+              {/* Files Section */}
+              <div>
+                <div className="flex justify-between items-center mb-2">
+                  <h3 className="font-medium">Files</h3>
+                  <Button
+                    size="sm"
+                    onClick={() => setUploadDialogOpen(true)}
+                  >
+                    <Upload className="h-4 w-4 mr-1" />
+                    Upload Files
+                  </Button>
+                </div>
+                
+                {(!selectedOrder.files || selectedOrder.files.length === 0) ? (
+                  <div className="text-center p-6 border rounded-md border-dashed">
+                    <p className="text-gray-500">No files uploaded yet.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {selectedOrder.files.map(file => (
+                      <div key={file.id} className="border rounded-md p-3 flex justify-between items-center">
+                        <div className="flex items-center">
+                          <File className="h-5 w-5 mr-2 text-blue-500" />
+                          <div>
+                            <p className="text-sm font-medium truncate max-w-[200px]">{file.name}</p>
+                            <p className="text-xs text-gray-500 capitalize">
+                              {file.type.replace('-', ' ')} • {file.uploadedBy}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex space-x-2">
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => handleFileAction(file, 'download')}
+                          >
+                            Download
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => handleFileAction(file, 'view')}
+                          >
+                            View
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </DialogContent>
         )}
+      </Dialog>
+
+      {/* File Upload Dialog */}
+      <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Upload Files</DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">File Type</label>
+              <Select value={fileType} onValueChange={(value: any) => setFileType(value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select file type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {isAdmin ? (
+                    <>
+                      <SelectItem value="invoice">Invoice</SelectItem>
+                      <SelectItem value="quote">Quote</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </>
+                  ) : (
+                    <>
+                      <SelectItem value="purchase-order">Purchase Order</SelectItem>
+                      <SelectItem value="proof-of-payment">Proof of Payment</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                Files (Max 3)
+              </label>
+              <div className="border-2 border-dashed rounded-md p-4 text-center relative">
+                {selectedFiles.length > 0 ? (
+                  <ul className="text-left space-y-1">
+                    {selectedFiles.map((file, index) => (
+                      <li key={index} className="text-sm">{file.name}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-gray-500">Click to select files or drag and drop</p>
+                )}
+                <input 
+                  type="file" 
+                  multiple 
+                  accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" 
+                  onChange={handleFileChange}
+                  className="absolute inset-0 opacity-0 cursor-pointer"
+                />
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                Supported formats: PDF, DOC, DOCX, JPG, PNG. Maximum 3 files.
+              </p>
+            </div>
+          </div>
+          
+          <div className="flex justify-end">
+            <Button 
+              onClick={handleFileUpload}
+              disabled={selectedFiles.length === 0}
+            >
+              Upload Files
+            </Button>
+          </div>
+        </DialogContent>
       </Dialog>
     </div>
   );

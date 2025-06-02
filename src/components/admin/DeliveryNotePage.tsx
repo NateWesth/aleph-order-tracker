@@ -8,8 +8,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { format } from "date-fns";
-import { Printer, Eye } from "lucide-react";
+import { Printer, Eye, Upload, File, Plus } from "lucide-react";
 
 // Define the order item interface
 interface OrderItem {
@@ -51,8 +58,18 @@ interface Order {
     id: string;
     name: string;
     url: string;
-    type: 'invoice' | 'quote' | 'purchase-order' | 'proof-of-payment';
+    type: 'invoice' | 'quote' | 'purchase-order' | 'proof-of-payment' | 'delivery-note' | 'other';
   }[];
+}
+
+// Define the order file interface
+interface OrderFile {
+  id: string;
+  name: string;
+  url: string;
+  type: 'invoice' | 'quote' | 'purchase-order' | 'proof-of-payment' | 'delivery-note' | 'other';
+  uploadedBy: 'admin' | 'client';
+  uploadDate: Date;
 }
 
 export default function DeliveryNotePage() {
@@ -60,6 +77,9 @@ export default function DeliveryNotePage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showPreview, setShowPreview] = useState(false);
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [fileType, setFileType] = useState<'invoice' | 'quote' | 'purchase-order' | 'proof-of-payment' | 'delivery-note' | 'other'>('other');
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
 
   // Load orders from localStorage on component mount
   useEffect(() => {
@@ -111,6 +131,78 @@ export default function DeliveryNotePage() {
     localStorage.setItem('progressOrders', JSON.stringify(updatedProgressOrders));
   };
 
+  // Handle file selection
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const files = Array.from(e.target.files).slice(0, 3);
+      setSelectedFiles(files);
+    }
+  };
+
+  // Upload files to order
+  const handleFileUpload = () => {
+    if (!selectedOrder || selectedFiles.length === 0) return;
+
+    const newFiles: OrderFile[] = selectedFiles.map(file => ({
+      id: `file-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      name: file.name,
+      url: URL.createObjectURL(file),
+      type: fileType,
+      uploadedBy: 'admin',
+      uploadDate: new Date()
+    }));
+
+    // Update the order with new files
+    const updatedOrders = orders.map(order => {
+      if (order.id === selectedOrder.id) {
+        return {
+          ...order,
+          files: [...(order.files || []), ...newFiles]
+        };
+      }
+      return order;
+    });
+
+    setOrders(updatedOrders);
+    localStorage.setItem('deliveryOrders', JSON.stringify(updatedOrders));
+
+    // Also update in other storage locations
+    const progressOrders = JSON.parse(localStorage.getItem('progressOrders') || '[]');
+    const updatedProgressOrders = progressOrders.map((order: Order) => {
+      if (order.id === selectedOrder.id) {
+        return {
+          ...order,
+          files: [...(order.files || []), ...newFiles]
+        };
+      }
+      return order;
+    });
+    localStorage.setItem('progressOrders', JSON.stringify(updatedProgressOrders));
+
+    setSelectedOrder({
+      ...selectedOrder,
+      files: [...(selectedOrder.files || []), ...newFiles]
+    });
+
+    setUploadDialogOpen(false);
+    setSelectedFiles([]);
+    
+    toast({
+      title: "Files Uploaded",
+      description: `${newFiles.length} file(s) have been uploaded successfully.`,
+    });
+  };
+
+  // Download or view a file
+  const handleFileAction = (file: OrderFile, action: 'download' | 'view') => {
+    toast({
+      title: action === 'download' ? "Downloading File" : "Opening File",
+      description: `${action === 'download' ? 'Downloading' : 'Opening'} ${file.name}...`,
+    });
+    
+    window.open(file.url, '_blank');
+  };
+
   // View order details
   const viewOrderDetails = (order: Order) => {
     setSelectedOrder(order);
@@ -158,37 +250,23 @@ export default function DeliveryNotePage() {
               }
               .header { 
                 display: flex; 
-                justify-content: space-between; 
+                justify-content: flex-end; 
                 align-items: flex-start; 
                 margin-bottom: 15mm; 
+                position: relative;
               }
               .logo { 
-                width: 40mm; 
-                height: 80mm; 
+                width: 60mm; 
+                height: 40mm; 
                 object-fit: contain; 
               }
-              .admin-section { 
-                display: flex; 
-                align-items: flex-start; 
-                margin-left: 5mm; 
-              }
-              .client-section { 
-                display: flex; 
-                align-items: flex-start; 
-                margin-right: 5mm; 
-              }
               .company-details { 
+                position: absolute;
+                right: 65mm;
+                top: 0;
                 font-size: 10px; 
                 line-height: 1.3; 
                 max-width: 60mm; 
-                margin-left: 5mm; 
-              }
-              .client-details { 
-                font-size: 10px; 
-                line-height: 1.3; 
-                max-width: 60mm; 
-                margin-right: 5mm; 
-                text-align: right; 
               }
               .delivery-note-number { 
                 text-align: center; 
@@ -206,13 +284,13 @@ export default function DeliveryNotePage() {
               table { 
                 width: 100%; 
                 border-collapse: collapse; 
-                margin-bottom: 20mm; 
+                margin-bottom: 15mm; 
               }
               th, td { 
                 border: 1px solid black; 
-                padding: 2mm; 
+                padding: 1.5mm; 
                 text-align: left; 
-                height: 4mm; 
+                height: 6mm; 
                 font-size: 10px; 
               }
               th { 
@@ -228,16 +306,16 @@ export default function DeliveryNotePage() {
               }
               .footer { 
                 position: absolute; 
-                bottom: 15mm; 
+                bottom: 10mm; 
                 left: 10mm; 
                 right: 10mm; 
                 display: flex; 
                 justify-content: space-between; 
-                font-size: 10px; 
+                font-size: 9px; 
               }
               .signature-section { 
                 text-align: center; 
-                width: 80mm; 
+                width: 60mm; 
               }
               .date-section { 
                 text-align: center; 
@@ -249,25 +327,14 @@ export default function DeliveryNotePage() {
             <!-- Original Page -->
             <div class="page">
               <div class="header">
-                <div class="admin-section">
-                  <img src="/lovable-uploads/4c615bdd-48d0-4893-a843-01d2335af67a.png" alt="Admin Logo" class="logo" />
-                  <div class="company-details">
-                    <strong>ALEPH TRADING AND PROJECTS CC</strong><br/>
-                    123 Business Street<br/>
-                    Johannesburg, 2000<br/>
-                    VAT: 4123456789<br/>
-                    Tel: 011 234 5678
-                  </div>
+                <div class="company-details">
+                  <strong>ALEPH TRADING AND PROJECTS CC</strong><br/>
+                  123 Business Street<br/>
+                  Johannesburg, 2000<br/>
+                  VAT: 4123456789<br/>
+                  Tel: 011 234 5678
                 </div>
-                <div class="client-section">
-                  <div class="client-details">
-                    <strong>${selectedOrder.companyName}</strong><br/>
-                    ${selectedOrder.company?.address || ''}<br/>
-                    ${selectedOrder.company?.vatNumber ? `VAT: ${selectedOrder.company.vatNumber}` : ''}<br/>
-                    ${selectedOrder.company?.phone ? `Tel: ${selectedOrder.company.phone}` : ''}
-                  </div>
-                  ${selectedOrder.company?.logo ? `<img src="${selectedOrder.company.logo}" alt="Client Logo" class="logo" />` : ''}
-                </div>
+                <img src="/lovable-uploads/4c615bdd-48d0-4893-a843-01d2335af67a.png" alt="Aleph Logo" class="logo" />
               </div>
               
               <div class="delivery-note-number">
@@ -311,25 +378,14 @@ export default function DeliveryNotePage() {
             <div class="page">
               <div class="copy-indicator">COPY</div>
               <div class="header">
-                <div class="admin-section">
-                  <img src="/lovable-uploads/4c615bdd-48d0-4893-a843-01d2335af67a.png" alt="Admin Logo" class="logo" />
-                  <div class="company-details">
-                    <strong>ALEPH TRADING AND PROJECTS CC</strong><br/>
-                    123 Business Street<br/>
-                    Johannesburg, 2000<br/>
-                    VAT: 4123456789<br/>
-                    Tel: 011 234 5678
-                  </div>
+                <div class="company-details">
+                  <strong>ALEPH TRADING AND PROJECTS CC</strong><br/>
+                  123 Business Street<br/>
+                  Johannesburg, 2000<br/>
+                  VAT: 4123456789<br/>
+                  Tel: 011 234 5678
                 </div>
-                <div class="client-section">
-                  <div class="client-details">
-                    <strong>${selectedOrder.companyName}</strong><br/>
-                    ${selectedOrder.company?.address || ''}<br/>
-                    ${selectedOrder.company?.vatNumber ? `VAT: ${selectedOrder.company.vatNumber}` : ''}<br/>
-                    ${selectedOrder.company?.phone ? `Tel: ${selectedOrder.company.phone}` : ''}
-                  </div>
-                  ${selectedOrder.company?.logo ? `<img src="${selectedOrder.company.logo}" alt="Client Logo" class="logo" />` : ''}
-                </div>
+                <img src="/lovable-uploads/4c615bdd-48d0-4893-a843-01d2335af67a.png" alt="Aleph Logo" class="logo" />
               </div>
               
               <div class="delivery-note-number">
@@ -403,6 +459,11 @@ export default function DeliveryNotePage() {
                   <p className="text-sm text-gray-600">
                     Due: {format(order.dueDate, 'MMM d, yyyy')}
                   </p>
+                  {order.files && order.files.length > 0 && (
+                    <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded mt-1 inline-block">
+                      {order.files.length} Files
+                    </span>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   <Button 
@@ -485,6 +546,56 @@ export default function DeliveryNotePage() {
                   ))}
                 </div>
               </div>
+
+              {/* Files Section */}
+              <div>
+                <div className="flex justify-between items-center mb-2">
+                  <h3 className="font-medium">Files</h3>
+                  <Button
+                    size="sm"
+                    onClick={() => setUploadDialogOpen(true)}
+                  >
+                    <Upload className="h-4 w-4 mr-1" />
+                    Upload Files
+                  </Button>
+                </div>
+                
+                {(!selectedOrder.files || selectedOrder.files.length === 0) ? (
+                  <div className="text-center p-6 border rounded-md border-dashed">
+                    <p className="text-gray-500">No files uploaded yet.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {selectedOrder.files.map(file => (
+                      <div key={file.id} className="border rounded-md p-3 flex justify-between items-center">
+                        <div className="flex items-center">
+                          <File className="h-5 w-5 mr-2 text-blue-500" />
+                          <div>
+                            <p className="text-sm font-medium truncate max-w-[200px]">{file.name}</p>
+                            <p className="text-xs text-gray-500 capitalize">{file.type.replace('-', ' ')}</p>
+                          </div>
+                        </div>
+                        <div className="flex space-x-2">
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => handleFileAction(file, 'download')}
+                          >
+                            Download
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => handleFileAction(file, 'view')}
+                          >
+                            View
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </DialogContent>
         )}
@@ -501,6 +612,70 @@ export default function DeliveryNotePage() {
             <Button onClick={printDeliveryNote} className="w-full">
               <Printer className="h-4 w-4 mr-2" />
               Print Delivery Note
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* File Upload Dialog */}
+      <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Upload Files</DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">File Type</label>
+              <Select value={fileType} onValueChange={(value: any) => setFileType(value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select file type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="delivery-note">Delivery Note</SelectItem>
+                  <SelectItem value="invoice">Invoice</SelectItem>
+                  <SelectItem value="quote">Quote</SelectItem>
+                  <SelectItem value="purchase-order">Purchase Order</SelectItem>
+                  <SelectItem value="proof-of-payment">Proof of Payment</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                Files (Max 3)
+              </label>
+              <div className="border-2 border-dashed rounded-md p-4 text-center relative">
+                {selectedFiles.length > 0 ? (
+                  <ul className="text-left space-y-1">
+                    {selectedFiles.map((file, index) => (
+                      <li key={index} className="text-sm">{file.name}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-gray-500">Click to select files or drag and drop</p>
+                )}
+                <input 
+                  type="file" 
+                  multiple 
+                  accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" 
+                  onChange={handleFileChange}
+                  className="absolute inset-0 opacity-0 cursor-pointer"
+                />
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                Supported formats: PDF, DOC, DOCX, JPG, PNG. Maximum 3 files.
+              </p>
+            </div>
+          </div>
+          
+          <div className="flex justify-end">
+            <Button 
+              onClick={handleFileUpload}
+              disabled={selectedFiles.length === 0}
+            >
+              Upload Files
             </Button>
           </div>
         </DialogContent>
