@@ -11,14 +11,10 @@ import { useToast } from "@/hooks/use-toast";
 import { Mail, Lock } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import ForgotPasswordForm from "./ForgotPasswordForm";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 const loginFormSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address" }),
-  password: z.string().min(8, { message: "Password must be at least 8 characters" }),
-  userType: z.enum(["client", "admin"], {
-    required_error: "Please select a user type",
-  })
+  password: z.string().min(1, { message: "Password is required" }),
 });
 
 type LoginFormValues = z.infer<typeof loginFormSchema>;
@@ -34,7 +30,6 @@ const LoginForm = () => {
     defaultValues: {
       email: "",
       password: "",
-      userType: "client"
     },
   });
 
@@ -42,18 +37,37 @@ const LoginForm = () => {
     setIsLoading(true);
     
     try {
-      // This is where you would integrate with your authentication service
-      console.log("Login attempt:", values);
+      // Get registered users from localStorage
+      const registeredUsers = JSON.parse(localStorage.getItem('registeredUsers') || '[]');
       
-      // Simulating a successful login for now
+      // Find user with matching email and password
+      const user = registeredUsers.find((u: any) => 
+        u.email === values.email && u.password === values.password
+      );
+
+      if (!user) {
+        toast({
+          title: "Login failed",
+          description: "Invalid email or password. Please check your credentials.",
+          variant: "destructive",
+        });
+        setIsLoading(false);
+        return;
+      }
+
+      // Store current user session
+      localStorage.setItem('currentUser', JSON.stringify(user));
+      
+      console.log("Login successful:", { email: user.email, userType: user.userType });
+      
       setTimeout(() => {
         toast({
           title: "Login successful",
-          description: `Welcome back! You're logged in as a ${values.userType}.`,
+          description: `Welcome back! You're logged in as ${user.userType === 'supplier' ? 'an admin' : 'a client'}.`,
         });
         
         // Redirect to appropriate dashboard based on user type
-        if (values.userType === "admin") {
+        if (user.userType === "supplier") {
           navigate("/admin-dashboard");
         } else {
           navigate("/client-dashboard");
@@ -66,7 +80,7 @@ const LoginForm = () => {
       console.error("Login error:", error);
       toast({
         title: "Login failed",
-        description: "Invalid email or password",
+        description: "An error occurred during login. Please try again.",
         variant: "destructive",
       });
       setIsLoading(false);
@@ -81,37 +95,6 @@ const LoginForm = () => {
     <>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-          <FormField
-            control={form.control}
-            name="userType"
-            render={({ field }) => (
-              <FormItem className="space-y-3">
-                <FormLabel className="dark:text-gray-200">Login as</FormLabel>
-                <FormControl>
-                  <RadioGroup
-                    onValueChange={field.onChange}
-                    value={field.value}
-                    className="flex space-x-4"
-                  >
-                    <FormItem className="flex items-center space-x-2">
-                      <FormControl>
-                        <RadioGroupItem value="client" />
-                      </FormControl>
-                      <FormLabel className="font-normal cursor-pointer dark:text-gray-200">Client</FormLabel>
-                    </FormItem>
-                    <FormItem className="flex items-center space-x-2">
-                      <FormControl>
-                        <RadioGroupItem value="admin" />
-                      </FormControl>
-                      <FormLabel className="font-normal cursor-pointer dark:text-gray-200">Admin</FormLabel>
-                    </FormItem>
-                  </RadioGroup>
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          
           <FormField
             control={form.control}
             name="email"

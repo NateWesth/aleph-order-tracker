@@ -9,12 +9,13 @@ import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
-import { Mail, User, Phone, Building, Lock } from "lucide-react";
+import { Mail, User, Phone, Building, Lock, Shield } from "lucide-react";
 
 const registerFormSchema = z.object({
   userType: z.enum(["client", "supplier"], {
     required_error: "Please select an account type",
   }),
+  companyCode: z.string().min(1, { message: "Company code is required" }),
   email: z.string().email({ message: "Please enter a valid email address" }),
   firstName: z.string().min(2, { message: "First name must be at least 2 characters" }),
   lastName: z.string().min(2, { message: "Last name must be at least 2 characters" }),
@@ -28,6 +29,14 @@ const registerFormSchema = z.object({
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords do not match",
   path: ["confirmPassword"],
+}).refine((data) => {
+  if (data.userType === "supplier" && data.companyCode !== "ALEPH7901") {
+    return false;
+  }
+  return true;
+}, {
+  message: "Invalid company code for admin registration",
+  path: ["companyCode"],
 });
 
 type RegisterFormValues = z.infer<typeof registerFormSchema>;
@@ -41,6 +50,7 @@ const RegisterForm = () => {
     resolver: zodResolver(registerFormSchema),
     defaultValues: {
       userType: "client",
+      companyCode: "",
       email: "",
       firstName: "",
       lastName: "",
@@ -51,20 +61,63 @@ const RegisterForm = () => {
     },
   });
 
+  const userType = form.watch("userType");
+
   const onSubmit = async (values: RegisterFormValues) => {
     setIsLoading(true);
     
     try {
-      // This is where you would integrate with your authentication service
-      console.log("Registration data:", values);
+      // Validate company codes
+      if (values.userType === "supplier" && values.companyCode !== "ALEPH7901") {
+        toast({
+          title: "Registration failed",
+          description: "Invalid company code for admin registration",
+          variant: "destructive",
+        });
+        setIsLoading(false);
+        return;
+      }
+
+      // Store user data in localStorage (in a real app, this would be sent to a backend)
+      const userData = {
+        id: Date.now().toString(),
+        email: values.email,
+        password: values.password, // In a real app, this would be hashed
+        firstName: values.firstName,
+        lastName: values.lastName,
+        companyName: values.companyName,
+        phoneNumber: values.phoneNumber,
+        userType: values.userType,
+        companyCode: values.companyCode,
+        createdAt: new Date().toISOString(),
+      };
+
+      // Get existing users or initialize empty array
+      const existingUsers = JSON.parse(localStorage.getItem('registeredUsers') || '[]');
       
-      // Simulating a successful registration for now
+      // Check if email already exists
+      if (existingUsers.some((user: any) => user.email === values.email)) {
+        toast({
+          title: "Registration failed",
+          description: "An account with this email already exists",
+          variant: "destructive",
+        });
+        setIsLoading(false);
+        return;
+      }
+
+      // Add new user
+      existingUsers.push(userData);
+      localStorage.setItem('registeredUsers', JSON.stringify(existingUsers));
+
+      console.log("Registration successful:", userData);
+      
       setTimeout(() => {
         toast({
           title: "Registration successful",
-          description: `Your ${values.userType} account has been created!`,
+          description: `Your ${values.userType} account has been created! You can now log in.`,
         });
-        navigate("/");
+        navigate("/auth");
         setIsLoading(false);
       }, 1000);
       
@@ -104,9 +157,32 @@ const RegisterForm = () => {
                     <FormControl>
                       <RadioGroupItem value="supplier" />
                     </FormControl>
-                    <FormLabel className="font-normal cursor-pointer">Supplier</FormLabel>
+                    <FormLabel className="font-normal cursor-pointer">Admin</FormLabel>
                   </FormItem>
                 </RadioGroup>
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="companyCode"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>
+                Company Code {userType === "supplier" && "(Must be ALEPH7901 for Admin)"}
+              </FormLabel>
+              <FormControl>
+                <div className="flex items-center border rounded-md focus-within:ring-2 focus-within:ring-ring focus-within:border-input">
+                  <Shield className="w-4 h-4 ml-3 text-gray-500" />
+                  <Input 
+                    placeholder={userType === "supplier" ? "ALEPH7901" : "Enter your company code"} 
+                    className="border-0 focus-visible:ring-0" 
+                    {...field} 
+                  />
+                </div>
               </FormControl>
               <FormMessage />
             </FormItem>
