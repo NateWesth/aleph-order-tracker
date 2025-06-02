@@ -148,7 +148,7 @@ export default function DeliveryNotePage() {
       name: file.name,
       url: URL.createObjectURL(file),
       type: fileType,
-      uploadedBy: 'admin',
+      uploadedBy: 'admin' as const,
       uploadDate: new Date()
     }));
 
