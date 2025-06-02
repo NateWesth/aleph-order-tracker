@@ -1,5 +1,4 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -61,6 +60,17 @@ export default function ProcessingPage({ isAdmin }: ProcessingPageProps) {
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [fileType, setFileType] = useState<'invoice' | 'quote' | 'purchase-order' | 'proof-of-payment'>('invoice');
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+
+  // Load orders from localStorage on component mount
+  useEffect(() => {
+    const storedProcessingOrders = JSON.parse(localStorage.getItem('processingOrders') || '[]');
+    setOrders(storedProcessingOrders);
+  }, []);
+
+  // Save orders to localStorage whenever orders change
+  useEffect(() => {
+    localStorage.setItem('processingOrders', JSON.stringify(orders));
+  }, [orders]);
 
   // View order details
   const viewOrderDetails = (order: Order) => {
@@ -146,15 +156,37 @@ export default function ProcessingPage({ isAdmin }: ProcessingPageProps) {
   const completeOrder = (orderId: string) => {
     if (!isAdmin) return;
 
-    setOrders(orders.map(order => {
-      if (order.id === orderId) {
-        return {
-          ...order,
-          status: 'completed'
-        };
-      }
-      return order;
-    }));
+    const orderToComplete = orders.find(order => order.id === orderId);
+    if (!orderToComplete) return;
+
+    // Check if required documents are present
+    const hasAdminDocs = orderToComplete.files?.some(f => f.type === 'invoice' || f.type === 'quote');
+    const hasClientDocs = orderToComplete.files?.some(f => f.type === 'purchase-order' || f.type === 'proof-of-payment');
+
+    if (!hasAdminDocs || !hasClientDocs) {
+      toast({
+        title: "Cannot Complete Order",
+        description: "Required documents must be uploaded before completing the order.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const completedOrder = {
+      ...orderToComplete,
+      status: 'completed' as const,
+      completedDate: new Date()
+    };
+
+    // Remove from processing orders
+    const remainingOrders = orders.filter(order => order.id !== orderId);
+    setOrders(remainingOrders);
+    localStorage.setItem('processingOrders', JSON.stringify(remainingOrders));
+
+    // Add to completed orders
+    const existingCompletedOrders = JSON.parse(localStorage.getItem('completedOrders') || '[]');
+    const updatedCompletedOrders = [...existingCompletedOrders, completedOrder];
+    localStorage.setItem('completedOrders', JSON.stringify(updatedCompletedOrders));
 
     toast({
       title: "Order Completed",

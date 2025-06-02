@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { Progress } from "@/components/ui/progress";
@@ -102,6 +102,17 @@ export default function OrdersPage({ isAdmin, companyCode }: OrdersPageProps) {
     },
   });
 
+  // Load orders from localStorage on component mount
+  useEffect(() => {
+    const storedPendingOrders = JSON.parse(localStorage.getItem('pendingOrders') || '[]');
+    setOrders(storedPendingOrders);
+  }, []);
+
+  // Save orders to localStorage whenever orders change
+  useEffect(() => {
+    localStorage.setItem('pendingOrders', JSON.stringify(orders));
+  }, [orders]);
+
   // Add a new item to the form
   const addItem = () => {
     if (!newItemName) {
@@ -152,7 +163,10 @@ export default function OrdersPage({ isAdmin, companyCode }: OrdersPageProps) {
       status: 'pending'
     };
 
-    setOrders([...orders, newOrder]);
+    const updatedOrders = [...orders, newOrder];
+    setOrders(updatedOrders);
+    localStorage.setItem('pendingOrders', JSON.stringify(updatedOrders));
+    
     setIsNewOrderDialogOpen(false);
     form.reset();
 
@@ -184,15 +198,34 @@ export default function OrdersPage({ isAdmin, companyCode }: OrdersPageProps) {
   const handleReceiveOrder = (orderId: string) => {
     if (!isAdmin) return;
 
-    setOrders(orders.map(order => 
-      order.id === orderId 
-        ? { ...order, status: 'received', progress: 0, progressStage: 'awaiting-stock' } 
-        : order
-    ));
+    const orderToReceive = orders.find(order => order.id === orderId);
+    if (!orderToReceive) return;
+
+    const receivedOrder = { 
+      ...orderToReceive, 
+      status: 'received' as const, 
+      progress: 0, 
+      progressStage: 'awaiting-stock' as const 
+    };
+
+    // Remove from pending orders
+    const remainingOrders = orders.filter(order => order.id !== orderId);
+    setOrders(remainingOrders);
+    localStorage.setItem('pendingOrders', JSON.stringify(remainingOrders));
+
+    // Add to progress orders
+    const existingProgressOrders = JSON.parse(localStorage.getItem('progressOrders') || '[]');
+    const updatedProgressOrders = [...existingProgressOrders, receivedOrder];
+    localStorage.setItem('progressOrders', JSON.stringify(updatedProgressOrders));
+
+    // Add to delivery orders
+    const existingDeliveryOrders = JSON.parse(localStorage.getItem('deliveryOrders') || '[]');
+    const updatedDeliveryOrders = [...existingDeliveryOrders, receivedOrder];
+    localStorage.setItem('deliveryOrders', JSON.stringify(updatedDeliveryOrders));
 
     toast({
       title: "Order Received",
-      description: "Order has been moved to progress tracking.",
+      description: "Order has been moved to progress tracking and delivery notes.",
     });
   };
 

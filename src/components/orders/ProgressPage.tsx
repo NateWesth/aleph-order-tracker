@@ -1,5 +1,4 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { Progress } from "@/components/ui/progress";
@@ -118,8 +117,19 @@ const mockOrders: Order[] = [
 
 export default function ProgressPage({ isAdmin }: ProgressPageProps) {
   const { toast } = useToast();
-  const [orders, setOrders] = useState<Order[]>(mockOrders);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+
+  // Load orders from localStorage on component mount
+  useEffect(() => {
+    const storedProgressOrders = JSON.parse(localStorage.getItem('progressOrders') || '[]');
+    setOrders(storedProgressOrders);
+  }, []);
+
+  // Save orders to localStorage whenever orders change
+  useEffect(() => {
+    localStorage.setItem('progressOrders', JSON.stringify(orders));
+  }, [orders]);
 
   // Progress stages with corresponding percentage values
   const progressStages = [
@@ -181,7 +191,7 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
   const updateItemDelivery = (orderId: string, itemId: string, delivered: number) => {
     if (!isAdmin) return;
 
-    setOrders(orders.map(order => {
+    const updatedOrders = orders.map(order => {
       if (order.id === orderId) {
         return {
           ...order,
@@ -194,13 +204,16 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
         };
       }
       return order;
-    }));
+    });
+
+    setOrders(updatedOrders);
+    localStorage.setItem('progressOrders', JSON.stringify(updatedOrders));
   };
 
   const toggleItemCompletion = (orderId: string, itemId: string) => {
     if (!isAdmin) return;
 
-    setOrders(orders.map(order => {
+    const updatedOrders = orders.map(order => {
       if (order.id === orderId) {
         return {
           ...order,
@@ -216,7 +229,10 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
         };
       }
       return order;
-    }));
+    });
+
+    setOrders(updatedOrders);
+    localStorage.setItem('progressOrders', JSON.stringify(updatedOrders));
 
     toast({
       title: "Item Status Updated",
@@ -233,39 +249,52 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
   const completeOrder = (orderId: string) => {
     if (!isAdmin) return;
 
-    setOrders(orders.map(order => {
-      if (order.id === orderId) {
-        if (!areAllItemsCompleted(order)) {
-          toast({
-            title: "Cannot Complete Order",
-            description: "All items must be marked as complete first.",
-            variant: "destructive",
-          });
-          return order;
-        }
-        
-        // Update all items to be fully delivered
-        const updatedItems = order.items.map(item => ({
-          ...item,
-          completed: true,
-          delivered: item.quantity
-        }));
-        
-        return {
-          ...order,
-          items: updatedItems,
-          status: 'processing',
-          progress: 100,
-          progressStage: 'completed'
-        };
-      }
-      return order;
-    }));
+    const orderToComplete = orders.find(order => order.id === orderId);
+    if (!orderToComplete) return;
+
+    if (!areAllItemsCompleted(orderToComplete)) {
+      toast({
+        title: "Cannot Complete Order",
+        description: "All items must be marked as complete first.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Update all items to be fully delivered
+    const completedOrder = {
+      ...orderToComplete,
+      items: orderToComplete.items.map(item => ({
+        ...item,
+        completed: true,
+        delivered: item.quantity
+      })),
+      status: 'processing' as const,
+      progress: 100,
+      progressStage: 'completed' as const
+    };
+
+    // Remove from progress orders
+    const remainingOrders = orders.filter(order => order.id !== orderId);
+    setOrders(remainingOrders);
+    localStorage.setItem('progressOrders', JSON.stringify(remainingOrders));
+
+    // Add to processing orders
+    const existingProcessingOrders = JSON.parse(localStorage.getItem('processingOrders') || '[]');
+    const updatedProcessingOrders = [...existingProcessingOrders, completedOrder];
+    localStorage.setItem('processingOrders', JSON.stringify(updatedProcessingOrders));
+
+    // Also remove from delivery notes if exists
+    const existingDeliveryOrders = JSON.parse(localStorage.getItem('deliveryOrders') || '[]');
+    const updatedDeliveryOrders = existingDeliveryOrders.filter((order: Order) => order.id !== orderId);
+    localStorage.setItem('deliveryOrders', JSON.stringify(updatedDeliveryOrders));
 
     toast({
       title: "Order Completed",
       description: "Order has been moved to processing with all items marked as delivered.",
     });
+
+    setSelectedOrder(null);
   };
 
   return (

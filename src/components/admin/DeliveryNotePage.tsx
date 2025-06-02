@@ -1,31 +1,23 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { format } from "date-fns";
-import { Search, Download, Printer } from "lucide-react";
+import { Printer, Eye } from "lucide-react";
 
-// Define the order item interface with completion tracking
+// Define the order item interface
 interface OrderItem {
   id: string;
   name: string;
   quantity: number;
   delivered?: number;
   completed: boolean;
-  description?: string;
 }
 
 // Define the company interface
@@ -51,771 +43,467 @@ interface Order {
   dueDate: Date;
   items: OrderItem[];
   status: 'pending' | 'received' | 'in-progress' | 'processing' | 'completed';
-  reference?: string;
-  attention?: string;
   progress?: number;
   progressStage?: 'awaiting-stock' | 'packing' | 'out-for-delivery' | 'completed';
+  reference?: string;
+  attention?: string;
+  files?: {
+    id: string;
+    name: string;
+    url: string;
+    type: 'invoice' | 'quote' | 'purchase-order' | 'proof-of-payment';
+  }[];
 }
-
-// Mock companies data with logos and details
-const mockCompanies: Company[] = [
-  {
-    id: "1",
-    name: "Pro Process",
-    code: "PROPROC",
-    contactPerson: "Matthew Smith",
-    email: "matthew@proprocess.com",
-    phone: "011 234 5678",
-    address: "123 Industrial Street, Johannesburg, 2000",
-    vatNumber: "4123456789",
-    logo: "/lovable-uploads/e1088147-889e-43f6-bdf0-271189b88913.png"
-  },
-  {
-    id: "2",
-    name: "XYZ Industries",
-    code: "XYZIND",
-    contactPerson: "John Doe",
-    email: "john@xyzindustries.com",
-    phone: "011 987 6543",
-    address: "456 Manufacturing Ave, Pretoria, 0001",
-    vatNumber: "4987654321"
-  }
-];
-
-// Mock orders data with all statuses
-const mockOrders: Order[] = [
-  {
-    id: "1",
-    orderNumber: "ORD-2024-001",
-    companyName: "Pro Process",
-    company: mockCompanies[0],
-    orderDate: new Date(2024, 0, 15),
-    dueDate: new Date(2024, 1, 15),
-    status: "in-progress",
-    reference: "MATTHEW",
-    attention: "Stores",
-    progress: 75,
-    progressStage: "out-for-delivery",
-    items: [
-      { id: "1", name: "BOSCH Angle grinder (ZAPPPAAG005)", quantity: 2, delivered: 2, completed: true, description: "Professional angle grinder" },
-      { id: "2", name: "Safety Equipment Set", quantity: 1, delivered: 0, completed: false, description: "Complete safety gear package" },
-    ]
-  },
-  {
-    id: "2",
-    orderNumber: "ORD-2024-002",
-    companyName: "XYZ Industries",
-    company: mockCompanies[1],
-    orderDate: new Date(2024, 0, 20),
-    dueDate: new Date(2024, 1, 20),
-    status: "processing",
-    reference: "JOHN",
-    attention: "Warehouse",
-    progress: 100,
-    progressStage: "completed",
-    items: [
-      { id: "3", name: "Welding Equipment", quantity: 3, delivered: 3, completed: true, description: "Professional welding equipment set" },
-      { id: "4", name: "Safety Helmets", quantity: 25, delivered: 25, completed: true, description: "Industrial safety helmets" },
-    ]
-  },
-  {
-    id: "3",
-    orderNumber: "ORD-2024-003",
-    companyName: "Pro Process",
-    company: mockCompanies[0],
-    orderDate: new Date(2024, 0, 25),
-    dueDate: new Date(2024, 1, 25),
-    status: "received",
-    reference: "SARAH",
-    attention: "Operations",
-    progress: 25,
-    progressStage: "awaiting-stock",
-    items: [
-      { id: "5", name: "Industrial Drill Set", quantity: 5, delivered: 0, completed: false, description: "Heavy duty industrial drills" },
-      { id: "6", name: "Measurement Tools", quantity: 10, delivered: 0, completed: false, description: "Precision measurement tools" },
-    ]
-  },
-  {
-    id: "4",
-    orderNumber: "ORD-2024-004",
-    companyName: "XYZ Industries",
-    company: mockCompanies[1],
-    orderDate: new Date(2024, 0, 30),
-    dueDate: new Date(2024, 2, 15),
-    status: "pending",
-    reference: "MICHAEL",
-    attention: "Procurement",
-    items: [
-      { id: "7", name: "Power Supply Units", quantity: 3, delivered: 0, completed: false, description: "Industrial power supply units" },
-      { id: "8", name: "Electrical Components", quantity: 50, delivered: 0, completed: false, description: "Various electrical components" },
-    ]
-  },
-];
 
 export default function DeliveryNotePage() {
   const { toast } = useToast();
-  const [orders] = useState<Order[]>(mockOrders);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [showDeliveryNote, setShowDeliveryNote] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
 
-  // Generate delivery note number
-  const generateDeliveryNoteNumber = () => {
-    const random = Math.floor(Math.random() * 100000).toString().padStart(6, '0');
-    return random;
-  };
+  // Load orders from localStorage on component mount
+  useEffect(() => {
+    const storedDeliveryOrders = JSON.parse(localStorage.getItem('deliveryOrders') || '[]');
+    setOrders(storedDeliveryOrders);
+  }, []);
 
-  // Create delivery note and auto-fill quantities from progress data
-  const createDeliveryNote = (order: Order) => {
-    setSelectedOrder(order);
-    setShowDeliveryNote(true);
-  };
+  // Save orders to localStorage whenever orders change
+  useEffect(() => {
+    localStorage.setItem('deliveryOrders', JSON.stringify(orders));
+  }, [orders]);
 
-  // Download delivery note as PDF
-  const downloadDeliveryNote = () => {
-    if (!selectedOrder) return;
-    
-    // Create delivery note content
-    const deliveryNoteContent = generateDeliveryNoteHTML();
-    
-    // Create a new window for printing/PDF generation
-    const printWindow = window.open('', '_blank');
-    if (printWindow) {
-      printWindow.document.write(deliveryNoteContent);
-      printWindow.document.close();
-      
-      // Trigger download
-      printWindow.focus();
-      setTimeout(() => {
-        printWindow.print();
-      }, 250);
-    }
-
-    toast({
-      title: "Delivery Note Downloaded",
-      description: `Delivery note for order ${selectedOrder.orderNumber} has been generated.`,
+  // Update delivery quantity for an item
+  const updateDeliveryQuantity = (orderId: string, itemId: string, quantity: number) => {
+    const updatedOrders = orders.map(order => {
+      if (order.id === orderId) {
+        return {
+          ...order,
+          items: order.items.map(item => {
+            if (item.id === itemId) {
+              return { ...item, delivered: quantity };
+            }
+            return item;
+          })
+        };
+      }
+      return order;
     });
+
+    setOrders(updatedOrders);
+    localStorage.setItem('deliveryOrders', JSON.stringify(updatedOrders));
+
+    // Also update the same order in progressOrders
+    const progressOrders = JSON.parse(localStorage.getItem('progressOrders') || '[]');
+    const updatedProgressOrders = progressOrders.map((order: Order) => {
+      if (order.id === orderId) {
+        return {
+          ...order,
+          items: order.items.map((item: any) => {
+            if (item.id === itemId) {
+              return { ...item, delivered: quantity };
+            }
+            return item;
+          })
+        };
+      }
+      return order;
+    });
+    localStorage.setItem('progressOrders', JSON.stringify(updatedProgressOrders));
+  };
+
+  // View order details
+  const viewOrderDetails = (order: Order) => {
+    setSelectedOrder(order);
+  };
+
+  // Close order details
+  const closeOrderDetails = () => {
+    setSelectedOrder(null);
+  };
+
+  // Generate delivery note
+  const generateDeliveryNote = (order: Order) => {
+    setSelectedOrder(order);
+    setShowPreview(true);
   };
 
   // Print delivery note
   const printDeliveryNote = () => {
-    if (!selectedOrder) return;
-    
-    // Create delivery note content
-    const deliveryNoteContent = generateDeliveryNoteHTML();
-    
-    // Create a new window for printing
     const printWindow = window.open('', '_blank');
-    if (printWindow) {
-      printWindow.document.write(deliveryNoteContent);
-      printWindow.document.close();
-      printWindow.focus();
-      setTimeout(() => {
-        printWindow.print();
-        printWindow.close();
-      }, 250);
-    }
-
-    toast({
-      title: "Delivery Note Printed",
-      description: `Delivery note for order ${selectedOrder.orderNumber} has been sent to printer.`,
-    });
-  };
-
-  // Generate HTML for delivery note matching the reference format
-  const generateDeliveryNoteHTML = () => {
-    if (!selectedOrder) return '';
-    
-    const deliveryNoteNumber = generateDeliveryNoteNumber();
-    const deliveryDate = format(new Date(), 'dd/MM/yyyy');
-    const company = selectedOrder.company;
-    
-    return `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Delivery Note ${deliveryNoteNumber}</title>
-          <style>
-            body { 
-              font-family: Arial, sans-serif; 
-              margin: 20px; 
-              background: white;
-              color: black;
-            }
-            .header { 
-              display: flex;
-              justify-content: space-between;
-              align-items: flex-start;
-              margin-bottom: 30px; 
-            }
-            .logo-section {
-              display: flex;
-              align-items: flex-start;
-              margin-left: -10px;
-            }
-            .aleph-logo {
-              width: 40mm;
-              height: 80mm;
-              margin-right: 15px;
-              background: transparent;
-              object-fit: contain;
-            }
-            .admin-contact-info {
-              font-size: 9px;
-              line-height: 1.2;
-              color: black;
-              margin-top: 5px;
-            }
-            .client-section {
-              display: flex;
-              align-items: flex-start;
-              margin-right: -10px;
-            }
-            .client-info {
-              font-size: 9px;
-              line-height: 1.2;
-              margin-top: 5px;
-              color: black;
-              text-align: right;
-              margin-right: 15px;
-            }
-            .client-logo {
-              width: 40mm;
-              height: 80mm;
-              background: transparent;
-              object-fit: contain;
-            }
-            .delivery-note-title { 
-              font-size: 16px; 
-              font-weight: bold;
-              text-align: center;
-              border: 2px solid black;
-              padding: 8px;
-              margin: 20px 0;
-              color: black;
-            }
-            .copy-title {
-              font-size: 14px;
-              font-weight: bold;
-              text-align: center;
-              margin: 10px 0;
-              color: black;
-            }
-            .info-section { 
-              margin: 20px 0; 
-            }
-            .info-row { 
-              display: flex; 
-              margin: 8px 0; 
-            }
-            .info-label { 
-              font-weight: bold; 
-              width: 120px;
-              text-decoration: underline;
-              color: black;
-            }
-            .info-value {
-              flex: 1;
-              color: black;
-            }
-            .delivery-section {
-              margin: 20px 0;
-            }
-            .date-section {
-              text-align: right;
-              margin: 20px 0;
-            }
-            table { 
-              width: 100%; 
-              border-collapse: collapse; 
-              margin: 20px 0; 
-            }
-            th, td { 
-              border: 1px solid black; 
-              padding: 1px 4px; 
-              text-align: left; 
-              color: black;
-              height: 4mm;
-              line-height: 1.0;
-              font-size: 10px;
-            }
-            th { 
-              background-color: #f5f5f5; 
-              font-weight: bold; 
-              text-align: center;
-              color: black;
-            }
-            .description-col {
-              width: 10.5cm;
-            }
-            .qty-col {
-              width: 17mm;
-              text-align: center;
-            }
-            .signature-section {
-              margin-top: 40px;
-              position: absolute;
-              bottom: 80px;
-              left: 20px;
-              right: 20px;
-            }
-            .signature-row {
-              display: flex;
-              align-items: center;
-              margin-bottom: 10px;
-            }
-            .signature-label {
-              font-weight: bold;
-              text-decoration: underline;
-              margin-right: 15px;
-              color: black;
-              font-size: 10px;
-            }
-            .signature-line {
-              border-bottom: 1px solid black;
-              width: 200px;
-              height: 20px;
-              margin-right: 30px;
-            }
-            .page-break {
-              page-break-before: always;
-            }
-          </style>
-        </head>
-        <body>
-          <!-- Original Delivery Note -->
-          <div class="header">
-            <div class="logo-section">
-              <img src="/lovable-uploads/4c615bdd-48d0-4893-a843-01d2335af67a.png" alt="Aleph Engineering & Supplies" class="aleph-logo">
-              <div class="admin-contact-info">
-                Unit F<br>
-                4 Skew Road<br>
-                Anderbolt<br>
-                Boksburg<br>
-                needs@alepheng.co.za<br>
-                072 887 6908
-              </div>
-            </div>
-            
-            <div class="client-section">
-              <div class="client-info">
-                <strong>${company?.name || selectedOrder.companyName}</strong><br>
-                ${company?.address ? company.address.split(',').join('<br>') + '<br>' : ''}
-                ${company?.vatNumber ? 'VAT: ' + company.vatNumber + '<br>' : ''}
-                ${company?.phone ? 'Tel: ' + company.phone + '<br>' : ''}
-                ${company?.email ? company.email : ''}
-              </div>
-              ${company?.logo ? `
-                <img src="${company.logo}" alt="${company.name} Logo" class="client-logo">
-              ` : ''}
-            </div>
-          </div>
-          
-          <div class="delivery-note-title">Delivery Note ${deliveryNoteNumber}</div>
-          
-          <div class="info-section">
-            <div class="info-row">
-              <span class="info-label">Delivery To:</span>
-              <span class="info-value">${selectedOrder.companyName}</span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">Reference No:</span>
-              <span class="info-value">${selectedOrder.orderNumber}</span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">Att:</span>
-              <span class="info-value">${selectedOrder.attention || 'N/A'}</span>
-            </div>
-          </div>
-
-          <div class="delivery-section">
-            <div class="info-row">
-              <span class="info-label">Delivery of the following:</span>
-            </div>
-          </div>
-
-          <div class="date-section">
-            <div class="info-row">
-              <span style="margin-left: auto;"><span class="info-label">Date:</span> ${deliveryDate}</span>
-            </div>
-          </div>
-          
-          <table>
-            <thead>
-              <tr>
-                <th class="description-col">Description</th>
-                <th class="qty-col">QTY Ordered</th>
-                <th class="qty-col">QTY Delivered</th>
-                <th class="qty-col">Balance</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${selectedOrder.items.map(item => {
-                const delivered = item.delivered || 0;
-                const balance = item.quantity - delivered;
-                return `
-                <tr>
-                  <td>${item.name}</td>
-                  <td style="text-align: center;">${item.quantity}</td>
-                  <td style="text-align: center;">${delivered}</td>
-                  <td style="text-align: center;">${balance}</td>
-                </tr>
-              `}).join('')}
-            </tbody>
-          </table>
-          
-          <div class="signature-section">
-            <div class="signature-row">
-              <span class="signature-label">Date:</span>
-              <div class="signature-line"></div>
-              <span class="signature-label">Signature:</span>
-              <div class="signature-line"></div>
-            </div>
-          </div>
-
-          <!-- Copy Delivery Note -->
-          <div class="page-break">
-            <div class="copy-title">COPY</div>
-            
-            <div class="header">
-              <div class="logo-section">
-                <img src="/lovable-uploads/4c615bdd-48d0-4893-a843-01d2335af67a.png" alt="Aleph Engineering & Supplies" class="aleph-logo">
-                <div class="admin-contact-info">
-                  Unit F<br>
-                  4 Skew Road<br>
-                  Anderbolt<br>
-                  Boksburg<br>
-                  needs@alepheng.co.za<br>
-                  072 887 6908
+    if (printWindow && selectedOrder) {
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>Delivery Note - ${selectedOrder.orderNumber}</title>
+            <style>
+              @page { 
+                size: A4; 
+                margin: 0; 
+              }
+              * { 
+                margin: 0; 
+                padding: 0; 
+                box-sizing: border-box; 
+              }
+              body { 
+                font-family: Arial, sans-serif; 
+                font-size: 12px; 
+                line-height: 1.2; 
+              }
+              .page { 
+                width: 210mm; 
+                height: 297mm; 
+                padding: 10mm; 
+                page-break-after: always; 
+              }
+              .header { 
+                display: flex; 
+                justify-content: space-between; 
+                align-items: flex-start; 
+                margin-bottom: 15mm; 
+              }
+              .logo { 
+                width: 40mm; 
+                height: 80mm; 
+                object-fit: contain; 
+              }
+              .admin-section { 
+                display: flex; 
+                align-items: flex-start; 
+                margin-left: 5mm; 
+              }
+              .client-section { 
+                display: flex; 
+                align-items: flex-start; 
+                margin-right: 5mm; 
+              }
+              .company-details { 
+                font-size: 10px; 
+                line-height: 1.3; 
+                max-width: 60mm; 
+                margin-left: 5mm; 
+              }
+              .client-details { 
+                font-size: 10px; 
+                line-height: 1.3; 
+                max-width: 60mm; 
+                margin-right: 5mm; 
+                text-align: right; 
+              }
+              .delivery-note-number { 
+                text-align: center; 
+                font-size: 16px; 
+                font-weight: bold; 
+                color: black; 
+                margin-bottom: 10mm; 
+              }
+              .copy-indicator { 
+                text-align: center; 
+                font-size: 14px; 
+                font-weight: bold; 
+                margin-bottom: 5mm; 
+              }
+              table { 
+                width: 100%; 
+                border-collapse: collapse; 
+                margin-bottom: 20mm; 
+              }
+              th, td { 
+                border: 1px solid black; 
+                padding: 2mm; 
+                text-align: left; 
+                height: 4mm; 
+                font-size: 10px; 
+              }
+              th { 
+                background-color: #f0f0f0; 
+                font-weight: bold; 
+              }
+              .col-description { 
+                width: 105mm; 
+              }
+              .col-ordered, .col-delivered, .col-remaining { 
+                width: 17mm; 
+                text-align: center; 
+              }
+              .footer { 
+                position: absolute; 
+                bottom: 15mm; 
+                left: 10mm; 
+                right: 10mm; 
+                display: flex; 
+                justify-content: space-between; 
+                font-size: 10px; 
+              }
+              .signature-section { 
+                text-align: center; 
+                width: 80mm; 
+              }
+              .date-section { 
+                text-align: center; 
+                width: 60mm; 
+              }
+            </style>
+          </head>
+          <body>
+            <!-- Original Page -->
+            <div class="page">
+              <div class="header">
+                <div class="admin-section">
+                  <img src="/lovable-uploads/4c615bdd-48d0-4893-a843-01d2335af67a.png" alt="Admin Logo" class="logo" />
+                  <div class="company-details">
+                    <strong>ALEPH TRADING AND PROJECTS CC</strong><br/>
+                    123 Business Street<br/>
+                    Johannesburg, 2000<br/>
+                    VAT: 4123456789<br/>
+                    Tel: 011 234 5678
+                  </div>
+                </div>
+                <div class="client-section">
+                  <div class="client-details">
+                    <strong>${selectedOrder.companyName}</strong><br/>
+                    ${selectedOrder.company?.address || ''}<br/>
+                    ${selectedOrder.company?.vatNumber ? `VAT: ${selectedOrder.company.vatNumber}` : ''}<br/>
+                    ${selectedOrder.company?.phone ? `Tel: ${selectedOrder.company.phone}` : ''}
+                  </div>
+                  ${selectedOrder.company?.logo ? `<img src="${selectedOrder.company.logo}" alt="Client Logo" class="logo" />` : ''}
                 </div>
               </div>
               
-              <div class="client-section">
-                <div class="client-info">
-                  <strong>${company?.name || selectedOrder.companyName}</strong><br>
-                  ${company?.address ? company.address.split(',').join('<br>') + '<br>' : ''}
-                  ${company?.vatNumber ? 'VAT: ' + company.vatNumber + '<br>' : ''}
-                  ${company?.phone ? 'Tel: ' + company.phone + '<br>' : ''}
-                  ${company?.email ? company.email : ''}
-                </div>
-                ${company?.logo ? `
-                  <img src="${company.logo}" alt="${company.name} Logo" class="client-logo">
-                ` : ''}
+              <div class="delivery-note-number">
+                DELIVERY NOTE: DN-${selectedOrder.orderNumber}
               </div>
-            </div>
-            
-            <div class="delivery-note-title">Delivery Note ${deliveryNoteNumber}</div>
-            
-            <div class="info-section">
-              <div class="info-row">
-                <span class="info-label">Delivery To:</span>
-                <span class="info-value">${selectedOrder.companyName}</span>
-              </div>
-              <div class="info-row">
-                <span class="info-label">Reference No:</span>
-                <span class="info-value">${selectedOrder.orderNumber}</span>
-              </div>
-              <div class="info-row">
-                <span class="info-label">Att:</span>
-                <span class="info-value">${selectedOrder.attention || 'N/A'}</span>
-              </div>
-            </div>
-
-            <div class="delivery-section">
-              <div class="info-row">
-                <span class="info-label">Delivery of the following:</span>
-              </div>
-            </div>
-
-            <div class="date-section">
-              <div class="info-row">
-                <span style="margin-left: auto;"><span class="info-label">Date:</span> ${deliveryDate}</span>
-              </div>
-            </div>
-            
-            <table>
-              <thead>
-                <tr>
-                  <th class="description-col">Description</th>
-                  <th class="qty-col">QTY Ordered</th>
-                  <th class="qty-col">QTY Delivered</th>
-                  <th class="qty-col">Balance</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${selectedOrder.items.map(item => {
-                  const delivered = item.delivered || 0;
-                  const balance = item.quantity - delivered;
-                  return `
+              
+              <table>
+                <thead>
                   <tr>
-                    <td>${item.name}</td>
-                    <td style="text-align: center;">${item.quantity}</td>
-                    <td style="text-align: center;">${delivered}</td>
-                    <td style="text-align: center;">${balance}</td>
+                    <th class="col-description">Description</th>
+                    <th class="col-ordered">Ordered</th>
+                    <th class="col-delivered">Delivered</th>
+                    <th class="col-remaining">Remaining</th>
                   </tr>
-                `}).join('')}
-              </tbody>
-            </table>
-            
-            <div class="signature-section">
-              <div class="signature-row">
-                <span class="signature-label">Date:</span>
-                <div class="signature-line"></div>
-                <span class="signature-label">Signature:</span>
-                <div class="signature-line"></div>
+                </thead>
+                <tbody>
+                  ${selectedOrder.items.map(item => `
+                    <tr>
+                      <td>${item.name}</td>
+                      <td class="col-ordered">${item.quantity}</td>
+                      <td class="col-delivered">${item.delivered || 0}</td>
+                      <td class="col-remaining">${item.quantity - (item.delivered || 0)}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+              
+              <div class="footer">
+                <div class="date-section">
+                  Date: ${format(new Date(), 'dd/MM/yyyy')}<br/>
+                  _________________
+                </div>
+                <div class="signature-section">
+                  Signature<br/>
+                  _________________
+                </div>
               </div>
             </div>
-          </div>
-        </body>
-      </html>
-    `;
+            
+            <!-- Copy Page -->
+            <div class="page">
+              <div class="copy-indicator">COPY</div>
+              <div class="header">
+                <div class="admin-section">
+                  <img src="/lovable-uploads/4c615bdd-48d0-4893-a843-01d2335af67a.png" alt="Admin Logo" class="logo" />
+                  <div class="company-details">
+                    <strong>ALEPH TRADING AND PROJECTS CC</strong><br/>
+                    123 Business Street<br/>
+                    Johannesburg, 2000<br/>
+                    VAT: 4123456789<br/>
+                    Tel: 011 234 5678
+                  </div>
+                </div>
+                <div class="client-section">
+                  <div class="client-details">
+                    <strong>${selectedOrder.companyName}</strong><br/>
+                    ${selectedOrder.company?.address || ''}<br/>
+                    ${selectedOrder.company?.vatNumber ? `VAT: ${selectedOrder.company.vatNumber}` : ''}<br/>
+                    ${selectedOrder.company?.phone ? `Tel: ${selectedOrder.company.phone}` : ''}
+                  </div>
+                  ${selectedOrder.company?.logo ? `<img src="${selectedOrder.company.logo}" alt="Client Logo" class="logo" />` : ''}
+                </div>
+              </div>
+              
+              <div class="delivery-note-number">
+                DELIVERY NOTE: DN-${selectedOrder.orderNumber}
+              </div>
+              
+              <table>
+                <thead>
+                  <tr>
+                    <th class="col-description">Description</th>
+                    <th class="col-ordered">Ordered</th>
+                    <th class="col-delivered">Delivered</th>
+                    <th class="col-remaining">Remaining</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${selectedOrder.items.map(item => `
+                    <tr>
+                      <td>${item.name}</td>
+                      <td class="col-ordered">${item.quantity}</td>
+                      <td class="col-delivered">${item.delivered || 0}</td>
+                      <td class="col-remaining">${item.quantity - (item.delivered || 0)}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+              
+              <div class="footer">
+                <div class="date-section">
+                  Date: ${format(new Date(), 'dd/MM/yyyy')}<br/>
+                  _________________
+                </div>
+                <div class="signature-section">
+                  Signature<br/>
+                  _________________
+                </div>
+              </div>
+            </div>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+      printWindow.print();
+    }
   };
-
-  // Filter orders based on search term - include all orders instead of just filtered by status
-  const filteredOrders = orders.filter(order => 
-    order.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    order.companyName.toLowerCase().includes(searchTerm.toLowerCase())
-  );
 
   return (
     <div className="container mx-auto p-4">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Delivery Notes</h1>
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search orders..."
-            className="pl-10 pr-4 py-2 border rounded-md"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
       </div>
 
-      {/* Orders List - showing ALL orders */}
+      {/* Orders available for delivery */}
       <div className="bg-white rounded-lg shadow">
         <div className="p-4 border-b">
-          <h2 className="text-lg font-semibold">Select Order for Delivery Note</h2>
+          <h2 className="text-lg font-semibold">Orders Ready for Delivery</h2>
         </div>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Order Number</TableHead>
-              <TableHead>Company</TableHead>
-              <TableHead>Order Date</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Progress</TableHead>
-              <TableHead>Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredOrders.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center text-gray-500">
-                  No orders found.
-                </TableCell>
-              </TableRow>
-            ) : (
-              filteredOrders.map(order => (
-                <TableRow key={order.id}>
-                  <TableCell className="font-medium">{order.orderNumber}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      {order.company?.logo && (
-                        <img 
-                          src={order.company.logo} 
-                          alt={`${order.companyName} logo`} 
-                          className="h-6 w-6 rounded object-cover" 
-                        />
-                      )}
-                      {order.companyName}
-                    </div>
-                  </TableCell>
-                  <TableCell>{format(order.orderDate, 'MMM d, yyyy')}</TableCell>
-                  <TableCell>
-                    <span className={`px-2 py-1 rounded text-xs font-medium ${
-                      order.status === 'completed' ? 'bg-green-100 text-green-800' :
-                      order.status === 'in-progress' ? 'bg-blue-100 text-blue-800' :
-                      order.status === 'processing' ? 'bg-yellow-100 text-yellow-800' :
-                      order.status === 'received' ? 'bg-purple-100 text-purple-800' :
-                      'bg-gray-100 text-gray-800'
-                    }`}>
-                      {order.status.replace('-', ' ')}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    {order.progressStage && (
-                      <span className="text-sm">
-                        {order.progressStage === 'awaiting-stock' ? 'Awaiting Stock' :
-                        order.progressStage === 'packing' ? 'Packing' :
-                        order.progressStage === 'out-for-delivery' ? 'Out for Delivery' :
-                        order.progressStage === 'completed' ? 'Completed' : ''}
-                      </span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => createDeliveryNote(order)}
-                    >
-                      Create Delivery Note
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+        <div className="divide-y">
+          {orders.length === 0 && (
+            <div className="p-4 text-center text-gray-500">
+              No orders ready for delivery.
+            </div>
+          )}
+          
+          {orders.map(order => (
+            <div key={order.id} className="p-4 hover:bg-gray-50">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h3 className="font-medium">Order #{order.orderNumber}</h3>
+                  <p className="text-sm text-gray-600">{order.companyName}</p>
+                  <p className="text-sm text-gray-600">
+                    Due: {format(order.dueDate, 'MMM d, yyyy')}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => viewOrderDetails(order)}
+                  >
+                    <Eye className="h-4 w-4 mr-2" />
+                    View Details
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => generateDeliveryNote(order)}
+                  >
+                    <Printer className="h-4 w-4 mr-2" />
+                    Generate Note
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
-      {/* Delivery Note Preview Dialog */}
-      <Dialog open={showDeliveryNote} onOpenChange={setShowDeliveryNote}>
+      {/* Order Details Dialog */}
+      <Dialog open={!!selectedOrder && !showPreview} onOpenChange={closeOrderDetails}>
         {selectedOrder && (
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-3xl">
             <DialogHeader>
-              <DialogTitle>Delivery Note Preview - {selectedOrder.orderNumber}</DialogTitle>
+              <DialogTitle>Order #{selectedOrder.orderNumber} - Delivery Details</DialogTitle>
             </DialogHeader>
             
-            <div className="space-y-6 p-4 bg-white border">
-              {/* Header section with company details */}
-              <div className="flex justify-between items-start">
-                <div className="flex items-start -ml-2">
-                  <img 
-                    src="/lovable-uploads/4c615bdd-48d0-4893-a843-01d2335af67a.png" 
-                    alt="Aleph Engineering & Supplies" 
-                    className="w-16 h-32 mr-4 object-contain bg-transparent" 
-                  />
-                  <div className="text-xs leading-tight text-black mt-1">
-                    <div>Unit F</div>
-                    <div>4 Skew Road</div>
-                    <div>Anderbolt</div>
-                    <div>Boksburg</div>
-                    <div>needs@alepheng.co.za</div>
-                    <div>072 887 6908</div>
-                  </div>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-gray-500">Company</p>
+                  <p>{selectedOrder.companyName}</p>
                 </div>
-
-                <div className="flex items-start -mr-2">
-                  <div className="text-xs text-right text-black mr-4 mt-1">
-                    <div className="font-semibold">{selectedOrder.company?.name || selectedOrder.companyName}</div>
-                    {selectedOrder.company?.address && selectedOrder.company.address.split(',').map((line, index) => (
-                      <div key={index}>{line.trim()}</div>
-                    ))}
-                    {selectedOrder.company?.vatNumber && <div>VAT: {selectedOrder.company.vatNumber}</div>}
-                    {selectedOrder.company?.phone && <div>Tel: {selectedOrder.company.phone}</div>}
-                    {selectedOrder.company?.email && <div>{selectedOrder.company.email}</div>}
-                  </div>
-                  {selectedOrder.company?.logo && (
-                    <img 
-                      src={selectedOrder.company.logo} 
-                      alt={`${selectedOrder.companyName} logo`} 
-                      className="w-16 h-32 object-contain bg-transparent" 
-                    />
-                  )}
+                <div>
+                  <p className="text-sm text-gray-500">Due Date</p>
+                  <p>{format(selectedOrder.dueDate, 'MMM d, yyyy')}</p>
                 </div>
               </div>
               
-              {/* Delivery Note Title */}
-              <div className="text-center border-2 border-black p-2">
-                <h3 className="text-lg font-bold text-black">Delivery Note {generateDeliveryNoteNumber()}</h3>
-              </div>
-              
-              {/* Order Information */}
-              <div className="space-y-2">
-                <div className="flex">
-                  <span className="font-bold underline w-32 text-black">Delivery To:</span>
-                  <span className="text-black">{selectedOrder.companyName}</span>
+              <div>
+                <h3 className="font-medium mb-2">Items for Delivery</h3>
+                <div className="border rounded-md divide-y">
+                  {selectedOrder.items.map((item) => (
+                    <div key={item.id} className="p-3">
+                      <div className="flex justify-between items-center">
+                        <div className="flex-grow">
+                          <p className="font-medium">{item.name}</p>
+                          <p className="text-sm text-gray-500">
+                            Ordered: {item.quantity}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <div className="flex items-center gap-2">
+                            <label className="text-sm">Delivered:</label>
+                            <Input
+                              type="number"
+                              min="0"
+                              max={item.quantity}
+                              value={item.delivered || 0}
+                              onChange={(e) => updateDeliveryQuantity(
+                                selectedOrder.id, 
+                                item.id, 
+                                parseInt(e.target.value) || 0
+                              )}
+                              className="w-20"
+                            />
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            Remaining: {item.quantity - (item.delivered || 0)}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                <div className="flex">
-                  <span className="font-bold underline w-32 text-black">Reference No:</span>
-                  <span className="text-black">{selectedOrder.orderNumber}</span>
-                </div>
-                <div className="flex">
-                  <span className="font-bold underline w-32 text-black">Att:</span>
-                  <span className="text-black">{selectedOrder.attention || 'N/A'}</span>
-                </div>
-              </div>
-
-              <div className="flex">
-                <span className="font-bold underline text-black">Delivery of the following:</span>
-              </div>
-
-              <div className="flex justify-end">
-                <div className="flex">
-                  <span className="font-bold underline text-black">Date:</span>
-                  <span className="ml-2 text-black">{format(new Date(), 'dd/MM/yyyy')}</span>
-                </div>
-              </div>
-              
-              {/* Items Table - Using quantities from progress tracking */}
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="border border-black text-center font-bold text-black bg-gray-100 w-[10.5cm]">Description</TableHead>
-                    <TableHead className="border border-black text-center font-bold w-[17mm] text-black bg-gray-100">QTY Ordered</TableHead>
-                    <TableHead className="border border-black text-center font-bold w-[17mm] text-black bg-gray-100">QTY Delivered</TableHead>
-                    <TableHead className="border border-black text-center font-bold w-[17mm] text-black bg-gray-100">Balance</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {selectedOrder.items.map((item) => {
-                    const delivered = item.delivered || 0;
-                    const balance = item.quantity - delivered;
-                    
-                    return (
-                      <TableRow key={item.id} className="h-[4mm]">
-                        <TableCell className="border border-black text-black p-1 text-xs">{item.name}</TableCell>
-                        <TableCell className="border border-black text-center text-black p-1 text-xs">{item.quantity}</TableCell>
-                        <TableCell className="border border-black text-center text-black p-1 text-xs">{delivered}</TableCell>
-                        <TableCell className="border border-black text-center text-black p-1 text-xs">{balance}</TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-
-              {/* Signature section moved to bottom */}
-              <div className="mt-16 space-y-4">
-                <div className="flex items-center space-x-8">
-                  <div className="flex items-center">
-                    <span className="font-bold underline mr-4 text-black text-sm">Date:</span>
-                    <div className="border-b border-black w-48 h-6"></div>
-                  </div>
-                  <div className="flex items-center">
-                    <span className="font-bold underline mr-4 text-black text-sm">Signature:</span>
-                    <div className="border-b border-black w-48 h-6"></div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex justify-end space-x-4 pt-4 border-t">
-                <Button 
-                  variant="outline" 
-                  onClick={() => setShowDeliveryNote(false)}
-                >
-                  Cancel
-                </Button>
-                <Button 
-                  variant="outline" 
-                  onClick={printDeliveryNote}
-                  className="flex items-center gap-2"
-                >
-                  <Printer className="h-4 w-4" />
-                  Print
-                </Button>
-                <Button 
-                  onClick={downloadDeliveryNote}
-                  className="flex items-center gap-2"
-                >
-                  <Download className="h-4 w-4" />
-                  Download PDF
-                </Button>
               </div>
             </div>
           </DialogContent>
         )}
+      </Dialog>
+
+      {/* Delivery Note Preview Dialog */}
+      <Dialog open={showPreview} onOpenChange={() => setShowPreview(false)}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Delivery Note Preview</DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <Button onClick={printDeliveryNote} className="w-full">
+              <Printer className="h-4 w-4 mr-2" />
+              Print Delivery Note
+            </Button>
+          </div>
+        </DialogContent>
       </Dialog>
     </div>
   );
