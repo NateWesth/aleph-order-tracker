@@ -1,166 +1,96 @@
 
 import { useState } from "react";
-import { z } from "zod";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Mail, Lock } from "lucide-react";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import ForgotPasswordForm from "./ForgotPasswordForm";
-
-const loginFormSchema = z.object({
-  email: z.string().email({ message: "Please enter a valid email address" }),
-  password: z.string().min(1, { message: "Password is required" }),
-});
-
-type LoginFormValues = z.infer<typeof loginFormSchema>;
+import { supabase } from "@/integrations/supabase/client";
 
 const LoginForm = () => {
-  const [isLoading, setIsLoading] = useState(false);
-  const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
-  const { toast } = useToast();
   const navigate = useNavigate();
-  
-  const form = useForm<LoginFormValues>({
-    resolver: zodResolver(loginFormSchema),
-    defaultValues: {
-      email: "",
-      password: "",
-    },
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    email: "",
+    password: "",
   });
 
-  const onSubmit = async (values: LoginFormValues) => {
-    setIsLoading(true);
-    
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
     try {
-      // Get registered users from localStorage
-      const registeredUsers = JSON.parse(localStorage.getItem('registeredUsers') || '[]');
-      
-      // Find user with matching email and password
-      const user = registeredUsers.find((u: any) => 
-        u.email === values.email && u.password === values.password
-      );
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: formData.email,
+        password: formData.password,
+      });
 
-      if (!user) {
-        toast({
-          title: "Login failed",
-          description: "Invalid email or password. Please check your credentials.",
-          variant: "destructive",
-        });
-        setIsLoading(false);
-        return;
-      }
+      if (error) throw error;
 
-      // Store current user session
-      localStorage.setItem('currentUser', JSON.stringify(user));
-      
-      console.log("Login successful:", { email: user.email, userType: user.userType });
-      
-      setTimeout(() => {
-        toast({
-          title: "Login successful",
-          description: `Welcome back! You're logged in as ${user.userType === 'supplier' ? 'an admin' : 'a client'}.`,
-        });
-        
-        // Redirect to appropriate dashboard based on user type
-        if (user.userType === "supplier") {
-          navigate("/admin-dashboard");
-        } else {
-          navigate("/client-dashboard");
-        }
-        
-        setIsLoading(false);
-      }, 1000);
-      
-    } catch (error) {
-      console.error("Login error:", error);
+      // Check if user is admin
+      const { data: userRole } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', data.user.id)
+        .single();
+
       toast({
-        title: "Login failed",
-        description: "An error occurred during login. Please try again.",
+        title: "Success",
+        description: "Logged in successfully!",
+      });
+
+      // Navigate based on role
+      if (userRole?.role === 'admin') {
+        navigate("/admin-dashboard");
+      } else {
+        navigate("/client-dashboard");
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
         variant: "destructive",
       });
-      setIsLoading(false);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleForgotPasswordSuccess = () => {
-    setForgotPasswordOpen(false);
-  };
-
   return (
-    <>
-      <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-          <FormField
-            control={form.control}
-            name="email"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel className="dark:text-gray-200">Email</FormLabel>
-                <FormControl>
-                  <div className="flex items-center border rounded-md focus-within:ring-2 focus-within:ring-ring focus-within:border-input dark:border-gray-600">
-                    <Mail className="w-4 h-4 ml-3 text-gray-500 dark:text-gray-400" />
-                    <Input placeholder="your@email.com" className="border-0 focus-visible:ring-0 dark:bg-gray-800 dark:text-gray-200" {...field} />
-                  </div>
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          
-          <FormField
-            control={form.control}
-            name="password"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel className="dark:text-gray-200">Password</FormLabel>
-                <FormControl>
-                  <div className="flex items-center border rounded-md focus-within:ring-2 focus-within:ring-ring focus-within:border-input dark:border-gray-600">
-                    <Lock className="w-4 h-4 ml-3 text-gray-500 dark:text-gray-400" />
-                    <Input type="password" placeholder="••••••••" className="border-0 focus-visible:ring-0 dark:bg-gray-800 dark:text-gray-200" {...field} />
-                  </div>
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          
-          <div className="flex justify-end">
-            <button
-              type="button"
-              onClick={() => setForgotPasswordOpen(true)}
-              className="text-sm text-aleph-green hover:text-green-500 hover:underline"
-            >
-              Forgot password?
-            </button>
-          </div>
-          
-          <Button 
-            type="submit" 
-            className="w-full bg-aleph-green hover:bg-green-500 border border-gray-400 dark:border-gray-400" 
-            disabled={isLoading}
-          >
-            {isLoading ? "Logging in..." : "Login"}
-          </Button>
-        </form>
-      </Form>
-
-      <Dialog open={forgotPasswordOpen} onOpenChange={setForgotPasswordOpen}>
-        <DialogContent className="sm:max-w-md dark:bg-gray-800 dark:border-gray-700">
-          <DialogHeader>
-            <DialogTitle className="dark:text-gray-200">Reset your password</DialogTitle>
-            <DialogDescription className="dark:text-gray-400">
-              We'll send you instructions to reset your password
-            </DialogDescription>
-          </DialogHeader>
-          <ForgotPasswordForm onSuccess={handleForgotPasswordSuccess} />
-        </DialogContent>
-      </Dialog>
-    </>
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="space-y-2">
+        <Label htmlFor="email">Email</Label>
+        <Input
+          id="email"
+          type="email"
+          value={formData.email}
+          onChange={(e) => setFormData({...formData, email: e.target.value})}
+          required
+          className="dark:bg-gray-700 dark:border-gray-600"
+        />
+      </div>
+      
+      <div className="space-y-2">
+        <Label htmlFor="password">Password</Label>
+        <Input
+          id="password"
+          type="password"
+          value={formData.password}
+          onChange={(e) => setFormData({...formData, password: e.target.value})}
+          required
+          className="dark:bg-gray-700 dark:border-gray-600"
+        />
+      </div>
+      
+      <Button 
+        type="submit" 
+        className="w-full bg-aleph-green hover:bg-green-500"
+        disabled={loading}
+      >
+        {loading ? "Signing in..." : "Sign In"}
+      </Button>
+    </form>
   );
 };
 

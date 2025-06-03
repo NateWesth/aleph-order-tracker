@@ -8,41 +8,115 @@ import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import { ArrowLeft, Building2, User, Mail, Phone, MapPin, Moon, Sun } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+
+interface UserProfile {
+  id: string;
+  full_name: string;
+  email: string;
+  phone: string;
+  position: string;
+  company_code: string;
+}
+
+interface Company {
+  id: string;
+  name: string;
+  code: string;
+  contact_person: string;
+  email: string;
+  phone: string;
+  address: string;
+  account_manager: string;
+}
 
 const Settings = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { theme, toggleTheme } = useTheme();
+  const { user } = useAuth();
   
-  // Mock user data - in a real app, this would come from authentication context
-  const [userInfo, setUserInfo] = useState({
-    name: "John Doe",
-    email: "john.doe@example.com",
-    phone: "+1 (555) 123-4567",
-    position: "Project Manager"
-  });
+  const [userInfo, setUserInfo] = useState<UserProfile | null>(null);
+  const [companyInfo, setCompanyInfo] = useState<Company | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  // Mock company data - in a real app, this would come from API
-  const companyInfo = {
-    name: "Acme Construction Corp",
-    address: "123 Main Street, City, State 12345",
-    phone: "+1 (555) 987-6543",
-    email: "contact@acmeconstruction.com",
-    accountManager: "Sarah Johnson"
+  useEffect(() => {
+    if (user) {
+      fetchUserData();
+    }
+  }, [user]);
+
+  const fetchUserData = async () => {
+    if (!user) return;
+    
+    try {
+      // Fetch user profile
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      if (profileError) throw profileError;
+      setUserInfo(profile);
+
+      // Fetch company information based on company code
+      if (profile.company_code) {
+        const { data: company, error: companyError } = await supabase
+          .from('companies')
+          .select('*')
+          .eq('code', profile.company_code)
+          .single();
+
+        if (companyError) {
+          console.error('Company not found:', companyError);
+        } else {
+          setCompanyInfo(company);
+        }
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Failed to fetch user data: " + error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleSaveProfile = () => {
-    // In a real app, this would make an API call to update user info
-    toast({
-      title: "Profile Updated",
-      description: "Your profile information has been saved successfully.",
-    });
+  const handleSaveProfile = async () => {
+    if (!user || !userInfo) return;
+
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          full_name: userInfo.full_name,
+          phone: userInfo.phone,
+          position: userInfo.position
+        })
+        .eq('id', user.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Profile Updated",
+        description: "Your profile information has been saved successfully.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Failed to update profile: " + error.message,
+        variant: "destructive",
+      });
+    }
   };
 
   const handleChangePassword = () => {
-    // In a real app, this would handle password change
     toast({
       title: "Password Change",
       description: "Password change functionality would be implemented here.",
@@ -51,10 +125,17 @@ const Settings = () => {
 
   const goBack = () => {
     // Determine which dashboard to return to based on current user role
-    // In a real app, this would be determined by user permissions/role
     const isAdmin = window.location.pathname.includes('admin');
     navigate(isAdmin ? '/admin-dashboard' : '/client-dashboard');
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-gray-900 flex items-center justify-center">
+        <div className="text-lg">Loading...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-gray-900">
@@ -110,45 +191,47 @@ const Settings = () => {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="name" className="dark:text-gray-200">Full Name</Label>
-                <Input
-                  id="name"
-                  value={userInfo.name}
-                  onChange={(e) => setUserInfo({...userInfo, name: e.target.value})}
-                  className="dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
-                />
+            {userInfo && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name" className="dark:text-gray-200">Full Name</Label>
+                  <Input
+                    id="name"
+                    value={userInfo.full_name || ''}
+                    onChange={(e) => setUserInfo({...userInfo, full_name: e.target.value})}
+                    className="dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="email" className="dark:text-gray-200">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={userInfo.email || ''}
+                    disabled
+                    className="dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 opacity-50"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="phone" className="dark:text-gray-200">Phone</Label>
+                  <Input
+                    id="phone"
+                    value={userInfo.phone || ''}
+                    onChange={(e) => setUserInfo({...userInfo, phone: e.target.value})}
+                    className="dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="position" className="dark:text-gray-200">Position</Label>
+                  <Input
+                    id="position"
+                    value={userInfo.position || ''}
+                    onChange={(e) => setUserInfo({...userInfo, position: e.target.value})}
+                    className="dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
+                  />
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="email" className="dark:text-gray-200">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={userInfo.email}
-                  onChange={(e) => setUserInfo({...userInfo, email: e.target.value})}
-                  className="dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="phone" className="dark:text-gray-200">Phone</Label>
-                <Input
-                  id="phone"
-                  value={userInfo.phone}
-                  onChange={(e) => setUserInfo({...userInfo, phone: e.target.value})}
-                  className="dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="position" className="dark:text-gray-200">Position</Label>
-                <Input
-                  id="position"
-                  value={userInfo.position}
-                  onChange={(e) => setUserInfo({...userInfo, position: e.target.value})}
-                  className="dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
-                />
-              </div>
-            </div>
+            )}
             <Button onClick={handleSaveProfile} className="bg-aleph-green hover:bg-green-500">
               Save Changes
             </Button>
@@ -184,47 +267,58 @@ const Settings = () => {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <Building2 className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-                  <span className="font-medium dark:text-gray-200">Company Name:</span>
+            {companyInfo ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Building2 className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                    <span className="font-medium dark:text-gray-200">Company Name:</span>
+                  </div>
+                  <p className="text-gray-700 dark:text-gray-300 ml-6">{companyInfo.name}</p>
                 </div>
-                <p className="text-gray-700 dark:text-gray-300 ml-6">{companyInfo.name}</p>
-              </div>
-              
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <Mail className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-                  <span className="font-medium dark:text-gray-200">Company Email:</span>
+                
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Mail className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                    <span className="font-medium dark:text-gray-200">Company Email:</span>
+                  </div>
+                  <p className="text-gray-700 dark:text-gray-300 ml-6">{companyInfo.email}</p>
                 </div>
-                <p className="text-gray-700 dark:text-gray-300 ml-6">{companyInfo.email}</p>
-              </div>
-              
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <MapPin className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-                  <span className="font-medium dark:text-gray-200">Address:</span>
+                
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <MapPin className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                    <span className="font-medium dark:text-gray-200">Address:</span>
+                  </div>
+                  <p className="text-gray-700 dark:text-gray-300 ml-6">{companyInfo.address}</p>
                 </div>
-                <p className="text-gray-700 dark:text-gray-300 ml-6">{companyInfo.address}</p>
-              </div>
-              
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <Phone className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-                  <span className="font-medium dark:text-gray-200">Phone:</span>
+                
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Phone className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                    <span className="font-medium dark:text-gray-200">Phone:</span>
+                  </div>
+                  <p className="text-gray-700 dark:text-gray-300 ml-6">{companyInfo.phone}</p>
                 </div>
-                <p className="text-gray-700 dark:text-gray-300 ml-6">{companyInfo.phone}</p>
-              </div>
-              
-              <div className="space-y-3 md:col-span-2">
-                <div className="flex items-center gap-2">
-                  <User className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-                  <span className="font-medium dark:text-gray-200">Account Manager:</span>
+                
+                <div className="space-y-3 md:col-span-2">
+                  <div className="flex items-center gap-2">
+                    <User className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                    <span className="font-medium dark:text-gray-200">Account Manager:</span>
+                  </div>
+                  <p className="text-gray-700 dark:text-gray-300 ml-6">{companyInfo.account_manager}</p>
                 </div>
-                <p className="text-gray-700 dark:text-gray-300 ml-6">{companyInfo.accountManager}</p>
               </div>
-            </div>
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-gray-600 dark:text-gray-400">
+                  {userInfo?.company_code ? 
+                    `Company information not found for code: ${userInfo.company_code}` :
+                    'No company code associated with your account'
+                  }
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
       </main>

@@ -1,8 +1,9 @@
-
 import { useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import { 
   SidebarProvider, 
   Sidebar, 
@@ -20,14 +21,35 @@ import CompletedPage from "@/components/orders/CompletedPage";
 import FilesPage from "@/components/orders/FilesPage";
 import ClientCompaniesPage from "@/components/admin/ClientCompaniesPage";
 import DeliveryNotePage from "@/components/admin/DeliveryNotePage";
+import UsersManagementPage from "@/components/admin/UsersManagementPage";
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user, signOut } = useAuth();
   const [activeView, setActiveView] = useState("home");
+  const [userProfile, setUserProfile] = useState<any>(null);
   
-  const handleLogout = () => {
-    // In a real app, we would clear auth tokens/state here
+  useEffect(() => {
+    if (user) {
+      fetchUserProfile();
+    }
+  }, [user]);
+
+  const fetchUserProfile = async () => {
+    if (!user) return;
+    
+    const { data } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single();
+    
+    setUserProfile(data);
+  };
+  
+  const handleLogout = async () => {
+    await signOut();
     toast({
       title: "Logged out",
       description: "You have been successfully logged out as admin.",
@@ -35,7 +57,7 @@ const AdminDashboard = () => {
     navigate("/auth");
   };
 
-  const handleMenuClick = (view) => {
+  const handleMenuClick = (view: string) => {
     setActiveView(view);
   };
   
@@ -187,8 +209,10 @@ const AdminDashboard = () => {
                   }}
                 ></div>
                 <div className="text-center relative z-10">
-                  <h1 className="text-4xl md:text-6xl font-bold text-aleph-green mb-4">Admin Dashboard</h1>
-                  <p className="text-xl text-gray-600 dark:text-gray-300">Welcome to Aleph Engineering and Supplies Admin Portal</p>
+                  <h1 className="text-4xl md:text-6xl font-bold text-aleph-green mb-4">
+                    Welcome{userProfile?.full_name ? `, ${userProfile.full_name}` : ''}
+                  </h1>
+                  <p className="text-xl text-gray-600 dark:text-gray-300">Admin Dashboard - Aleph Engineering and Supplies</p>
                 </div>
               </div>
             ) : activeView === "orders" ? (
@@ -220,9 +244,8 @@ const AdminDashboard = () => {
                 <ClientCompaniesPage />
               </div>
             ) : activeView === "users" ? (
-              <div className="text-center p-8 bg-white dark:bg-gray-800 min-h-full">
-                <h2 className="text-2xl font-bold mb-4 text-aleph-green">User Management</h2>
-                <p className="text-gray-600 dark:text-gray-300">User management functionality will be implemented here.</p>
+              <div className="bg-white dark:bg-gray-800 min-h-full">
+                <UsersManagementPage />
               </div>
             ) : (
               <div className="text-center p-8 bg-white dark:bg-gray-800 min-h-full">
