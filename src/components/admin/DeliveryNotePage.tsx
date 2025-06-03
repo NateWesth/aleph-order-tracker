@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -143,13 +144,12 @@ export default function DeliveryNotePage() {
   const handleFileUpload = () => {
     if (!selectedOrder || selectedFiles.length === 0) return;
 
-    const newFiles: OrderFile[] = selectedFiles.map(file => ({
+    // Create simple file objects for regular uploads (without uploadedBy and uploadDate)
+    const newFiles = selectedFiles.map(file => ({
       id: `file-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       name: file.name,
       url: URL.createObjectURL(file),
-      type: fileType,
-      uploadedBy: 'admin' as const,
-      uploadDate: new Date()
+      type: fileType
     }));
 
     // Update the order with new files
@@ -194,7 +194,7 @@ export default function DeliveryNotePage() {
   };
 
   // Download or view a file
-  const handleFileAction = (file: OrderFile, action: 'download' | 'view') => {
+  const handleFileAction = (file: any, action: 'download' | 'view') => {
     toast({
       title: action === 'download' ? "Downloading File" : "Opening File",
       description: `${action === 'download' ? 'Downloading' : 'Opening'} ${file.name}...`,
@@ -215,7 +215,31 @@ export default function DeliveryNotePage() {
 
   // Generate delivery note
   const generateDeliveryNote = (order: Order) => {
-    setSelectedOrder(order);
+    // Add delivery note with uploadedBy and uploadDate when generating
+    const deliveryNoteFile: OrderFile = {
+      id: `file-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      name: `Delivery_Note_${order.orderNumber}_${format(new Date(), 'yyyy-MM-dd')}.pdf`,
+      url: `delivery-note-${order.id}`,
+      type: 'delivery-note',
+      uploadedBy: 'admin' as const,
+      uploadDate: new Date()
+    };
+
+    // Update order with delivery note file
+    const updatedOrders = orders.map(o => {
+      if (o.id === order.id) {
+        return {
+          ...o,
+          files: [...(o.files || []), deliveryNoteFile]
+        };
+      }
+      return o;
+    });
+
+    setOrders(updatedOrders);
+    localStorage.setItem('deliveryOrders', JSON.stringify(updatedOrders));
+
+    setSelectedOrder({...order, files: [...(order.files || []), deliveryNoteFile]});
     setShowPreview(true);
   };
 
