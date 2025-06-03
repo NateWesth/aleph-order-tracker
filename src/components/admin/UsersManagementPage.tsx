@@ -79,27 +79,33 @@ export default function UsersManagementPage() {
 
   const updateUserRole = async (userId: string, newRole: string) => {
     try {
+      // Ensure the role is properly typed
+      const roleValue = newRole as 'admin' | 'user';
+      
       // First, delete existing role
       await supabase
         .from('user_roles')
         .delete()
         .eq('user_id', userId);
 
-      // Then insert new role
+      // Then insert new role with proper typing
       const { error } = await supabase
         .from('user_roles')
-        .insert({ user_id: userId, role: newRole });
+        .insert({
+          user_id: userId,
+          role: roleValue
+        });
 
       if (error) throw error;
 
       // Update local state
       setUsers(users.map(user => 
-        user.id === userId ? { ...user, role: newRole } : user
+        user.id === userId ? { ...user, role: roleValue } : user
       ));
 
       toast({
         title: "Success",
-        description: `User role updated to ${newRole}`,
+        description: `User role updated to ${roleValue}`,
       });
     } catch (error: any) {
       toast({
