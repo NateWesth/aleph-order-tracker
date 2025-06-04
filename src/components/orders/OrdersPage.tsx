@@ -72,9 +72,10 @@ export default function OrdersPage({ isAdmin = false }: OrdersPageProps) {
 
   const deleteOrder = async (orderId: string, orderNumber: string) => {
     try {
-      const { error } = await supabase.rpc('delete_order_with_audit', {
-        order_id: orderId
-      });
+      const { error } = await supabase
+        .from('orders')
+        .delete()
+        .eq('id', orderId);
 
       if (error) throw error;
 
