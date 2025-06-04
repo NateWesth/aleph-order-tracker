@@ -21,6 +21,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { User, Shield, Search } from "lucide-react";
+import type { Database } from "@/integrations/supabase/types";
+
+type UserRole = Database['public']['Enums']['app_role'];
 
 interface UserProfile {
   id: string;
@@ -30,7 +33,7 @@ interface UserProfile {
   position: string;
   company_code: string;
   created_at: string;
-  role?: string;
+  role?: UserRole;
 }
 
 export default function UsersManagementPage() {
@@ -62,7 +65,7 @@ export default function UsersManagementPage() {
       // Combine profiles with roles
       const usersWithRoles = profiles?.map(profile => ({
         ...profile,
-        role: userRoles?.find(role => role.user_id === profile.id)?.role || 'user'
+        role: userRoles?.find(role => role.user_id === profile.id)?.role || 'user' as UserRole
       })) || [];
 
       setUsers(usersWithRoles);
@@ -77,7 +80,7 @@ export default function UsersManagementPage() {
     }
   };
 
-  const updateUserRole = async (userId: string, newRole: string) => {
+  const updateUserRole = async (userId: string, newRole: UserRole) => {
     try {
       // First, delete existing role
       await supabase
@@ -85,7 +88,7 @@ export default function UsersManagementPage() {
         .delete()
         .eq('user_id', userId);
 
-      // Then insert new role
+      // Then insert new role with correct field name
       const { error } = await supabase
         .from('user_roles')
         .insert({ user_id: userId, role: newRole });
@@ -200,7 +203,7 @@ export default function UsersManagementPage() {
                   <TableCell>
                     <Select
                       value={user.role}
-                      onValueChange={(value) => updateUserRole(user.id, value)}
+                      onValueChange={(value: UserRole) => updateUserRole(user.id, value)}
                     >
                       <SelectTrigger className="w-24">
                         <SelectValue />

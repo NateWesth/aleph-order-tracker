@@ -189,19 +189,19 @@ const ClientDashboard = () => {
               </div>
             ) : activeView === "progress" ? (
               <div className="bg-white dark:bg-gray-800 min-h-full">
-                <ProgressPage />
+                <ProgressPage isAdmin={false} />
               </div>
             ) : activeView === "processing" ? (
               <div className="bg-white dark:bg-gray-800 min-h-full">
-                <ProcessingPage />
+                <ProcessingPage isAdmin={false} />
               </div>
             ) : activeView === "completed" ? (
               <div className="bg-white dark:bg-gray-800 min-h-full">
-                <CompletedPage />
+                <CompletedPage isAdmin={false} />
               </div>
             ) : activeView === "files" ? (
               <div className="bg-white dark:bg-gray-800 min-h-full">
-                <FilesPage />
+                <FilesPage isAdmin={false} />
               </div>
             ) : (
               <div className="text-center p-8 bg-white dark:bg-gray-800 min-h-full">
