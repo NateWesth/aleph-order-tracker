@@ -1,8 +1,10 @@
 
 import { useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import { 
   SidebarProvider, 
   Sidebar, 
@@ -22,12 +24,30 @@ import FilesPage from "@/components/orders/FilesPage";
 const ClientDashboard = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user, signOut } = useAuth();
   const [activeView, setActiveView] = useState("home");
-  // In a real app, this would come from an authentication context or API
-  const clientName = "John Doe";
+  const [userProfile, setUserProfile] = useState<any>(null);
   
-  const handleLogout = () => {
-    // In a real app, we would clear auth tokens/state here
+  useEffect(() => {
+    if (user) {
+      fetchUserProfile();
+    }
+  }, [user]);
+
+  const fetchUserProfile = async () => {
+    if (!user) return;
+    
+    const { data } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single();
+    
+    setUserProfile(data);
+  };
+  
+  const handleLogout = async () => {
+    await signOut();
     toast({
       title: "Logged out",
       description: "You have been successfully logged out.",
@@ -35,15 +55,15 @@ const ClientDashboard = () => {
     navigate("/auth");
   };
 
-  const handleMenuClick = (view) => {
+  const handleMenuClick = (view: string) => {
     setActiveView(view);
   };
   
   return (
     <SidebarProvider>
-      <div className="min-h-screen w-full flex bg-black dark:bg-gray-950">
+      <div className="min-h-screen w-full flex bg-black dark:bg-black">
         {/* Sidebar */}
-        <Sidebar className="dark:bg-gray-900 bg-white">
+        <Sidebar className="dark:bg-black bg-white">
           <SidebarContent>
             <SidebarMenu>
               <SidebarMenuItem>
@@ -143,7 +163,7 @@ const ClientDashboard = () => {
             </div>
           </header>
 
-          {/* Dashboard content - White in light mode, dark grey in dark mode */}
+          {/* Dashboard content - White in light mode, slightly lighter grey than toolbar in dark mode */}
           <main className="flex-1 p-4 md:p-8 bg-white dark:bg-gray-800">
             {activeView === "home" ? (
               <div className="flex items-center justify-center h-full relative bg-white dark:bg-gray-800">
@@ -157,29 +177,31 @@ const ClientDashboard = () => {
                   }}
                 ></div>
                 <div className="text-center relative z-10">
-                  <h1 className="text-4xl md:text-6xl font-bold text-aleph-green mb-4">Welcome, {clientName}</h1>
-                  <p className="text-xl text-gray-600 dark:text-gray-300">Thank you for choosing Aleph Engineering and Supplies</p>
+                  <h1 className="text-4xl md:text-6xl font-bold text-aleph-green mb-4">
+                    Welcome{userProfile?.full_name ? `, ${userProfile.full_name}` : ''}
+                  </h1>
+                  <p className="text-xl text-gray-600 dark:text-gray-300">Client Dashboard - Aleph Engineering and Supplies</p>
                 </div>
               </div>
             ) : activeView === "orders" ? (
               <div className="bg-white dark:bg-gray-800 min-h-full">
-                <OrdersPage isAdmin={false} />
+                <OrdersPage />
               </div>
             ) : activeView === "progress" ? (
               <div className="bg-white dark:bg-gray-800 min-h-full">
-                <ProgressPage isAdmin={false} />
+                <ProgressPage />
               </div>
             ) : activeView === "processing" ? (
               <div className="bg-white dark:bg-gray-800 min-h-full">
-                <ProcessingPage isAdmin={false} />
+                <ProcessingPage />
               </div>
             ) : activeView === "completed" ? (
               <div className="bg-white dark:bg-gray-800 min-h-full">
-                <CompletedPage isAdmin={false} />
+                <CompletedPage />
               </div>
             ) : activeView === "files" ? (
               <div className="bg-white dark:bg-gray-800 min-h-full">
-                <FilesPage isAdmin={false} />
+                <FilesPage />
               </div>
             ) : (
               <div className="text-center p-8 bg-white dark:bg-gray-800 min-h-full">
