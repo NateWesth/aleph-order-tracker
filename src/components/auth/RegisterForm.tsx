@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -18,7 +19,9 @@ const RegisterForm = () => {
     confirmPassword: "",
     companyCode: "",
     phone: "",
-    position: ""
+    position: "",
+    userType: "client",
+    adminCode: ""
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -28,6 +31,16 @@ const RegisterForm = () => {
       toast({
         title: "Error",
         description: "Passwords do not match",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate admin code if user selected admin
+    if (formData.userType === "admin" && formData.adminCode !== "ALEPH7901") {
+      toast({
+        title: "Error",
+        description: "Invalid admin code. Please contact Aleph Engineering and Supplies for the correct code.",
         variant: "destructive",
       });
       return;
@@ -44,7 +57,8 @@ const RegisterForm = () => {
             full_name: formData.fullName,
             company_code: formData.companyCode,
             phone: formData.phone,
-            position: formData.position
+            position: formData.position,
+            user_type: formData.userType
           }
         }
       });
@@ -93,6 +107,42 @@ const RegisterForm = () => {
           className="dark:bg-gray-700 dark:border-gray-600"
         />
       </div>
+
+      <div className="space-y-3">
+        <Label>Account Type</Label>
+        <RadioGroup 
+          value={formData.userType} 
+          onValueChange={(value) => setFormData({...formData, userType: value, adminCode: ""})}
+          className="flex flex-col space-y-2"
+        >
+          <div className="flex items-center space-x-2">
+            <RadioGroupItem value="client" id="client" />
+            <Label htmlFor="client" className="cursor-pointer">Client User</Label>
+          </div>
+          <div className="flex items-center space-x-2">
+            <RadioGroupItem value="admin" id="admin" />
+            <Label htmlFor="admin" className="cursor-pointer">Admin User (Aleph Engineering & Supplies)</Label>
+          </div>
+        </RadioGroup>
+      </div>
+
+      {formData.userType === "admin" && (
+        <div className="space-y-2">
+          <Label htmlFor="adminCode">Admin Access Code</Label>
+          <Input
+            id="adminCode"
+            type="text"
+            value={formData.adminCode}
+            onChange={(e) => setFormData({...formData, adminCode: e.target.value})}
+            placeholder="Enter admin access code"
+            required
+            className="dark:bg-gray-700 dark:border-gray-600"
+          />
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            Contact Aleph Engineering and Supplies for the admin access code
+          </p>
+        </div>
+      )}
 
       <div className="space-y-2">
         <Label htmlFor="companyCode">Company Code</Label>
