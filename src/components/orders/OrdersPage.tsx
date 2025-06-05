@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Plus, Search, Trash2 } from "lucide-react";
+import { Plus, Search, Trash2, CheckCircle } from "lucide-react";
 
 interface OrdersPageProps {
   isAdmin?: boolean;
@@ -95,12 +95,66 @@ export default function OrdersPage({ isAdmin = false }: OrdersPageProps) {
     }
   };
 
+  const receiveOrder = async (order: Order) => {
+    try {
+      // Update order status to 'received'
+      const { error } = await supabase
+        .from('orders')
+        .update({ status: 'received' })
+        .eq('id', order.id);
+
+      if (error) throw error;
+
+      // Create a progress order object
+      const progressOrder = {
+        id: order.id,
+        orderNumber: order.order_number,
+        companyName: "Company Name", // This would come from the company_id lookup in a real implementation
+        orderDate: new Date(order.created_at),
+        dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now as default
+        status: 'received' as const,
+        progress: 0,
+        progressStage: 'awaiting-stock' as const,
+        items: [
+          {
+            id: "1",
+            name: order.description || "Order items",
+            quantity: 1,
+            delivered: 0,
+            completed: false
+          }
+        ]
+      };
+
+      // Add to progress orders in localStorage
+      const existingProgressOrders = JSON.parse(localStorage.getItem('progressOrders') || '[]');
+      const updatedProgressOrders = [...existingProgressOrders, progressOrder];
+      localStorage.setItem('progressOrders', JSON.stringify(updatedProgressOrders));
+
+      // Update local state
+      setOrders(orders.map(o => o.id === order.id ? { ...o, status: 'received' } : o));
+
+      toast({
+        title: "Order Received",
+        description: `Order ${order.order_number} has been moved to progress tracking.`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Failed to receive order: " + error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
   const getStatusColor = (status: string | null) => {
     switch (status?.toLowerCase()) {
       case 'completed':
         return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
       case 'processing':
         return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300';
+      case 'received':
+        return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300';
       case 'pending':
         return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300';
       default:
@@ -190,6 +244,17 @@ export default function OrdersPage({ isAdmin = false }: OrdersPageProps) {
                       <Button variant="outline" size="sm">
                         Edit
                       </Button>
+                      {isAdmin && order.status === 'pending' && (
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => receiveOrder(order)}
+                          className="text-green-600 hover:text-green-700"
+                        >
+                          <CheckCircle className="h-4 w-4 mr-1" />
+                          Receive
+                        </Button>
+                      )}
                       {isAdmin && (
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
