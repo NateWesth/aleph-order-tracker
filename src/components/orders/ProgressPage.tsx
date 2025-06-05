@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { Progress } from "@/components/ui/progress";
+import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
@@ -208,6 +209,37 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
 
     setOrders(updatedOrders);
     localStorage.setItem('progressOrders', JSON.stringify(updatedOrders));
+
+    // Also update delivery orders
+    const existingDeliveryOrders = JSON.parse(localStorage.getItem('deliveryOrders') || '[]');
+    const updatedDeliveryOrders = existingDeliveryOrders.map((order: Order) => {
+      if (order.id === orderId) {
+        return {
+          ...order,
+          items: order.items.map((item: any) => {
+            if (item.id === itemId) {
+              return { ...item, delivered };
+            }
+            return item;
+          })
+        };
+      }
+      return order;
+    });
+    localStorage.setItem('deliveryOrders', JSON.stringify(updatedDeliveryOrders));
+
+    // Update selected order if it matches
+    if (selectedOrder && selectedOrder.id === orderId) {
+      setSelectedOrder({
+        ...selectedOrder,
+        items: selectedOrder.items.map(item => {
+          if (item.id === itemId) {
+            return { ...item, delivered };
+          }
+          return item;
+        })
+      });
+    }
   };
 
   const toggleItemCompletion = (orderId: string, itemId: string) => {
@@ -459,11 +491,13 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
                       <div className="flex items-center space-x-2">
                         {isAdmin && (
                           <div className="flex items-center">
-                            <input
-                              className="w-20 border rounded px-2 py-1"
+                            <label className="text-sm mr-2">Delivered:</label>
+                            <Input
+                              className="w-20"
                               type="number"
-                              placeholder="Delivered"
-                              value={item.delivered || ""}
+                              min="0"
+                              max={item.quantity}
+                              value={item.delivered || 0}
                               onChange={(e) => updateItemDelivery(
                                 selectedOrder.id, 
                                 item.id, 
@@ -472,7 +506,7 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
                             />
                           </div>
                         )}
-                        {item.delivered !== undefined && (
+                        {!isAdmin && item.delivered !== undefined && (
                           <div className="text-sm">
                             Delivered: {item.delivered}
                           </div>

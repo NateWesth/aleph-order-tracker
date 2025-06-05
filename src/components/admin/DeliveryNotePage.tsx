@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -85,13 +84,31 @@ export default function DeliveryNotePage() {
   // Load orders from localStorage on component mount
   useEffect(() => {
     const storedDeliveryOrders = JSON.parse(localStorage.getItem('deliveryOrders') || '[]');
-    setOrders(storedDeliveryOrders);
+    const storedProgressOrders = JSON.parse(localStorage.getItem('progressOrders') || '[]');
+    
+    // Combine orders from both sources and remove duplicates
+    const allOrders = [...storedDeliveryOrders, ...storedProgressOrders];
+    const uniqueOrders = allOrders.filter((order, index, self) => 
+      index === self.findIndex(o => o.id === order.id)
+    );
+    
+    setOrders(uniqueOrders);
   }, []);
 
-  // Save orders to localStorage whenever orders change
-  useEffect(() => {
-    localStorage.setItem('deliveryOrders', JSON.stringify(orders));
-  }, [orders]);
+  // Generate delivery note number
+  const generateDeliveryNoteNumber = () => {
+    const existingNumbers = orders
+      .flatMap(order => order.files || [])
+      .filter(file => file.type === 'delivery-note')
+      .map(file => {
+        const match = file.name.match(/DN-(\d+)/);
+        return match ? parseInt(match[1]) : 0;
+      });
+    
+    const highestNumber = Math.max(0, ...existingNumbers);
+    const nextNumber = highestNumber + 1;
+    return `DN-${nextNumber.toString().padStart(5, '0')}`;
+  };
 
   // Update delivery quantity for an item
   const updateDeliveryQuantity = (orderId: string, itemId: string, quantity: number) => {
@@ -215,10 +232,11 @@ export default function DeliveryNotePage() {
 
   // Generate delivery note
   const generateDeliveryNote = (order: Order) => {
-    // Add delivery note with uploadedBy and uploadDate when generating
+    const deliveryNoteNumber = generateDeliveryNoteNumber();
+    
     const deliveryNoteFile: OrderFile = {
       id: `file-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      name: `Delivery_Note_${order.orderNumber}_${format(new Date(), 'yyyy-MM-dd')}.pdf`,
+      name: `Delivery_Note_${deliveryNoteNumber}_${format(new Date(), 'yyyy-MM-dd')}.pdf`,
       url: `delivery-note-${order.id}`,
       type: 'delivery-note',
       uploadedBy: 'admin' as const,
@@ -243,10 +261,12 @@ export default function DeliveryNotePage() {
     setShowPreview(true);
   };
 
-  // Print delivery note
+  // Print delivery note with improved layout
   const printDeliveryNote = () => {
     const printWindow = window.open('', '_blank');
     if (printWindow && selectedOrder) {
+      const deliveryNoteNumber = generateDeliveryNoteNumber();
+      
       printWindow.document.write(`
         <html>
           <head>
@@ -269,81 +289,85 @@ export default function DeliveryNotePage() {
               .page { 
                 width: 210mm; 
                 height: 297mm; 
-                padding: 10mm; 
+                padding: 8mm; 
                 page-break-after: always; 
               }
               .header { 
                 display: flex; 
-                justify-content: flex-end; 
+                justify-content: space-between; 
                 align-items: flex-start; 
-                margin-bottom: 15mm; 
-                position: relative;
+                margin-bottom: 8mm; 
+              }
+              .logo-section {
+                width: 80mm;
               }
               .logo { 
-                width: 60mm; 
-                height: 40mm; 
+                width: 80mm; 
+                height: 50mm; 
                 object-fit: contain; 
               }
               .company-details { 
-                position: absolute;
-                right: 65mm;
-                top: 0;
-                font-size: 10px; 
-                line-height: 1.3; 
-                max-width: 60mm; 
+                text-align: right;
+                font-size: 11px; 
+                line-height: 1.4; 
+                width: 80mm; 
               }
               .delivery-note-number { 
                 text-align: center; 
-                font-size: 16px; 
+                font-size: 18px; 
                 font-weight: bold; 
                 color: black; 
-                margin-bottom: 10mm; 
+                margin-bottom: 8mm; 
               }
               .copy-indicator { 
                 text-align: center; 
-                font-size: 14px; 
+                font-size: 16px; 
                 font-weight: bold; 
                 margin-bottom: 5mm; 
+                color: #666;
+              }
+              .client-details {
+                margin-bottom: 8mm;
+                font-size: 11px;
               }
               table { 
                 width: 100%; 
                 border-collapse: collapse; 
-                margin-bottom: 15mm; 
+                margin-bottom: 12mm; 
               }
               th, td { 
                 border: 1px solid black; 
-                padding: 1.5mm; 
+                padding: 2mm; 
                 text-align: left; 
-                height: 6mm; 
-                font-size: 10px; 
+                font-size: 11px; 
               }
               th { 
                 background-color: #f0f0f0; 
                 font-weight: bold; 
               }
               .col-description { 
-                width: 105mm; 
+                width: 100mm; 
               }
               .col-ordered, .col-delivered, .col-remaining { 
-                width: 17mm; 
+                width: 20mm; 
                 text-align: center; 
               }
               .footer { 
                 position: absolute; 
-                bottom: 10mm; 
-                left: 10mm; 
-                right: 10mm; 
+                bottom: 8mm; 
+                left: 8mm; 
+                right: 8mm; 
                 display: flex; 
                 justify-content: space-between; 
-                font-size: 9px; 
+                font-size: 10px; 
               }
               .signature-section { 
                 text-align: center; 
-                width: 60mm; 
+                width: 70mm; 
               }
               .date-section { 
                 text-align: center; 
-                width: 60mm; 
+                width: 70mm; 
               }
             </style>
           </head>
@@ -351,18 +375,27 @@ export default function DeliveryNotePage() {
             <!-- Original Page -->
             <div class="page">
               <div class="header">
+                <div class="logo-section">
+                  <img src="/lovable-uploads/4c615bdd-48d0-4893-a843-01d2335af67a.png" alt="Aleph Logo" class="logo" />
+                </div>
                 <div class="company-details">
                   <strong>ALEPH TRADING AND PROJECTS CC</strong><br/>
                   123 Business Street<br/>
                   Johannesburg, 2000<br/>
                   VAT: 4123456789<br/>
-                  Tel: 011 234 5678
+                  Tel: 011 234 5678<br/>
+                  Email: info@aleph.co.za
                 </div>
-                <img src="/lovable-uploads/4c615bdd-48d0-4893-a843-01d2335af67a.png" alt="Aleph Logo" class="logo" />
               </div>
               
               <div class="delivery-note-number">
-                DELIVERY NOTE: DN-${selectedOrder.orderNumber}
+                DELIVERY NOTE: ${deliveryNoteNumber}
+              </div>
+              
+              <div class="client-details">
+                <strong>To: ${selectedOrder.companyName}</strong><br/>
+                Order Number: ${selectedOrder.orderNumber}<br/>
+                Date: ${format(new Date(), 'dd/MM/yyyy')}
               </div>
               
               <table>
@@ -392,7 +425,7 @@ export default function DeliveryNotePage() {
                   _________________
                 </div>
                 <div class="signature-section">
-                  Signature<br/>
+                  Customer Signature<br/>
                   _________________
                 </div>
               </div>
@@ -402,18 +435,27 @@ export default function DeliveryNotePage() {
             <div class="page">
               <div class="copy-indicator">COPY</div>
               <div class="header">
+                <div class="logo-section">
+                  <img src="/lovable-uploads/4c615bdd-48d0-4893-a843-01d2335af67a.png" alt="Aleph Logo" class="logo" />
+                </div>
                 <div class="company-details">
                   <strong>ALEPH TRADING AND PROJECTS CC</strong><br/>
                   123 Business Street<br/>
                   Johannesburg, 2000<br/>
                   VAT: 4123456789<br/>
-                  Tel: 011 234 5678
+                  Tel: 011 234 5678<br/>
+                  Email: info@aleph.co.za
                 </div>
-                <img src="/lovable-uploads/4c615bdd-48d0-4893-a843-01d2335af67a.png" alt="Aleph Logo" class="logo" />
               </div>
               
               <div class="delivery-note-number">
-                DELIVERY NOTE: DN-${selectedOrder.orderNumber}
+                DELIVERY NOTE: ${deliveryNoteNumber}
+              </div>
+              
+              <div class="client-details">
+                <strong>To: ${selectedOrder.companyName}</strong><br/>
+                Order Number: ${selectedOrder.orderNumber}<br/>
+                Date: ${format(new Date(), 'dd/MM/yyyy')}
               </div>
               
               <table>
@@ -443,7 +485,7 @@ export default function DeliveryNotePage() {
                   _________________
                 </div>
                 <div class="signature-section">
-                  Signature<br/>
+                  Customer Signature<br/>
                   _________________
                 </div>
               </div>
