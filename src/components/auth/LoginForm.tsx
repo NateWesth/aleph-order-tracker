@@ -37,7 +37,7 @@ const LoginForm = () => {
 
       if (roleError) {
         console.error('Error fetching user role:', roleError);
-        // Default to client if no role found
+        // Default to user if no role found
         navigate("/client-dashboard");
         return;
       }

@@ -68,7 +68,7 @@ export default function UsersManagementPage() {
       // Combine profiles with roles and company names
       const usersWithRoles = profiles?.map(profile => ({
         ...profile,
-        role: userRoles?.find(role => role.user_id === profile.id)?.role || 'client',
+        role: userRoles?.find(role => role.user_id === profile.id)?.role || 'user',
         company_name: profile.companies?.name || 'Unknown Company'
       })) || [];
 
@@ -195,7 +195,7 @@ export default function UsersManagementPage() {
                       className={user.role === 'admin' ? 'bg-aleph-green' : ''}
                     >
                       <Shield className="h-3 w-3 mr-1" />
-                      {user.role}
+                      {user.role === 'user' ? 'client' : user.role}
                     </Badge>
                   </TableCell>
                   <TableCell>
@@ -212,7 +212,7 @@ export default function UsersManagementPage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="client">Client</SelectItem>
+                        <SelectItem value="user">Client</SelectItem>
                         <SelectItem value="admin">Admin</SelectItem>
                       </SelectContent>
                     </Select>

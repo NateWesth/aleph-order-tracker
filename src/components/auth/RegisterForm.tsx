@@ -20,7 +20,7 @@ const RegisterForm = () => {
     companyCode: "",
     phone: "",
     position: "",
-    userType: "client",
+    userType: "user",
     adminCode: ""
   });
 
@@ -132,8 +132,8 @@ const RegisterForm = () => {
           className="flex flex-col space-y-2"
         >
           <div className="flex items-center space-x-2">
-            <RadioGroupItem value="client" id="client" />
-            <Label htmlFor="client" className="cursor-pointer">Client User</Label>
+            <RadioGroupItem value="user" id="user" />
+            <Label htmlFor="user" className="cursor-pointer">Client User</Label>
           </div>
           <div className="flex items-center space-x-2">
             <RadioGroupItem value="admin" id="admin" />
