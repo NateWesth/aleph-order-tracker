@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -84,7 +83,7 @@ export default function UsersManagementPage() {
     }
   };
 
-  const updateUserRole = async (userId: string, newRole: string) => {
+  const updateUserRole = async (userId: string, newRole: "admin" | "user") => {
     try {
       // Update role in user_roles table
       const { error } = await supabase
@@ -206,7 +205,7 @@ export default function UsersManagementPage() {
                   <TableCell>
                     <Select
                       value={user.role}
-                      onValueChange={(value) => updateUserRole(user.id, value)}
+                      onValueChange={(value: "admin" | "user") => updateUserRole(user.id, value)}
                     >
                       <SelectTrigger className="w-24">
                         <SelectValue />
