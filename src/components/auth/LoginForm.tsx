@@ -28,19 +28,26 @@ const LoginForm = () => {
 
       if (error) throw error;
 
-      // Check if user is admin
-      const { data: userRole } = await supabase
+      // Get user role from user_roles table
+      const { data: userRole, error: roleError } = await supabase
         .from('user_roles')
         .select('role')
         .eq('user_id', data.user.id)
         .single();
+
+      if (roleError) {
+        console.error('Error fetching user role:', roleError);
+        // Default to client if no role found
+        navigate("/client-dashboard");
+        return;
+      }
 
       toast({
         title: "Success",
         description: "Logged in successfully!",
       });
 
-      // Navigate based on role
+      // Navigate based on role from user_roles table
       if (userRole?.role === 'admin') {
         navigate("/admin-dashboard");
       } else {

@@ -21,9 +21,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { User, Shield, Search } from "lucide-react";
-import type { Database } from "@/integrations/supabase/types";
-
-type UserRole = Database['public']['Enums']['app_role'];
 
 interface UserProfile {
   id: string;
@@ -32,8 +29,10 @@ interface UserProfile {
   phone: string;
   position: string;
   company_code: string;
+  company_id: string;
   created_at: string;
-  role?: UserRole;
+  role?: string;
+  company_name?: string;
 }
 
 export default function UsersManagementPage() {
@@ -48,9 +47,13 @@ export default function UsersManagementPage() {
 
   const fetchUsers = async () => {
     try {
+      // Fetch profiles with company information
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
-        .select('*')
+        .select(`
+          *,
+          companies(name)
+        `)
         .order('created_at', { ascending: false });
 
       if (profilesError) throw profilesError;
@@ -62,10 +65,11 @@ export default function UsersManagementPage() {
 
       if (rolesError) throw rolesError;
 
-      // Combine profiles with roles
+      // Combine profiles with roles and company names
       const usersWithRoles = profiles?.map(profile => ({
         ...profile,
-        role: userRoles?.find(role => role.user_id === profile.id)?.role || 'user' as UserRole
+        role: userRoles?.find(role => role.user_id === profile.id)?.role || 'client',
+        company_name: profile.companies?.name || 'Unknown Company'
       })) || [];
 
       setUsers(usersWithRoles);
@@ -80,18 +84,13 @@ export default function UsersManagementPage() {
     }
   };
 
-  const updateUserRole = async (userId: string, newRole: UserRole) => {
+  const updateUserRole = async (userId: string, newRole: string) => {
     try {
-      // First, delete existing role
-      await supabase
-        .from('user_roles')
-        .delete()
-        .eq('user_id', userId);
-
-      // Then insert new role with correct field name
+      // Update role in user_roles table
       const { error } = await supabase
         .from('user_roles')
-        .insert({ user_id: userId, role: newRole });
+        .update({ role: newRole })
+        .eq('user_id', userId);
 
       if (error) throw error;
 
@@ -116,7 +115,8 @@ export default function UsersManagementPage() {
   const filteredUsers = users.filter(user => 
     user.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.company_code?.toLowerCase().includes(searchTerm.toLowerCase())
+    user.company_code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    user.company_name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   if (loading) {
@@ -184,7 +184,10 @@ export default function UsersManagementPage() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge variant="outline">{user.company_code || 'No company'}</Badge>
+                    <div>
+                      <Badge variant="outline">{user.company_name}</Badge>
+                      <div className="text-xs text-gray-500 mt-1">Code: {user.company_code || 'None'}</div>
+                    </div>
                   </TableCell>
                   <TableCell>
                     <Badge 
@@ -203,13 +206,13 @@ export default function UsersManagementPage() {
                   <TableCell>
                     <Select
                       value={user.role}
-                      onValueChange={(value: UserRole) => updateUserRole(user.id, value)}
+                      onValueChange={(value) => updateUserRole(user.id, value)}
                     >
                       <SelectTrigger className="w-24">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="user">User</SelectItem>
+                        <SelectItem value="client">Client</SelectItem>
                         <SelectItem value="admin">Admin</SelectItem>
                       </SelectContent>
                     </Select>

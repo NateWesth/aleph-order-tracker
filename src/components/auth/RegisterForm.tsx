@@ -46,6 +46,22 @@ const RegisterForm = () => {
       return;
     }
 
+    // Validate company code exists
+    const { data: company, error: companyError } = await supabase
+      .from('companies')
+      .select('id, code')
+      .eq('code', formData.companyCode)
+      .single();
+
+    if (companyError || !company) {
+      toast({
+        title: "Error",
+        description: "Invalid company code. Please check with your company administrator.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setLoading(true);
 
     try {

@@ -101,6 +101,7 @@ export type Database = {
       profiles: {
         Row: {
           company_code: string | null
+          company_id: string | null
           created_at: string | null
           email: string | null
           full_name: string | null
@@ -111,6 +112,7 @@ export type Database = {
         }
         Insert: {
           company_code?: string | null
+          company_id?: string | null
           created_at?: string | null
           email?: string | null
           full_name?: string | null
@@ -121,6 +123,7 @@ export type Database = {
         }
         Update: {
           company_code?: string | null
+          company_id?: string | null
           created_at?: string | null
           email?: string | null
           full_name?: string | null
@@ -129,7 +132,15 @@ export type Database = {
           position?: string | null
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {
