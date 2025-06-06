@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -45,20 +46,31 @@ const RegisterForm = () => {
       return;
     }
 
-    // Validate company code exists
-    const { data: company, error: companyError } = await supabase
-      .from('companies')
-      .select('id, code')
-      .eq('code', formData.companyCode)
-      .single();
+    // Validate company code exists only for regular users
+    if (formData.userType === "user") {
+      if (!formData.companyCode) {
+        toast({
+          title: "Error",
+          description: "Company code is required for client users.",
+          variant: "destructive",
+        });
+        return;
+      }
 
-    if (companyError || !company) {
-      toast({
-        title: "Error",
-        description: "Invalid company code. Please check with your company administrator.",
-        variant: "destructive",
-      });
-      return;
+      const { data: company, error: companyError } = await supabase
+        .from('companies')
+        .select('id, code')
+        .eq('code', formData.companyCode)
+        .single();
+
+      if (companyError || !company) {
+        toast({
+          title: "Error",
+          description: "Invalid company code. Please check with your company administrator.",
+          variant: "destructive",
+        });
+        return;
+      }
     }
 
     setLoading(true);
@@ -70,7 +82,7 @@ const RegisterForm = () => {
         options: {
           data: {
             full_name: formData.fullName,
-            company_code: formData.companyCode,
+            company_code: formData.userType === "user" ? formData.companyCode : null,
             phone: formData.phone,
             position: formData.position,
             user_type: formData.userType
@@ -127,7 +139,7 @@ const RegisterForm = () => {
         <Label>Account Type</Label>
         <RadioGroup 
           value={formData.userType} 
-          onValueChange={(value) => setFormData({...formData, userType: value, adminCode: ""})}
+          onValueChange={(value) => setFormData({...formData, userType: value, adminCode: "", companyCode: ""})}
           className="flex flex-col space-y-2"
         >
           <div className="flex items-center space-x-2">
@@ -159,18 +171,20 @@ const RegisterForm = () => {
         </div>
       )}
 
-      <div className="space-y-2">
-        <Label htmlFor="companyCode">Company Code</Label>
-        <Input
-          id="companyCode"
-          type="text"
-          value={formData.companyCode}
-          onChange={(e) => setFormData({...formData, companyCode: e.target.value})}
-          placeholder="Enter your company code"
-          required
-          className="dark:bg-gray-700 dark:border-gray-600"
-        />
-      </div>
+      {formData.userType === "user" && (
+        <div className="space-y-2">
+          <Label htmlFor="companyCode">Company Code</Label>
+          <Input
+            id="companyCode"
+            type="text"
+            value={formData.companyCode}
+            onChange={(e) => setFormData({...formData, companyCode: e.target.value})}
+            placeholder="Enter your company code"
+            required
+            className="dark:bg-gray-700 dark:border-gray-600"
+          />
+        </div>
+      )}
 
       <div className="space-y-2">
         <Label htmlFor="phone">Phone (Optional)</Label>
