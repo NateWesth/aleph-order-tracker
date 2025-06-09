@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -24,8 +23,54 @@ const RegisterForm = () => {
     adminCode: ""
   });
 
+  const validateAdminCode = async (adminCode: string): Promise<boolean> => {
+    try {
+      const { data, error } = await supabase.functions.invoke('validate-admin-code', {
+        body: { adminCode }
+      });
+
+      if (error) {
+        console.error('Admin validation error:', error);
+        return false;
+      }
+
+      return data?.isValid || false;
+    } catch (error) {
+      console.error('Error validating admin code:', error);
+      return false;
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Input validation
+    if (!formData.fullName.trim()) {
+      toast({
+        title: "Error",
+        description: "Full name is required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!formData.email.trim()) {
+      toast({
+        title: "Error",
+        description: "Email is required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (formData.password.length < 6) {
+      toast({
+        title: "Error",
+        description: "Password must be at least 6 characters long",
+        variant: "destructive",
+      });
+      return;
+    }
     
     if (formData.password !== formData.confirmPassword) {
       toast({
@@ -37,18 +82,30 @@ const RegisterForm = () => {
     }
 
     // Validate admin code if user selected admin
-    if (formData.userType === "admin" && formData.adminCode !== "ALEPH7901") {
-      toast({
-        title: "Error",
-        description: "Invalid admin code. Please contact Aleph Engineering and Supplies for the correct code.",
-        variant: "destructive",
-      });
-      return;
+    if (formData.userType === "admin") {
+      if (!formData.adminCode.trim()) {
+        toast({
+          title: "Error",
+          description: "Admin access code is required for admin users.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const isValidAdmin = await validateAdminCode(formData.adminCode);
+      if (!isValidAdmin) {
+        toast({
+          title: "Error",
+          description: "Invalid admin code. Please contact Aleph Engineering and Supplies for the correct code.",
+          variant: "destructive",
+        });
+        return;
+      }
     }
 
     // Validate company code exists only for regular users
     if (formData.userType === "user") {
-      if (!formData.companyCode) {
+      if (!formData.companyCode.trim()) {
         toast({
           title: "Error",
           description: "Company code is required for client users.",
@@ -158,7 +215,7 @@ const RegisterForm = () => {
           <Label htmlFor="adminCode">Admin Access Code</Label>
           <Input
             id="adminCode"
-            type="text"
+            type="password"
             value={formData.adminCode}
             onChange={(e) => setFormData({...formData, adminCode: e.target.value})}
             placeholder="Enter admin access code"
