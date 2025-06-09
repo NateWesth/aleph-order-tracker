@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -22,24 +23,6 @@ const RegisterForm = () => {
     userType: "user",
     adminCode: ""
   });
-
-  const validateAdminCode = async (adminCode: string): Promise<boolean> => {
-    try {
-      const { data, error } = await supabase.functions.invoke('validate-admin-code', {
-        body: { adminCode }
-      });
-
-      if (error) {
-        console.error('Admin validation error:', error);
-        return false;
-      }
-
-      return data?.isValid || false;
-    } catch (error) {
-      console.error('Error validating admin code:', error);
-      return false;
-    }
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -92,8 +75,8 @@ const RegisterForm = () => {
         return;
       }
 
-      const isValidAdmin = await validateAdminCode(formData.adminCode);
-      if (!isValidAdmin) {
+      // Hardcoded admin code validation
+      if (formData.adminCode !== "ALEPH7901") {
         toast({
           title: "Error",
           description: "Invalid admin code. Please contact Aleph Engineering and Supplies for the correct code.",
