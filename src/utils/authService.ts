@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { FormData } from "./authValidation";
 
@@ -21,27 +20,57 @@ export const signInUser = async (email: string, password: string) => {
 export const getUserRole = async (userId: string) => {
   console.log("Fetching user role for:", userId);
 
-  const { data: roleData, error: roleError } = await supabase
-    .from('user_roles')
-    .select('role')
-    .eq('user_id', userId)
-    .maybeSingle();
+  try {
+    const { data: roleData, error: roleError } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', userId)
+      .maybeSingle();
 
-  console.log("User role query result:", { roleData, roleError });
+    console.log("User role query result:", { roleData, roleError });
 
-  if (roleError) {
-    console.error('Error fetching user role:', roleError);
-    throw new Error("Unable to verify user role. Please contact support.");
-  }
+    if (roleError) {
+      console.error('Error fetching user role:', roleError);
+      
+      // If it's a policy error, the user might not have proper access
+      if (roleError.code === '42501' || roleError.message.includes('policy')) {
+        console.log('Policy error detected, assigning default role');
+        return "user";
+      }
+      
+      // For other database errors, assign default role instead of throwing
+      console.log('Database error detected, assigning default role');
+      return "user";
+    }
 
-  if (!roleData) {
-    console.error('No role found for user:', userId);
-    // Assign a default role if no role is found
-    console.log('Assigning default role "user" for user:', userId);
+    if (!roleData) {
+      console.log('No role found for user, assigning default role "user"');
+      
+      // Try to create a default role for the user
+      try {
+        const { error: insertError } = await supabase
+          .from('user_roles')
+          .insert([{ user_id: userId, role: 'user' }]);
+        
+        if (insertError) {
+          console.error('Error creating default role:', insertError);
+        } else {
+          console.log('Default role created successfully');
+        }
+      } catch (insertErr) {
+        console.error('Failed to insert default role:', insertErr);
+      }
+      
+      return "user";
+    }
+
+    console.log('User role found:', roleData.role);
+    return roleData.role;
+  } catch (error) {
+    console.error('Unexpected error in getUserRole:', error);
+    // Always return a default role instead of throwing
     return "user";
   }
-
-  return roleData.role;
 };
 
 export const validateUserRole = (actualRole: string, selectedUserType: string) => {
