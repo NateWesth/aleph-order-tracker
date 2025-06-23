@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -103,7 +102,7 @@ export default function OrdersPage({ isAdmin = false }: OrdersPageProps) {
       console.error("Failed to fetch orders:", error);
       toast({
         title: "Error",
-        description: "Failed to fetch orders. Please try again.",
+        description: "Failed to fetch orders: " + error.message,
         variant: "destructive",
       });
     } finally {
@@ -128,11 +127,6 @@ export default function OrdersPage({ isAdmin = false }: OrdersPageProps) {
       setCompanies(data || []);
     } catch (error: any) {
       console.error('Error fetching companies:', error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch companies. Please try again.",
-        variant: "destructive",
-      });
     }
   };
 
@@ -153,11 +147,6 @@ export default function OrdersPage({ isAdmin = false }: OrdersPageProps) {
       setProfiles(data || []);
     } catch (error: any) {
       console.error('Error fetching profiles:', error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch user profiles. Please try again.",
-        variant: "destructive",
-      });
     }
   };
 
@@ -223,7 +212,7 @@ export default function OrdersPage({ isAdmin = false }: OrdersPageProps) {
       console.error("Failed to create order:", error);
       toast({
         title: "Error",
-        description: "Failed to create order. Please try again.",
+        description: "Failed to create order: " + error.message,
         variant: "destructive",
       });
     }
@@ -247,7 +236,7 @@ export default function OrdersPage({ isAdmin = false }: OrdersPageProps) {
     } catch (error: any) {
       toast({
         title: "Error",
-        description: "Failed to delete order. Please try again.",
+        description: "Failed to delete order: " + error.message,
         variant: "destructive",
       });
     }
@@ -299,7 +288,7 @@ export default function OrdersPage({ isAdmin = false }: OrdersPageProps) {
     } catch (error: any) {
       toast({
         title: "Error",
-        description: "Failed to receive order. Please try again.",
+        description: "Failed to receive order: " + error.message,
         variant: "destructive",
       });
     }
