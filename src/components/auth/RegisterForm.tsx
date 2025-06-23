@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -97,16 +96,40 @@ const RegisterForm = () => {
         return;
       }
 
-      const { data: company, error: companyError } = await supabase
-        .from('companies')
-        .select('id, code')
-        .eq('code', formData.companyCode)
-        .single();
+      try {
+        console.log("Validating company code:", formData.companyCode);
+        
+        const { data: company, error: companyError } = await supabase
+          .from('companies')
+          .select('id, code')
+          .eq('code', formData.companyCode)
+          .maybeSingle();
 
-      if (companyError || !company) {
+        console.log("Company validation result:", { company, companyError });
+
+        if (companyError) {
+          console.error("Company validation error:", companyError);
+          toast({
+            title: "Error",
+            description: "Unable to validate company code. Please try again.",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        if (!company) {
+          toast({
+            title: "Error",
+            description: "Invalid company code. Please check with your company administrator.",
+            variant: "destructive",
+          });
+          return;
+        }
+      } catch (error) {
+        console.error("Network error during company validation:", error);
         toast({
           title: "Error",
-          description: "Invalid company code. Please check with your company administrator.",
+          description: "Network error. Please check your connection and try again.",
           variant: "destructive",
         });
         return;
@@ -116,10 +139,13 @@ const RegisterForm = () => {
     setLoading(true);
 
     try {
+      console.log("Attempting to sign up user with email:", formData.email);
+      
       const { error } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
         options: {
+          emailRedirectTo: `${window.location.origin}/auth`,
           data: {
             full_name: formData.fullName,
             company_code: formData.userType === "user" ? formData.companyCode : null,
@@ -130,8 +156,13 @@ const RegisterForm = () => {
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Supabase auth error:", error);
+        throw error;
+      }
 
+      console.log("User signed up successfully");
+      
       toast({
         title: "Success",
         description: "Account created successfully! Please check your email to confirm your account.",
@@ -139,9 +170,26 @@ const RegisterForm = () => {
       
       navigate("/auth");
     } catch (error: any) {
+      console.error("Registration error:", error);
+      
+      let errorMessage = "An unexpected error occurred. Please try again.";
+      
+      if (error.message) {
+        // Handle specific Supabase auth errors
+        if (error.message.includes("User already registered")) {
+          errorMessage = "An account with this email already exists. Please try logging in instead.";
+        } else if (error.message.includes("Invalid email")) {
+          errorMessage = "Please enter a valid email address.";
+        } else if (error.message.includes("Password")) {
+          errorMessage = "Password does not meet requirements. Please try a stronger password.";
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
       toast({
-        title: "Error",
-        description: error.message,
+        title: "Registration Failed",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
