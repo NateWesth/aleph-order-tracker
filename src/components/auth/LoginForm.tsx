@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -104,11 +105,14 @@ const LoginForm = () => {
 
       console.log("User signed in successfully, checking role...");
 
-      // Use the new security definer function to get user role
+      // Query user_roles directly instead of using the function to avoid recursion
       const { data: roleData, error: roleError } = await supabase
-        .rpc('get_user_role', { user_uuid: data.user.id });
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', data.user.id)
+        .single();
 
-      console.log("User role function result:", { roleData, roleError });
+      console.log("User role query result:", { roleData, roleError });
 
       if (roleError) {
         console.error('Error fetching user role:', roleError);
@@ -133,7 +137,7 @@ const LoginForm = () => {
       }
 
       // Verify the selected role matches the user's actual role
-      const actualRole = roleData;
+      const actualRole = roleData.role;
       const selectedRole = formData.userType === "admin" ? "admin" : "user";
       
       console.log("Role verification:", { actualRole, selectedRole });
