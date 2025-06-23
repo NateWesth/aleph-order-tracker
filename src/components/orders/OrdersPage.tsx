@@ -79,14 +79,27 @@ export default function OrdersPage({ isAdmin = false }: OrdersPageProps) {
 
   const fetchOrders = async () => {
     try {
-      const { data, error } = await supabase
-        .from('orders')
-        .select('*')
-        .order('created_at', { ascending: false });
+      console.log("Fetching orders...");
+      
+      // Build the query - for admins, fetch all orders; for users, fetch only their own
+      let query = supabase.from('orders').select('*').order('created_at', { ascending: false });
+      
+      // If not admin, only fetch orders for the current user
+      if (!isAdmin && user?.id) {
+        query = query.eq('user_id', user.id);
+      }
 
-      if (error) throw error;
+      const { data, error } = await query;
+
+      if (error) {
+        console.error("Orders fetch error:", error);
+        throw error;
+      }
+      
+      console.log("Orders fetched successfully:", data);
       setOrders(data || []);
     } catch (error: any) {
+      console.error("Failed to fetch orders:", error);
       toast({
         title: "Error",
         description: "Failed to fetch orders: " + error.message,
@@ -99,12 +112,18 @@ export default function OrdersPage({ isAdmin = false }: OrdersPageProps) {
 
   const fetchCompanies = async () => {
     try {
+      console.log("Fetching companies...");
       const { data, error } = await supabase
         .from('companies')
         .select('id, name, code')
         .order('name');
 
-      if (error) throw error;
+      if (error) {
+        console.error("Companies fetch error:", error);
+        throw error;
+      }
+      
+      console.log("Companies fetched successfully:", data);
       setCompanies(data || []);
     } catch (error: any) {
       console.error('Error fetching companies:', error);
@@ -113,12 +132,18 @@ export default function OrdersPage({ isAdmin = false }: OrdersPageProps) {
 
   const fetchProfiles = async () => {
     try {
+      console.log("Fetching profiles...");
       const { data, error } = await supabase
         .from('profiles')
         .select('id, full_name, email, company_id')
         .order('full_name');
 
-      if (error) throw error;
+      if (error) {
+        console.error("Profiles fetch error:", error);
+        throw error;
+      }
+      
+      console.log("Profiles fetched successfully:", data);
       setProfiles(data || []);
     } catch (error: any) {
       console.error('Error fetching profiles:', error);
@@ -145,6 +170,8 @@ export default function OrdersPage({ isAdmin = false }: OrdersPageProps) {
     }
 
     try {
+      console.log("Creating order...");
+      
       const orderData = {
         order_number: newOrder.order_number,
         description: newOrder.description,
@@ -154,11 +181,18 @@ export default function OrdersPage({ isAdmin = false }: OrdersPageProps) {
         user_id: isAdmin ? (newOrder.user_id || null) : user?.id
       };
 
+      console.log("Order data:", orderData);
+
       const { error } = await supabase
         .from('orders')
         .insert([orderData]);
 
-      if (error) throw error;
+      if (error) {
+        console.error("Order creation error:", error);
+        throw error;
+      }
+
+      console.log("Order created successfully");
 
       toast({
         title: "Order Created",
@@ -175,6 +209,7 @@ export default function OrdersPage({ isAdmin = false }: OrdersPageProps) {
       });
       fetchOrders();
     } catch (error: any) {
+      console.error("Failed to create order:", error);
       toast({
         title: "Error",
         description: "Failed to create order: " + error.message,

@@ -22,16 +22,17 @@ export const getUserRole = async (userId: string) => {
   console.log("Fetching user role for:", userId);
 
   try {
-    // Use the security definer function to avoid RLS recursion issues
-    const { data: roleData, error: roleError } = await supabase.rpc('get_user_role', {
-      user_uuid: userId
-    });
+    // Query user_roles table directly with proper error handling
+    const { data: roleData, error: roleError } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', userId)
+      .maybeSingle();
 
     console.log("User role query result:", { roleData, roleError });
 
     if (roleError) {
       console.error('Error fetching user role:', roleError);
-      
       // For any database errors, assign default role instead of throwing
       console.log('Database error detected, assigning default role');
       return "user";
@@ -42,8 +43,8 @@ export const getUserRole = async (userId: string) => {
       return "user";
     }
 
-    console.log('User role found:', roleData);
-    return roleData;
+    console.log('User role found:', roleData.role);
+    return roleData.role;
   } catch (error) {
     console.error('Unexpected error in getUserRole:', error);
     // Always return a default role instead of throwing
