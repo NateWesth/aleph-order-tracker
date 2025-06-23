@@ -53,15 +53,17 @@ export const getUserRole = async (userId: string) => {
 };
 
 export const validateUserRole = (actualRole: string, selectedUserType: string) => {
-  // Map the selected user type to the expected role
-  const selectedRole = selectedUserType === "admin" ? "admin" : "user";
+  console.log("Role verification:", { actualRole, selectedUserType });
   
-  console.log("Role verification:", { actualRole, selectedRole, selectedUserType });
+  // Fix the validation logic - if user selected "admin" in login form, 
+  // we expect their role in database to be "admin"
+  // if user selected "client" in login form, we expect their role to be "user"
+  if (selectedUserType === "admin" && actualRole !== "admin") {
+    throw new Error(`You are registered as a client user but trying to login as admin. Please select the correct user type.`);
+  }
   
-  if (actualRole !== selectedRole) {
-    const displayRole = actualRole === "user" ? "client" : actualRole;
-    const displaySelected = selectedUserType === "client" ? "client" : selectedUserType;
-    throw new Error(`You are registered as a ${displayRole} user but trying to login as ${displaySelected}. Please select the correct user type.`);
+  if (selectedUserType === "client" && actualRole !== "user") {
+    throw new Error(`You are registered as an admin user but trying to login as client. Please select the correct user type.`);
   }
 
   return actualRole;

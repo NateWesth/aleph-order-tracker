@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -19,7 +20,7 @@ const RegisterForm = () => {
     companyCode: "",
     phone: "",
     position: "",
-    userType: "user",
+    userType: "user", // This maps to "user" role in database
     adminCode: ""
   });
 
@@ -152,7 +153,7 @@ const RegisterForm = () => {
             company_code: formData.userType === "user" ? formData.companyCode : null,
             phone: formData.phone,
             position: formData.position,
-            user_type: formData.userType // This should be "admin" or "user"
+            user_type: formData.userType // This will be "admin" or "user" - matches our trigger expectations
           }
         }
       });
@@ -162,7 +163,7 @@ const RegisterForm = () => {
         throw error;
       }
 
-      console.log("User signed up successfully");
+      console.log("User signed up successfully with user_type:", formData.userType);
       
       toast({
         title: "Success",
