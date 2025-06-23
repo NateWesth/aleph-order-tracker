@@ -52,16 +52,36 @@ const LoginForm = () => {
       }
       
       // Validate company code exists
-      const { data: company, error: companyError } = await supabase
-        .from('companies')
-        .select('id, code')
-        .eq('code', formData.accessCode)
-        .single();
+      try {
+        const { data: company, error: companyError } = await supabase
+          .from('companies')
+          .select('id, code')
+          .eq('code', formData.accessCode)
+          .maybeSingle();
 
-      if (companyError || !company) {
+        if (companyError) {
+          console.error('Company validation error:', companyError);
+          toast({
+            title: "Error",
+            description: "Unable to validate company code. Please try again.",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        if (!company) {
+          toast({
+            title: "Error",
+            description: "Invalid company code. Please check with your company administrator.",
+            variant: "destructive",
+          });
+          return;
+        }
+      } catch (error) {
+        console.error('Network error during company validation:', error);
         toast({
           title: "Error",
-          description: "Invalid company code. Please check with your company administrator.",
+          description: "Network error. Please check your connection and try again.",
           variant: "destructive",
         });
         return;
@@ -71,19 +91,28 @@ const LoginForm = () => {
     setLoading(true);
 
     try {
+      console.log("Attempting to sign in user with email:", formData.email);
+      
       const { data, error } = await supabase.auth.signInWithPassword({
         email: formData.email,
         password: formData.password,
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Auth sign in error:', error);
+        throw error;
+      }
 
-      // Get user role from user_roles table
+      console.log("User signed in successfully, checking role...");
+
+      // Get user role from user_roles table with better error handling
       const { data: userRole, error: roleError } = await supabase
         .from('user_roles')
         .select('role')
         .eq('user_id', data.user.id)
-        .single();
+        .maybeSingle();
+
+      console.log("User role query result:", { userRole, roleError });
 
       if (roleError) {
         console.error('Error fetching user role:', roleError);
@@ -96,9 +125,22 @@ const LoginForm = () => {
         return;
       }
 
+      if (!userRole) {
+        console.error('No role found for user:', data.user.id);
+        toast({
+          title: "Error",
+          description: "No role assigned to this user. Please contact support.",
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+
       // Verify the selected role matches the user's actual role
-      const actualRole = userRole?.role;
+      const actualRole = userRole.role;
       const selectedRole = formData.userType === "admin" ? "admin" : "user";
+      
+      console.log("Role verification:", { actualRole, selectedRole });
       
       if (actualRole !== selectedRole) {
         toast({
@@ -116,9 +158,22 @@ const LoginForm = () => {
           .from('profiles')
           .select('company_code')
           .eq('id', data.user.id)
-          .single();
+          .maybeSingle();
 
-        if (profileError || profile?.company_code !== formData.accessCode) {
+        console.log("Profile query result:", { profile, profileError });
+
+        if (profileError) {
+          console.error('Error fetching user profile:', profileError);
+          toast({
+            title: "Error",
+            description: "Unable to verify company association. Please contact support.",
+            variant: "destructive",
+          });
+          setLoading(false);
+          return;
+        }
+
+        if (!profile || profile.company_code !== formData.accessCode) {
           toast({
             title: "Error",
             description: "You don't belong to the company associated with this code.",
@@ -141,9 +196,23 @@ const LoginForm = () => {
         navigate("/client-dashboard");
       }
     } catch (error: any) {
+      console.error('Login error:', error);
+      
+      let errorMessage = "An unexpected error occurred. Please try again.";
+      
+      if (error.message) {
+        if (error.message.includes("Invalid login credentials")) {
+          errorMessage = "Invalid email or password. Please check your credentials and try again.";
+        } else if (error.message.includes("Email not confirmed")) {
+          errorMessage = "Please check your email and confirm your account before logging in.";
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
       toast({
-        title: "Error",
-        description: error.message,
+        title: "Login Failed",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
