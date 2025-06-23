@@ -22,6 +22,13 @@ export const getUserRole = async (userId: string) => {
   console.log("Fetching user role for:", userId);
 
   try {
+    // First, let's check if the user exists in user_roles table
+    const { data: allRoles, error: allRolesError } = await supabase
+      .from('user_roles')
+      .select('*');
+    
+    console.log("All user roles in table:", allRoles);
+    
     const { data: roleData, error: roleError } = await supabase
       .from('user_roles')
       .select('role')

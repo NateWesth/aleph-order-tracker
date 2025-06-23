@@ -142,7 +142,7 @@ const RegisterForm = () => {
       console.log("Attempting to sign up user with email:", formData.email);
       console.log("User type selected:", formData.userType);
       
-      const { error } = await supabase.auth.signUp({
+      const signupData = {
         email: formData.email,
         password: formData.password,
         options: {
@@ -155,7 +155,11 @@ const RegisterForm = () => {
             user_type: formData.userType // This should be "admin" or "user"
           }
         }
-      });
+      };
+      
+      console.log("Signup data being sent:", signupData);
+      
+      const { error } = await supabase.auth.signUp(signupData);
 
       if (error) {
         console.error("Supabase auth error:", error);
