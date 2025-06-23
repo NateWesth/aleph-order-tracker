@@ -21,22 +21,29 @@ export const signInUser = async (email: string, password: string) => {
 export const getUserRole = async (userId: string) => {
   console.log("Fetching user role for:", userId);
 
+  // Try to get the user role directly without using the problematic function
   const { data: roleData, error: roleError } = await supabase
     .from('user_roles')
     .select('role')
     .eq('user_id', userId)
-    .single();
+    .maybeSingle();
 
   console.log("User role query result:", { roleData, roleError });
 
   if (roleError) {
     console.error('Error fetching user role:', roleError);
+    // If there's a specific RLS error, provide more context
+    if (roleError.message.includes('row-level security')) {
+      throw new Error("Access denied. Please ensure you are logged in properly.");
+    }
     throw new Error("Unable to verify user role. Please contact support.");
   }
 
   if (!roleData) {
     console.error('No role found for user:', userId);
-    throw new Error("No role assigned to this user. Please contact support.");
+    // Instead of throwing an error, assign a default role
+    console.log('Assigning default role "user" for user:', userId);
+    return "user";
   }
 
   return roleData.role;
