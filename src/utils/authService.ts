@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { FormData } from "./authValidation";
 
@@ -79,7 +80,9 @@ export const validateUserRole = (actualRole: string, selectedUserType: string) =
   console.log("Role verification:", { actualRole, selectedRole });
   
   if (actualRole !== selectedRole) {
-    throw new Error(`You are registered as a ${actualRole} user but trying to login as ${selectedUserType}. Please select the correct user type.`);
+    const displayRole = actualRole === "user" ? "client" : actualRole;
+    const displaySelected = selectedUserType === "client" ? "client" : selectedUserType;
+    throw new Error(`You are registered as a ${displayRole} user but trying to login as ${displaySelected}. Please select the correct user type.`);
   }
 
   return actualRole;
