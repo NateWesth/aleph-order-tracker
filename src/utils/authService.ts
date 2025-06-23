@@ -75,9 +75,10 @@ export const getUserRole = async (userId: string) => {
 };
 
 export const validateUserRole = (actualRole: string, selectedUserType: string) => {
+  // Map the selected user type to the expected role
   const selectedRole = selectedUserType === "admin" ? "admin" : "user";
   
-  console.log("Role verification:", { actualRole, selectedRole });
+  console.log("Role verification:", { actualRole, selectedRole, selectedUserType });
   
   if (actualRole !== selectedRole) {
     const displayRole = actualRole === "user" ? "client" : actualRole;
