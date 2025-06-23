@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -105,14 +104,11 @@ const LoginForm = () => {
 
       console.log("User signed in successfully, checking role...");
 
-      // Get user role from user_roles table with better error handling
-      const { data: userRole, error: roleError } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', data.user.id)
-        .maybeSingle();
+      // Use the new security definer function to get user role
+      const { data: roleData, error: roleError } = await supabase
+        .rpc('get_user_role', { user_uuid: data.user.id });
 
-      console.log("User role query result:", { userRole, roleError });
+      console.log("User role function result:", { roleData, roleError });
 
       if (roleError) {
         console.error('Error fetching user role:', roleError);
@@ -125,7 +121,7 @@ const LoginForm = () => {
         return;
       }
 
-      if (!userRole) {
+      if (!roleData) {
         console.error('No role found for user:', data.user.id);
         toast({
           title: "Error",
@@ -137,7 +133,7 @@ const LoginForm = () => {
       }
 
       // Verify the selected role matches the user's actual role
-      const actualRole = userRole.role;
+      const actualRole = roleData;
       const selectedRole = formData.userType === "admin" ? "admin" : "user";
       
       console.log("Role verification:", { actualRole, selectedRole });
