@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -46,6 +47,8 @@ export default function UsersManagementPage() {
 
   const fetchUsers = async () => {
     try {
+      console.log("Fetching profiles...");
+      
       // Fetch profiles with company information
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
@@ -55,14 +58,25 @@ export default function UsersManagementPage() {
         `)
         .order('created_at', { ascending: false });
 
-      if (profilesError) throw profilesError;
+      if (profilesError) {
+        console.error("Profiles fetch error:", profilesError);
+        throw profilesError;
+      }
+
+      console.log("Profiles fetched successfully:", profiles);
 
       // Fetch user roles
+      console.log("Fetching user roles...");
       const { data: userRoles, error: rolesError } = await supabase
         .from('user_roles')
         .select('user_id, role');
 
-      if (rolesError) throw rolesError;
+      if (rolesError) {
+        console.error("User roles fetch error:", rolesError);
+        throw rolesError;
+      }
+
+      console.log("User roles fetched successfully:", userRoles);
 
       // Combine profiles with roles and company names
       const usersWithRoles = profiles?.map(profile => ({
@@ -71,11 +85,13 @@ export default function UsersManagementPage() {
         company_name: profile.companies?.name || 'Unknown Company'
       })) || [];
 
+      console.log("Combined user data:", usersWithRoles);
       setUsers(usersWithRoles);
     } catch (error: any) {
+      console.error("Failed to fetch users:", error);
       toast({
         title: "Error",
-        description: "Failed to fetch users: " + error.message,
+        description: "Failed to fetch users. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -85,13 +101,20 @@ export default function UsersManagementPage() {
 
   const updateUserRole = async (userId: string, newRole: "admin" | "user") => {
     try {
+      console.log("Updating user role:", { userId, newRole });
+      
       // Update role in user_roles table
       const { error } = await supabase
         .from('user_roles')
         .update({ role: newRole })
         .eq('user_id', userId);
 
-      if (error) throw error;
+      if (error) {
+        console.error("Role update error:", error);
+        throw error;
+      }
+
+      console.log("User role updated successfully");
 
       // Update local state
       setUsers(users.map(user => 
@@ -100,12 +123,13 @@ export default function UsersManagementPage() {
 
       toast({
         title: "Success",
-        description: `User role updated to ${newRole}`,
+        description: `User role updated to ${newRole === 'user' ? 'client' : newRole}`,
       });
     } catch (error: any) {
+      console.error("Failed to update user role:", error);
       toast({
         title: "Error",
-        description: "Failed to update user role: " + error.message,
+        description: "Failed to update user role. Please try again.",
         variant: "destructive",
       });
     }

@@ -30,6 +30,7 @@ const AdminDashboard = () => {
   const { user, signOut } = useAuth();
   const [activeView, setActiveView] = useState("home");
   const [userProfile, setUserProfile] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
   
   useEffect(() => {
     if (user) {
@@ -41,6 +42,8 @@ const AdminDashboard = () => {
     if (!user) return;
     
     try {
+      console.log("Fetching user profile for:", user.id);
+      
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
@@ -49,12 +52,16 @@ const AdminDashboard = () => {
       
       if (error) {
         console.error('Error fetching profile:', error);
+        // Don't show error to user for profile fetch, just log it
         return;
       }
       
+      console.log("Profile fetched successfully:", data);
       setUserProfile(data);
     } catch (error) {
       console.error('Unexpected error fetching profile:', error);
+    } finally {
+      setLoading(false);
     }
   };
   
@@ -70,6 +77,14 @@ const AdminDashboard = () => {
   const handleMenuClick = (view: string) => {
     setActiveView(view);
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen w-full flex items-center justify-center bg-black">
+        <div className="text-aleph-green text-lg">Loading dashboard...</div>
+      </div>
+    );
+  }
   
   return (
     <SidebarProvider>
