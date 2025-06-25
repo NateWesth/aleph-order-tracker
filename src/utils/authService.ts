@@ -24,7 +24,7 @@ export const getUserRole = async (userId: string) => {
   try {
     // Use the new security definer function to get user role safely
     const { data: roleData, error: roleError } = await supabase
-      .rpc('get_user_role_safe', { user_uuid: userId });
+      .rpc('get_user_role_simple', { user_uuid: userId });
 
     console.log("User role query result:", { roleData, roleError });
 
