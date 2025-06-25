@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -16,7 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { format } from "date-fns";
-import { Printer, Eye, Upload, File, Plus } from "lucide-react";
+import { Upload, File, Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -29,49 +30,22 @@ interface OrderItem {
   completed: boolean;
 }
 
-// Define the company interface
-interface Company {
-  id: string;
-  name: string;
-  code: string;
-  contactPerson: string;
-  email: string;
-  phone: string;
-  address: string;
-  vatNumber: string;
-  logo?: string;
-}
-
-// Define the order interface with company details
+// Define the order interface
 interface Order {
   id: string;
   orderNumber: string;
   companyName: string;
-  company?: Company;
   orderDate: Date;
   dueDate: Date;
   items: OrderItem[];
   status: 'pending' | 'received' | 'in-progress' | 'processing' | 'completed';
-  progress?: number;
-  progressStage?: 'awaiting-stock' | 'packing' | 'out-for-delivery' | 'completed';
-  reference?: string;
-  attention?: string;
+  completedDate?: Date;
   files?: {
     id: string;
     name: string;
     url: string;
     type: 'invoice' | 'quote' | 'purchase-order' | 'proof-of-payment' | 'delivery-note' | 'other';
   }[];
-}
-
-// Define the order file interface
-interface OrderFile {
-  id: string;
-  name: string;
-  url: string;
-  type: 'invoice' | 'quote' | 'purchase-order' | 'proof-of-payment' | 'delivery-note' | 'other';
-  uploadedBy: 'admin' | 'client';
-  uploadDate: Date;
 }
 
 interface DeliveryNotePageProps {
@@ -81,129 +55,74 @@ interface DeliveryNotePageProps {
 export default function DeliveryNotePage({ isAdmin }: DeliveryNotePageProps) {
   const { toast } = useToast();
   const { user } = useAuth();
-  const [orders, setOrders] = useState<Order[]>([]);
+  const [completedOrders, setCompletedOrders] = useState<Order[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-  const [showPreview, setShowPreview] = useState(false);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
-  const [fileType, setFileType] = useState<'invoice' | 'quote' | 'purchase-order' | 'proof-of-payment' | 'delivery-note' | 'other'>('other');
+  const [fileType, setFileType] = useState<'invoice' | 'quote' | 'purchase-order' | 'proof-of-payment' | 'delivery-note' | 'other'>('delivery-note');
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [supabaseOrders, setSupabaseOrders] = useState<any[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
 
-  // Fetch orders from database
-  const fetchSupabaseOrders = async () => {
-    if (!user?.id) return;
-
+  // Fetch completed orders from localStorage and database
+  const fetchCompletedOrders = async () => {
     try {
-      let query = supabase
-        .from('orders')
-        .select('*')
-        .in('status', ['received', 'in-progress', 'processing'])
-        .order('created_at', { ascending: false });
-
-      // Only admins can see all orders for delivery notes
-      if (!isAdmin) {
-        query = query.eq('user_id', user.id);
+      // Get from localStorage first
+      const storedCompletedOrders = JSON.parse(localStorage.getItem('completedOrders') || '[]');
+      
+      // Filter orders based on admin status
+      let filteredOrders = storedCompletedOrders;
+      if (!isAdmin && user?.id) {
+        filteredOrders = storedCompletedOrders.filter((order: any) => order.userId === user.id);
       }
+      
+      // Only show completed orders
+      const completedOnly = filteredOrders.filter((order: Order) => order.status === 'completed');
+      
+      setCompletedOrders(completedOnly);
 
-      const { data, error } = await query;
+      // Also fetch from Supabase for real-time sync
+      if (user?.id) {
+        let query = supabase
+          .from('orders')
+          .select('*')
+          .eq('status', 'completed')
+          .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error("Error fetching delivery orders:", error);
-        return;
+        if (!isAdmin) {
+          query = query.eq('user_id', user.id);
+        }
+
+        const { data, error } = await query;
+        if (error) {
+          console.error("Error fetching completed orders:", error);
+          return;
+        }
+
+        // Merge with localStorage data (localStorage takes priority for files)
+        // This ensures we don't lose any files stored locally
+        console.log('Fetched completed orders from database:', data?.length || 0);
       }
-
-      setSupabaseOrders(data || []);
     } catch (error) {
-      console.error("Failed to fetch delivery orders:", error);
+      console.error("Failed to fetch completed orders:", error);
     }
   };
 
-  // Load orders from localStorage on component mount
   useEffect(() => {
-    const storedDeliveryOrders = JSON.parse(localStorage.getItem('deliveryOrders') || '[]');
-    const storedProgressOrders = JSON.parse(localStorage.getItem('progressOrders') || '[]');
-    
-    // Combine orders from both sources and remove duplicates
-    const allOrders = [...storedDeliveryOrders, ...storedProgressOrders];
-    let uniqueOrders = allOrders.filter((order, index, self) => 
-      index === self.findIndex(o => o.id === order.id)
-    );
-    
-    // Filter orders based on admin status
-    if (!isAdmin && user?.id) {
-      uniqueOrders = uniqueOrders.filter(order => order.userId === user.id);
-    }
-    
-    setOrders(uniqueOrders);
-    fetchSupabaseOrders();
+    fetchCompletedOrders();
   }, [isAdmin, user?.id]);
-
-  // Generate delivery note number
-  const generateDeliveryNoteNumber = () => {
-    const existingNumbers = orders
-      .flatMap(order => order.files || [])
-      .filter(file => file.type === 'delivery-note')
-      .map(file => {
-        const match = file.name.match(/DN-(\d+)/);
-        return match ? parseInt(match[1]) : 0;
-      });
-    
-    const highestNumber = Math.max(0, ...existingNumbers);
-    const nextNumber = highestNumber + 1;
-    return `DN-${nextNumber.toString().padStart(5, '0')}`;
-  };
-
-  // Update delivery quantity for an item
-  const updateDeliveryQuantity = (orderId: string, itemId: string, quantity: number) => {
-    const updatedOrders = orders.map(order => {
-      if (order.id === orderId) {
-        return {
-          ...order,
-          items: order.items.map(item => {
-            if (item.id === itemId) {
-              return { ...item, delivered: quantity };
-            }
-            return item;
-          })
-        };
-      }
-      return order;
-    });
-
-    setOrders(updatedOrders);
-    localStorage.setItem('deliveryOrders', JSON.stringify(updatedOrders));
-
-    const progressOrders = JSON.parse(localStorage.getItem('progressOrders') || '[]');
-    const updatedProgressOrders = progressOrders.map((order: Order) => {
-      if (order.id === orderId) {
-        return {
-          ...order,
-          items: order.items.map((item: any) => {
-            if (item.id === itemId) {
-              return { ...item, delivered: quantity };
-            }
-            return item;
-          })
-        };
-      }
-      return order;
-    });
-    localStorage.setItem('progressOrders', JSON.stringify(updatedProgressOrders));
-  };
 
   // Handle file selection
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
-      const files = Array.from(e.target.files).slice(0, 3);
+      const files = Array.from(e.target.files).slice(0, 5);
       setSelectedFiles(files);
     }
   };
 
-  // Upload files to order
+  // Upload files to the selected order
   const handleFileUpload = () => {
     if (!selectedOrder || selectedFiles.length === 0) return;
 
-    // Create simple file objects for regular uploads (without uploadedBy and uploadDate)
+    // Create file objects for the upload
     const newFiles = selectedFiles.map(file => ({
       id: `file-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       name: file.name,
@@ -211,55 +130,34 @@ export default function DeliveryNotePage({ isAdmin }: DeliveryNotePageProps) {
       type: fileType
     }));
 
-    // Update the order with new files
-    const updatedOrders = orders.map(order => {
-      if (order.id === selectedOrder.id) {
-        return {
-          ...order,
-          files: [...(order.files || []), ...newFiles]
-        };
-      }
-      return order;
-    });
-
-    setOrders(updatedOrders);
-    localStorage.setItem('deliveryOrders', JSON.stringify(updatedOrders));
-
-    // Also update in other storage locations
-    const progressOrders = JSON.parse(localStorage.getItem('progressOrders') || '[]');
-    const updatedProgressOrders = progressOrders.map((order: Order) => {
-      if (order.id === selectedOrder.id) {
-        return {
-          ...order,
-          files: [...(order.files || []), ...newFiles]
-        };
-      }
-      return order;
-    });
-    localStorage.setItem('progressOrders', JSON.stringify(updatedProgressOrders));
-
-    setSelectedOrder({
+    // Update the selected order with new files
+    const updatedOrder = {
       ...selectedOrder,
       files: [...(selectedOrder.files || []), ...newFiles]
+    };
+
+    // Update completed orders list
+    const updatedOrders = completedOrders.map(order => {
+      if (order.id === selectedOrder.id) {
+        return updatedOrder;
+      }
+      return order;
     });
 
+    setCompletedOrders(updatedOrders);
+    setSelectedOrder(updatedOrder);
+
+    // Save to localStorage
+    localStorage.setItem('completedOrders', JSON.stringify(updatedOrders));
+
+    // Close dialog and reset
     setUploadDialogOpen(false);
     setSelectedFiles([]);
     
     toast({
       title: "Files Uploaded",
-      description: `${newFiles.length} file(s) have been uploaded successfully.`,
+      description: `${newFiles.length} file(s) have been uploaded to order ${selectedOrder.orderNumber}.`,
     });
-  };
-
-  // Download or view a file
-  const handleFileAction = (file: any, action: 'download' | 'view') => {
-    toast({
-      title: action === 'download' ? "Downloading File" : "Opening File",
-      description: `${action === 'download' ? 'Downloading' : 'Opening'} ${file.name}...`,
-    });
-    
-    window.open(file.url, '_blank');
   };
 
   // View order details
@@ -272,306 +170,67 @@ export default function DeliveryNotePage({ isAdmin }: DeliveryNotePageProps) {
     setSelectedOrder(null);
   };
 
-  // Generate delivery note
-  const generateDeliveryNote = (order: Order) => {
-    const deliveryNoteNumber = generateDeliveryNoteNumber();
-    
-    const deliveryNoteFile: OrderFile = {
-      id: `file-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      name: `Delivery_Note_${deliveryNoteNumber}_${format(new Date(), 'yyyy-MM-dd')}.pdf`,
-      url: `delivery-note-${order.id}`,
-      type: 'delivery-note',
-      uploadedBy: 'admin' as const,
-      uploadDate: new Date()
-    };
-
-    // Update order with delivery note file
-    const updatedOrders = orders.map(o => {
-      if (o.id === order.id) {
-        return {
-          ...o,
-          files: [...(o.files || []), deliveryNoteFile]
-        };
-      }
-      return o;
+  // Download or view a file
+  const handleFileAction = (file: any, action: 'download' | 'view') => {
+    toast({
+      title: action === 'download' ? "Downloading File" : "Opening File",
+      description: `${action === 'download' ? 'Downloading' : 'Opening'} ${file.name}...`,
     });
-
-    setOrders(updatedOrders);
-    localStorage.setItem('deliveryOrders', JSON.stringify(updatedOrders));
-
-    setSelectedOrder({...order, files: [...(order.files || []), deliveryNoteFile]});
-    setShowPreview(true);
+    
+    window.open(file.url, '_blank');
   };
 
-  // Print delivery note with improved layout
-  const printDeliveryNote = () => {
-    const printWindow = window.open('', '_blank');
-    if (printWindow && selectedOrder) {
-      const deliveryNoteNumber = generateDeliveryNoteNumber();
-      
-      printWindow.document.write(`
-        <html>
-          <head>
-            <title>Delivery Note - ${selectedOrder.orderNumber}</title>
-            <style>
-              @page { 
-                size: A4; 
-                margin: 0; 
-              }
-              * { 
-                margin: 0; 
-                padding: 0; 
-                box-sizing: border-box; 
-              }
-              body { 
-                font-family: Arial, sans-serif; 
-                font-size: 12px; 
-                line-height: 1.2; 
-              }
-              .page { 
-                width: 210mm; 
-                height: 297mm; 
-                padding: 8mm; 
-                page-break-after: always; 
-              }
-              .header { 
-                display: flex; 
-                justify-content: space-between; 
-                align-items: flex-start; 
-                margin-bottom: 8mm; 
-              }
-              .logo-section {
-                width: 80mm;
-              }
-              .logo { 
-                width: 80mm; 
-                height: 50mm; 
-                object-fit: contain; 
-              }
-              .company-details { 
-                text-align: right;
-                font-size: 11px; 
-                line-height: 1.4; 
-                width: 80mm; 
-              }
-              .delivery-note-number { 
-                text-align: center; 
-                font-size: 18px; 
-                font-weight: bold; 
-                color: black; 
-                margin-bottom: 8mm; 
-              }
-              .copy-indicator { 
-                text-align: center; 
-                font-size: 16px; 
-                font-weight: bold; 
-                margin-bottom: 5mm; 
-                color: #666;
-              }
-              .client-details {
-                margin-bottom: 8mm;
-                font-size: 11px;
-              }
-              table { 
-                width: 100%; 
-                border-collapse: collapse; 
-                margin-bottom: 12mm; 
-              }
-              th, td { 
-                border: 1px solid black; 
-                padding: 2mm; 
-                text-align: left; 
-                font-size: 11px; 
-              }
-              th { 
-                background-color: #f0f0f0; 
-                font-weight: bold; 
-              }
-              .col-description { 
-                width: 100mm; 
-              }
-              .col-ordered, .col-delivered, .col-remaining { 
-                width: 20mm; 
-                text-align: center; 
-              }
-              .footer { 
-                position: absolute; 
-                bottom: 8mm; 
-                left: 8mm; 
-                right: 8mm; 
-                display: flex; 
-                justify-content: space-between; 
-                font-size: 10px; 
-              }
-              .signature-section { 
-                text-align: center; 
-                width: 70mm; 
-              }
-              .date-section { 
-                text-align: center; 
-                width: 70mm; 
-              }
-            </style>
-          </head>
-          <body>
-            <!-- Original Page -->
-            <div class="page">
-              <div class="header">
-                <div class="logo-section">
-                  <img src="/lovable-uploads/4c615bdd-48d0-4893-a843-01d2335af67a.png" alt="Aleph Logo" class="logo" />
-                </div>
-                <div class="company-details">
-                  <strong>ALEPH TRADING AND PROJECTS CC</strong><br/>
-                  123 Business Street<br/>
-                  Johannesburg, 2000<br/>
-                  VAT: 4123456789<br/>
-                  Tel: 011 234 5678<br/>
-                  Email: info@aleph.co.za
-                </div>
-              </div>
-              
-              <div class="delivery-note-number">
-                DELIVERY NOTE: ${deliveryNoteNumber}
-              </div>
-              
-              <div class="client-details">
-                <strong>To: ${selectedOrder.companyName}</strong><br/>
-                Order Number: ${selectedOrder.orderNumber}<br/>
-                Date: ${format(new Date(), 'dd/MM/yyyy')}
-              </div>
-              
-              <table>
-                <thead>
-                  <tr>
-                    <th class="col-description">Description</th>
-                    <th class="col-ordered">Ordered</th>
-                    <th class="col-delivered">Delivered</th>
-                    <th class="col-remaining">Remaining</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${selectedOrder.items.map(item => `
-                    <tr>
-                      <td>${item.name}</td>
-                      <td class="col-ordered">${item.quantity}</td>
-                      <td class="col-delivered">${item.delivered || 0}</td>
-                      <td class="col-remaining">${item.quantity - (item.delivered || 0)}</td>
-                    </tr>
-                  `).join('')}
-                </tbody>
-              </table>
-              
-              <div class="footer">
-                <div class="date-section">
-                  Date: ${format(new Date(), 'dd/MM/yyyy')}<br/>
-                  _________________
-                </div>
-                <div class="signature-section">
-                  Customer Signature<br/>
-                  _________________
-                </div>
-              </div>
-            </div>
-            
-            <!-- Copy Page -->
-            <div class="page">
-              <div class="copy-indicator">COPY</div>
-              <div class="header">
-                <div class="logo-section">
-                  <img src="/lovable-uploads/4c615bdd-48d0-4893-a843-01d2335af67a.png" alt="Aleph Logo" class="logo" />
-                </div>
-                <div class="company-details">
-                  <strong>ALEPH TRADING AND PROJECTS CC</strong><br/>
-                  123 Business Street<br/>
-                  Johannesburg, 2000<br/>
-                  VAT: 4123456789<br/>
-                  Tel: 011 234 5678<br/>
-                  Email: info@aleph.co.za
-                </div>
-              </div>
-              
-              <div class="delivery-note-number">
-                DELIVERY NOTE: ${deliveryNoteNumber}
-              </div>
-              
-              <div class="client-details">
-                <strong>To: ${selectedOrder.companyName}</strong><br/>
-                Order Number: ${selectedOrder.orderNumber}<br/>
-                Date: ${format(new Date(), 'dd/MM/yyyy')}
-              </div>
-              
-              <table>
-                <thead>
-                  <tr>
-                    <th class="col-description">Description</th>
-                    <th class="col-ordered">Ordered</th>
-                    <th class="col-delivered">Delivered</th>
-                    <th class="col-remaining">Remaining</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${selectedOrder.items.map(item => `
-                    <tr>
-                      <td>${item.name}</td>
-                      <td class="col-ordered">${item.quantity}</td>
-                      <td class="col-delivered">${item.delivered || 0}</td>
-                      <td class="col-remaining">${item.quantity - (item.delivered || 0)}</td>
-                    </tr>
-                  `).join('')}
-                </tbody>
-              </table>
-              
-              <div class="footer">
-                <div class="date-section">
-                  Date: ${format(new Date(), 'dd/MM/yyyy')}<br/>
-                  _________________
-                </div>
-                <div class="signature-section">
-                  Customer Signature<br/>
-                  _________________
-                </div>
-              </div>
-            </div>
-          </body>
-        </html>
-      `);
-      printWindow.document.close();
-      printWindow.print();
-    }
-  };
+  // Filter orders based on search term
+  const filteredOrders = completedOrders.filter(order => 
+    order.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    order.companyName.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   return (
     <div className="container mx-auto p-4">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Delivery Notes</h1>
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search completed orders..."
+            className="pl-10 pr-4 py-2 border rounded-md"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
       </div>
 
-      {/* Orders available for delivery */}
+      {/* Completed Orders for File Upload */}
       <div className="bg-white rounded-lg shadow">
         <div className="p-4 border-b">
-          <h2 className="text-lg font-semibold">Orders Ready for Delivery</h2>
+          <h2 className="text-lg font-semibold">Completed Orders - Upload Files</h2>
+          <p className="text-sm text-gray-600 mt-1">
+            Upload delivery notes and other files to completed orders
+          </p>
         </div>
         <div className="divide-y">
-          {orders.length === 0 && (
+          {filteredOrders.length === 0 && (
             <div className="p-4 text-center text-gray-500">
-              No orders ready for delivery.
+              No completed orders found.
             </div>
           )}
           
-          {orders.map(order => (
+          {filteredOrders.map(order => (
             <div key={order.id} className="p-4 hover:bg-gray-50">
               <div className="flex justify-between items-center">
                 <div>
                   <h3 className="font-medium">Order #{order.orderNumber}</h3>
                   <p className="text-sm text-gray-600">{order.companyName}</p>
-                  <p className="text-sm text-gray-600">
-                    Due: {format(order.dueDate, 'MMM d, yyyy')}
-                  </p>
-                  {order.files && order.files.length > 0 && (
-                    <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded mt-1 inline-block">
-                      {order.files.length} Files
-                    </span>
-                  )}
+                  <div className="flex space-x-4 text-xs text-gray-500 mt-1">
+                    <span>Completed: {order.completedDate ? format(new Date(order.completedDate), 'MMM d, yyyy') : 'N/A'}</span>
+                    {order.files && order.files.length > 0 && (
+                      <span className="bg-green-100 text-green-800 px-2 py-1 rounded">
+                        {order.files.length} Files
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <Button 
@@ -579,19 +238,19 @@ export default function DeliveryNotePage({ isAdmin }: DeliveryNotePageProps) {
                     size="sm"
                     onClick={() => viewOrderDetails(order)}
                   >
-                    <Eye className="h-4 w-4 mr-2" />
                     View Details
                   </Button>
-                  {isAdmin && (
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => generateDeliveryNote(order)}
-                    >
-                      <Printer className="h-4 w-4 mr-2" />
-                      Generate Note
-                    </Button>
-                  )}
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => {
+                      setSelectedOrder(order);
+                      setUploadDialogOpen(true);
+                    }}
+                  >
+                    <Upload className="h-4 w-4 mr-2" />
+                    Upload Files
+                  </Button>
                 </div>
               </div>
             </div>
@@ -600,11 +259,11 @@ export default function DeliveryNotePage({ isAdmin }: DeliveryNotePageProps) {
       </div>
 
       {/* Order Details Dialog */}
-      <Dialog open={!!selectedOrder && !showPreview} onOpenChange={closeOrderDetails}>
+      <Dialog open={!!selectedOrder && !uploadDialogOpen} onOpenChange={closeOrderDetails}>
         {selectedOrder && (
           <DialogContent className="max-w-3xl">
             <DialogHeader>
-              <DialogTitle>Order #{selectedOrder.orderNumber} - Delivery Details</DialogTitle>
+              <DialogTitle>Order #{selectedOrder.orderNumber} - Files</DialogTitle>
             </DialogHeader>
             
             <div className="space-y-4">
@@ -614,69 +273,26 @@ export default function DeliveryNotePage({ isAdmin }: DeliveryNotePageProps) {
                   <p>{selectedOrder.companyName}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500">Due Date</p>
-                  <p>{format(selectedOrder.dueDate, 'MMM d, yyyy')}</p>
-                </div>
-              </div>
-              
-              <div>
-                <h3 className="font-medium mb-2">Items for Delivery</h3>
-                <div className="border rounded-md divide-y">
-                  {selectedOrder.items.map((item) => (
-                    <div key={item.id} className="p-3">
-                      <div className="flex justify-between items-center">
-                        <div className="flex-grow">
-                          <p className="font-medium">{item.name}</p>
-                          <p className="text-sm text-gray-500">
-                            Ordered: {item.quantity}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-4">
-                          {isAdmin && (
-                            <div className="flex items-center gap-2">
-                              <label className="text-sm">Delivered:</label>
-                              <Input
-                                type="number"
-                                min="0"
-                                max={item.quantity}
-                                value={item.delivered || 0}
-                                onChange={(e) => updateDeliveryQuantity(
-                                  selectedOrder.id, 
-                                  item.id, 
-                                  parseInt(e.target.value) || 0
-                                )}
-                                className="w-20"
-                              />
-                            </div>
-                          )}
-                          {!isAdmin && (
-                            <div className="text-sm text-gray-500">
-                              Delivered: {item.delivered || 0}
-                            </div>
-                          )}
-                          <div className="text-sm text-gray-500">
-                            Remaining: {item.quantity - (item.delivered || 0)}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                  <p className="text-sm text-gray-500">Completed Date</p>
+                  <p>
+                    {selectedOrder.completedDate 
+                      ? format(new Date(selectedOrder.completedDate), 'MMM d, yyyy')
+                      : 'N/A'}
+                  </p>
                 </div>
               </div>
 
               {/* Files Section */}
               <div>
-                <div className="flex justify-between items-center mb-2">
-                  <h3 className="font-medium">Files</h3>
-                  {isAdmin && (
-                    <Button
-                      size="sm"
-                      onClick={() => setUploadDialogOpen(true)}
-                    >
-                      <Upload className="h-4 w-4 mr-1" />
-                      Upload Files
-                    </Button>
-                  )}
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="font-medium">Uploaded Files</h3>
+                  <Button
+                    size="sm"
+                    onClick={() => setUploadDialogOpen(true)}
+                  >
+                    <Upload className="h-4 w-4 mr-1" />
+                    Upload More Files
+                  </Button>
                 </div>
                 
                 {(!selectedOrder.files || selectedOrder.files.length === 0) ? (
@@ -684,7 +300,7 @@ export default function DeliveryNotePage({ isAdmin }: DeliveryNotePageProps) {
                     <p className="text-gray-500">No files uploaded yet.</p>
                   </div>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {selectedOrder.files.map(file => (
                       <div key={file.id} className="border rounded-md p-3 flex justify-between items-center">
                         <div className="flex items-center">
@@ -720,27 +336,13 @@ export default function DeliveryNotePage({ isAdmin }: DeliveryNotePageProps) {
         )}
       </Dialog>
 
-      {/* Delivery Note Preview Dialog */}
-      <Dialog open={showPreview} onOpenChange={() => setShowPreview(false)}>
-        <DialogContent className="max-w-4xl">
-          <DialogHeader>
-            <DialogTitle>Delivery Note Preview</DialogTitle>
-          </DialogHeader>
-          
-          <div className="space-y-4">
-            <Button onClick={printDeliveryNote} className="w-full">
-              <Printer className="h-4 w-4 mr-2" />
-              Print Delivery Note
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
       {/* File Upload Dialog */}
       <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Upload Files</DialogTitle>
+            <DialogTitle>
+              Upload Files to Order #{selectedOrder?.orderNumber}
+            </DialogTitle>
           </DialogHeader>
           
           <div className="space-y-4">
@@ -763,7 +365,7 @@ export default function DeliveryNotePage({ isAdmin }: DeliveryNotePageProps) {
             
             <div>
               <label className="block text-sm font-medium mb-1">
-                Files (Max 3)
+                Files (Max 5)
               </label>
               <div className="border-2 border-dashed rounded-md p-4 text-center relative">
                 {selectedFiles.length > 0 ? (
@@ -784,12 +386,18 @@ export default function DeliveryNotePage({ isAdmin }: DeliveryNotePageProps) {
                 />
               </div>
               <p className="text-xs text-gray-500 mt-1">
-                Supported formats: PDF, DOC, DOCX, JPG, PNG. Maximum 3 files.
+                Supported formats: PDF, DOC, DOCX, JPG, PNG. Maximum 5 files.
               </p>
             </div>
           </div>
           
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-2">
+            <Button 
+              variant="outline"
+              onClick={() => setUploadDialogOpen(false)}
+            >
+              Cancel
+            </Button>
             <Button 
               onClick={handleFileUpload}
               disabled={selectedFiles.length === 0}
