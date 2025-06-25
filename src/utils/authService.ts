@@ -53,19 +53,36 @@ export const getUserRole = async (userId: string) => {
 };
 
 export const validateUserRole = (actualRole: string, selectedUserType: string) => {
-  console.log("Role verification:", { actualRole, selectedUserType });
+  console.log("=== ROLE VALIDATION DEBUG ===");
+  console.log("Actual role from database:", actualRole);
+  console.log("Selected user type from login form:", selectedUserType);
   
-  // Fix the validation logic - if user selected "admin" in login form, 
-  // we expect their role in database to be "admin"
-  // if user selected "client" in login form, we expect their role to be "user"
-  if (selectedUserType === "admin" && actualRole !== "admin") {
-    throw new Error(`You are registered as a client user but trying to login as admin. Please select the correct user type.`);
-  }
+  // The login form has options: "admin" and "client"
+  // The database stores roles as: "admin" and "user"
+  // Registration form sends user_type as: "admin" or "user"
   
-  if (selectedUserType === "client" && actualRole !== "user") {
-    throw new Error(`You are registered as an admin user but trying to login as client. Please select the correct user type.`);
+  // Validation logic:
+  // If user selected "admin" in login -> expect "admin" role in DB
+  // If user selected "client" in login -> expect "user" role in DB
+  
+  if (selectedUserType === "admin") {
+    if (actualRole !== "admin") {
+      console.log("ERROR: User selected admin but has role:", actualRole);
+      throw new Error(`Access denied. You are registered as a client user but trying to login as admin. Please select "Client User" instead.`);
+    }
+    console.log("✓ Admin validation passed");
+  } else if (selectedUserType === "client") {
+    if (actualRole !== "user") {
+      console.log("ERROR: User selected client but has role:", actualRole);
+      throw new Error(`Access denied. You are registered as an admin user but trying to login as client. Please select "Admin User" instead.`);
+    }
+    console.log("✓ Client validation passed");
+  } else {
+    console.log("ERROR: Unknown user type selected:", selectedUserType);
+    throw new Error(`Invalid user type selected: ${selectedUserType}`);
   }
 
+  console.log("=== ROLE VALIDATION SUCCESS ===");
   return actualRole;
 };
 
