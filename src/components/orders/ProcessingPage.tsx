@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -33,7 +34,7 @@ interface OrderFile {
   uploadDate: Date;
 }
 
-// Define the order interface
+// Define the order interface - updated to match actual data structure
 interface Order {
   id: string;
   orderNumber: string;
@@ -215,13 +216,6 @@ export default function ProcessingPage({ isAdmin }: ProcessingPageProps) {
               <div className="flex justify-between items-center">
                 <div>
                   <div className="flex items-center gap-2">
-                    {order.company?.logo && (
-                      <img 
-                        src={order.company.logo} 
-                        alt={`${order.companyName} logo`} 
-                        className="h-6 w-6 rounded object-cover" 
-                      />
-                    )}
                     <h3 className="font-medium">Order #{order.orderNumber}</h3>
                   </div>
                   <p className="text-sm text-gray-600">{order.companyName}</p>
@@ -259,13 +253,6 @@ export default function ProcessingPage({ isAdmin }: ProcessingPageProps) {
             <DialogHeader>
               <DialogTitle>
                 <div className="flex items-center gap-2">
-                  {selectedOrder.company?.logo && (
-                    <img 
-                      src={selectedOrder.company.logo} 
-                      alt={`${selectedOrder.companyName} logo`} 
-                      className="h-6 w-6 rounded object-cover" 
-                    />
-                  )}
                   Order #{selectedOrder.orderNumber} Details
                 </div>
               </DialogTitle>
@@ -276,13 +263,6 @@ export default function ProcessingPage({ isAdmin }: ProcessingPageProps) {
                 <div>
                   <p className="text-sm text-gray-500">Company</p>
                   <p>{selectedOrder.companyName}</p>
-                  {selectedOrder.company && (
-                    <div className="mt-2 text-xs text-gray-600">
-                      <p>{selectedOrder.company.address}</p>
-                      <p>VAT: {selectedOrder.company.vatNumber}</p>
-                      <p>Tel: {selectedOrder.company.phone}</p>
-                    </div>
-                  )}
                 </div>
                 <div>
                   <div className="space-y-1">
