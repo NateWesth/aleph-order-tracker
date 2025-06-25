@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import OrdersHeader from "./components/OrdersHeader";
 import OrderTable from "./components/OrderTable";
@@ -12,6 +12,7 @@ interface OrdersPageProps {
 
 export default function OrdersPage({ isAdmin = false }: OrdersPageProps) {
   const [searchTerm, setSearchTerm] = useState('');
+  const [ordersWithCompanies, setOrdersWithCompanies] = useState<any[]>([]);
   const {
     orders,
     setOrders,
@@ -29,6 +30,44 @@ export default function OrdersPage({ isAdmin = false }: OrdersPageProps) {
     onOrdersChange: fetchOrders,
     isAdmin
   });
+
+  // Fetch company names for orders
+  useEffect(() => {
+    const fetchOrdersWithCompanies = async () => {
+      if (orders.length === 0) {
+        setOrdersWithCompanies([]);
+        return;
+      }
+
+      // Get unique company IDs
+      const companyIds = [...new Set(orders.map(order => order.company_id).filter(Boolean))];
+      
+      if (companyIds.length === 0) {
+        setOrdersWithCompanies(orders.map(order => ({
+          ...order,
+          companyName: 'No Company'
+        })));
+        return;
+      }
+
+      // Fetch company names
+      const { data: companiesData } = await supabase
+        .from('companies')
+        .select('id, name')
+        .in('id', companyIds);
+
+      const companyMap = new Map(companiesData?.map(c => [c.id, c.name]) || []);
+
+      const ordersWithNames = orders.map(order => ({
+        ...order,
+        companyName: order.company_id ? companyMap.get(order.company_id) || 'Unknown Company' : 'No Company'
+      }));
+
+      setOrdersWithCompanies(ordersWithNames);
+    };
+
+    fetchOrdersWithCompanies();
+  }, [orders]);
 
   const deleteOrder = async (orderId: string, orderNumber: string) => {
     try {
@@ -106,9 +145,9 @@ export default function OrdersPage({ isAdmin = false }: OrdersPageProps) {
     }
   };
 
-  const filteredOrders = orders.filter(order =>
+  const filteredOrders = ordersWithCompanies.filter(order =>
     order.order_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    order.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    order.companyName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     order.status?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 

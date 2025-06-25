@@ -33,9 +33,8 @@ export default function OrderTable({ orders, isAdmin, onReceiveOrder, onDeleteOr
         <TableHeader>
           <TableRow>
             <TableHead>Order Number</TableHead>
-            <TableHead>Description</TableHead>
+            <TableHead>Company</TableHead>
             <TableHead>Status</TableHead>
-            <TableHead>Amount</TableHead>
             <TableHead>Created</TableHead>
             <TableHead>Actions</TableHead>
           </TableRow>
@@ -43,7 +42,7 @@ export default function OrderTable({ orders, isAdmin, onReceiveOrder, onDeleteOr
         <TableBody>
           {orders.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={6} className="text-center py-8">
+              <TableCell colSpan={5} className="text-center py-8">
                 No orders found.
               </TableCell>
             </TableRow>
