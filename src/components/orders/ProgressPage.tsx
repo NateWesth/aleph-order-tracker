@@ -4,13 +4,6 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Input } from "@/components/ui/input";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,10 +16,11 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { format } from "date-fns";
-import { Eye, Package, Truck, CheckCircle, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useGlobalRealtimeOrders } from "./hooks/useGlobalRealtimeOrders";
+import ProgressOrderDetailsDialog from "./components/ProgressOrderDetailsDialog";
 
 // Define the order item interface
 interface OrderItem {
@@ -93,44 +87,6 @@ const mockCompanies: Company[] = [
     address: "456 Manufacturing Ave, Pretoria, 0001",
     vatNumber: "4987654321"
   }
-];
-
-// Mock orders data
-const mockOrders: Order[] = [
-  {
-    id: "1",
-    orderNumber: "ORD-2024-001",
-    companyName: "Pro Process",
-    company: mockCompanies[0],
-    orderDate: new Date(2024, 0, 15),
-    dueDate: new Date(2024, 1, 15),
-    status: "in-progress",
-    reference: "MATTHEW",
-    attention: "Stores",
-    progress: 50,
-    progressStage: "packing",
-    items: [
-      { id: "1", name: "BOSCH Angle grinder (ZAPPPAAG005)", quantity: 2, delivered: 1, completed: true },
-      { id: "2", name: "Safety Equipment Set", quantity: 1, delivered: 0, completed: false },
-    ]
-  },
-  {
-    id: "2",
-    orderNumber: "ORD-2024-002",
-    companyName: "XYZ Industries",
-    company: mockCompanies[1],
-    orderDate: new Date(2024, 0, 20),
-    dueDate: new Date(2024, 1, 20),
-    status: "received",
-    progress: 25,
-    progressStage: "awaiting-stock",
-    reference: "JOHN",
-    attention: "Warehouse",
-    items: [
-      { id: "3", name: "Welding Equipment", quantity: 3, delivered: 0, completed: false },
-      { id: "4", name: "Safety Helmets", quantity: 25, delivered: 0, completed: false },
-    ]
-  },
 ];
 
 export default function ProgressPage({ isAdmin }: ProgressPageProps) {
@@ -291,93 +247,25 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
     setSelectedOrder(null);
   };
 
-  // Update delivery quantities and completion status (admin only)
-  const updateItemDelivery = (orderId: string, itemId: string, delivered: number) => {
-    if (!isAdmin) return;
-
-    const updatedOrders = orders.map(order => {
-      if (order.id === orderId) {
-        return {
-          ...order,
-          items: order.items.map(item => {
-            if (item.id === itemId) {
-              return { ...item, delivered };
-            }
-            return item;
-          })
-        };
-      }
-      return order;
-    });
-
+  // Handle order updates from the dialog
+  const handleOrderUpdate = (orderId: string, updates: Partial<Order>) => {
+    const updatedOrders = orders.map(order => 
+      order.id === orderId ? { ...order, ...updates } : order
+    );
     setOrders(updatedOrders);
     localStorage.setItem('progressOrders', JSON.stringify(updatedOrders));
 
-    // Also update delivery orders
+    // Also update delivery orders if they exist
     const existingDeliveryOrders = JSON.parse(localStorage.getItem('deliveryOrders') || '[]');
-    const updatedDeliveryOrders = existingDeliveryOrders.map((order: Order) => {
-      if (order.id === orderId) {
-        return {
-          ...order,
-          items: order.items.map((item: any) => {
-            if (item.id === itemId) {
-              return { ...item, delivered };
-            }
-            return item;
-          })
-        };
-      }
-      return order;
-    });
+    const updatedDeliveryOrders = existingDeliveryOrders.map((order: Order) => 
+      order.id === orderId ? { ...order, ...updates } : order
+    );
     localStorage.setItem('deliveryOrders', JSON.stringify(updatedDeliveryOrders));
 
     // Update selected order if it matches
     if (selectedOrder && selectedOrder.id === orderId) {
-      setSelectedOrder({
-        ...selectedOrder,
-        items: selectedOrder.items.map(item => {
-          if (item.id === itemId) {
-            return { ...item, delivered };
-          }
-          return item;
-        })
-      });
+      setSelectedOrder({ ...selectedOrder, ...updates });
     }
-  };
-
-  const toggleItemCompletion = (orderId: string, itemId: string) => {
-    if (!isAdmin) return;
-
-    const updatedOrders = orders.map(order => {
-      if (order.id === orderId) {
-        return {
-          ...order,
-          items: order.items.map(item => {
-            if (item.id === itemId) {
-              // Mark as completed and update delivered quantities
-              const completed = !item.completed;
-              const delivered = completed ? item.quantity : 0;
-              return { ...item, completed, delivered };
-            }
-            return item;
-          })
-        };
-      }
-      return order;
-    });
-
-    setOrders(updatedOrders);
-    localStorage.setItem('progressOrders', JSON.stringify(updatedOrders));
-
-    toast({
-      title: "Item Status Updated",
-      description: "Delivery quantities have been adjusted according to completion status.",
-    });
-  };
-
-  // Check if all items in an order are completed
-  const areAllItemsCompleted = (order: Order) => {
-    return order.items.every(item => item.completed);
   };
 
   // Mark order as complete and move to processing
@@ -387,7 +275,8 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
     const orderToComplete = orders.find(order => order.id === orderId);
     if (!orderToComplete) return;
 
-    if (!areAllItemsCompleted(orderToComplete)) {
+    const areAllItemsCompleted = orderToComplete.items.every(item => item.completed);
+    if (!areAllItemsCompleted) {
       toast({
         title: "Cannot Complete Order",
         description: "All items must be marked as complete first.",
@@ -478,20 +367,12 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
       setOrders(remainingOrders);
       localStorage.setItem('progressOrders', JSON.stringify(remainingOrders));
 
-      // Also remove from delivery orders if exists
-      const existingDeliveryOrders = JSON.parse(localStorage.getItem('deliveryOrders') || '[]');
-      const updatedDeliveryOrders = existingDeliveryOrders.filter((order: Order) => order.id !== orderId);
-      localStorage.setItem('deliveryOrders', JSON.stringify(updatedDeliveryOrders));
-
-      // Remove from processing orders if exists
-      const existingProcessingOrders = JSON.parse(localStorage.getItem('processingOrders') || '[]');
-      const updatedProcessingOrders = existingProcessingOrders.filter((order: Order) => order.id !== orderId);
-      localStorage.setItem('processingOrders', JSON.stringify(updatedProcessingOrders));
-
-      // Remove from completed orders if exists
-      const existingCompletedOrders = JSON.parse(localStorage.getItem('completedOrders') || '[]');
-      const updatedCompletedOrders = existingCompletedOrders.filter((order: Order) => order.id !== orderId);
-      localStorage.setItem('completedOrders', JSON.stringify(updatedCompletedOrders));
+      // Also remove from other localStorage arrays if exists
+      ['deliveryOrders', 'processingOrders', 'completedOrders'].forEach(storageKey => {
+        const existingOrders = JSON.parse(localStorage.getItem(storageKey) || '[]');
+        const updatedOrders = existingOrders.filter((order: Order) => order.id !== orderId);
+        localStorage.setItem(storageKey, JSON.stringify(updatedOrders));
+      });
 
       toast({
         title: "Order Deleted",
@@ -641,172 +522,15 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
       </div>
 
       {/* Order Details Dialog */}
-      <Dialog open={!!selectedOrder} onOpenChange={closeOrderDetails}>
-        {selectedOrder && (
-          <DialogContent className="max-w-3xl">
-            <DialogHeader>
-              <DialogTitle>
-                <div className="flex items-center gap-2">
-                  {selectedOrder.company?.logo && (
-                    <img 
-                      src={selectedOrder.company.logo} 
-                      alt={`${selectedOrder.companyName} logo`} 
-                      className="h-6 w-6 rounded object-cover" 
-                    />
-                  )}
-                  Order #{selectedOrder.orderNumber} Details
-                  {isAdmin && (
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          className="text-red-600 hover:text-red-700 ml-auto"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Delete Order</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Are you sure you want to delete order {selectedOrder.orderNumber}? This action cannot be undone and will remove the order from all systems.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction 
-                            onClick={() => deleteOrder(selectedOrder.id, selectedOrder.orderNumber)}
-                            className="bg-red-600 hover:bg-red-700"
-                          >
-                            Delete
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  )}
-                </div>
-              </DialogTitle>
-            </DialogHeader>
-            
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm text-gray-500">Company</p>
-                  <p>{selectedOrder.companyName}</p>
-                  {selectedOrder.company && (
-                    <div className="mt-2 text-xs text-gray-600">
-                      <p>{selectedOrder.company.address}</p>
-                      <p>VAT: {selectedOrder.company.vatNumber}</p>
-                      <p>Tel: {selectedOrder.company.phone}</p>
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <div className="space-y-1">
-                    <div>
-                      <p className="text-sm text-gray-500">Order Date</p>
-                      <p>{format(selectedOrder.orderDate, 'MMM d, yyyy')}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-500">Due Date</p>
-                      <p>{format(selectedOrder.dueDate, 'MMM d, yyyy')}</p>
-                    </div>
-                  </div>
-                </div>
-                <div className="col-span-2">
-                  <p className="text-sm text-gray-500">Progress</p>
-                  <div className="flex items-center space-x-2">
-                    <Progress value={selectedOrder.progress || 0} className="flex-grow h-2" />
-                    <span>{selectedOrder.progress || 0}%</span>
-                  </div>
-                </div>
-              </div>
-
-              {isAdmin && (
-                <div className="flex justify-start space-x-2">
-                  {progressStages.map((stage) => (
-                    <Button 
-                      key={stage.id} 
-                      variant={selectedOrder.progressStage === stage.id ? "default" : "outline"}
-                      onClick={() => updateProgressStage(selectedOrder.id, stage.id)}
-                    >
-                      {stage.name}
-                    </Button>
-                  ))}
-                </div>
-              )}
-              
-              <div>
-                <h3 className="font-medium mb-2">Items</h3>
-                <div className="border rounded-md divide-y">
-                  {selectedOrder.items.map((item) => (
-                    <div key={item.id} className="p-3 flex justify-between items-center">
-                      <div>
-                        <p>{item.name}</p>
-                        <p className="text-sm text-gray-500">
-                          Ordered: {item.quantity}
-                        </p>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        {isAdmin && (
-                          <div className="flex items-center">
-                            <label className="text-sm mr-2">Delivered:</label>
-                            <Input
-                              className="w-20"
-                              type="number"
-                              min="0"
-                              max={item.quantity}
-                              value={item.delivered || 0}
-                              onChange={(e) => updateItemDelivery(
-                                selectedOrder.id, 
-                                item.id, 
-                                parseInt(e.target.value) || 0
-                              )}
-                            />
-                          </div>
-                        )}
-                        {!isAdmin && item.delivered !== undefined && (
-                          <div className="text-sm">
-                            Delivered: {item.delivered}
-                          </div>
-                        )}
-                        <div className="flex items-center">
-                          <label className="inline-flex items-center cursor-pointer mr-2">
-                            <span className="mr-2 text-sm font-medium">Complete</span>
-                            <input
-                              type="checkbox"
-                              checked={item.completed}
-                              onChange={() => isAdmin && toggleItemCompletion(selectedOrder.id, item.id)}
-                              disabled={!isAdmin}
-                              className="rounded border-gray-300 text-aleph-green focus:ring-aleph-green"
-                            />
-                          </label>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {isAdmin && (
-                <div className="flex justify-between pt-4">
-                  <div className="text-sm text-gray-500">
-                    <p>Note: Completing this order will move it to Processing for all users.</p>
-                    <p>All items must be marked as complete before the order can be completed.</p>
-                  </div>
-                  <Button 
-                    onClick={() => completeOrder(selectedOrder.id)}
-                    disabled={!areAllItemsCompleted(selectedOrder)}
-                  >
-                    Complete Order
-                  </Button>
-                </div>
-              )}
-            </div>
-          </DialogContent>
-        )}
-      </Dialog>
+      <ProgressOrderDetailsDialog
+        order={selectedOrder}
+        isOpen={!!selectedOrder}
+        onClose={closeOrderDetails}
+        isAdmin={isAdmin}
+        onOrderUpdate={handleOrderUpdate}
+        onCompleteOrder={completeOrder}
+        onDeleteOrder={deleteOrder}
+      />
     </div>
   );
 }
