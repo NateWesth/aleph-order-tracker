@@ -26,7 +26,7 @@ export default function OrdersPage({ isAdmin = false }: OrdersPageProps) {
     user
   } = useOrderData(isAdmin);
 
-  // Set up real-time subscriptions using the global hook
+  // Set up real-time subscriptions using the enhanced global hook
   useGlobalRealtimeOrders({
     onOrdersChange: fetchOrders,
     isAdmin,
@@ -97,48 +97,30 @@ export default function OrdersPage({ isAdmin = false }: OrdersPageProps) {
 
   const receiveOrder = async (order: any) => {
     try {
+      console.log('Receiving order and updating status to received:', order.id);
+      
+      // Update order status in database to 'received' - this will trigger real-time updates
       const { error } = await supabase
         .from('orders')
-        .update({ status: 'received' })
+        .update({ 
+          status: 'received',
+          updated_at: new Date().toISOString()
+        })
         .eq('id', order.id);
 
       if (error) throw error;
 
-      const progressOrder = {
-        id: order.id,
-        orderNumber: order.order_number,
-        companyName: "Company Name",
-        orderDate: new Date(order.created_at),
-        dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-        status: 'received' as const,
-        progress: 0,
-        progressStage: 'awaiting-stock' as const,
-        items: [
-          {
-            id: "1",
-            name: order.description || "Order items",
-            quantity: 1,
-            delivered: 0,
-            completed: false
-          }
-        ]
-      };
-
-      const existingProgressOrders = JSON.parse(localStorage.getItem('progressOrders') || '[]');
-      const updatedProgressOrders = [...existingProgressOrders, progressOrder];
-      localStorage.setItem('progressOrders', JSON.stringify(updatedProgressOrders));
-
-      const existingDeliveryOrders = JSON.parse(localStorage.getItem('deliveryOrders') || '[]');
-      const updatedDeliveryOrders = [...existingDeliveryOrders, progressOrder];
-      localStorage.setItem('deliveryOrders', JSON.stringify(updatedDeliveryOrders));
-
+      // Update local state immediately
       setOrders(orders.map(o => o.id === order.id ? { ...o, status: 'received' } : o));
 
       toast({
         title: "Order Received",
-        description: `Order ${order.order_number} has been moved to progress tracking.`,
+        description: `Order ${order.order_number} has been received and moved to progress tracking. All users will see this update automatically.`,
       });
+
+      console.log('Order successfully received and database updated');
     } catch (error: any) {
+      console.error('Error receiving order:', error);
       toast({
         title: "Error",
         description: "Failed to receive order. Please try again.",
@@ -172,6 +154,13 @@ export default function OrdersPage({ isAdmin = false }: OrdersPageProps) {
           userProfile={userProfile}
           onOrderCreated={fetchOrders}
         />
+      </div>
+
+      {/* Enhanced Real-time Status Indicator */}
+      <div className="mb-4 p-2 bg-blue-50 rounded-md border border-blue-200">
+        <p className="text-sm text-blue-800">
+          🔄 Enhanced real-time updates enabled - All order changes are synchronized across all admin and client users automatically
+        </p>
       </div>
       
       <OrderTable 

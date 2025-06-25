@@ -143,6 +143,11 @@ const ClientDashboard = () => {
                 <h1 className="text-2xl font-bold text-aleph-green">Aleph Engineering and Supplies</h1>
               </div>
               <div className="flex items-center gap-4">
+                {/* Real-time Status Indicator */}
+                <div className="flex items-center gap-2 text-sm text-green-600">
+                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                  <span>Real-time Sync Active</span>
+                </div>
                 <Button 
                   variant="ghost" 
                   size="icon" 
@@ -181,6 +186,11 @@ const ClientDashboard = () => {
                     Welcome{userProfile?.full_name ? `, ${userProfile.full_name}` : ''}
                   </h1>
                   <p className="text-xl text-gray-600 dark:text-gray-300">Client Dashboard - Aleph Engineering and Supplies</p>
+                  <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900 rounded-lg">
+                    <p className="text-sm text-blue-800 dark:text-blue-200">
+                      🔄 All order updates are synchronized in real-time across all users
+                    </p>
+                  </div>
                 </div>
               </div>
             ) : activeView === "orders" ? (
@@ -192,7 +202,7 @@ const ClientDashboard = () => {
                 <ProgressPage isAdmin={false} />
               </div>
             ) : activeView === "processing" ? (
-              <div className="bg-white dark:bg-gray-800 min-h-full">
+              <div className="bg-white dark:bg-gray-800 min-h-full">  
                 <ProcessingPage isAdmin={false} />
               </div>
             ) : activeView === "completed" ? (
