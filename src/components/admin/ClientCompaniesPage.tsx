@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -23,10 +22,20 @@ import { Textarea } from "@/components/ui/textarea";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
-import { Building2, Plus, Copy, Upload, Search } from "lucide-react";
+import { Building2, Plus, Copy, Upload, Search, Edit, Trash2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
-// Form schema for new companies with expanded fields
-const newCompanySchema = z.object({
+// Form schema for companies with expanded fields
+const companySchema = z.object({
   name: z.string().min(1, "Company name is required"),
   contact_person: z.string().min(1, "Contact person name is required"),
   email: z.string().email("Invalid email address"),
@@ -36,17 +45,21 @@ const newCompanySchema = z.object({
   account_manager: z.string().optional(),
 });
 
-type NewCompanyFormValues = z.infer<typeof newCompanySchema>;
+type CompanyFormValues = z.infer<typeof companySchema>;
 
 export default function ClientCompaniesPage() {
   const { toast } = useToast();
   const [companies, setCompanies] = useState<any[]>([]);
   const [isNewCompanyDialogOpen, setIsNewCompanyDialogOpen] = useState(false);
+  const [isEditCompanyDialogOpen, setIsEditCompanyDialogOpen] = useState(false);
+  const [editingCompany, setEditingCompany] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [companyToDelete, setCompanyToDelete] = useState<any>(null);
 
-  const form = useForm<NewCompanyFormValues>({
-    resolver: zodResolver(newCompanySchema),
+  const form = useForm<CompanyFormValues>({
+    resolver: zodResolver(companySchema),
     defaultValues: {
       name: "",
       contact_person: "",
@@ -92,8 +105,8 @@ export default function ClientCompaniesPage() {
     return result;
   };
 
-  // Handle form submission
-  const onSubmit = async (data: NewCompanyFormValues) => {
+  // Handle form submission for new company
+  const onSubmit = async (data: CompanyFormValues) => {
     try {
       const newCompany = {
         name: data.name,
@@ -129,6 +142,88 @@ export default function ClientCompaniesPage() {
     }
   };
 
+  // Handle edit company
+  const handleEditCompany = (company: any) => {
+    setEditingCompany(company);
+    form.reset({
+      name: company.name,
+      contact_person: company.contact_person || "",
+      email: company.email || "",
+      phone: company.phone || "",
+      address: company.address || "",
+      vat_number: company.vat_number || "",
+      account_manager: company.account_manager || "",
+    });
+    setIsEditCompanyDialogOpen(true);
+  };
+
+  // Handle update company
+  const handleUpdateCompany = async (data: CompanyFormValues) => {
+    if (!editingCompany) return;
+
+    try {
+      const { error } = await supabase
+        .from('companies')
+        .update({
+          name: data.name,
+          contact_person: data.contact_person,
+          email: data.email,
+          phone: data.phone,
+          address: data.address,
+          vat_number: data.vat_number,
+          account_manager: data.account_manager,
+        })
+        .eq('id', editingCompany.id);
+
+      if (error) throw error;
+
+      await fetchCompanies();
+      setIsEditCompanyDialogOpen(false);
+      setEditingCompany(null);
+      form.reset();
+
+      toast({
+        title: "Company Updated",
+        description: `${data.name} has been updated successfully.`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Failed to update company: " + error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Handle delete company
+  const handleDeleteCompany = async () => {
+    if (!companyToDelete) return;
+
+    try {
+      const { error } = await supabase
+        .from('companies')
+        .delete()
+        .eq('id', companyToDelete.id);
+
+      if (error) throw error;
+
+      await fetchCompanies();
+      setDeleteDialogOpen(false);
+      setCompanyToDelete(null);
+
+      toast({
+        title: "Company Deleted",
+        description: `${companyToDelete.name} has been deleted successfully.`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Failed to delete company: " + error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
   // Copy company code to clipboard
   const copyToClipboard = (code: string) => {
     navigator.clipboard.writeText(code);
@@ -142,6 +237,8 @@ export default function ClientCompaniesPage() {
   const handleDialogClose = () => {
     form.reset();
     setIsNewCompanyDialogOpen(false);
+    setIsEditCompanyDialogOpen(false);
+    setEditingCompany(null);
   };
 
   // Filter companies based on search term
@@ -251,9 +348,25 @@ export default function ClientCompaniesPage() {
                       <div className="text-sm text-gray-500 dark:text-gray-400">Manager: {company.account_manager || 'N/A'}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <Button variant="link" size="sm">
-                        Manage
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleEditCompany(company)}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => {
+                            setCompanyToDelete(company);
+                            setDeleteDialogOpen(true);
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -394,6 +507,143 @@ export default function ClientCompaniesPage() {
           </Form>
         </DialogContent>
       </Dialog>
+
+      {/* Edit Company Dialog */}
+      <Dialog open={isEditCompanyDialogOpen} onOpenChange={handleDialogClose}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Company</DialogTitle>
+          </DialogHeader>
+          
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(handleUpdateCompany)} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Company Name</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="Enter company name" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="contact_person"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Contact Person</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="Enter contact name" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <FormField
+                control={form.control}
+                name="address"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Company Address</FormLabel>
+                    <FormControl>
+                      <Textarea {...field} placeholder="Enter complete company address" rows={3} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="vat_number"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>VAT Number</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="Enter VAT number" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="phone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Phone</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="Enter phone number" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="Enter email address" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="account_manager"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Account Manager</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="Enter account manager name" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <DialogFooter>
+                <Button type="submit">Update Company</Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete {companyToDelete?.name} and all associated data. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteCompany}>Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
