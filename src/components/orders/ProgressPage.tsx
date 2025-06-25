@@ -93,7 +93,6 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
   const { user } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-  const [supabaseOrders, setSupabaseOrders] = useState<any[]>([]);
 
   // Helper function to get proper progress stage based on status
   const getProgressStage = (status: string): 'awaiting-stock' | 'packing' | 'out-for-delivery' | 'completed' => {
@@ -111,21 +110,38 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
     }
   };
 
-  // Fetch orders from database and sync with localStorage
-  const fetchSupabaseOrders = async () => {
+  // Fetch orders from database with company information
+  const fetchProgressOrders = async () => {
     if (!user?.id) return;
 
     try {
       console.log('Fetching received and in-progress orders from Supabase...');
       let query = supabase
         .from('orders')
-        .select('*')
+        .select(`
+          *,
+          companies (
+            name,
+            code
+          )
+        `)
         .in('status', ['received', 'in-progress'])
         .order('created_at', { ascending: false });
 
-      // If user is admin, fetch all orders; otherwise, fetch only user's orders
+      // If user is admin, fetch all orders; otherwise, fetch only user's orders or company orders
       if (!isAdmin) {
-        query = query.eq('user_id', user.id);
+        // For non-admin users, get their profile first to find their company
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('company_id')
+          .eq('id', user.id)
+          .single();
+
+        if (profile?.company_id) {
+          query = query.eq('company_id', profile.company_id);
+        } else {
+          query = query.eq('user_id', user.id);
+        }
       }
 
       const { data, error } = await query;
@@ -136,14 +152,13 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
       }
 
       console.log('Fetched orders from database:', data?.length || 0);
-      setSupabaseOrders(data || []);
 
-      // Convert database orders to local format and sync with localStorage
+      // Convert database orders to local format
       if (data && data.length > 0) {
         const convertedOrders = data.map((dbOrder: any) => ({
           id: dbOrder.id,
           orderNumber: dbOrder.order_number,
-          companyName: "Company Name", // You'll need to fetch company name separately
+          companyName: dbOrder.companies?.name || "Unknown Company",
           orderDate: new Date(dbOrder.created_at),
           dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
           status: dbOrder.status,
@@ -163,7 +178,7 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
         console.log('Converted orders for progress page:', convertedOrders.length);
         setOrders(convertedOrders);
         
-        // Update localStorage
+        // Update localStorage for consistency
         localStorage.setItem('progressOrders', JSON.stringify(convertedOrders));
       } else {
         setOrders([]);
@@ -174,11 +189,11 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
     }
   };
 
-  // Set up real-time subscriptions with enhanced refresh
+  // Set up real-time subscriptions
   useGlobalRealtimeOrders({
     onOrdersChange: () => {
       console.log('Real-time update detected for progress page, refreshing...');
-      fetchSupabaseOrders();
+      fetchProgressOrders();
     },
     isAdmin,
     pageType: 'progress'
@@ -187,7 +202,7 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
   // Load orders from database on component mount
   useEffect(() => {
     console.log('Progress page mounted, fetching orders...');
-    fetchSupabaseOrders();
+    fetchProgressOrders();
   }, [isAdmin, user?.id]);
 
   // Progress stages with corresponding percentage values
@@ -254,7 +269,7 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
         
         // Refresh to remove from progress page if moved to processing
         setTimeout(() => {
-          fetchSupabaseOrders();
+          fetchProgressOrders();
         }, 500);
       }
     } catch (error) {
@@ -366,7 +381,7 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
       console.log('Order successfully completed and moved to processing');
       
       // Refresh the orders to reflect the change immediately
-      fetchSupabaseOrders();
+      fetchProgressOrders();
     } catch (error: any) {
       console.error('Error completing order:', error);
       toast({
@@ -417,7 +432,7 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
       console.log('Order successfully deleted');
       
       // Refresh the orders to reflect the change immediately
-      fetchSupabaseOrders();
+      fetchProgressOrders();
     } catch (error: any) {
       console.error('Error deleting order:', error);
       toast({
@@ -444,7 +459,7 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
       {/* Debug Information */}
       <div className="mb-4 p-2 bg-gray-50 rounded-md border border-gray-200">
         <p className="text-xs text-gray-600">
-          Debug: Found {orders.length} progress orders | Database orders: {supabaseOrders.length} | User: {user?.id ? 'Authenticated' : 'Not authenticated'} | Admin: {isAdmin ? 'Yes' : 'No'}
+          Debug: Found {orders.length} progress orders | User: {user?.id ? 'Authenticated' : 'Not authenticated'} | Admin: {isAdmin ? 'Yes' : 'No'}
         </p>
       </div>
 

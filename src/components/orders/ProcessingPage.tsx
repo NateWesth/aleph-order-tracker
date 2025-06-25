@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -19,8 +20,8 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
-import { format, startOfMonth, endOfMonth, isSameMonth } from "date-fns";
-import { Eye, Package, CheckCircle, Search, Trash2, FileText } from "lucide-react";
+import { format } from "date-fns";
+import { Eye, CheckCircle, Search, Trash2, FileText } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useGlobalRealtimeOrders } from "./hooks/useGlobalRealtimeOrders";
@@ -67,25 +68,41 @@ export default function ProcessingPage({ isAdmin }: ProcessingPageProps) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [supabaseOrders, setSupabaseOrders] = useState<any[]>([]);
   const [showFilesDialog, setShowFilesDialog] = useState(false);
   const [filesDialogOrder, setFilesDialogOrder] = useState<Order | null>(null);
 
-  // Fetch orders from database
-  const fetchSupabaseOrders = async () => {
+  // Fetch orders from database with company information
+  const fetchProcessingOrders = async () => {
     if (!user?.id) return;
 
     try {
       console.log('Fetching processing orders from Supabase...');
       let query = supabase
         .from('orders')
-        .select('*')
+        .select(`
+          *,
+          companies (
+            name,
+            code
+          )
+        `)
         .eq('status', 'processing')
         .order('created_at', { ascending: false });
 
-      // If user is admin, fetch all orders; otherwise, fetch only user's orders
+      // If user is admin, fetch all orders; otherwise, fetch only user's orders or company orders
       if (!isAdmin) {
-        query = query.eq('user_id', user.id);
+        // For non-admin users, get their profile first to find their company
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('company_id')
+          .eq('id', user.id)
+          .single();
+
+        if (profile?.company_id) {
+          query = query.eq('company_id', profile.company_id);
+        } else {
+          query = query.eq('user_id', user.id);
+        }
       }
 
       const { data, error } = await query;
@@ -96,37 +113,50 @@ export default function ProcessingPage({ isAdmin }: ProcessingPageProps) {
       }
 
       console.log('Fetched processing orders:', data?.length || 0);
-      setSupabaseOrders(data || []);
+      
+      // Transform database orders to match UI format
+      const transformedOrders = (data || []).map(order => ({
+        id: order.id,
+        orderNumber: order.order_number,
+        companyName: order.companies?.name || "Unknown Company",
+        orderDate: new Date(order.created_at),
+        dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from creation
+        status: 'processing' as const,
+        items: [
+          {
+            id: "1",
+            name: order.description || "Order items",
+            quantity: 1,
+            delivered: 1,
+            completed: true
+          }
+        ],
+        files: [] // Will be loaded separately when needed
+      }));
+
+      setOrders(transformedOrders);
+      
+      // Also update localStorage for consistency
+      localStorage.setItem('processingOrders', JSON.stringify(transformedOrders));
     } catch (error) {
       console.error("Failed to fetch processing orders:", error);
     }
   };
 
-  // Set up real-time subscriptions with improved logging
+  // Set up real-time subscriptions
   useGlobalRealtimeOrders({
     onOrdersChange: () => {
       console.log('Real-time update detected, refreshing processing orders...');
-      fetchSupabaseOrders();
+      fetchProcessingOrders();
     },
     isAdmin,
     pageType: 'processing'
   });
 
-  // Load orders from localStorage on component mount
+  // Load orders from database on component mount
   useEffect(() => {
-    console.log('Loading processing orders from localStorage...');
-    const storedProcessingOrders = JSON.parse(localStorage.getItem('processingOrders') || '[]');
-    
-    // Filter orders based on admin status
-    let filteredOrders = storedProcessingOrders;
-    if (!isAdmin && user?.id) {
-      // For non-admin users, only show their own orders
-      filteredOrders = storedProcessingOrders.filter((order: any) => order.userId === user.id);
-    }
-    
-    console.log('Loaded processing orders from localStorage:', filteredOrders.length);
-    setOrders(filteredOrders);
-    fetchSupabaseOrders();
+    console.log('Loading processing orders from database...');
+    fetchProcessingOrders();
   }, [isAdmin, user?.id]);
 
   // Save orders to localStorage whenever orders change
@@ -179,23 +209,6 @@ export default function ProcessingPage({ isAdmin }: ProcessingPageProps) {
 
       if (error) throw error;
 
-      // Create completed order with completion date
-      const completedOrder = {
-        ...orderToComplete,
-        status: 'completed' as const,
-        completedDate: new Date()
-      };
-
-      // Remove from processing orders
-      const remainingOrders = orders.filter(order => order.id !== orderId);
-      setOrders(remainingOrders);
-      localStorage.setItem('processingOrders', JSON.stringify(remainingOrders));
-
-      // Add to completed orders
-      const existingCompletedOrders = JSON.parse(localStorage.getItem('completedOrders') || '[]');
-      const updatedCompletedOrders = [...existingCompletedOrders, completedOrder];
-      localStorage.setItem('completedOrders', JSON.stringify(updatedCompletedOrders));
-
       toast({
         title: "Order Completed",
         description: "Order has been moved to completed orders with all files preserved.",
@@ -203,6 +216,8 @@ export default function ProcessingPage({ isAdmin }: ProcessingPageProps) {
 
       setSelectedOrder(null);
       console.log('Order successfully marked as completed');
+      
+      // Refresh will happen automatically via real-time updates
     } catch (error: any) {
       console.error('Error marking order as completed:', error);
       toast({
@@ -228,24 +243,6 @@ export default function ProcessingPage({ isAdmin }: ProcessingPageProps) {
 
       if (error) throw error;
 
-      // Remove from local processing orders
-      const remainingOrders = orders.filter(order => order.id !== orderId);
-      setOrders(remainingOrders);
-      localStorage.setItem('processingOrders', JSON.stringify(remainingOrders));
-
-      // Also remove from other localStorage arrays if exists
-      const existingProgressOrders = JSON.parse(localStorage.getItem('progressOrders') || '[]');
-      const updatedProgressOrders = existingProgressOrders.filter((order: Order) => order.id !== orderId);
-      localStorage.setItem('progressOrders', JSON.stringify(updatedProgressOrders));
-
-      const existingDeliveryOrders = JSON.parse(localStorage.getItem('deliveryOrders') || '[]');
-      const updatedDeliveryOrders = existingDeliveryOrders.filter((order: Order) => order.id !== orderId);
-      localStorage.setItem('deliveryOrders', JSON.stringify(updatedDeliveryOrders));
-
-      const existingCompletedOrders = JSON.parse(localStorage.getItem('completedOrders') || '[]');
-      const updatedCompletedOrders = existingCompletedOrders.filter((order: Order) => order.id !== orderId);
-      localStorage.setItem('completedOrders', JSON.stringify(updatedCompletedOrders));
-
       toast({
         title: "Order Deleted",
         description: `Order ${orderNumber} has been permanently deleted from all systems.`,
@@ -258,8 +255,7 @@ export default function ProcessingPage({ isAdmin }: ProcessingPageProps) {
 
       console.log('Processing order successfully deleted');
       
-      // Refresh the orders to reflect the change immediately
-      fetchSupabaseOrders();
+      // Refresh will happen automatically via real-time updates
     } catch (error: any) {
       console.error('Error deleting processing order:', error);
       toast({
@@ -296,6 +292,13 @@ export default function ProcessingPage({ isAdmin }: ProcessingPageProps) {
       <div className="mb-4 p-2 bg-blue-50 rounded-md border border-blue-200">
         <p className="text-sm text-blue-800">
           🔄 Real-time updates enabled - Changes will appear automatically across all users
+        </p>
+      </div>
+
+      {/* Debug Information */}
+      <div className="mb-4 p-2 bg-gray-50 rounded-md border border-gray-200">
+        <p className="text-xs text-gray-600">
+          Debug: Found {orders.length} processing orders | User: {user?.id ? 'Authenticated' : 'Not authenticated'} | Admin: {isAdmin ? 'Yes' : 'No'}
         </p>
       </div>
 
