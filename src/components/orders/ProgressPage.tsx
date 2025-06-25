@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -133,6 +134,7 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
     if (!user?.id) return;
 
     try {
+      console.log('Fetching progress orders from Supabase...');
       let query = supabase
         .from('orders')
         .select('*')
@@ -151,6 +153,7 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
         return;
       }
 
+      console.log('Fetched progress orders:', data?.length || 0);
       setSupabaseOrders(data || []);
     } catch (error) {
       console.error("Failed to fetch progress orders:", error);
@@ -159,13 +162,17 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
 
   // Set up real-time subscriptions
   useGlobalRealtimeOrders({
-    onOrdersChange: fetchSupabaseOrders,
+    onOrdersChange: () => {
+      console.log('Real-time update detected, refreshing progress orders...');
+      fetchSupabaseOrders();
+    },
     isAdmin,
     pageType: 'progress'
   });
 
   // Load orders from localStorage on component mount
   useEffect(() => {
+    console.log('Loading progress orders from localStorage...');
     const storedProgressOrders = JSON.parse(localStorage.getItem('progressOrders') || '[]');
     
     // Filter orders based on admin status
@@ -175,13 +182,17 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
       filteredOrders = storedProgressOrders.filter((order: any) => order.userId === user.id);
     }
     
+    console.log('Loaded progress orders from localStorage:', filteredOrders.length);
     setOrders(filteredOrders);
     fetchSupabaseOrders();
   }, [isAdmin, user?.id]);
 
   // Save orders to localStorage whenever orders change
   useEffect(() => {
-    localStorage.setItem('progressOrders', JSON.stringify(orders));
+    if (orders.length > 0) {
+      console.log('Saving progress orders to localStorage:', orders.length);
+      localStorage.setItem('progressOrders', JSON.stringify(orders));
+    }
   }, [orders]);
 
   // Progress stages with corresponding percentage values
@@ -346,10 +357,15 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
     }
 
     try {
+      console.log('Completing order and moving to processing:', orderId);
+      
       // Update order status in database to 'processing'
       const { error } = await supabase
         .from('orders')
-        .update({ status: 'processing' })
+        .update({ 
+          status: 'processing',
+          updated_at: new Date().toISOString()
+        })
         .eq('id', orderId);
 
       if (error) throw error;
@@ -384,10 +400,14 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
 
       toast({
         title: "Order Completed",
-        description: "Order has been moved to processing with all items marked as delivered.",
+        description: "Order has been moved to processing with all items marked as delivered. All users will see this update automatically.",
       });
 
       setSelectedOrder(null);
+      console.log('Order successfully completed and moved to processing');
+      
+      // Refresh the orders to reflect the change immediately
+      fetchSupabaseOrders();
     } catch (error: any) {
       console.error('Error completing order:', error);
       toast({
@@ -402,6 +422,13 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
     <div className="container mx-auto p-4">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Order Progress Tracking</h1>
+      </div>
+
+      {/* Real-time Status Indicator */}
+      <div className="mb-4 p-2 bg-blue-50 rounded-md border border-blue-200">
+        <p className="text-sm text-blue-800">
+          🔄 Real-time updates enabled - Changes will appear automatically across all users
+        </p>
       </div>
 
       {/* In-Progress Orders */}
@@ -601,8 +628,8 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
               {isAdmin && (
                 <div className="flex justify-between pt-4">
                   <div className="text-sm text-gray-500">
-                    <p>Note: Marking an item as complete will automatically set delivered quantity to match ordered quantity.</p>
-                    <p>These quantities will be used on delivery notes.</p>
+                    <p>Note: Completing this order will move it to Processing for all users.</p>
+                    <p>All items must be marked as complete before the order can be completed.</p>
                   </div>
                   <Button 
                     onClick={() => completeOrder(selectedOrder.id)}
