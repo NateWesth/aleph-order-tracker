@@ -104,8 +104,10 @@ export const useGlobalRealtimeOrders = ({
   const handleOrderInsert = useCallback((payload: any) => {
     console.log(`New order created (${pageType}):`, payload.new);
     
-    // Show notification only for admins or if it's the user's own order
-    if (isAdmin) {
+    // Show notification for both admin and client users
+    const shouldShowNotification = isAdmin || payload.new.user_id === supabase.auth.getUser()?.then(u => u.data.user?.id);
+    
+    if (shouldShowNotification) {
       toast({
         title: "New Order Created",
         description: `Order ${payload.new.order_number} has been created.`,
@@ -116,7 +118,7 @@ export const useGlobalRealtimeOrders = ({
     onOrdersChange();
   }, [toast, onOrdersChange, isAdmin, pageType]);
 
-  const handleOrderUpdate = useCallback((payload: any) => {
+  const handleOrderUpdate = useCallback(async (payload: any) => {
     console.log(`Order updated (${pageType}):`, payload.old, '->', payload.new);
     
     // Show notification for status changes and important updates
@@ -127,9 +129,14 @@ export const useGlobalRealtimeOrders = ({
       console.log(`Order status changed from ${oldStatus} to ${newStatus}`);
       
       // Sync with localStorage first
-      syncLocalStorageWithDatabase(payload);
+      await syncLocalStorageWithDatabase(payload);
       
-      if (isAdmin) {
+      // Check if this user should receive notifications
+      const currentUser = await supabase.auth.getUser();
+      const userId = currentUser.data.user?.id;
+      const shouldShowNotification = isAdmin || payload.new.user_id === userId;
+      
+      if (shouldShowNotification) {
         let message = '';
         switch (newStatus) {
           case 'received':
@@ -139,7 +146,7 @@ export const useGlobalRealtimeOrders = ({
             message = `Order ${payload.new.order_number} is now in progress.`;
             break;
           case 'processing':
-            message = `Order ${payload.new.order_number} has been moved to Processing page.`;
+            message = `Order ${payload.new.order_number} has been completed and moved to Processing page.`;
             break;
           case 'completed':
             message = `Order ${payload.new.order_number} has been completed and moved to Completed/Delivery Notes pages.`;
@@ -160,7 +167,7 @@ export const useGlobalRealtimeOrders = ({
     }
   }, [toast, onOrdersChange, isAdmin, pageType, syncLocalStorageWithDatabase]);
 
-  const handleOrderDelete = useCallback((payload: any) => {
+  const handleOrderDelete = useCallback(async (payload: any) => {
     console.log(`Order deleted (${pageType}):`, payload.old);
     
     // Remove from all localStorage arrays
@@ -172,11 +179,15 @@ export const useGlobalRealtimeOrders = ({
       console.log(`Removed order ${orderId} from ${storageKey}`);
     });
     
-    // Show notification only for admins
-    if (isAdmin) {
+    // Check if this user should receive notifications
+    const currentUser = await supabase.auth.getUser();
+    const userId = currentUser.data.user?.id;
+    const shouldShowNotification = isAdmin || payload.old.user_id === userId;
+    
+    if (shouldShowNotification) {
       toast({
         title: "Order Deleted",
-        description: `Order ${payload.old.order_number} has been deleted from all systems.`,
+        description: `Order ${payload.old.order_number} has been deleted.`,
       });
     }
     
