@@ -67,8 +67,11 @@ export const useGlobalRealtimeOrders = ({
   useEffect(() => {
     console.log(`Setting up global real-time order subscriptions for ${pageType}...`);
     
+    // Create a unique channel name per page type to avoid conflicts
+    const channelName = `orders-realtime-${pageType}-${Date.now()}`;
+    
     const channel = supabase
-      .channel(`orders-changes-${pageType}`)
+      .channel(channelName)
       .on(
         'postgres_changes',
         {
@@ -98,6 +101,11 @@ export const useGlobalRealtimeOrders = ({
       )
       .subscribe((status) => {
         console.log(`Real-time subscription status for ${pageType}:`, status);
+        if (status === 'SUBSCRIBED') {
+          console.log(`✅ Successfully subscribed to real-time updates for ${pageType}`);
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error(`❌ Real-time subscription error for ${pageType}`);
+        }
       });
 
     return () => {

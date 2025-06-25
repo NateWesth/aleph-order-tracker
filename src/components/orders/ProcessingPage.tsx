@@ -1,5 +1,4 @@
 
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -64,6 +63,7 @@ export default function ProcessingPage({ isAdmin }: ProcessingPageProps) {
     if (!user?.id) return;
 
     try {
+      console.log('Fetching processing orders from Supabase...');
       let query = supabase
         .from('orders')
         .select('*')
@@ -82,21 +82,26 @@ export default function ProcessingPage({ isAdmin }: ProcessingPageProps) {
         return;
       }
 
+      console.log('Fetched processing orders:', data?.length || 0);
       setSupabaseOrders(data || []);
     } catch (error) {
       console.error("Failed to fetch processing orders:", error);
     }
   };
 
-  // Set up real-time subscriptions
+  // Set up real-time subscriptions with improved logging
   useGlobalRealtimeOrders({
-    onOrdersChange: fetchSupabaseOrders,
+    onOrdersChange: () => {
+      console.log('Real-time update detected, refreshing processing orders...');
+      fetchSupabaseOrders();
+    },
     isAdmin,
     pageType: 'processing'
   });
 
   // Load orders from localStorage on component mount
   useEffect(() => {
+    console.log('Loading processing orders from localStorage...');
     const storedProcessingOrders = JSON.parse(localStorage.getItem('processingOrders') || '[]');
     
     // Filter orders based on admin status
@@ -106,13 +111,17 @@ export default function ProcessingPage({ isAdmin }: ProcessingPageProps) {
       filteredOrders = storedProcessingOrders.filter((order: any) => order.userId === user.id);
     }
     
+    console.log('Loaded processing orders from localStorage:', filteredOrders.length);
     setOrders(filteredOrders);
     fetchSupabaseOrders();
   }, [isAdmin, user?.id]);
 
   // Save orders to localStorage whenever orders change
   useEffect(() => {
-    localStorage.setItem('processingOrders', JSON.stringify(orders));
+    if (orders.length > 0) {
+      console.log('Saving processing orders to localStorage:', orders.length);
+      localStorage.setItem('processingOrders', JSON.stringify(orders));
+    }
   }, [orders]);
 
   // View order details
@@ -133,6 +142,7 @@ export default function ProcessingPage({ isAdmin }: ProcessingPageProps) {
     if (!orderToComplete) return;
 
     try {
+      console.log('Marking order as completed:', orderId);
       // Update order status in database to 'completed'
       const { error } = await supabase
         .from('orders')
@@ -164,6 +174,7 @@ export default function ProcessingPage({ isAdmin }: ProcessingPageProps) {
       });
 
       setSelectedOrder(null);
+      console.log('Order successfully marked as completed');
     } catch (error: any) {
       console.error('Error marking order as completed:', error);
       toast({
@@ -194,6 +205,13 @@ export default function ProcessingPage({ isAdmin }: ProcessingPageProps) {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
+      </div>
+
+      {/* Real-time Status Indicator */}
+      <div className="mb-4 p-2 bg-blue-50 rounded-md border border-blue-200">
+        <p className="text-sm text-blue-800">
+          🔄 Real-time updates enabled - Changes will appear automatically
+        </p>
       </div>
 
       {/* Processing Orders */}
@@ -319,4 +337,3 @@ export default function ProcessingPage({ isAdmin }: ProcessingPageProps) {
     </div>
   );
 }
-
