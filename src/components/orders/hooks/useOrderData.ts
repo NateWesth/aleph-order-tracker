@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -72,13 +71,17 @@ export const useOrderData = (isAdmin: boolean) => {
     try {
       console.log("Fetching orders for user:", user.id, "isAdmin:", isAdmin);
       
-      // For now, fetch orders using the current user's ID since RLS only allows own orders
-      // This is a temporary solution until we can properly configure admin access
-      const { data, error } = await supabase
+      let query = supabase
         .from('orders')
         .select('*')
-        .eq('user_id', user.id)
         .order('created_at', { ascending: false });
+
+      // If user is admin, fetch all orders; otherwise, fetch only user's orders
+      if (!isAdmin) {
+        query = query.eq('user_id', user.id);
+      }
+
+      const { data, error } = await query;
 
       if (error) {
         console.error("Orders fetch error:", error);
