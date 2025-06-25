@@ -154,7 +154,7 @@ export default function OrderRow({ order, isAdmin, onReceiveOrder, onDeleteOrder
                   <AlertDialogHeader>
                     <AlertDialogTitle>Delete Order</AlertDialogTitle>
                     <AlertDialogDescription>
-                      Are you sure you want to delete order {order.order_number}? This action cannot be undone.
+                      Are you sure you want to delete order {order.order_number}? This action cannot be undone and will remove the order from all systems.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>

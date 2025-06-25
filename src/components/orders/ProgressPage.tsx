@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -11,8 +10,19 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { format } from "date-fns";
-import { Eye, Package, Truck, CheckCircle } from "lucide-react";
+import { Eye, Package, Truck, CheckCircle, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useGlobalRealtimeOrders } from "./hooks/useGlobalRealtimeOrders";
@@ -418,6 +428,65 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
     }
   };
 
+  // Delete order function for admins
+  const deleteOrder = async (orderId: string, orderNumber: string) => {
+    if (!isAdmin) return;
+
+    try {
+      console.log('Deleting order:', orderId);
+      
+      // Delete from database
+      const { error } = await supabase
+        .from('orders')
+        .delete()
+        .eq('id', orderId);
+
+      if (error) throw error;
+
+      // Remove from local progress orders
+      const remainingOrders = orders.filter(order => order.id !== orderId);
+      setOrders(remainingOrders);
+      localStorage.setItem('progressOrders', JSON.stringify(remainingOrders));
+
+      // Also remove from delivery orders if exists
+      const existingDeliveryOrders = JSON.parse(localStorage.getItem('deliveryOrders') || '[]');
+      const updatedDeliveryOrders = existingDeliveryOrders.filter((order: Order) => order.id !== orderId);
+      localStorage.setItem('deliveryOrders', JSON.stringify(updatedDeliveryOrders));
+
+      // Remove from processing orders if exists
+      const existingProcessingOrders = JSON.parse(localStorage.getItem('processingOrders') || '[]');
+      const updatedProcessingOrders = existingProcessingOrders.filter((order: Order) => order.id !== orderId);
+      localStorage.setItem('processingOrders', JSON.stringify(updatedProcessingOrders));
+
+      // Remove from completed orders if exists
+      const existingCompletedOrders = JSON.parse(localStorage.getItem('completedOrders') || '[]');
+      const updatedCompletedOrders = existingCompletedOrders.filter((order: Order) => order.id !== orderId);
+      localStorage.setItem('completedOrders', JSON.stringify(updatedCompletedOrders));
+
+      toast({
+        title: "Order Deleted",
+        description: `Order ${orderNumber} has been permanently deleted from all systems.`,
+      });
+
+      // Close dialog if the deleted order was being viewed
+      if (selectedOrder && selectedOrder.id === orderId) {
+        setSelectedOrder(null);
+      }
+
+      console.log('Order successfully deleted');
+      
+      // Refresh the orders to reflect the change immediately
+      fetchSupabaseOrders();
+    } catch (error: any) {
+      console.error('Error deleting order:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete order. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="container mx-auto p-4">
       <div className="flex justify-between items-center mb-6">
@@ -465,6 +534,37 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
                           />
                         )}
                         <h3 className="font-medium">Order #{order.orderNumber}</h3>
+                        {isAdmin && (
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button 
+                                variant="ghost" 
+                                size="sm"
+                                className="text-red-600 hover:text-red-700 ml-2"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete Order</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to delete order {order.orderNumber}? This action cannot be undone and will remove the order from all systems.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction 
+                                  onClick={() => deleteOrder(order.id, order.orderNumber)}
+                                  className="bg-red-600 hover:bg-red-700"
+                                >
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        )}
                       </div>
                       <p className="text-sm text-gray-600">{order.companyName}</p>
                       <p className="text-sm text-gray-600">
@@ -521,6 +621,36 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
                     />
                   )}
                   Order #{selectedOrder.orderNumber} Details
+                  {isAdmin && (
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          className="text-red-600 hover:text-red-700 ml-auto"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete Order</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Are you sure you want to delete order {selectedOrder.orderNumber}? This action cannot be undone and will remove the order from all systems.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction 
+                            onClick={() => deleteOrder(selectedOrder.id, selectedOrder.orderNumber)}
+                            className="bg-red-600 hover:bg-red-700"
+                          >
+                            Delete
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  )}
                 </div>
               </DialogTitle>
             </DialogHeader>
