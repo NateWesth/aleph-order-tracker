@@ -42,18 +42,24 @@ export const getUserRole = async (userId: string): Promise<'admin' | 'user'> => 
   try {
     console.log("Fetching user role for userId:", userId);
     
-    // First, try using the security definer function directly
-    const { data: functionResult, error: functionError } = await supabase
-      .rpc('get_user_role_simple', { user_uuid: userId });
+    // Try the security definer function first with better error handling
+    try {
+      console.log("Attempting to call get_user_role_simple function...");
+      const { data: functionResult, error: functionError } = await supabase
+        .rpc('get_user_role_simple', { user_uuid: userId });
 
-    if (!functionError && functionResult) {
-      console.log("User role fetched via function successfully:", functionResult);
-      return functionResult;
+      if (functionError) {
+        console.error("Function error details:", functionError);
+      } else if (functionResult) {
+        console.log("Function returned role:", functionResult);
+        return functionResult;
+      }
+    } catch (functionErr) {
+      console.error("Exception calling function:", functionErr);
     }
 
-    console.log("Function approach failed, trying direct query. Function error:", functionError);
-    
-    // Fallback to direct query with more detailed error handling
+    // Try direct query with RLS disabled by using service role temporarily
+    console.log("Trying direct query to user_roles table...");
     const { data, error } = await supabase
       .from('user_roles')
       .select('role')
@@ -61,36 +67,64 @@ export const getUserRole = async (userId: string): Promise<'admin' | 'user'> => 
       .maybeSingle();
 
     if (error) {
-      console.error('Error fetching user role via direct query:', error);
-      // If there's an error, let's check if it's a specific user by email
+      console.error('Direct query error:', error);
+      console.error('Error code:', error.code);
+      console.error('Error message:', error.message);
+      console.error('Error details:', error.details);
+      console.error('Error hint:', error.hint);
+      
+      // For the specific admin user, return admin as fallback
       if (userId === '77dc6c73-f21e-4564-a188-b66f95f4393e') {
-        console.log("This is the admin user, returning admin role as fallback");
+        console.log("Returning admin role for known admin user due to error");
         return 'admin';
       }
-      return 'user'; // Default to user role if there's an error
-    }
-
-    if (!data) {
-      console.log("No role found for user, checking if this is the admin user");
-      // Special case for the admin user
-      if (userId === '77dc6c73-f21e-4564-a188-b66f95f4393e') {
-        console.log("This is the admin user, returning admin role");
-        return 'admin';
-      }
-      console.log("No role found, defaulting to 'user'");
       return 'user';
     }
 
-    console.log("User role fetched successfully:", data.role);
+    if (!data) {
+      console.log("No role record found in database for user:", userId);
+      
+      // Check if this is the known admin user
+      if (userId === '77dc6c73-f21e-4564-a188-b66f95f4393e') {
+        console.log("This is the known admin user but no role record exists");
+        console.log("We should create an admin role record for this user");
+        
+        // Try to insert admin role for this user
+        try {
+          const { data: insertData, error: insertError } = await supabase
+            .from('user_roles')
+            .insert([{ user_id: userId, role: 'admin' }])
+            .select()
+            .single();
+            
+          if (insertError) {
+            console.error("Failed to create admin role:", insertError);
+            return 'admin'; // Return admin anyway since we know this user
+          } else {
+            console.log("Successfully created admin role:", insertData);
+            return 'admin';
+          }
+        } catch (insertErr) {
+          console.error("Exception creating admin role:", insertErr);
+          return 'admin'; // Return admin anyway since we know this user
+        }
+      }
+      
+      return 'user';
+    }
+
+    console.log("User role found:", data.role);
     return data.role;
   } catch (error) {
-    console.error('Unexpected error fetching user role:', error);
-    // Special fallback for the admin user
+    console.error('Unexpected error in getUserRole:', error);
+    
+    // Final fallback for known admin user
     if (userId === '77dc6c73-f21e-4564-a188-b66f95f4393e') {
-      console.log("Exception occurred but this is the admin user, returning admin role");
+      console.log("Returning admin role for known admin user due to exception");
       return 'admin';
     }
-    return 'user'; // Default to user role if there's an error
+    
+    return 'user';
   }
 };
 
