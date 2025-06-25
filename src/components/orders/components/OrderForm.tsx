@@ -2,7 +2,6 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -10,12 +9,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import OrderItemsForm from "./OrderItemsForm";
+
+interface OrderItem {
+  id: string;
+  name: string;
+  quantity: number;
+}
 
 interface OrderFormProps {
   newOrder: {
     order_number: string;
-    description: string;
-    total_amount: string;
+    items: OrderItem[];
     company_id: string;
     user_id: string;
   };
@@ -61,28 +66,10 @@ export default function OrderForm({
         </div>
       </div>
 
-      <div>
-        <Label htmlFor="description">Description *</Label>
-        <Textarea
-          id="description"
-          value={newOrder.description}
-          onChange={(e) => setNewOrder({ ...newOrder, description: e.target.value })}
-          placeholder="Enter order description"
-          required
-        />
-      </div>
-
-      <div>
-        <Label htmlFor="total_amount">Total Amount</Label>
-        <Input
-          id="total_amount"
-          type="number"
-          step="0.01"
-          value={newOrder.total_amount}
-          onChange={(e) => setNewOrder({ ...newOrder, total_amount: e.target.value })}
-          placeholder="Enter total amount"
-        />
-      </div>
+      <OrderItemsForm
+        items={newOrder.items}
+        onItemsChange={(items) => setNewOrder({ ...newOrder, items })}
+      />
 
       {/* Only show company selection for admin users */}
       {isAdmin && (
