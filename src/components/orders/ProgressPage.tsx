@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -16,7 +15,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { format } from "date-fns";
-import { Trash2 } from "lucide-react";
+import { Trash2, Eye } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useGlobalRealtimeOrders } from "./hooks/useGlobalRealtimeOrders";
@@ -199,40 +198,71 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
     { id: 'completed', name: 'Completed', value: 100 },
   ];
 
-  // Update the progress of an order (admin only)
-  const updateProgressStage = (orderId: string, stage: string) => {
+  // Update the progress stage of an order and sync to database
+  const updateProgressStage = async (orderId: string, stage: string) => {
     if (!isAdmin) return;
 
     const stageInfo = progressStages.find(s => s.id === stage);
     if (!stageInfo) return;
 
-    setOrders(orders.map(order => {
-      if (order.id === orderId) {
-        const updatedOrder = { 
-          ...order, 
-          progressStage: stage as 'awaiting-stock' | 'packing' | 'out-for-delivery' | 'completed', 
-          progress: stageInfo.value 
-        };
-        
-        // If completed, move to processing
-        if (stage === 'completed') {
-          updatedOrder.status = 'processing';
-        }
-        
-        return updatedOrder;
+    try {
+      console.log(`Updating order ${orderId} progress stage to ${stage}`);
+      
+      // Determine new status based on stage
+      let newStatus = 'in-progress';
+      if (stage === 'completed') {
+        newStatus = 'processing';
+      } else if (stage === 'awaiting-stock') {
+        newStatus = 'received';
       }
-      return order;
-    }));
 
-    toast({
-      title: "Progress Updated",
-      description: `Order progress updated to ${stageInfo.name}.`,
-    });
-    
-    if (stage === 'completed') {
+      // Update in database
+      const { error } = await supabase
+        .from('orders')
+        .update({ 
+          status: newStatus,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', orderId);
+
+      if (error) throw error;
+
+      // Update local state
+      setOrders(orders.map(order => {
+        if (order.id === orderId) {
+          const updatedOrder = {
+            ...order,
+            progressStage: stage as 'awaiting-stock' | 'packing' | 'out-for-delivery' | 'completed',
+            progress: stageInfo.value,
+            status: newStatus as 'received' | 'in-progress' | 'processing'
+          };
+          return updatedOrder;
+        }
+        return order;
+      }));
+
       toast({
-        title: "Order Completed",
-        description: "Order has been moved to processing.",
+        title: "Progress Updated",
+        description: `Order progress updated to ${stageInfo.name}.`,
+      });
+
+      if (stage === 'completed') {
+        toast({
+          title: "Order Completed",
+          description: "Order has been moved to processing and will sync across all users.",
+        });
+        
+        // Refresh to remove from progress page if moved to processing
+        setTimeout(() => {
+          fetchSupabaseOrders();
+        }, 500);
+      }
+    } catch (error) {
+      console.error('Error updating progress stage:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update progress. Please try again.",
+        variant: "destructive",
       });
     }
   };
@@ -418,107 +448,124 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
         </p>
       </div>
 
-      {/* In-Progress Orders */}
+      {/* In-Progress Orders Table */}
       <div className="bg-white rounded-lg shadow">
         <div className="p-4 border-b">
           <h2 className="text-lg font-semibold">Orders In Progress</h2>
         </div>
-        <div className="divide-y">
-          {orders.length === 0 && (
-            <div className="p-4 text-center text-gray-500">
-              No orders in progress. Orders marked as "received" should appear here automatically.
-            </div>
-          )}
-          
-          {orders.map(order => (
-            <div 
-              key={order.id} 
-              className="p-4 hover:bg-gray-50 cursor-pointer"
-              onClick={() => viewOrderDetails(order)}
-            >
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      {order.company?.logo && (
-                        <img 
-                          src={order.company.logo} 
-                          alt={`${order.companyName} logo`} 
-                          className="h-6 w-6 rounded object-cover" 
-                        />
-                      )}
-                      <h3 className="font-medium">Order #{order.orderNumber}</h3>
-                      <Badge className="ml-2">{order.status}</Badge>
-                      {isAdmin && (
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button 
-                              variant="ghost" 
-                              size="sm"
-                              className="text-red-600 hover:text-red-700 ml-2"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Delete Order</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Are you sure you want to delete order {order.orderNumber}? This action cannot be undone and will remove the order from all systems.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction 
-                                onClick={() => deleteOrder(order.id, order.orderNumber)}
-                                className="bg-red-600 hover:bg-red-700"
+        
+        {orders.length === 0 ? (
+          <div className="p-4 text-center text-gray-500">
+            No orders in progress. Orders marked as "received" should appear here automatically.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Order</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Company</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Status</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Progress</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Due Date</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {orders.map(order => (
+                  <tr key={order.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        {order.company?.logo && (
+                          <img 
+                            src={order.company.logo} 
+                            alt={`${order.companyName} logo`} 
+                            className="h-6 w-6 rounded object-cover" 
+                          />
+                        )}
+                        <span className="font-medium">#{order.orderNumber}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600">
+                      {order.companyName}
+                    </td>
+                    <td className="px-4 py-3">
+                      <Badge variant={order.status === 'in-progress' ? 'default' : 'secondary'}>
+                        {order.status}
+                      </Badge>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <Progress value={order.progress || 0} className="w-20 h-2" />
+                        <span className="text-xs text-gray-500">
+                          {progressStages.find(s => s.id === order.progressStage)?.name || 'Not started'}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600">
+                      {format(order.dueDate, 'MMM d, yyyy')}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => viewOrderDetails(order)}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        
+                        {isAdmin && (
+                          <>
+                            {progressStages.map((stage) => (
+                              <Button 
+                                key={stage.id} 
+                                variant={order.progressStage === stage.id ? "default" : "outline"}
+                                size="sm"
+                                onClick={() => updateProgressStage(order.id, stage.id)}
                               >
-                                Delete
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      )}
-                    </div>
-                    <p className="text-sm text-gray-600">{order.companyName}</p>
-                    <p className="text-sm text-gray-600">
-                      Due: {format(order.dueDate, 'MMM d, yyyy')}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <div className="flex justify-between text-sm">
-                    <span>Progress:</span>
-                    <span>
-                      {progressStages.find(s => s.id === order.progressStage)?.name || 'Not started'}
-                    </span>
-                  </div>
-                  <Progress value={order.progress || 0} className="h-2" />
-                </div>
-
-                {isAdmin && (
-                  <div className="flex justify-end space-x-2 pt-2">
-                    {progressStages.map((stage) => (
-                      <Button 
-                        key={stage.id} 
-                        variant={order.progressStage === stage.id ? "default" : "outline"}
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          updateProgressStage(order.id, stage.id);
-                        }}
-                      >
-                        {stage.name}
-                      </Button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
+                                {stage.name}
+                              </Button>
+                            ))}
+                            
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm"
+                                  className="text-red-600 hover:text-red-700"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete Order</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Are you sure you want to delete order {order.orderNumber}? This action cannot be undone and will remove the order from all systems.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction 
+                                    onClick={() => deleteOrder(order.id, order.orderNumber)}
+                                    className="bg-red-600 hover:bg-red-700"
+                                  >
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Order Details Dialog */}

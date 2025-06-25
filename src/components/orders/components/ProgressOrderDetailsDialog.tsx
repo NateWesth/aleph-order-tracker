@@ -108,11 +108,23 @@ export default function ProgressOrderDetailsDialog({
     if (!stageInfo) return;
 
     try {
+      console.log(`Updating order ${order.id} progress stage to ${stage}`);
+      
+      // Determine new status based on stage
+      let newStatus = order.status;
+      if (stage === 'completed') {
+        newStatus = 'processing';
+      } else if (stage === 'awaiting-stock') {
+        newStatus = 'received';
+      } else if (stage === 'packing' || stage === 'out-for-delivery') {
+        newStatus = 'in-progress';
+      }
+
       // Update in database
       const { error } = await supabase
         .from('orders')
         .update({ 
-          status: stage === 'completed' ? 'processing' : order.status,
+          status: newStatus,
           updated_at: new Date().toISOString()
         })
         .eq('id', order.id);
@@ -123,7 +135,7 @@ export default function ProgressOrderDetailsDialog({
       onOrderUpdate(order.id, {
         progressStage: stage as 'awaiting-stock' | 'packing' | 'out-for-delivery' | 'completed',
         progress: stageInfo.value,
-        status: stage === 'completed' ? 'processing' : order.status
+        status: newStatus as 'pending' | 'received' | 'in-progress' | 'processing' | 'completed'
       });
 
       toast({
@@ -134,8 +146,13 @@ export default function ProgressOrderDetailsDialog({
       if (stage === 'completed') {
         toast({
           title: "Order Completed",
-          description: "Order has been moved to processing.",
+          description: "Order has been moved to processing and will sync across all users.",
         });
+        
+        // Close dialog and refresh parent
+        setTimeout(() => {
+          onClose();
+        }, 1000);
       }
     } catch (error) {
       console.error('Error updating progress stage:', error);
