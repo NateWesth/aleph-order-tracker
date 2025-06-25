@@ -1,5 +1,4 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -10,6 +9,8 @@ import {
 } from "@/components/ui/dialog";
 import { format } from "date-fns";
 import { File, Search } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 
 // Define the order item interface
 interface OrderItem {
@@ -49,9 +50,54 @@ interface CompletedPageProps {
 
 export default function CompletedPage({ isAdmin }: CompletedPageProps) {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [supabaseOrders, setSupabaseOrders] = useState<any[]>([]);
+
+  // Fetch orders from database
+  const fetchSupabaseOrders = async () => {
+    if (!user?.id) return;
+
+    try {
+      let query = supabase
+        .from('orders')
+        .select('*')
+        .eq('status', 'completed')
+        .order('created_at', { ascending: false });
+
+      // If user is admin, fetch all orders; otherwise, fetch only user's orders
+      if (!isAdmin) {
+        query = query.eq('user_id', user.id);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error("Error fetching completed orders:", error);
+        return;
+      }
+
+      setSupabaseOrders(data || []);
+    } catch (error) {
+      console.error("Failed to fetch completed orders:", error);
+    }
+  };
+
+  useEffect(() => {
+    const storedCompletedOrders = JSON.parse(localStorage.getItem('completedOrders') || '[]');
+    
+    // Filter orders based on admin status
+    let filteredOrders = storedCompletedOrders;
+    if (!isAdmin && user?.id) {
+      // For non-admin users, only show their own orders
+      filteredOrders = storedCompletedOrders.filter((order: any) => order.userId === user.id);
+    }
+    
+    setOrders(filteredOrders);
+    fetchSupabaseOrders();
+  }, [isAdmin, user?.id]);
 
   // View order details
   const viewOrderDetails = (order: Order) => {
@@ -65,17 +111,14 @@ export default function CompletedPage({ isAdmin }: CompletedPageProps) {
 
   // Handle file action (download or print)
   const handleFileAction = (file: OrderFile, action: 'download' | 'print') => {
-    // In a real app, this would download or print the actual file
     toast({
       title: action === 'download' ? "Downloading File" : "Printing File",
       description: `${action === 'download' ? 'Downloading' : 'Printing'} ${file.name}...`,
     });
     
     if (action === 'download') {
-      // Simulate a download by opening in a new tab
       window.open(file.url, '_blank');
     } else {
-      // Simulate printing by opening print dialog
       const printWindow = window.open(file.url, '_blank');
       printWindow?.addEventListener('load', () => {
         printWindow.print();

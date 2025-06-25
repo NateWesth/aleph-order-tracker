@@ -1,9 +1,10 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { File, Download, Printer, Search, Plus } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 
 // Define the order file interface
 interface OrderFile {
@@ -23,9 +24,54 @@ interface FilesPageProps {
 
 export default function FilesPage({ isAdmin }: FilesPageProps) {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [files, setFiles] = useState<OrderFile[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<string | null>(null);
+  const [supabaseFiles, setSupabaseFiles] = useState<any[]>([]);
+
+  // Fetch files from database (if any file-related tables exist)
+  const fetchSupabaseFiles = async () => {
+    if (!user?.id) return;
+
+    try {
+      // This would be implemented if there are file-related tables in the database
+      // For now, we'll just show empty results from Supabase
+      setSupabaseFiles([]);
+    } catch (error) {
+      console.error("Failed to fetch files from database:", error);
+    }
+  };
+
+  useEffect(() => {
+    // Load files from localStorage (this would typically come from order files)
+    const allOrders = [
+      ...JSON.parse(localStorage.getItem('processingOrders') || '[]'),
+      ...JSON.parse(localStorage.getItem('completedOrders') || '[]'),
+      ...JSON.parse(localStorage.getItem('progressOrders') || '[]'),
+      ...JSON.parse(localStorage.getItem('deliveryOrders') || '[]')
+    ];
+
+    const allFiles: OrderFile[] = [];
+    
+    allOrders.forEach((order: any) => {
+      if (order.files) {
+        order.files.forEach((file: any) => {
+          // Filter files based on admin status
+          if (isAdmin || (!isAdmin && order.userId === user?.id)) {
+            allFiles.push({
+              ...file,
+              orderNumber: order.orderNumber,
+              companyName: order.companyName
+            });
+          }
+        });
+      }
+    });
+
+    setFiles(allFiles);
+    fetchSupabaseFiles();
+  }, [isAdmin, user?.id]);
 
   // Handle file action (download or print)
   const handleFileAction = (file: OrderFile, action: 'download' | 'print') => {
@@ -47,7 +93,6 @@ export default function FilesPage({ isAdmin }: FilesPageProps) {
     }
   };
 
-  // Filter files based on search term and file type
   const filteredFiles = files.filter(file => 
     (file.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
      file.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -55,7 +100,6 @@ export default function FilesPage({ isAdmin }: FilesPageProps) {
     (!filterType || file.type === filterType)
   );
 
-  // Get unique file types for filtering
   const fileTypes = [...new Set(files.map(file => file.type))];
 
   return (

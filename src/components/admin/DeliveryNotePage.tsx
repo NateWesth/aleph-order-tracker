@@ -17,6 +17,8 @@ import {
 } from "@/components/ui/select";
 import { format } from "date-fns";
 import { Printer, Eye, Upload, File, Plus } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 
 // Define the order item interface
 interface OrderItem {
@@ -72,14 +74,49 @@ interface OrderFile {
   uploadDate: Date;
 }
 
-export default function DeliveryNotePage() {
+interface DeliveryNotePageProps {
+  isAdmin: boolean;
+}
+
+export default function DeliveryNotePage({ isAdmin }: DeliveryNotePageProps) {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [fileType, setFileType] = useState<'invoice' | 'quote' | 'purchase-order' | 'proof-of-payment' | 'delivery-note' | 'other'>('other');
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [supabaseOrders, setSupabaseOrders] = useState<any[]>([]);
+
+  // Fetch orders from database
+  const fetchSupabaseOrders = async () => {
+    if (!user?.id) return;
+
+    try {
+      let query = supabase
+        .from('orders')
+        .select('*')
+        .in('status', ['received', 'in-progress', 'processing'])
+        .order('created_at', { ascending: false });
+
+      // Only admins can see all orders for delivery notes
+      if (!isAdmin) {
+        query = query.eq('user_id', user.id);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error("Error fetching delivery orders:", error);
+        return;
+      }
+
+      setSupabaseOrders(data || []);
+    } catch (error) {
+      console.error("Failed to fetch delivery orders:", error);
+    }
+  };
 
   // Load orders from localStorage on component mount
   useEffect(() => {
@@ -88,12 +125,18 @@ export default function DeliveryNotePage() {
     
     // Combine orders from both sources and remove duplicates
     const allOrders = [...storedDeliveryOrders, ...storedProgressOrders];
-    const uniqueOrders = allOrders.filter((order, index, self) => 
+    let uniqueOrders = allOrders.filter((order, index, self) => 
       index === self.findIndex(o => o.id === order.id)
     );
     
+    // Filter orders based on admin status
+    if (!isAdmin && user?.id) {
+      uniqueOrders = uniqueOrders.filter(order => order.userId === user.id);
+    }
+    
     setOrders(uniqueOrders);
-  }, []);
+    fetchSupabaseOrders();
+  }, [isAdmin, user?.id]);
 
   // Generate delivery note number
   const generateDeliveryNoteNumber = () => {
@@ -130,7 +173,6 @@ export default function DeliveryNotePage() {
     setOrders(updatedOrders);
     localStorage.setItem('deliveryOrders', JSON.stringify(updatedOrders));
 
-    // Also update the same order in progressOrders
     const progressOrders = JSON.parse(localStorage.getItem('progressOrders') || '[]');
     const updatedProgressOrders = progressOrders.map((order: Order) => {
       if (order.id === orderId) {
@@ -540,14 +582,16 @@ export default function DeliveryNotePage() {
                     <Eye className="h-4 w-4 mr-2" />
                     View Details
                   </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => generateDeliveryNote(order)}
-                  >
-                    <Printer className="h-4 w-4 mr-2" />
-                    Generate Note
-                  </Button>
+                  {isAdmin && (
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => generateDeliveryNote(order)}
+                    >
+                      <Printer className="h-4 w-4 mr-2" />
+                      Generate Note
+                    </Button>
+                  )}
                 </div>
               </div>
             </div>
@@ -588,21 +632,28 @@ export default function DeliveryNotePage() {
                           </p>
                         </div>
                         <div className="flex items-center gap-4">
-                          <div className="flex items-center gap-2">
-                            <label className="text-sm">Delivered:</label>
-                            <Input
-                              type="number"
-                              min="0"
-                              max={item.quantity}
-                              value={item.delivered || 0}
-                              onChange={(e) => updateDeliveryQuantity(
-                                selectedOrder.id, 
-                                item.id, 
-                                parseInt(e.target.value) || 0
-                              )}
-                              className="w-20"
-                            />
-                          </div>
+                          {isAdmin && (
+                            <div className="flex items-center gap-2">
+                              <label className="text-sm">Delivered:</label>
+                              <Input
+                                type="number"
+                                min="0"
+                                max={item.quantity}
+                                value={item.delivered || 0}
+                                onChange={(e) => updateDeliveryQuantity(
+                                  selectedOrder.id, 
+                                  item.id, 
+                                  parseInt(e.target.value) || 0
+                                )}
+                                className="w-20"
+                              />
+                            </div>
+                          )}
+                          {!isAdmin && (
+                            <div className="text-sm text-gray-500">
+                              Delivered: {item.delivered || 0}
+                            </div>
+                          )}
                           <div className="text-sm text-gray-500">
                             Remaining: {item.quantity - (item.delivered || 0)}
                           </div>
@@ -617,13 +668,15 @@ export default function DeliveryNotePage() {
               <div>
                 <div className="flex justify-between items-center mb-2">
                   <h3 className="font-medium">Files</h3>
-                  <Button
-                    size="sm"
-                    onClick={() => setUploadDialogOpen(true)}
-                  >
-                    <Upload className="h-4 w-4 mr-1" />
-                    Upload Files
-                  </Button>
+                  {isAdmin && (
+                    <Button
+                      size="sm"
+                      onClick={() => setUploadDialogOpen(true)}
+                    >
+                      <Upload className="h-4 w-4 mr-1" />
+                      Upload Files
+                    </Button>
+                  )}
                 </div>
                 
                 {(!selectedOrder.files || selectedOrder.files.length === 0) ? (

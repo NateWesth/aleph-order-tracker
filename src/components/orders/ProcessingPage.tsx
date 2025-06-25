@@ -17,6 +17,8 @@ import {
 } from "@/components/ui/select";
 import { format } from "date-fns";
 import { File, Plus, Upload } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 
 // Define the order item interface
 interface OrderItem {
@@ -55,17 +57,57 @@ interface ProcessingPageProps {
 
 export default function ProcessingPage({ isAdmin }: ProcessingPageProps) {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [fileType, setFileType] = useState<'invoice' | 'quote' | 'purchase-order' | 'proof-of-payment'>('invoice');
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [supabaseOrders, setSupabaseOrders] = useState<any[]>([]);
+
+  // Fetch orders from database
+  const fetchSupabaseOrders = async () => {
+    if (!user?.id) return;
+
+    try {
+      let query = supabase
+        .from('orders')
+        .select('*')
+        .eq('status', 'processing')
+        .order('created_at', { ascending: false });
+
+      // If user is admin, fetch all orders; otherwise, fetch only user's orders
+      if (!isAdmin) {
+        query = query.eq('user_id', user.id);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error("Error fetching processing orders:", error);
+        return;
+      }
+
+      setSupabaseOrders(data || []);
+    } catch (error) {
+      console.error("Failed to fetch processing orders:", error);
+    }
+  };
 
   // Load orders from localStorage on component mount
   useEffect(() => {
     const storedProcessingOrders = JSON.parse(localStorage.getItem('processingOrders') || '[]');
-    setOrders(storedProcessingOrders);
-  }, []);
+    
+    // Filter orders based on admin status
+    let filteredOrders = storedProcessingOrders;
+    if (!isAdmin && user?.id) {
+      // For non-admin users, only show their own orders
+      filteredOrders = storedProcessingOrders.filter((order: any) => order.userId === user.id);
+    }
+    
+    setOrders(filteredOrders);
+    fetchSupabaseOrders();
+  }, [isAdmin, user?.id]);
 
   // Save orders to localStorage whenever orders change
   useEffect(() => {
