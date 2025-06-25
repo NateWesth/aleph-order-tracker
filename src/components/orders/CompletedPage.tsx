@@ -11,6 +11,7 @@ import { format } from "date-fns";
 import { File, Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useGlobalRealtimeOrders } from "./hooks/useGlobalRealtimeOrders";
 
 // Define the order item interface
 interface OrderItem {
@@ -84,6 +85,13 @@ export default function CompletedPage({ isAdmin }: CompletedPageProps) {
       console.error("Failed to fetch completed orders:", error);
     }
   };
+
+  // Set up real-time subscriptions
+  useGlobalRealtimeOrders({
+    onOrdersChange: fetchSupabaseOrders,
+    isAdmin,
+    pageType: 'completed'
+  });
 
   useEffect(() => {
     const storedCompletedOrders = JSON.parse(localStorage.getItem('completedOrders') || '[]');

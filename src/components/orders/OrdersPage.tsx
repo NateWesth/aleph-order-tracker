@@ -1,10 +1,11 @@
+
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import OrdersHeader from "./components/OrdersHeader";
 import OrderTable from "./components/OrderTable";
 import CreateOrderDialog from "./components/CreateOrderDialog";
 import { useOrderData } from "./hooks/useOrderData";
-import { useRealtimeOrders } from "./hooks/useRealtimeOrders";
+import { useGlobalRealtimeOrders } from "./hooks/useGlobalRealtimeOrders";
 
 interface OrdersPageProps {
   isAdmin?: boolean;
@@ -25,10 +26,11 @@ export default function OrdersPage({ isAdmin = false }: OrdersPageProps) {
     user
   } = useOrderData(isAdmin);
 
-  // Set up real-time subscriptions
-  useRealtimeOrders({
+  // Set up real-time subscriptions using the global hook
+  useGlobalRealtimeOrders({
     onOrdersChange: fetchOrders,
-    isAdmin
+    isAdmin,
+    pageType: 'orders'
   });
 
   // Fetch company names for orders

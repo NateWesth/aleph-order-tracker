@@ -5,6 +5,7 @@ import { format } from "date-fns";
 import { File, Download, Printer, Search, Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useGlobalRealtimeOrders } from "./hooks/useGlobalRealtimeOrders";
 
 // Define the order file interface
 interface OrderFile {
@@ -42,6 +43,42 @@ export default function FilesPage({ isAdmin }: FilesPageProps) {
       console.error("Failed to fetch files from database:", error);
     }
   };
+
+  // Set up real-time subscriptions for order changes that might affect files
+  useGlobalRealtimeOrders({
+    onOrdersChange: () => {
+      // Refresh files when orders change
+      fetchSupabaseFiles();
+      // Also refresh localStorage data
+      const allOrders = [
+        ...JSON.parse(localStorage.getItem('processingOrders') || '[]'),
+        ...JSON.parse(localStorage.getItem('completedOrders') || '[]'),
+        ...JSON.parse(localStorage.getItem('progressOrders') || '[]'),
+        ...JSON.parse(localStorage.getItem('deliveryOrders') || '[]')
+      ];
+
+      const allFiles: OrderFile[] = [];
+      
+      allOrders.forEach((order: any) => {
+        if (order.files) {
+          order.files.forEach((file: any) => {
+            // Filter files based on admin status
+            if (isAdmin || (!isAdmin && order.userId === user?.id)) {
+              allFiles.push({
+                ...file,
+                orderNumber: order.orderNumber,
+                companyName: order.companyName
+              });
+            }
+          });
+        }
+      });
+
+      setFiles(allFiles);
+    },
+    isAdmin,
+    pageType: 'files'
+  });
 
   useEffect(() => {
     // Load files from localStorage (this would typically come from order files)

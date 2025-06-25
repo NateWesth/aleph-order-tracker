@@ -1,17 +1,13 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Input } from "@/components/ui/input";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { format } from "date-fns";
+import { Eye, Package, Truck, CheckCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useGlobalRealtimeOrders } from "./hooks/useGlobalRealtimeOrders";
 
 // Define the order item interface
 interface OrderItem {
@@ -133,7 +129,7 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
       let query = supabase
         .from('orders')
         .select('*')
-        .eq('status', 'received')
+        .in('status', ['received', 'in-progress'])
         .order('created_at', { ascending: false });
 
       // If user is admin, fetch all orders; otherwise, fetch only user's orders
@@ -153,6 +149,13 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
       console.error("Failed to fetch progress orders:", error);
     }
   };
+
+  // Set up real-time subscriptions
+  useGlobalRealtimeOrders({
+    onOrdersChange: fetchSupabaseOrders,
+    isAdmin,
+    pageType: 'progress'
+  });
 
   // Load orders from localStorage on component mount
   useEffect(() => {

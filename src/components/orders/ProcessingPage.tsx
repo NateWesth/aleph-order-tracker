@@ -19,6 +19,7 @@ import { format } from "date-fns";
 import { File, Plus, Upload } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useGlobalRealtimeOrders } from "./hooks/useGlobalRealtimeOrders";
 
 // Define the order item interface
 interface OrderItem {
@@ -93,6 +94,13 @@ export default function ProcessingPage({ isAdmin }: ProcessingPageProps) {
       console.error("Failed to fetch processing orders:", error);
     }
   };
+
+  // Set up real-time subscriptions
+  useGlobalRealtimeOrders({
+    onOrdersChange: fetchSupabaseOrders,
+    isAdmin,
+    pageType: 'processing'
+  });
 
   // Load orders from localStorage on component mount
   useEffect(() => {
