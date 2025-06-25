@@ -254,7 +254,7 @@ const AdminDashboard = () => {
               </div>
             ) : activeView === "delivery-notes" ? (
               <div className="bg-white dark:bg-gray-800 min-h-full">
-                <DeliveryNotePage />
+                <DeliveryNotePage isAdmin={true} />
               </div>
             ) : activeView === "completed" ? (
               <div className="bg-white dark:bg-gray-800 min-h-full">
