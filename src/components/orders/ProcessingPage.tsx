@@ -3,12 +3,6 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -26,6 +20,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useGlobalRealtimeOrders } from "./hooks/useGlobalRealtimeOrders";
 import ProcessingOrderFilesDialog from "./components/ProcessingOrderFilesDialog";
+import OrderDetailsDialog from "./components/OrderDetailsDialog";
 
 // Define the order item interface
 interface OrderItem {
@@ -66,10 +61,11 @@ export default function ProcessingPage({ isAdmin }: ProcessingPageProps) {
   const { toast } = useToast();
   const { user } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [showFilesDialog, setShowFilesDialog] = useState(false);
   const [filesDialogOrder, setFilesDialogOrder] = useState<Order | null>(null);
+  const [showOrderDetails, setShowOrderDetails] = useState(false);
 
   // Fetch orders from database with company information
   const fetchProcessingOrders = async () => {
@@ -167,13 +163,47 @@ export default function ProcessingPage({ isAdmin }: ProcessingPageProps) {
     }
   }, [orders]);
 
-  // View order details
+  // View order details - now uses the same format as OrdersPage
   const viewOrderDetails = (order: Order) => {
-    setSelectedOrder(order);
+    // Find the original database order for the details dialog
+    const fetchOrderForDetails = async () => {
+      try {
+        const { data } = await supabase
+          .from('orders')
+          .select(`
+            *,
+            companies (
+              name,
+              code
+            )
+          `)
+          .eq('id', order.id)
+          .single();
+
+        if (data) {
+          setSelectedOrder({
+            ...data,
+            companyName: data.companies?.name || "Unknown Company",
+            items: [
+              {
+                name: data.description || "Order items",
+                quantity: 1
+              }
+            ]
+          });
+          setShowOrderDetails(true);
+        }
+      } catch (error) {
+        console.error('Error fetching order details:', error);
+      }
+    };
+
+    fetchOrderForDetails();
   };
 
   // Close order details
   const closeOrderDetails = () => {
+    setShowOrderDetails(false);
     setSelectedOrder(null);
   };
 
@@ -214,6 +244,7 @@ export default function ProcessingPage({ isAdmin }: ProcessingPageProps) {
         description: "Order has been moved to completed orders with all files preserved.",
       });
 
+      setShowOrderDetails(false);
       setSelectedOrder(null);
       console.log('Order successfully marked as completed');
       
@@ -250,6 +281,7 @@ export default function ProcessingPage({ isAdmin }: ProcessingPageProps) {
 
       // Close dialog if the deleted order was being viewed
       if (selectedOrder && selectedOrder.id === orderId) {
+        setShowOrderDetails(false);
         setSelectedOrder(null);
       }
 
@@ -398,112 +430,18 @@ export default function ProcessingPage({ isAdmin }: ProcessingPageProps) {
         </div>
       </div>
 
-      {/* Order Details Dialog */}
-      <Dialog open={!!selectedOrder} onOpenChange={closeOrderDetails}>
-        {selectedOrder && (
-          <DialogContent className="max-w-3xl">
-            <DialogHeader>
-              <DialogTitle>
-                <div className="flex items-center gap-2">
-                  Order #{selectedOrder.orderNumber} Details
-                  {isAdmin && (
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          className="text-red-600 hover:text-red-700 ml-auto"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Delete Order</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Are you sure you want to delete order {selectedOrder.orderNumber}? This action cannot be undone and will remove the order from all systems.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction 
-                            onClick={() => deleteOrder(selectedOrder.id, selectedOrder.orderNumber)}
-                            className="bg-red-600 hover:bg-red-700"
-                          >
-                            Delete
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  )}
-                </div>
-              </DialogTitle>
-            </DialogHeader>
-            
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm text-gray-500">Company</p>
-                  <p>{selectedOrder.companyName}</p>
-                </div>
-                <div>
-                  <div className="space-y-1">
-                    <div>
-                      <p className="text-sm text-gray-500">Order Date</p>
-                      <p>{format(selectedOrder.orderDate, 'MMM d, yyyy')}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-500">Status</p>
-                      <Badge variant="outline" className="bg-blue-100 text-blue-800">
-                        Processing
-                      </Badge>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              <div>
-                <h3 className="font-medium mb-2">Items</h3>
-                <div className="border rounded-md divide-y">
-                  {selectedOrder.items.map((item) => (
-                    <div key={item.id} className="p-3">
-                      <div className="flex justify-between">
-                        <div>
-                          <p>{item.name}</p>
-                          <p className="text-sm text-gray-500">
-                            Quantity: {item.quantity}
-                            {item.delivered ? ` (Delivered: ${item.delivered})` : ''}
-                          </p>
-                        </div>
-                        <div className="text-green-600 text-sm">
-                          {item.completed ? 'Completed' : 'Pending'}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="flex justify-between pt-4">
-                <Button 
-                  variant="outline"
-                  onClick={() => openFilesDialog(selectedOrder)}
-                >
-                  <FileText className="h-4 w-4 mr-2" />
-                  Manage Files
-                </Button>
-                {isAdmin && (
-                  <Button 
-                    onClick={() => markOrderCompleted(selectedOrder.id)}
-                  >
-                    Mark as Completed
-                  </Button>
-                )}
-              </div>
-            </div>
-          </DialogContent>
-        )}
-      </Dialog>
+      {/* Order Details Dialog - Using the same component as OrdersPage */}
+      {selectedOrder && (
+        <OrderDetailsDialog
+          open={showOrderDetails}
+          onOpenChange={closeOrderDetails}
+          orderNumber={selectedOrder.order_number}
+          companyName={selectedOrder.companyName}
+          status={selectedOrder.status}
+          createdAt={selectedOrder.created_at}
+          items={selectedOrder.items}
+        />
+      )}
 
       {/* Files Dialog */}
       <ProcessingOrderFilesDialog
