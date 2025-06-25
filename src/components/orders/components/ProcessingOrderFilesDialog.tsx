@@ -76,7 +76,21 @@ export default function ProcessingOrderFilesDialog({
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setFiles(data || []);
+      
+      // Transform the data to match our OrderFile interface
+      const transformedFiles: OrderFile[] = (data || []).map(file => ({
+        id: file.id,
+        file_name: file.file_name,
+        file_url: file.file_url,
+        file_type: file.file_type as 'quote' | 'purchase-order' | 'invoice',
+        uploaded_by_role: file.uploaded_by_role as 'admin' | 'client',
+        uploaded_by_user_id: file.uploaded_by_user_id,
+        file_size: file.file_size || undefined,
+        mime_type: file.mime_type || undefined,
+        created_at: file.created_at
+      }));
+      
+      setFiles(transformedFiles);
     } catch (error) {
       console.error('Error fetching order files:', error);
       toast({
@@ -155,12 +169,10 @@ export default function ProcessingOrderFilesDialog({
     document.body.removeChild(link);
   };
 
-  // View file (open in new tab)
   const handleFileView = (file: OrderFile) => {
     window.open(file.file_url, '_blank');
   };
 
-  // Print file
   const handleFilePrint = (file: OrderFile) => {
     const printWindow = window.open(file.file_url, '_blank');
     if (printWindow) {
@@ -170,7 +182,6 @@ export default function ProcessingOrderFilesDialog({
     }
   };
 
-  // Delete file
   const handleFileDelete = async (file: OrderFile) => {
     if (!user?.id || file.uploaded_by_user_id !== user.id) return;
 
@@ -212,7 +223,6 @@ export default function ProcessingOrderFilesDialog({
     return files.filter(file => file.file_type === type);
   };
 
-  // Check if user can upload this file type
   const canUpload = (fileType: string) => {
     if (isAdmin) {
       return fileType === 'quote' || fileType === 'invoice';
@@ -221,7 +231,6 @@ export default function ProcessingOrderFilesDialog({
     }
   };
 
-  // Check if user can delete this file
   const canDelete = (file: OrderFile) => {
     return file.uploaded_by_user_id === user?.id;
   };
@@ -401,7 +410,6 @@ export default function ProcessingOrderFilesDialog({
             </div>
           </TabsContent>
 
-          {/* Invoice Tab */}
           <TabsContent value="invoice" className="space-y-4">
             <div className="flex justify-between items-center">
               <h3 className="text-lg font-medium">Invoice Files</h3>

@@ -60,7 +60,7 @@ export default function CompletedPage({ isAdmin }: CompletedPageProps) {
   const [showFilesDialog, setShowFilesDialog] = useState(false);
   const [filesDialogOrder, setFilesDialogOrder] = useState<Order | null>(null);
 
-  // Fetch completed orders from database
+  // Fetch completed orders from database with company information
   const fetchCompletedOrders = async () => {
     if (!user?.id) return;
 
@@ -68,7 +68,13 @@ export default function CompletedPage({ isAdmin }: CompletedPageProps) {
       console.log('Fetching completed orders from Supabase...');
       let query = supabase
         .from('orders')
-        .select('*')
+        .select(`
+          *,
+          companies (
+            name,
+            code
+          )
+        `)
         .eq('status', 'completed')
         .order('completed_date', { ascending: false });
 
@@ -90,7 +96,7 @@ export default function CompletedPage({ isAdmin }: CompletedPageProps) {
       const transformedOrders = (data || []).map(order => ({
         id: order.id,
         orderNumber: order.order_number,
-        companyName: order.company_name || "Unknown Company",
+        companyName: order.companies?.name || "Unknown Company",
         orderDate: new Date(order.created_at),
         dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from creation
         completedDate: order.completed_date ? new Date(order.completed_date) : new Date(),
@@ -190,18 +196,15 @@ export default function CompletedPage({ isAdmin }: CompletedPageProps) {
     setSelectedOrder(order);
   };
 
-  // Close order details
   const closeOrderDetails = () => {
     setSelectedOrder(null);
   };
 
-  // Open files dialog
   const openFilesDialog = (order: Order) => {
     setFilesDialogOrder(order);
     setShowFilesDialog(true);
   };
 
-  // Close files dialog
   const closeFilesDialog = () => {
     setShowFilesDialog(false);
     setFilesDialogOrder(null);
@@ -367,7 +370,6 @@ export default function CompletedPage({ isAdmin }: CompletedPageProps) {
         )}
       </Dialog>
 
-      {/* Files Dialog */}
       <ProcessingOrderFilesDialog
         order={filesDialogOrder}
         isOpen={showFilesDialog}
