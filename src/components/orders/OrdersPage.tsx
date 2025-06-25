@@ -1,267 +1,27 @@
-import { useState, useEffect } from "react";
-import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
+
+import { useState } from "react";
 import OrdersHeader from "./components/OrdersHeader";
 import OrderTable from "./components/OrderTable";
-import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import CreateOrderDialog from "./components/CreateOrderDialog";
+import { useOrderData } from "./hooks/useOrderData";
 
 interface OrdersPageProps {
   isAdmin?: boolean;
 }
 
-interface Order {
-  id: string;
-  order_number: string;
-  description: string | null;
-  status: string | null;
-  total_amount: number | null;
-  created_at: string;
-  company_id: string | null;
-  user_id: string | null;
-}
-
-interface Company {
-  id: string;
-  name: string;
-  code: string;
-}
-
-interface Profile {
-  id: string;
-  full_name: string;
-  email: string;
-  company_id: string;
-}
-
 export default function OrdersPage({ isAdmin = false }: OrdersPageProps) {
-  const { toast } = useToast();
-  const { user } = useAuth();
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [companies, setCompanies] = useState<Company[]>([]);
-  const [profiles, setProfiles] = useState<Profile[]>([]);
-  const [userProfile, setUserProfile] = useState<any>(null);
-  const [newOrder, setNewOrder] = useState({
-    order_number: '',
-    description: '',
-    total_amount: '',
-    company_id: '',
-    user_id: ''
-  });
-
-  useEffect(() => {
-    fetchOrders();
-    fetchUserProfile(); // Fetch user profile for client users
-    if (isAdmin) {
-      fetchCompanies();
-      fetchProfiles();
-    }
-  }, [isAdmin, user]);
-
-  const fetchUserProfile = async () => {
-    if (!user?.id) return;
-    
-    try {
-      console.log("Fetching user profile for order creation:", user.id);
-      
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .maybeSingle();
-      
-      if (error) {
-        console.error('Error fetching user profile:', error);
-        return;
-      }
-      
-      console.log("User profile fetched for orders:", data);
-      setUserProfile(data);
-    } catch (error) {
-      console.error('Unexpected error fetching user profile:', error);
-    }
-  };
-
-  const fetchOrders = async () => {
-    try {
-      console.log("Fetching orders...");
-      
-      // Build the query - for admins, fetch all orders; for users, fetch only their own
-      let query = supabase.from('orders').select('*').order('created_at', { ascending: false });
-      
-      // If not admin, only fetch orders for the current user
-      if (!isAdmin && user?.id) {
-        query = query.eq('user_id', user.id);
-      }
-
-      const { data, error } = await query;
-
-      if (error) {
-        console.error("Orders fetch error:", error);
-        throw error;
-      }
-      
-      console.log("Orders fetched successfully:", data);
-      setOrders(data || []);
-    } catch (error: any) {
-      console.error("Failed to fetch orders:", error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch orders. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchCompanies = async () => {
-    try {
-      console.log("Fetching companies...");
-      const { data, error } = await supabase
-        .from('companies')
-        .select('id, name, code')
-        .order('name');
-
-      if (error) {
-        console.error("Companies fetch error:", error);
-        throw error;
-      }
-      
-      console.log("Companies fetched successfully:", data);
-      setCompanies(data || []);
-    } catch (error: any) {
-      console.error('Error fetching companies:', error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch companies. Please try again.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const fetchProfiles = async () => {
-    try {
-      console.log("Fetching profiles...");
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, full_name, email, company_id')
-        .order('full_name');
-
-      if (error) {
-        console.error("Profiles fetch error:", error);
-        throw error;
-      }
-      
-      console.log("Profiles fetched successfully:", data);
-      setProfiles(data || []);
-    } catch (error: any) {
-      console.error('Error fetching profiles:', error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch user profiles. Please try again.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const generateOrderNumber = () => {
-    const date = new Date();
-    const year = date.getFullYear();
-    const month = (date.getMonth() + 1).toString().padStart(2, '0');
-    const day = date.getDate().toString().padStart(2, '0');
-    const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-    return `ORD-${year}${month}${day}-${random}`;
-  };
-
-  const createOrder = async () => {
-    if (!newOrder.order_number || !newOrder.description) {
-      toast({
-        title: "Error",
-        description: "Please fill in all required fields.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      console.log("Creating order...");
-      
-      // For client users, automatically use their company_id from their profile
-      let orderCompanyId = null;
-      if (isAdmin) {
-        orderCompanyId = newOrder.company_id || null;
-      } else {
-        // Client user - use their company_id from profile
-        orderCompanyId = userProfile?.company_id || null;
-      }
-      
-      const orderData = {
-        order_number: newOrder.order_number,
-        description: newOrder.description,
-        total_amount: newOrder.total_amount ? parseFloat(newOrder.total_amount) : null,
-        status: 'pending',
-        company_id: orderCompanyId,
-        user_id: isAdmin ? (newOrder.user_id || user?.id) : user?.id
-      };
-
-      console.log("Order data:", orderData);
-
-      const { error } = await supabase
-        .from('orders')
-        .insert([orderData]);
-
-      if (error) {
-        console.error("Order creation error:", error);
-        throw error;
-      }
-
-      console.log("Order created successfully");
-
-      toast({
-        title: "Order Created",
-        description: `Order ${newOrder.order_number} has been created successfully.`,
-      });
-
-      setShowCreateDialog(false);
-      setNewOrder({
-        order_number: '',
-        description: '',
-        total_amount: '',
-        company_id: '',
-        user_id: ''
-      });
-      fetchOrders();
-    } catch (error: any) {
-      console.error("Failed to create order:", error);
-      toast({
-        title: "Error",
-        description: "Failed to create order. Please try again.",
-        variant: "destructive",
-      });
-    }
-  };
+  const {
+    orders,
+    setOrders,
+    loading,
+    companies,
+    profiles,
+    userProfile,
+    fetchOrders,
+    toast,
+    user
+  } = useOrderData(isAdmin);
 
   const deleteOrder = async (orderId: string, orderNumber: string) => {
     try {
@@ -287,7 +47,7 @@ export default function OrdersPage({ isAdmin = false }: OrdersPageProps) {
     }
   };
 
-  const receiveOrder = async (order: Order) => {
+  const receiveOrder = async (order: any) => {
     try {
       const { error } = await supabase
         .from('orders')
@@ -345,10 +105,6 @@ export default function OrdersPage({ isAdmin = false }: OrdersPageProps) {
     order.status?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const getCompanyProfiles = (companyId: string) => {
-    return profiles.filter(profile => profile.company_id === companyId);
-  };
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -361,125 +117,13 @@ export default function OrdersPage({ isAdmin = false }: OrdersPageProps) {
     <div className="container mx-auto p-6">
       <div className="flex justify-between items-center mb-6">
         <OrdersHeader searchTerm={searchTerm} onSearchChange={setSearchTerm} />
-        <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Create Order
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>Create New Order</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="order_number">Order Number</Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="order_number"
-                    value={newOrder.order_number}
-                    onChange={(e) => setNewOrder({ ...newOrder, order_number: e.target.value })}
-                    placeholder="Enter order number"
-                  />
-                  <Button 
-                    type="button" 
-                    variant="outline"
-                    onClick={() => setNewOrder({ ...newOrder, order_number: generateOrderNumber() })}
-                  >
-                    Generate
-                  </Button>
-                </div>
-              </div>
-
-              <div>
-                <Label htmlFor="description">Description *</Label>
-                <Textarea
-                  id="description"
-                  value={newOrder.description}
-                  onChange={(e) => setNewOrder({ ...newOrder, description: e.target.value })}
-                  placeholder="Enter order description"
-                  required
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="total_amount">Total Amount</Label>
-                <Input
-                  id="total_amount"
-                  type="number"
-                  step="0.01"
-                  value={newOrder.total_amount}
-                  onChange={(e) => setNewOrder({ ...newOrder, total_amount: e.target.value })}
-                  placeholder="Enter total amount"
-                />
-              </div>
-
-              {/* Only show company selection for admin users */}
-              {isAdmin && (
-                <>
-                  <div>
-                    <Label htmlFor="company">Company</Label>
-                    <Select
-                      value={newOrder.company_id}
-                      onValueChange={(value) => setNewOrder({ ...newOrder, company_id: value, user_id: '' })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select company (optional)" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {companies.map((company) => (
-                          <SelectItem key={company.id} value={company.id}>
-                            {company.name} ({company.code})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {newOrder.company_id && (
-                    <div>
-                      <Label htmlFor="user">Client User</Label>
-                      <Select
-                        value={newOrder.user_id}
-                        onValueChange={(value) => setNewOrder({ ...newOrder, user_id: value })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select client user (optional)" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {getCompanyProfiles(newOrder.company_id).map((profile) => (
-                            <SelectItem key={profile.id} value={profile.id}>
-                              {profile.full_name} ({profile.email})
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
-                </>
-              )}
-
-              {/* Show company info for client users */}
-              {!isAdmin && userProfile && (
-                <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-md">
-                  <p className="text-sm text-gray-600 dark:text-gray-300">
-                    This order will be created for your company.
-                  </p>
-                </div>
-              )}
-
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={createOrder}>
-                  Create Order
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <CreateOrderDialog
+          isAdmin={isAdmin}
+          companies={companies}
+          profiles={profiles}
+          userProfile={userProfile}
+          onOrderCreated={fetchOrders}
+        />
       </div>
       
       <OrderTable 
