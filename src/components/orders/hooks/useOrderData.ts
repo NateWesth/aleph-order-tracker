@@ -62,14 +62,19 @@ export const useOrderData = (isAdmin: boolean) => {
   };
 
   const fetchOrders = async () => {
+    if (!user?.id) {
+      console.log("No user ID available for fetching orders");
+      setLoading(false);
+      return;
+    }
+
     try {
-      console.log("Fetching orders...");
+      console.log("Fetching orders for user:", user.id, "isAdmin:", isAdmin);
       
-      // Build the query - for admins, fetch all orders; for users, fetch only their own
       let query = supabase.from('orders').select('*').order('created_at', { ascending: false });
       
-      // If not admin, only fetch orders for the current user
-      if (!isAdmin && user?.id) {
+      // For non-admin users, only fetch their own orders
+      if (!isAdmin) {
         query = query.eq('user_id', user.id);
       }
 
@@ -95,6 +100,11 @@ export const useOrderData = (isAdmin: boolean) => {
   };
 
   const fetchCompanies = async () => {
+    if (!user?.id) {
+      console.log("No user ID available for fetching companies");
+      return;
+    }
+
     try {
       console.log("Fetching companies...");
       const { data, error } = await supabase
@@ -120,6 +130,11 @@ export const useOrderData = (isAdmin: boolean) => {
   };
 
   const fetchProfiles = async () => {
+    if (!user?.id) {
+      console.log("No user ID available for fetching profiles");
+      return;
+    }
+
     try {
       console.log("Fetching profiles...");
       const { data, error } = await supabase
@@ -145,13 +160,15 @@ export const useOrderData = (isAdmin: boolean) => {
   };
 
   useEffect(() => {
-    fetchOrders();
-    fetchUserProfile();
-    if (isAdmin) {
-      fetchCompanies();
-      fetchProfiles();
+    if (user?.id) {
+      fetchOrders();
+      fetchUserProfile();
+      if (isAdmin) {
+        fetchCompanies();
+        fetchProfiles();
+      }
     }
-  }, [isAdmin, user]);
+  }, [isAdmin, user?.id]);
 
   return {
     orders,
