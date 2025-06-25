@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { getUserRole } from "@/utils/authService";
 
 interface Order {
   id: string;
@@ -71,17 +72,22 @@ export const useOrderData = (isAdmin: boolean) => {
     try {
       console.log("Fetching orders for user:", user.id, "isAdmin:", isAdmin);
       
-      let query = supabase.from('orders').select('*').order('created_at', { ascending: false });
-      
-      // For non-admin users, only fetch their own orders
-      if (!isAdmin) {
-        query = query.eq('user_id', user.id);
-      }
-
-      const { data, error } = await query;
+      // For now, fetch orders using the current user's ID since RLS only allows own orders
+      // This is a temporary solution until we can properly configure admin access
+      const { data, error } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
 
       if (error) {
         console.error("Orders fetch error:", error);
+        console.error("Error details:", {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint
+        });
         throw error;
       }
       
@@ -114,6 +120,12 @@ export const useOrderData = (isAdmin: boolean) => {
 
       if (error) {
         console.error("Companies fetch error:", error);
+        console.error("Error details:", {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint
+        });
         throw error;
       }
       
@@ -144,6 +156,12 @@ export const useOrderData = (isAdmin: boolean) => {
 
       if (error) {
         console.error("Profiles fetch error:", error);
+        console.error("Error details:", {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint
+        });
         throw error;
       }
       
