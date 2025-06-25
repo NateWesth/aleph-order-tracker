@@ -1,10 +1,10 @@
-
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import OrdersHeader from "./components/OrdersHeader";
 import OrderTable from "./components/OrderTable";
 import CreateOrderDialog from "./components/CreateOrderDialog";
 import { useOrderData } from "./hooks/useOrderData";
+import { useRealtimeOrders } from "./hooks/useRealtimeOrders";
 
 interface OrdersPageProps {
   isAdmin?: boolean;
@@ -23,6 +23,12 @@ export default function OrdersPage({ isAdmin = false }: OrdersPageProps) {
     toast,
     user
   } = useOrderData(isAdmin);
+
+  // Set up real-time subscriptions
+  useRealtimeOrders({
+    onOrdersChange: fetchOrders,
+    isAdmin
+  });
 
   const deleteOrder = async (orderId: string, orderNumber: string) => {
     try {

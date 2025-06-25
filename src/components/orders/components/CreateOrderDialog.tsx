@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -57,7 +56,7 @@ export default function CreateOrderDialog({
     }
 
     try {
-      console.log("Creating order...");
+      console.log("Creating order with real-time updates...");
       
       // For client users, automatically use their company_id from their profile
       let orderCompanyId = null;
@@ -76,14 +75,15 @@ export default function CreateOrderDialog({
       const orderData = {
         order_number: newOrder.order_number,
         description: itemsDescription,
-        total_amount: null, // Remove price/amount field
+        total_amount: null,
         status: 'pending',
         company_id: orderCompanyId,
         user_id: isAdmin ? (newOrder.user_id || user?.id) : user?.id
       };
 
-      console.log("Order data:", orderData);
+      console.log("Order data for real-time insert:", orderData);
 
+      // Insert the order - this will trigger real-time updates automatically
       const { error } = await supabase
         .from('orders')
         .insert([orderData]);
@@ -93,7 +93,7 @@ export default function CreateOrderDialog({
         throw error;
       }
 
-      console.log("Order created successfully");
+      console.log("Order created successfully - real-time updates should be triggered");
 
       toast({
         title: "Order Created",
@@ -107,6 +107,8 @@ export default function CreateOrderDialog({
         company_id: '',
         user_id: ''
       });
+      
+      // Call the callback to refresh local state
       onOrderCreated();
     } catch (error: any) {
       console.error("Failed to create order:", error);
