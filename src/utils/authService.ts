@@ -71,3 +71,84 @@ export const isUserAdmin = async (userId: string): Promise<boolean> => {
   const role = await getUserRole(userId);
   return role === 'admin';
 };
+
+// Add the missing functions that LoginForm.tsx needs
+export const signInUser = async (email: string, password: string) => {
+  console.log("Attempting to sign in user with email:", email);
+  
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
+
+  if (error) {
+    console.error("Sign in error:", error);
+    throw error;
+  }
+
+  if (!data.user) {
+    throw new Error("No user data returned from sign in");
+  }
+
+  console.log("User signed in successfully:", data.user.id);
+  return data;
+};
+
+export const validateUserRole = (actualRole: 'admin' | 'user', expectedUserType: string) => {
+  console.log("Validating user role - actual:", actualRole, "expected:", expectedUserType);
+  
+  if (expectedUserType === "admin" && actualRole !== "admin") {
+    throw new Error("Access denied. Admin privileges required.");
+  }
+  
+  if (expectedUserType === "client" && actualRole === "admin") {
+    throw new Error("Admin users cannot log in as clients. Please use the admin login.");
+  }
+  
+  console.log("Role validation passed");
+};
+
+export const validateCompanyAssociation = async (userId: string, accessCode: string, userType: string) => {
+  if (userType !== "client") {
+    return; // Only validate for client users
+  }
+  
+  console.log("Validating company association for user:", userId, "with code:", accessCode);
+  
+  // Get user profile to check company association
+  const profile = await getUserProfile(userId);
+  
+  if (!profile) {
+    throw new Error("Unable to verify user profile. Please try again.");
+  }
+  
+  // Check if user's company code matches the provided access code
+  if (profile.company_code !== accessCode) {
+    throw new Error("Your account is not associated with the provided company code. Please contact your administrator.");
+  }
+  
+  console.log("Company association validated successfully");
+};
+
+export const getErrorMessage = (error: any): string => {
+  console.log("Processing error message for:", error);
+  
+  if (error?.message) {
+    // Handle specific Supabase auth errors
+    if (error.message.includes('Invalid login credentials')) {
+      return 'Invalid email or password. Please check your credentials and try again.';
+    }
+    
+    if (error.message.includes('Email not confirmed')) {
+      return 'Please check your email and click the confirmation link before signing in.';
+    }
+    
+    if (error.message.includes('Too many requests')) {
+      return 'Too many login attempts. Please wait a moment and try again.';
+    }
+    
+    return error.message;
+  }
+  
+  return 'An unexpected error occurred. Please try again.';
+};
