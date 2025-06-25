@@ -8,13 +8,19 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { format, startOfMonth, parseISO, isValid } from "date-fns";
-import { File, Search, ChevronDown, ChevronRight } from "lucide-react";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { Badge } from "@/components/ui/badge";
+import { format, startOfMonth, endOfMonth, isSameMonth } from "date-fns";
+import { Eye, ChevronDown, ChevronRight, FileText, Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useGlobalRealtimeOrders } from "./hooks/useGlobalRealtimeOrders";
+import ProcessingOrderFilesDialog from "./components/ProcessingOrderFilesDialog";
 
-// Define the order item interface
 interface OrderItem {
   id: string;
   name: string;
@@ -23,31 +29,25 @@ interface OrderItem {
   completed: boolean;
 }
 
-// Define the order file interface
-interface OrderFile {
-  id: string;
-  name: string;
-  url: string;
-  type: 'invoice' | 'quote' | 'purchase-order' | 'proof-of-payment';
-  uploadedBy: 'admin' | 'client';
-  uploadDate: Date;
-}
-
-// Define the order interface
 interface Order {
   id: string;
   orderNumber: string;
   companyName: string;
   orderDate: Date;
   dueDate: Date;
-  items: OrderItem[];
-  files: OrderFile[];
-  status: 'pending' | 'received' | 'in-progress' | 'processing' | 'completed';
   completedDate?: Date;
+  items: OrderItem[];
+  status: 'completed';
 }
 
 interface CompletedPageProps {
   isAdmin: boolean;
+}
+
+interface MonthGroup {
+  month: string;
+  orders: Order[];
+  isOpen: boolean;
 }
 
 export default function CompletedPage({ isAdmin }: CompletedPageProps) {
@@ -56,19 +56,21 @@ export default function CompletedPage({ isAdmin }: CompletedPageProps) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [supabaseOrders, setSupabaseOrders] = useState<any[]>([]);
-  const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set());
+  const [monthGroups, setMonthGroups] = useState<MonthGroup[]>([]);
+  const [showFilesDialog, setShowFilesDialog] = useState(false);
+  const [filesDialogOrder, setFilesDialogOrder] = useState<Order | null>(null);
 
-  // Fetch orders from database
-  const fetchSupabaseOrders = async () => {
+  // Fetch completed orders from database
+  const fetchCompletedOrders = async () => {
     if (!user?.id) return;
 
     try {
+      console.log('Fetching completed orders from Supabase...');
       let query = supabase
         .from('orders')
         .select('*')
         .eq('status', 'completed')
-        .order('created_at', { ascending: false });
+        .order('completed_date', { ascending: false });
 
       // If user is admin, fetch all orders; otherwise, fetch only user's orders
       if (!isAdmin) {
@@ -82,7 +84,29 @@ export default function CompletedPage({ isAdmin }: CompletedPageProps) {
         return;
       }
 
-      setSupabaseOrders(data || []);
+      console.log('Fetched completed orders:', data?.length || 0);
+      
+      // Transform database orders to match UI format
+      const transformedOrders = (data || []).map(order => ({
+        id: order.id,
+        orderNumber: order.order_number,
+        companyName: order.company_name || "Unknown Company",
+        orderDate: new Date(order.created_at),
+        dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from creation
+        completedDate: order.completed_date ? new Date(order.completed_date) : new Date(),
+        status: 'completed' as const,
+        items: [
+          {
+            id: "1",
+            name: order.description || "Order items",
+            quantity: 1,
+            delivered: 1,
+            completed: true
+          }
+        ]
+      }));
+
+      setOrders(transformedOrders);
     } catch (error) {
       console.error("Failed to fetch completed orders:", error);
     }
@@ -90,12 +114,17 @@ export default function CompletedPage({ isAdmin }: CompletedPageProps) {
 
   // Set up real-time subscriptions
   useGlobalRealtimeOrders({
-    onOrdersChange: fetchSupabaseOrders,
+    onOrdersChange: () => {
+      console.log('Real-time update detected, refreshing completed orders...');
+      fetchCompletedOrders();
+    },
     isAdmin,
     pageType: 'completed'
   });
 
+  // Load orders from localStorage and database on component mount
   useEffect(() => {
+    console.log('Loading completed orders...');
     const storedCompletedOrders = JSON.parse(localStorage.getItem('completedOrders') || '[]');
     
     // Filter orders based on admin status
@@ -105,9 +134,56 @@ export default function CompletedPage({ isAdmin }: CompletedPageProps) {
       filteredOrders = storedCompletedOrders.filter((order: any) => order.userId === user.id);
     }
     
+    console.log('Loaded completed orders from localStorage:', filteredOrders.length);
     setOrders(filteredOrders);
-    fetchSupabaseOrders();
+    fetchCompletedOrders();
   }, [isAdmin, user?.id]);
+
+  // Group orders by completion month
+  useEffect(() => {
+    const filteredOrders = orders.filter(order => 
+      order.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      order.companyName.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    // Group orders by completion month
+    const monthMap = new Map<string, Order[]>();
+    
+    filteredOrders.forEach(order => {
+      const completionDate = order.completedDate || order.orderDate;
+      const monthKey = format(completionDate, 'MMMM yyyy');
+      
+      if (!monthMap.has(monthKey)) {
+        monthMap.set(monthKey, []);
+      }
+      monthMap.get(monthKey)!.push(order);
+    });
+
+    // Convert to array and sort by month (newest first)
+    const groups: MonthGroup[] = Array.from(monthMap.entries())
+      .map(([month, orders]) => ({
+        month,
+        orders: orders.sort((a, b) => 
+          (b.completedDate || b.orderDate).getTime() - (a.completedDate || a.orderDate).getTime()
+        ),
+        isOpen: true // Default to open
+      }))
+      .sort((a, b) => {
+        // Sort by month (newest first)
+        const dateA = new Date(a.month);
+        const dateB = new Date(b.month);
+        return dateB.getTime() - dateA.getTime();
+      });
+
+    setMonthGroups(groups);
+  }, [orders, searchTerm]);
+
+  // Toggle month group
+  const toggleMonthGroup = (monthIndex: number) => {
+    setMonthGroups(prev => prev.map((group, index) => 
+      index === monthIndex ? { ...group, isOpen: !group.isOpen } : group
+    ));
+  };
 
   // View order details
   const viewOrderDetails = (order: Order) => {
@@ -119,82 +195,16 @@ export default function CompletedPage({ isAdmin }: CompletedPageProps) {
     setSelectedOrder(null);
   };
 
-  // Handle file action (download or print)
-  const handleFileAction = (file: OrderFile, action: 'download' | 'print') => {
-    toast({
-      title: action === 'download' ? "Downloading File" : "Printing File",
-      description: `${action === 'download' ? 'Downloading' : 'Printing'} ${file.name}...`,
-    });
-    
-    if (action === 'download') {
-      window.open(file.url, '_blank');
-    } else {
-      const printWindow = window.open(file.url, '_blank');
-      printWindow?.addEventListener('load', () => {
-        printWindow.print();
-      });
-    }
+  // Open files dialog
+  const openFilesDialog = (order: Order) => {
+    setFilesDialogOrder(order);
+    setShowFilesDialog(true);
   };
 
-  // Filter orders based on search term
-  const filteredOrders = orders
-    .filter(order => order.status === 'completed')
-    .filter(order => 
-      order.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.companyName.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-
-  // Group orders by month
-  const ordersByMonth = filteredOrders.reduce((acc, order) => {
-    let completedDate;
-    
-    // Handle different date formats
-    if (order.completedDate) {
-      if (order.completedDate instanceof Date) {
-        completedDate = order.completedDate;
-      } else if (typeof order.completedDate === 'string') {
-        completedDate = parseISO(order.completedDate);
-        if (!isValid(completedDate)) {
-          completedDate = new Date(order.completedDate);
-        }
-      }
-    }
-    
-    // Fallback to order date if no completed date
-    if (!completedDate || !isValid(completedDate)) {
-      if (order.orderDate instanceof Date) {
-        completedDate = order.orderDate;
-      } else {
-        completedDate = new Date(order.orderDate);
-      }
-    }
-    
-    const monthKey = format(startOfMonth(completedDate), 'yyyy-MM');
-    const monthLabel = format(startOfMonth(completedDate), 'MMMM yyyy');
-    
-    if (!acc[monthKey]) {
-      acc[monthKey] = {
-        label: monthLabel,
-        orders: []
-      };
-    }
-    
-    acc[monthKey].orders.push(order);
-    return acc;
-  }, {} as Record<string, { label: string; orders: Order[] }>);
-
-  // Sort months in descending order (most recent first)
-  const sortedMonths = Object.entries(ordersByMonth).sort(([a], [b]) => b.localeCompare(a));
-
-  // Toggle month expansion
-  const toggleMonth = (monthKey: string) => {
-    const newExpanded = new Set(expandedMonths);
-    if (newExpanded.has(monthKey)) {
-      newExpanded.delete(monthKey);
-    } else {
-      newExpanded.add(monthKey);
-    }
-    setExpandedMonths(newExpanded);
+  // Close files dialog
+  const closeFilesDialog = () => {
+    setShowFilesDialog(false);
+    setFilesDialogOrder(null);
   };
 
   return (
@@ -213,84 +223,79 @@ export default function CompletedPage({ isAdmin }: CompletedPageProps) {
         </div>
       </div>
 
+      {/* Real-time Status Indicator */}
+      <div className="mb-4 p-2 bg-green-50 rounded-md border border-green-200">
+        <p className="text-sm text-green-800">
+          ✅ Real-time updates enabled - Completed orders sync automatically
+        </p>
+      </div>
+
       {/* Completed Orders by Month */}
-      <div className="bg-white rounded-lg shadow">
-        <div className="p-4 border-b">
-          <h2 className="text-lg font-semibold">Completed Orders by Month</h2>
-        </div>
-        
-        {sortedMonths.length === 0 ? (
-          <div className="p-4 text-center text-gray-500">
+      <div className="space-y-4">
+        {monthGroups.length === 0 && (
+          <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
             No completed orders found.
           </div>
-        ) : (
-          <div className="divide-y">
-            {sortedMonths.map(([monthKey, monthData]) => (
-              <div key={monthKey}>
-                {/* Month Header */}
-                <div 
-                  className="p-4 bg-gray-50 cursor-pointer hover:bg-gray-100 flex items-center justify-between"
-                  onClick={() => toggleMonth(monthKey)}
-                >
-                  <div className="flex items-center">
-                    {expandedMonths.has(monthKey) ? (
-                      <ChevronDown className="h-5 w-5 mr-2" />
+        )}
+
+        {monthGroups.map((monthGroup, monthIndex) => (
+          <div key={monthGroup.month} className="bg-white rounded-lg shadow">
+            <Collapsible open={monthGroup.isOpen} onOpenChange={() => toggleMonthGroup(monthIndex)}>
+              <CollapsibleTrigger asChild>
+                <div className="p-4 border-b cursor-pointer hover:bg-gray-50 flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    {monthGroup.isOpen ? (
+                      <ChevronDown className="h-4 w-4" />
                     ) : (
-                      <ChevronRight className="h-5 w-5 mr-2" />
+                      <ChevronRight className="h-4 w-4" />
                     )}
-                    <h3 className="font-medium text-lg">{monthData.label}</h3>
-                    <span className="ml-2 text-sm text-gray-600">
-                      ({monthData.orders.length} order{monthData.orders.length !== 1 ? 's' : ''})
-                    </span>
+                    <h2 className="text-lg font-semibold">{monthGroup.month}</h2>
+                    <Badge variant="outline">{monthGroup.orders.length} orders</Badge>
                   </div>
                 </div>
-                
-                {/* Month Orders */}
-                {expandedMonths.has(monthKey) && (
-                  <div className="divide-y">
-                    {monthData.orders.map(order => (
-                      <div 
-                        key={order.id} 
-                        className="p-4 hover:bg-gray-50 cursor-pointer ml-8"
-                        onClick={() => viewOrderDetails(order)}
-                      >
-                        <div className="flex justify-between items-center">
-                          <div>
-                            <h3 className="font-medium">Order #{order.orderNumber}</h3>
-                            <p className="text-sm text-gray-600">{order.companyName}</p>
-                            <div className="flex space-x-4 text-xs text-gray-500 mt-1">
-                              <span>Ordered: {format(order.orderDate, 'MMM d, yyyy')}</span>
-                              {order.completedDate && (
-                                <span>Completed: {format(new Date(order.completedDate), 'MMM d, yyyy')}</span>
-                              )}
-                            </div>
-                          </div>
-                          <div className="flex items-center">
-                            {order.files && order.files.length > 0 && (
-                              <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded mr-2">
-                                {order.files.length} Files
-                              </span>
-                            )}
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                viewOrderDetails(order);
-                              }}
-                            >
-                              View Details
-                            </Button>
-                          </div>
+              </CollapsibleTrigger>
+              
+              <CollapsibleContent>
+                <div className="divide-y">
+                  {monthGroup.orders.map(order => (
+                    <div key={order.id} className="p-4 hover:bg-gray-50">
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <h3 className="font-medium">Order #{order.orderNumber}</h3>
+                          <p className="text-sm text-gray-600">{order.companyName}</p>
+                          <p className="text-sm text-gray-600">
+                            Completed: {format(order.completedDate || order.orderDate, 'MMM d, yyyy')}
+                          </p>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Badge variant="outline" className="bg-green-100 text-green-800">
+                            Completed
+                          </Badge>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => openFilesDialog(order)}
+                          >
+                            <FileText className="h-4 w-4 mr-2" />
+                            Files
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => viewOrderDetails(order)}
+                          >
+                            <Eye className="h-4 w-4 mr-2" />
+                            View Details
+                          </Button>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ))}
+                    </div>
+                  ))}
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
           </div>
-        )}
+        ))}
       </div>
 
       {/* Order Details Dialog */}
@@ -301,136 +306,74 @@ export default function CompletedPage({ isAdmin }: CompletedPageProps) {
               <DialogTitle>Order #{selectedOrder.orderNumber} Details</DialogTitle>
             </DialogHeader>
             
-            <div className="space-y-6">
+            <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-gray-500">Company</p>
                   <p>{selectedOrder.companyName}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500">Order Date</p>
-                  <p>{format(selectedOrder.orderDate, 'MMM d, yyyy')}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500">Completed Date</p>
-                  <p>
-                    {selectedOrder.completedDate 
-                      ? format(new Date(selectedOrder.completedDate), 'MMM d, yyyy')
-                      : 'N/A'}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500">Status</p>
-                  <p className="text-green-600 font-medium">Completed</p>
+                  <div className="space-y-1">
+                    <div>
+                      <p className="text-sm text-gray-500">Order Date</p>
+                      <p>{format(selectedOrder.orderDate, 'MMM d, yyyy')}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500">Completed Date</p>
+                      <p>{format(selectedOrder.completedDate || selectedOrder.orderDate, 'MMM d, yyyy')}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500">Status</p>
+                      <Badge variant="outline" className="bg-green-100 text-green-800">
+                        Completed
+                      </Badge>
+                    </div>
+                  </div>
                 </div>
               </div>
               
               <div>
-                <h3 className="font-medium mb-2">Order Items</h3>
+                <h3 className="font-medium mb-2">Items Delivered</h3>
                 <div className="border rounded-md divide-y">
                   {selectedOrder.items.map((item) => (
                     <div key={item.id} className="p-3">
                       <div className="flex justify-between">
                         <div>
-                          <p>{item.name}</p>
+                          <p className="font-medium">{item.name}</p>
                           <p className="text-sm text-gray-500">
-                            Quantity: {item.quantity}
-                            {item.delivered ? ` (Delivered: ${item.delivered})` : ''}
+                            Quantity: {item.quantity} | Delivered: {item.delivered || item.quantity}
                           </p>
                         </div>
-                        <div className="text-green-600 text-sm">Completed</div>
+                        <div className="text-green-600 text-sm font-medium">
+                          ✓ Completed
+                        </div>
                       </div>
                     </div>
                   ))}
                 </div>
               </div>
 
-              <div>
-                <h3 className="font-medium mb-2">Documents</h3>
-                {(!selectedOrder.files || selectedOrder.files.length === 0) ? (
-                  <div className="text-center p-6 border rounded-md border-dashed">
-                    <p className="text-gray-500">No documents available.</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {/* Admin Documents */}
-                    <div>
-                      <h4 className="text-sm font-medium text-gray-500 mb-2">Admin Documents</h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        {selectedOrder.files
-                          .filter(file => file.uploadedBy === 'admin')
-                          .map(file => (
-                            <div key={file.id} className="border rounded-md p-3 flex justify-between items-center">
-                              <div className="flex items-center">
-                                <File className="h-5 w-5 mr-2 text-blue-500" />
-                                <div>
-                                  <p className="text-sm font-medium truncate max-w-[200px]">{file.name}</p>
-                                  <p className="text-xs text-gray-500 capitalize">{file.type.replace('-', ' ')}</p>
-                                </div>
-                              </div>
-                              <div className="flex space-x-2">
-                                <Button 
-                                  variant="ghost" 
-                                  size="sm"
-                                  onClick={() => handleFileAction(file, 'download')}
-                                >
-                                  Download
-                                </Button>
-                                <Button 
-                                  variant="ghost" 
-                                  size="sm"
-                                  onClick={() => handleFileAction(file, 'print')}
-                                >
-                                  Print
-                                </Button>
-                              </div>
-                            </div>
-                          ))}
-                      </div>
-                    </div>
-
-                    {/* Client Documents */}
-                    <div>
-                      <h4 className="text-sm font-medium text-gray-500 mb-2">Client Documents</h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        {selectedOrder.files
-                          .filter(file => file.uploadedBy === 'client')
-                          .map(file => (
-                            <div key={file.id} className="border rounded-md p-3 flex justify-between items-center">
-                              <div className="flex items-center">
-                                <File className="h-5 w-5 mr-2 text-green-500" />
-                                <div>
-                                  <p className="text-sm font-medium truncate max-w-[200px]">{file.name}</p>
-                                  <p className="text-xs text-gray-500 capitalize">{file.type.replace('-', ' ')}</p>
-                                </div>
-                              </div>
-                              <div className="flex space-x-2">
-                                <Button 
-                                  variant="ghost" 
-                                  size="sm"
-                                  onClick={() => handleFileAction(file, 'download')}
-                                >
-                                  Download
-                                </Button>
-                                <Button 
-                                  variant="ghost" 
-                                  size="sm"
-                                  onClick={() => handleFileAction(file, 'print')}
-                                >
-                                  Print
-                                </Button>
-                              </div>
-                            </div>
-                          ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
+              <div className="flex justify-end pt-4">
+                <Button 
+                  variant="outline"
+                  onClick={() => openFilesDialog(selectedOrder)}
+                >
+                  <FileText className="h-4 w-4 mr-2" />
+                  View All Files
+                </Button>
               </div>
             </div>
           </DialogContent>
         )}
       </Dialog>
+
+      {/* Files Dialog */}
+      <ProcessingOrderFilesDialog
+        order={filesDialogOrder}
+        isOpen={showFilesDialog}
+        onClose={closeFilesDialog}
+        isAdmin={isAdmin}
+      />
     </div>
   );
 }

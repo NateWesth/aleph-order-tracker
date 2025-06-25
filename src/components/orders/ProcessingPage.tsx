@@ -20,10 +20,11 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { format, startOfMonth, endOfMonth, isSameMonth } from "date-fns";
-import { Eye, Package, CheckCircle, Search, Trash2 } from "lucide-react";
+import { Eye, Package, CheckCircle, Search, Trash2, FileText } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useGlobalRealtimeOrders } from "./hooks/useGlobalRealtimeOrders";
+import ProcessingOrderFilesDialog from "./components/ProcessingOrderFilesDialog";
 
 // Define the order item interface
 interface OrderItem {
@@ -67,6 +68,8 @@ export default function ProcessingPage({ isAdmin }: ProcessingPageProps) {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [supabaseOrders, setSupabaseOrders] = useState<any[]>([]);
+  const [showFilesDialog, setShowFilesDialog] = useState(false);
+  const [filesDialogOrder, setFilesDialogOrder] = useState<Order | null>(null);
 
   // Fetch orders from database
   const fetchSupabaseOrders = async () => {
@@ -144,6 +147,18 @@ export default function ProcessingPage({ isAdmin }: ProcessingPageProps) {
     setSelectedOrder(null);
   };
 
+  // Open files dialog
+  const openFilesDialog = (order: Order) => {
+    setFilesDialogOrder(order);
+    setShowFilesDialog(true);
+  };
+
+  // Close files dialog
+  const closeFilesDialog = () => {
+    setShowFilesDialog(false);
+    setFilesDialogOrder(null);
+  };
+
   // Mark order as fully completed and move to completed orders
   const markOrderCompleted = async (orderId: string) => {
     if (!isAdmin) return;
@@ -153,10 +168,13 @@ export default function ProcessingPage({ isAdmin }: ProcessingPageProps) {
 
     try {
       console.log('Marking order as completed:', orderId);
-      // Update order status in database to 'completed'
+      // Update order status in database to 'completed' with completion date
       const { error } = await supabase
         .from('orders')
-        .update({ status: 'completed' })
+        .update({ 
+          status: 'completed',
+          completed_date: new Date().toISOString()
+        })
         .eq('id', orderId);
 
       if (error) throw error;
@@ -180,7 +198,7 @@ export default function ProcessingPage({ isAdmin }: ProcessingPageProps) {
 
       toast({
         title: "Order Completed",
-        description: "Order has been moved to completed orders.",
+        description: "Order has been moved to completed orders with all files preserved.",
       });
 
       setSelectedOrder(null);
@@ -277,7 +295,7 @@ export default function ProcessingPage({ isAdmin }: ProcessingPageProps) {
       {/* Real-time Status Indicator */}
       <div className="mb-4 p-2 bg-blue-50 rounded-md border border-blue-200">
         <p className="text-sm text-blue-800">
-          🔄 Real-time updates enabled - Changes will appear automatically
+          🔄 Real-time updates enabled - Changes will appear automatically across all users
         </p>
       </div>
 
@@ -296,8 +314,7 @@ export default function ProcessingPage({ isAdmin }: ProcessingPageProps) {
           {filteredOrders.map(order => (
             <div 
               key={order.id} 
-              className="p-4 hover:bg-gray-50 cursor-pointer"
-              onClick={() => viewOrderDetails(order)}
+              className="p-4 hover:bg-gray-50"
             >
               <div className="flex justify-between items-center">
                 <div>
@@ -310,7 +327,6 @@ export default function ProcessingPage({ isAdmin }: ProcessingPageProps) {
                             variant="ghost" 
                             size="sm"
                             className="text-red-600 hover:text-red-700"
-                            onClick={(e) => e.stopPropagation()}
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -344,6 +360,22 @@ export default function ProcessingPage({ isAdmin }: ProcessingPageProps) {
                   <Badge variant="outline" className="bg-blue-100 text-blue-800">
                     Processing
                   </Badge>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => openFilesDialog(order)}
+                  >
+                    <FileText className="h-4 w-4 mr-2" />
+                    Files
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => viewOrderDetails(order)}
+                  >
+                    <Eye className="h-4 w-4 mr-2" />
+                    View Details
+                  </Button>
                   {isAdmin && (
                     <Button 
                       variant="outline" 
@@ -449,19 +481,34 @@ export default function ProcessingPage({ isAdmin }: ProcessingPageProps) {
                 </div>
               </div>
 
-              {isAdmin && (
-                <div className="flex justify-end pt-4">
+              <div className="flex justify-between pt-4">
+                <Button 
+                  variant="outline"
+                  onClick={() => openFilesDialog(selectedOrder)}
+                >
+                  <FileText className="h-4 w-4 mr-2" />
+                  Manage Files
+                </Button>
+                {isAdmin && (
                   <Button 
                     onClick={() => markOrderCompleted(selectedOrder.id)}
                   >
                     Mark as Completed
                   </Button>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           </DialogContent>
         )}
       </Dialog>
+
+      {/* Files Dialog */}
+      <ProcessingOrderFilesDialog
+        order={filesDialogOrder}
+        isOpen={showFilesDialog}
+        onClose={closeFilesDialog}
+        isAdmin={isAdmin}
+      />
     </div>
   );
 }

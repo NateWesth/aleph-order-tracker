@@ -69,9 +69,52 @@ export type Database = {
         }
         Relationships: []
       }
+      order_files: {
+        Row: {
+          created_at: string
+          file_name: string
+          file_size: number | null
+          file_type: string
+          file_url: string
+          id: string
+          mime_type: string | null
+          order_id: string
+          updated_at: string
+          uploaded_by_role: string
+          uploaded_by_user_id: string
+        }
+        Insert: {
+          created_at?: string
+          file_name: string
+          file_size?: number | null
+          file_type: string
+          file_url: string
+          id?: string
+          mime_type?: string | null
+          order_id: string
+          updated_at?: string
+          uploaded_by_role: string
+          uploaded_by_user_id: string
+        }
+        Update: {
+          created_at?: string
+          file_name?: string
+          file_size?: number | null
+          file_type?: string
+          file_url?: string
+          id?: string
+          mime_type?: string | null
+          order_id?: string
+          updated_at?: string
+          uploaded_by_role?: string
+          uploaded_by_user_id?: string
+        }
+        Relationships: []
+      }
       orders: {
         Row: {
           company_id: string | null
+          completed_date: string | null
           created_at: string | null
           description: string | null
           id: string
@@ -83,6 +126,7 @@ export type Database = {
         }
         Insert: {
           company_id?: string | null
+          completed_date?: string | null
           created_at?: string | null
           description?: string | null
           id?: string
@@ -94,6 +138,7 @@ export type Database = {
         }
         Update: {
           company_id?: string | null
+          completed_date?: string | null
           created_at?: string | null
           description?: string | null
           id?: string
