@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -139,6 +140,22 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [supabaseOrders, setSupabaseOrders] = useState<any[]>([]);
 
+  // Helper function to get proper progress stage based on status
+  const getProgressStage = (status: string): 'awaiting-stock' | 'packing' | 'out-for-delivery' | 'completed' => {
+    switch (status) {
+      case 'received':
+        return 'awaiting-stock';
+      case 'in-progress':
+        return 'packing';
+      case 'processing':
+        return 'out-for-delivery';
+      case 'completed':
+        return 'completed';
+      default:
+        return 'awaiting-stock';
+    }
+  };
+
   // Fetch orders from database and sync with localStorage
   const fetchSupabaseOrders = async () => {
     if (!user?.id) return;
@@ -176,7 +193,7 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
           dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
           status: dbOrder.status,
           progress: dbOrder.status === 'received' ? 25 : dbOrder.status === 'in-progress' ? 50 : 0,
-          progressStage: dbOrder.status === 'received' ? 'awaiting-stock' : 'packing',
+          progressStage: getProgressStage(dbOrder.status),
           items: [
             {
               id: "1",
@@ -237,7 +254,7 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
       if (order.id === orderId) {
         const updatedOrder = { 
           ...order, 
-          progressStage: stage as any, 
+          progressStage: stage as 'awaiting-stock' | 'packing' | 'out-for-delivery' | 'completed', 
           progress: stageInfo.value 
         };
         
