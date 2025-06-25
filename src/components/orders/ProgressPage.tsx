@@ -139,12 +139,12 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [supabaseOrders, setSupabaseOrders] = useState<any[]>([]);
 
-  // Fetch orders from database
+  // Fetch orders from database and sync with localStorage
   const fetchSupabaseOrders = async () => {
     if (!user?.id) return;
 
     try {
-      console.log('Fetching progress orders from Supabase...');
+      console.log('Fetching received and in-progress orders from Supabase...');
       let query = supabase
         .from('orders')
         .select('*')
@@ -163,47 +163,60 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
         return;
       }
 
-      console.log('Fetched progress orders:', data?.length || 0);
+      console.log('Fetched orders from database:', data?.length || 0);
       setSupabaseOrders(data || []);
+
+      // Convert database orders to local format and sync with localStorage
+      if (data && data.length > 0) {
+        const convertedOrders = data.map((dbOrder: any) => ({
+          id: dbOrder.id,
+          orderNumber: dbOrder.order_number,
+          companyName: "Company Name", // You'll need to fetch company name separately
+          orderDate: new Date(dbOrder.created_at),
+          dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+          status: dbOrder.status,
+          progress: dbOrder.status === 'received' ? 25 : dbOrder.status === 'in-progress' ? 50 : 0,
+          progressStage: dbOrder.status === 'received' ? 'awaiting-stock' : 'packing',
+          items: [
+            {
+              id: "1",
+              name: dbOrder.description || "Order items",
+              quantity: 1,
+              delivered: 0,
+              completed: false
+            }
+          ]
+        }));
+
+        console.log('Converted orders for progress page:', convertedOrders.length);
+        setOrders(convertedOrders);
+        
+        // Update localStorage
+        localStorage.setItem('progressOrders', JSON.stringify(convertedOrders));
+      } else {
+        setOrders([]);
+        localStorage.setItem('progressOrders', JSON.stringify([]));
+      }
     } catch (error) {
       console.error("Failed to fetch progress orders:", error);
     }
   };
 
-  // Set up real-time subscriptions
+  // Set up real-time subscriptions with enhanced refresh
   useGlobalRealtimeOrders({
     onOrdersChange: () => {
-      console.log('Real-time update detected, refreshing progress orders...');
+      console.log('Real-time update detected for progress page, refreshing...');
       fetchSupabaseOrders();
     },
     isAdmin,
     pageType: 'progress'
   });
 
-  // Load orders from localStorage on component mount
+  // Load orders from database on component mount
   useEffect(() => {
-    console.log('Loading progress orders from localStorage...');
-    const storedProgressOrders = JSON.parse(localStorage.getItem('progressOrders') || '[]');
-    
-    // Filter orders based on admin status
-    let filteredOrders = storedProgressOrders;
-    if (!isAdmin && user?.id) {
-      // For non-admin users, only show their own orders
-      filteredOrders = storedProgressOrders.filter((order: any) => order.userId === user.id);
-    }
-    
-    console.log('Loaded progress orders from localStorage:', filteredOrders.length);
-    setOrders(filteredOrders);
+    console.log('Progress page mounted, fetching orders...');
     fetchSupabaseOrders();
   }, [isAdmin, user?.id]);
-
-  // Save orders to localStorage whenever orders change
-  useEffect(() => {
-    if (orders.length > 0) {
-      console.log('Saving progress orders to localStorage:', orders.length);
-      localStorage.setItem('progressOrders', JSON.stringify(orders));
-    }
-  }, [orders]);
 
   // Progress stages with corresponding percentage values
   const progressStages = [
@@ -500,109 +513,113 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
         </p>
       </div>
 
+      {/* Debug Information */}
+      <div className="mb-4 p-2 bg-gray-50 rounded-md border border-gray-200">
+        <p className="text-xs text-gray-600">
+          Debug: Found {orders.length} progress orders | Database orders: {supabaseOrders.length} | User: {user?.id ? 'Authenticated' : 'Not authenticated'} | Admin: {isAdmin ? 'Yes' : 'No'}
+        </p>
+      </div>
+
       {/* In-Progress Orders */}
       <div className="bg-white rounded-lg shadow">
         <div className="p-4 border-b">
           <h2 className="text-lg font-semibold">Orders In Progress</h2>
         </div>
         <div className="divide-y">
-          {orders.filter(order => 
-            order.status === 'received' || order.status === 'in-progress'
-          ).length === 0 && (
+          {orders.length === 0 && (
             <div className="p-4 text-center text-gray-500">
-              No orders in progress.
+              No orders in progress. Orders marked as "received" should appear here automatically.
             </div>
           )}
           
-          {orders
-            .filter(order => order.status === 'received' || order.status === 'in-progress')
-            .map(order => (
-              <div 
-                key={order.id} 
-                className="p-4 hover:bg-gray-50 cursor-pointer"
-                onClick={() => viewOrderDetails(order)}
-              >
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        {order.company?.logo && (
-                          <img 
-                            src={order.company.logo} 
-                            alt={`${order.companyName} logo`} 
-                            className="h-6 w-6 rounded object-cover" 
-                          />
-                        )}
-                        <h3 className="font-medium">Order #{order.orderNumber}</h3>
-                        {isAdmin && (
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button 
-                                variant="ghost" 
-                                size="sm"
-                                className="text-red-600 hover:text-red-700 ml-2"
-                                onClick={(e) => e.stopPropagation()}
+          {orders.map(order => (
+            <div 
+              key={order.id} 
+              className="p-4 hover:bg-gray-50 cursor-pointer"
+              onClick={() => viewOrderDetails(order)}
+            >
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      {order.company?.logo && (
+                        <img 
+                          src={order.company.logo} 
+                          alt={`${order.companyName} logo`} 
+                          className="h-6 w-6 rounded object-cover" 
+                        />
+                      )}
+                      <h3 className="font-medium">Order #{order.orderNumber}</h3>
+                      <Badge className="ml-2">{order.status}</Badge>
+                      {isAdmin && (
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              className="text-red-600 hover:text-red-700 ml-2"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Order</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to delete order {order.orderNumber}? This action cannot be undone and will remove the order from all systems.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction 
+                                onClick={() => deleteOrder(order.id, order.orderNumber)}
+                                className="bg-red-600 hover:bg-red-700"
                               >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Delete Order</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Are you sure you want to delete order {order.orderNumber}? This action cannot be undone and will remove the order from all systems.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction 
-                                  onClick={() => deleteOrder(order.id, order.orderNumber)}
-                                  className="bg-red-600 hover:bg-red-700"
-                                >
-                                  Delete
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        )}
-                      </div>
-                      <p className="text-sm text-gray-600">{order.companyName}</p>
-                      <p className="text-sm text-gray-600">
-                        Due: {format(order.dueDate, 'MMM d, yyyy')}
-                      </p>
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      )}
                     </div>
+                    <p className="text-sm text-gray-600">{order.companyName}</p>
+                    <p className="text-sm text-gray-600">
+                      Due: {format(order.dueDate, 'MMM d, yyyy')}
+                    </p>
                   </div>
-
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-sm">
-                      <span>Progress:</span>
-                      <span>
-                        {progressStages.find(s => s.id === order.progressStage)?.name || 'Not started'}
-                      </span>
-                    </div>
-                    <Progress value={order.progress || 0} className="h-2" />
-                  </div>
-
-                  {isAdmin && (
-                    <div className="flex justify-end space-x-2 pt-2">
-                      {progressStages.map((stage) => (
-                        <Button 
-                          key={stage.id} 
-                          variant={order.progressStage === stage.id ? "default" : "outline"}
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            updateProgressStage(order.id, stage.id);
-                          }}
-                        >
-                          {stage.name}
-                        </Button>
-                      ))}
-                    </div>
-                  )}
                 </div>
+
+                <div className="space-y-1">
+                  <div className="flex justify-between text-sm">
+                    <span>Progress:</span>
+                    <span>
+                      {progressStages.find(s => s.id === order.progressStage)?.name || 'Not started'}
+                    </span>
+                  </div>
+                  <Progress value={order.progress || 0} className="h-2" />
+                </div>
+
+                {isAdmin && (
+                  <div className="flex justify-end space-x-2 pt-2">
+                    {progressStages.map((stage) => (
+                      <Button 
+                        key={stage.id} 
+                        variant={order.progressStage === stage.id ? "default" : "outline"}
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          updateProgressStage(order.id, stage.id);
+                        }}
+                      >
+                        {stage.name}
+                      </Button>
+                    ))}
+                  </div>
+                )}
               </div>
-            ))}
+            </div>
+          ))}
         </div>
       </div>
 

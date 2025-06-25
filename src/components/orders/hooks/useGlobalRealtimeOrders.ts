@@ -56,12 +56,14 @@ export const useGlobalRealtimeOrders = ({
       }
       
       localStorage.setItem(storageKey, JSON.stringify(filteredOrders));
+      console.log(`Updated ${storageKey} with ${filteredOrders.length} orders`);
     };
 
     // Update localStorage based on status
     switch (newStatus) {
       case 'received':
       case 'in-progress':
+        console.log(`Moving order ${orderId} to progress page (status: ${newStatus})`);
         updateOrderInStorage('progressOrders', true);
         updateOrderInStorage('deliveryOrders', true);
         updateOrderInStorage('processingOrders', false);
@@ -69,6 +71,7 @@ export const useGlobalRealtimeOrders = ({
         break;
       
       case 'processing':
+        console.log(`Moving order ${orderId} to processing page`);
         updateOrderInStorage('progressOrders', false);
         updateOrderInStorage('deliveryOrders', false);
         updateOrderInStorage('processingOrders', true);
@@ -76,6 +79,7 @@ export const useGlobalRealtimeOrders = ({
         break;
       
       case 'completed':
+        console.log(`Moving order ${orderId} to completed/delivery pages`);
         updateOrderInStorage('progressOrders', false);
         updateOrderInStorage('deliveryOrders', false);
         updateOrderInStorage('processingOrders', false);
@@ -83,6 +87,7 @@ export const useGlobalRealtimeOrders = ({
         break;
       
       default:
+        console.log(`Order ${orderId} status is ${newStatus}, removing from progress-related storage`);
         // For pending status, remove from all progress-related storage
         updateOrderInStorage('progressOrders', false);
         updateOrderInStorage('deliveryOrders', false);
@@ -92,6 +97,7 @@ export const useGlobalRealtimeOrders = ({
     }
     
     // Trigger refresh for all pages
+    console.log(`Triggering data refresh for ${pageType} page`);
     onOrdersChange();
   }, [onOrdersChange, pageType]);
 
@@ -111,14 +117,16 @@ export const useGlobalRealtimeOrders = ({
   }, [toast, onOrdersChange, isAdmin, pageType]);
 
   const handleOrderUpdate = useCallback((payload: any) => {
-    console.log(`Order updated (${pageType}):`, payload.new);
+    console.log(`Order updated (${pageType}):`, payload.old, '->', payload.new);
     
     // Show notification for status changes and important updates
     const oldStatus = payload.old?.status;
     const newStatus = payload.new?.status;
     
     if (oldStatus !== newStatus) {
-      // Sync with localStorage
+      console.log(`Order status changed from ${oldStatus} to ${newStatus}`);
+      
+      // Sync with localStorage first
       syncLocalStorageWithDatabase(payload);
       
       if (isAdmin) {
@@ -147,6 +155,7 @@ export const useGlobalRealtimeOrders = ({
       }
     } else {
       // Just refresh data for other updates
+      console.log(`Order updated without status change, refreshing data`);
       onOrdersChange();
     }
   }, [toast, onOrdersChange, isAdmin, pageType, syncLocalStorageWithDatabase]);
@@ -160,6 +169,7 @@ export const useGlobalRealtimeOrders = ({
       const existingOrders = JSON.parse(localStorage.getItem(storageKey) || '[]');
       const filteredOrders = existingOrders.filter((order: any) => order.id !== orderId);
       localStorage.setItem(storageKey, JSON.stringify(filteredOrders));
+      console.log(`Removed order ${orderId} from ${storageKey}`);
     });
     
     // Show notification only for admins
