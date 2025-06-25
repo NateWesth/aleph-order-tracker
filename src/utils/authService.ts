@@ -22,12 +22,9 @@ export const getUserRole = async (userId: string) => {
   console.log("Fetching user role for:", userId);
 
   try {
-    // Query user_roles table directly with proper error handling
+    // Use the new security definer function to get user role safely
     const { data: roleData, error: roleError } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', userId)
-      .maybeSingle();
+      .rpc('get_user_role_safe', { user_uuid: userId });
 
     console.log("User role query result:", { roleData, roleError });
 
@@ -43,8 +40,8 @@ export const getUserRole = async (userId: string) => {
       return "user";
     }
 
-    console.log('User role found:', roleData.role);
-    return roleData.role;
+    console.log('User role found:', roleData);
+    return roleData;
   } catch (error) {
     console.error('Unexpected error in getUserRole:', error);
     // Always return a default role instead of throwing

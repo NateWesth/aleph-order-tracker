@@ -191,6 +191,10 @@ export type Database = {
         Args: { user_uuid: string }
         Returns: Database["public"]["Enums"]["app_role"]
       }
+      get_user_role_safe: {
+        Args: { user_uuid: string }
+        Returns: Database["public"]["Enums"]["app_role"]
+      }
       is_admin: {
         Args: Record<PropertyKey, never>
         Returns: boolean
