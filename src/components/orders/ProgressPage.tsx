@@ -3,6 +3,13 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { format } from "date-fns";
 import { Eye, Package, Truck, CheckCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -323,7 +330,7 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
   };
 
   // Mark order as complete and move to processing
-  const completeOrder = (orderId: string) => {
+  const completeOrder = async (orderId: string) => {
     if (!isAdmin) return;
 
     const orderToComplete = orders.find(order => order.id === orderId);
@@ -338,40 +345,57 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
       return;
     }
 
-    // Update all items to be fully delivered
-    const completedOrder = {
-      ...orderToComplete,
-      items: orderToComplete.items.map(item => ({
-        ...item,
-        completed: true,
-        delivered: item.quantity
-      })),
-      status: 'processing' as const,
-      progress: 100,
-      progressStage: 'completed' as const
-    };
+    try {
+      // Update order status in database to 'processing'
+      const { error } = await supabase
+        .from('orders')
+        .update({ status: 'processing' })
+        .eq('id', orderId);
 
-    // Remove from progress orders
-    const remainingOrders = orders.filter(order => order.id !== orderId);
-    setOrders(remainingOrders);
-    localStorage.setItem('progressOrders', JSON.stringify(remainingOrders));
+      if (error) throw error;
 
-    // Add to processing orders
-    const existingProcessingOrders = JSON.parse(localStorage.getItem('processingOrders') || '[]');
-    const updatedProcessingOrders = [...existingProcessingOrders, completedOrder];
-    localStorage.setItem('processingOrders', JSON.stringify(updatedProcessingOrders));
+      // Update all items to be fully delivered
+      const completedOrder = {
+        ...orderToComplete,
+        items: orderToComplete.items.map(item => ({
+          ...item,
+          completed: true,
+          delivered: item.quantity
+        })),
+        status: 'processing' as const,
+        progress: 100,
+        progressStage: 'completed' as const
+      };
 
-    // Also remove from delivery notes if exists
-    const existingDeliveryOrders = JSON.parse(localStorage.getItem('deliveryOrders') || '[]');
-    const updatedDeliveryOrders = existingDeliveryOrders.filter((order: Order) => order.id !== orderId);
-    localStorage.setItem('deliveryOrders', JSON.stringify(updatedDeliveryOrders));
+      // Remove from progress orders (localStorage)
+      const remainingOrders = orders.filter(order => order.id !== orderId);
+      setOrders(remainingOrders);
+      localStorage.setItem('progressOrders', JSON.stringify(remainingOrders));
 
-    toast({
-      title: "Order Completed",
-      description: "Order has been moved to processing with all items marked as delivered.",
-    });
+      // Add to processing orders (localStorage)
+      const existingProcessingOrders = JSON.parse(localStorage.getItem('processingOrders') || '[]');
+      const updatedProcessingOrders = [...existingProcessingOrders, completedOrder];
+      localStorage.setItem('processingOrders', JSON.stringify(updatedProcessingOrders));
 
-    setSelectedOrder(null);
+      // Also remove from delivery notes if exists
+      const existingDeliveryOrders = JSON.parse(localStorage.getItem('deliveryOrders') || '[]');
+      const updatedDeliveryOrders = existingDeliveryOrders.filter((order: Order) => order.id !== orderId);
+      localStorage.setItem('deliveryOrders', JSON.stringify(updatedDeliveryOrders));
+
+      toast({
+        title: "Order Completed",
+        description: "Order has been moved to processing with all items marked as delivered.",
+      });
+
+      setSelectedOrder(null);
+    } catch (error: any) {
+      console.error('Error completing order:', error);
+      toast({
+        title: "Error",
+        description: "Failed to complete order. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (

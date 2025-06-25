@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -7,8 +8,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { format } from "date-fns";
-import { File, Search } from "lucide-react";
+import { format, startOfMonth, parseISO, isValid } from "date-fns";
+import { File, Search, ChevronDown, ChevronRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useGlobalRealtimeOrders } from "./hooks/useGlobalRealtimeOrders";
@@ -56,6 +57,7 @@ export default function CompletedPage({ isAdmin }: CompletedPageProps) {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [supabaseOrders, setSupabaseOrders] = useState<any[]>([]);
+  const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set());
 
   // Fetch orders from database
   const fetchSupabaseOrders = async () => {
@@ -142,6 +144,59 @@ export default function CompletedPage({ isAdmin }: CompletedPageProps) {
       order.companyName.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
+  // Group orders by month
+  const ordersByMonth = filteredOrders.reduce((acc, order) => {
+    let completedDate;
+    
+    // Handle different date formats
+    if (order.completedDate) {
+      if (order.completedDate instanceof Date) {
+        completedDate = order.completedDate;
+      } else if (typeof order.completedDate === 'string') {
+        completedDate = parseISO(order.completedDate);
+        if (!isValid(completedDate)) {
+          completedDate = new Date(order.completedDate);
+        }
+      }
+    }
+    
+    // Fallback to order date if no completed date
+    if (!completedDate || !isValid(completedDate)) {
+      if (order.orderDate instanceof Date) {
+        completedDate = order.orderDate;
+      } else {
+        completedDate = new Date(order.orderDate);
+      }
+    }
+    
+    const monthKey = format(startOfMonth(completedDate), 'yyyy-MM');
+    const monthLabel = format(startOfMonth(completedDate), 'MMMM yyyy');
+    
+    if (!acc[monthKey]) {
+      acc[monthKey] = {
+        label: monthLabel,
+        orders: []
+      };
+    }
+    
+    acc[monthKey].orders.push(order);
+    return acc;
+  }, {} as Record<string, { label: string; orders: Order[] }>);
+
+  // Sort months in descending order (most recent first)
+  const sortedMonths = Object.entries(ordersByMonth).sort(([a], [b]) => b.localeCompare(a));
+
+  // Toggle month expansion
+  const toggleMonth = (monthKey: string) => {
+    const newExpanded = new Set(expandedMonths);
+    if (newExpanded.has(monthKey)) {
+      newExpanded.delete(monthKey);
+    } else {
+      newExpanded.add(monthKey);
+    }
+    setExpandedMonths(newExpanded);
+  };
+
   return (
     <div className="container mx-auto p-4">
       <div className="flex justify-between items-center mb-6">
@@ -158,56 +213,84 @@ export default function CompletedPage({ isAdmin }: CompletedPageProps) {
         </div>
       </div>
 
-      {/* Completed Orders */}
+      {/* Completed Orders by Month */}
       <div className="bg-white rounded-lg shadow">
         <div className="p-4 border-b">
-          <h2 className="text-lg font-semibold">Completed Orders</h2>
+          <h2 className="text-lg font-semibold">Completed Orders by Month</h2>
         </div>
-        <div className="divide-y">
-          {filteredOrders.length === 0 && (
-            <div className="p-4 text-center text-gray-500">
-              No completed orders found.
-            </div>
-          )}
-          
-          {filteredOrders.map(order => (
-            <div 
-              key={order.id} 
-              className="p-4 hover:bg-gray-50 cursor-pointer"
-              onClick={() => viewOrderDetails(order)}
-            >
-              <div className="flex justify-between items-center">
-                <div>
-                  <h3 className="font-medium">Order #{order.orderNumber}</h3>
-                  <p className="text-sm text-gray-600">{order.companyName}</p>
-                  <div className="flex space-x-4 text-xs text-gray-500 mt-1">
-                    <span>Ordered: {format(order.orderDate, 'MMM d, yyyy')}</span>
-                    {order.completedDate && (
-                      <span>Completed: {format(order.completedDate, 'MMM d, yyyy')}</span>
+        
+        {sortedMonths.length === 0 ? (
+          <div className="p-4 text-center text-gray-500">
+            No completed orders found.
+          </div>
+        ) : (
+          <div className="divide-y">
+            {sortedMonths.map(([monthKey, monthData]) => (
+              <div key={monthKey}>
+                {/* Month Header */}
+                <div 
+                  className="p-4 bg-gray-50 cursor-pointer hover:bg-gray-100 flex items-center justify-between"
+                  onClick={() => toggleMonth(monthKey)}
+                >
+                  <div className="flex items-center">
+                    {expandedMonths.has(monthKey) ? (
+                      <ChevronDown className="h-5 w-5 mr-2" />
+                    ) : (
+                      <ChevronRight className="h-5 w-5 mr-2" />
                     )}
+                    <h3 className="font-medium text-lg">{monthData.label}</h3>
+                    <span className="ml-2 text-sm text-gray-600">
+                      ({monthData.orders.length} order{monthData.orders.length !== 1 ? 's' : ''})
+                    </span>
                   </div>
                 </div>
-                <div className="flex items-center">
-                  {order.files && order.files.length > 0 && (
-                    <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded mr-2">
-                      {order.files.length} Files
-                    </span>
-                  )}
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      viewOrderDetails(order);
-                    }}
-                  >
-                    View Details
-                  </Button>
-                </div>
+                
+                {/* Month Orders */}
+                {expandedMonths.has(monthKey) && (
+                  <div className="divide-y">
+                    {monthData.orders.map(order => (
+                      <div 
+                        key={order.id} 
+                        className="p-4 hover:bg-gray-50 cursor-pointer ml-8"
+                        onClick={() => viewOrderDetails(order)}
+                      >
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <h3 className="font-medium">Order #{order.orderNumber}</h3>
+                            <p className="text-sm text-gray-600">{order.companyName}</p>
+                            <div className="flex space-x-4 text-xs text-gray-500 mt-1">
+                              <span>Ordered: {format(order.orderDate, 'MMM d, yyyy')}</span>
+                              {order.completedDate && (
+                                <span>Completed: {format(new Date(order.completedDate), 'MMM d, yyyy')}</span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center">
+                            {order.files && order.files.length > 0 && (
+                              <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded mr-2">
+                                {order.files.length} Files
+                              </span>
+                            )}
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                viewOrderDetails(order);
+                              }}
+                            >
+                              View Details
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Order Details Dialog */}
@@ -232,7 +315,7 @@ export default function CompletedPage({ isAdmin }: CompletedPageProps) {
                   <p className="text-sm text-gray-500">Completed Date</p>
                   <p>
                     {selectedOrder.completedDate 
-                      ? format(selectedOrder.completedDate, 'MMM d, yyyy')
+                      ? format(new Date(selectedOrder.completedDate), 'MMM d, yyyy')
                       : 'N/A'}
                   </p>
                 </div>
