@@ -1,5 +1,6 @@
 
 import { useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import OrdersHeader from "./components/OrdersHeader";
 import OrderTable from "./components/OrderTable";
 import CreateOrderDialog from "./components/CreateOrderDialog";
