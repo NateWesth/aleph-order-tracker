@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -14,7 +14,7 @@ import {
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
-  AlertDialogTitle,
+  AlertDialegTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import {
@@ -67,6 +67,7 @@ interface Order {
   progressStage?: 'awaiting-stock' | 'packing' | 'out-for-delivery' | 'completed';
   reference?: string;
   attention?: string;
+  description?: string;
 }
 
 interface ProgressOrderDetailsDialogProps {
@@ -97,8 +98,56 @@ export default function ProgressOrderDetailsDialog({
 }: ProgressOrderDetailsDialogProps) {
   const { toast } = useToast();
   const [savingItems, setSavingItems] = useState<Set<string>>(new Set());
+  const [parsedItems, setParsedItems] = useState<OrderItem[]>([]);
+
+  // Parse order items from description - same logic as other components
+  const parseOrderItems = (description: string | null) => {
+    if (!description) {
+      return [];
+    }
+
+    // Parse the description to extract items and quantities
+    // Format: "Item Name (Qty: 2)\nAnother Item (Qty: 1)"
+    const items = description.split('\n').map((line, index) => {
+      const match = line.match(/^(.+?)\s*\(Qty:\s*(\d+)\)$/);
+      if (match) {
+        return {
+          id: `item-${index}`,
+          name: match[1].trim(),
+          quantity: parseInt(match[2]),
+          delivered: 0,
+          completed: false
+        };
+      }
+      // Fallback for items without quantity format
+      return {
+        id: `item-${index}`,
+        name: line.trim(),
+        quantity: 1,
+        delivered: 0,
+        completed: false
+      };
+    }).filter(item => item.name);
+
+    return items;
+  };
+
+  // Parse items when order changes
+  useEffect(() => {
+    if (order?.description) {
+      const items = parseOrderItems(order.description);
+      setParsedItems(items);
+    } else if (order?.items) {
+      setParsedItems(order.items);
+    } else {
+      setParsedItems([]);
+    }
+  }, [order]);
 
   if (!order) return null;
+
+  // Use parsed items or fallback to order items
+  const itemsToDisplay = parsedItems.length > 0 ? parsedItems : (order.items || []);
 
   // Update progress stage and sync to database
   const updateProgressStage = async (stage: string) => {
@@ -171,10 +220,13 @@ export default function ProgressOrderDetailsDialog({
     setSavingItems(prev => new Set(prev).add(itemId));
 
     try {
-      // In a real implementation, you'd save item details to a separate order_items table
-      // For now, we'll update the order's metadata or use localStorage as backup
-      
-      const updatedItems = order.items.map(item => 
+      // Update the parsed items state
+      setParsedItems(prev => prev.map(item => 
+        item.id === itemId ? { ...item, delivered } : item
+      ));
+
+      // Update the order items
+      const updatedItems = itemsToDisplay.map(item => 
         item.id === itemId ? { ...item, delivered } : item
       );
 
@@ -207,13 +259,18 @@ export default function ProgressOrderDetailsDialog({
     setSavingItems(prev => new Set(prev).add(itemId));
 
     try {
-      const item = order.items.find(i => i.id === itemId);
+      const item = itemsToDisplay.find(i => i.id === itemId);
       if (!item) return;
 
       const completed = !item.completed;
       const delivered = completed ? item.quantity : 0;
 
-      const updatedItems = order.items.map(i => 
+      // Update the parsed items state
+      setParsedItems(prev => prev.map(i => 
+        i.id === itemId ? { ...i, completed, delivered } : i
+      ));
+
+      const updatedItems = itemsToDisplay.map(i => 
         i.id === itemId ? { ...i, completed, delivered } : i
       );
 
@@ -240,7 +297,7 @@ export default function ProgressOrderDetailsDialog({
   };
 
   const areAllItemsCompleted = () => {
-    return order.items.every(item => item.completed);
+    return itemsToDisplay.every(item => item.completed);
   };
 
   return (
@@ -344,59 +401,65 @@ export default function ProgressOrderDetailsDialog({
           {/* Items Table */}
           <div>
             <h3 className="font-medium mb-3">Order Items</h3>
-            <div className="border rounded-md">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Item Name</TableHead>
-                    <TableHead className="text-center">Quantity</TableHead>
-                    {isAdmin && <TableHead className="text-center">Delivered</TableHead>}
-                    {!isAdmin && <TableHead className="text-center">Delivered</TableHead>}
-                    <TableHead className="text-center">Status</TableHead>
-                    {isAdmin && <TableHead className="text-center">Complete</TableHead>}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {order.items.map((item) => (
-                    <TableRow key={item.id}>
-                      <TableCell className="font-medium">{item.name}</TableCell>
-                      <TableCell className="text-center">{item.quantity}</TableCell>
-                      <TableCell className="text-center">
-                        {isAdmin ? (
-                          <Input
-                            className="w-20 mx-auto"
-                            type="number"
-                            min="0"
-                            max={item.quantity}
-                            value={item.delivered || 0}
-                            onChange={(e) => updateItemDelivery(item.id, parseInt(e.target.value) || 0)}
-                            disabled={savingItems.has(item.id)}
-                          />
-                        ) : (
-                          <span>{item.delivered || 0}</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Badge variant={item.completed ? "default" : "secondary"}>
-                          {item.completed ? "Complete" : "Pending"}
-                        </Badge>
-                      </TableCell>
-                      {isAdmin && (
-                        <TableCell className="text-center">
-                          <input
-                            type="checkbox"
-                            checked={item.completed}
-                            onChange={() => toggleItemCompletion(item.id)}
-                            disabled={savingItems.has(item.id)}
-                            className="rounded border-gray-300 text-aleph-green focus:ring-aleph-green"
-                          />
-                        </TableCell>
-                      )}
+            {itemsToDisplay.length === 0 ? (
+              <div className="text-center p-6 border rounded-md border-dashed">
+                <p className="text-gray-500">No items found in this order.</p>
+              </div>
+            ) : (
+              <div className="border rounded-md">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Item Name</TableHead>
+                      <TableHead className="text-center">Quantity</TableHead>
+                      {isAdmin && <TableHead className="text-center">Delivered</TableHead>}
+                      {!isAdmin && <TableHead className="text-center">Delivered</TableHead>}
+                      <TableHead className="text-center">Status</TableHead>
+                      {isAdmin && <TableHead className="text-center">Complete</TableHead>}
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                  </TableHeader>
+                  <TableBody>
+                    {itemsToDisplay.map((item) => (
+                      <TableRow key={item.id}>
+                        <TableCell className="font-medium">{item.name}</TableCell>
+                        <TableCell className="text-center">{item.quantity}</TableCell>
+                        <TableCell className="text-center">
+                          {isAdmin ? (
+                            <Input
+                              className="w-20 mx-auto"
+                              type="number"
+                              min="0"
+                              max={item.quantity}
+                              value={item.delivered || 0}
+                              onChange={(e) => updateItemDelivery(item.id, parseInt(e.target.value) || 0)}
+                              disabled={savingItems.has(item.id)}
+                            />
+                          ) : (
+                            <span>{item.delivered || 0}</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant={item.completed ? "default" : "secondary"}>
+                            {item.completed ? "Complete" : "Pending"}
+                          </Badge>
+                        </TableCell>
+                        {isAdmin && (
+                          <TableCell className="text-center">
+                            <input
+                              type="checkbox"
+                              checked={item.completed}
+                              onChange={() => toggleItemCompletion(item.id)}
+                              disabled={savingItems.has(item.id)}
+                              className="rounded border-gray-300 text-aleph-green focus:ring-aleph-green"
+                            />
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
           </div>
 
           {/* Complete Order Button */}

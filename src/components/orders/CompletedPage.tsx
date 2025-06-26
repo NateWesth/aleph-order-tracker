@@ -20,13 +20,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useGlobalRealtimeOrders } from "./hooks/useGlobalRealtimeOrders";
 import ProcessingOrderFilesDialog from "./components/ProcessingOrderFilesDialog";
+import OrderDetailsDialog from "./components/OrderDetailsDialog";
 
 interface OrderItem {
-  id: string;
   name: string;
   quantity: number;
-  delivered?: number;
-  completed: boolean;
 }
 
 interface Order {
@@ -54,11 +52,38 @@ export default function CompletedPage({ isAdmin }: CompletedPageProps) {
   const { toast } = useToast();
   const { user } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [monthGroups, setMonthGroups] = useState<MonthGroup[]>([]);
   const [showFilesDialog, setShowFilesDialog] = useState(false);
   const [filesDialogOrder, setFilesDialogOrder] = useState<Order | null>(null);
+  const [showOrderDetails, setShowOrderDetails] = useState(false);
+
+  // Parse order items from description - same logic as other components
+  const parseOrderItems = (description: string | null) => {
+    if (!description) {
+      return [];
+    }
+
+    // Parse the description to extract items and quantities
+    // Format: "Item Name (Qty: 2)\nAnother Item (Qty: 1)"
+    const items = description.split('\n').map(line => {
+      const match = line.match(/^(.+?)\s*\(Qty:\s*(\d+)\)$/);
+      if (match) {
+        return {
+          name: match[1].trim(),
+          quantity: parseInt(match[2])
+        };
+      }
+      // Fallback for items without quantity format
+      return {
+        name: line.trim(),
+        quantity: 1
+      };
+    }).filter(item => item.name);
+
+    return items;
+  };
 
   // Fetch completed orders from database with company information
   const fetchCompletedOrders = async () => {
@@ -92,7 +117,7 @@ export default function CompletedPage({ isAdmin }: CompletedPageProps) {
 
       console.log('Fetched completed orders:', data?.length || 0);
       
-      // Transform database orders to match UI format
+      // Transform database orders to match UI format with properly parsed items
       const transformedOrders = (data || []).map(order => ({
         id: order.id,
         orderNumber: order.order_number,
@@ -101,15 +126,7 @@ export default function CompletedPage({ isAdmin }: CompletedPageProps) {
         dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from creation
         completedDate: order.completed_date ? new Date(order.completed_date) : new Date(),
         status: 'completed' as const,
-        items: [
-          {
-            id: "1",
-            name: order.description || "Order items",
-            quantity: 1,
-            delivered: 1,
-            completed: true
-          }
-        ]
+        items: parseOrderItems(order.description)
       }));
 
       setOrders(transformedOrders);
@@ -131,17 +148,6 @@ export default function CompletedPage({ isAdmin }: CompletedPageProps) {
   // Load orders from localStorage and database on component mount
   useEffect(() => {
     console.log('Loading completed orders...');
-    const storedCompletedOrders = JSON.parse(localStorage.getItem('completedOrders') || '[]');
-    
-    // Filter orders based on admin status
-    let filteredOrders = storedCompletedOrders;
-    if (!isAdmin && user?.id) {
-      // For non-admin users, only show their own orders
-      filteredOrders = storedCompletedOrders.filter((order: any) => order.userId === user.id);
-    }
-    
-    console.log('Loaded completed orders from localStorage:', filteredOrders.length);
-    setOrders(filteredOrders);
     fetchCompletedOrders();
   }, [isAdmin, user?.id]);
 
@@ -191,12 +197,44 @@ export default function CompletedPage({ isAdmin }: CompletedPageProps) {
     ));
   };
 
-  // View order details
+  // View order details - now properly parses items like other pages
   const viewOrderDetails = (order: Order) => {
-    setSelectedOrder(order);
+    // Find the original database order for the details dialog
+    const fetchOrderForDetails = async () => {
+      try {
+        const { data } = await supabase
+          .from('orders')
+          .select(`
+            *,
+            companies (
+              name,
+              code
+            )
+          `)
+          .eq('id', order.id)
+          .single();
+
+        if (data) {
+          // Parse the items from the description
+          const parsedItems = parseOrderItems(data.description);
+          
+          setSelectedOrder({
+            ...data,
+            companyName: data.companies?.name || "Unknown Company",
+            items: parsedItems
+          });
+          setShowOrderDetails(true);
+        }
+      } catch (error) {
+        console.error('Error fetching order details:', error);
+      }
+    };
+
+    fetchOrderForDetails();
   };
 
   const closeOrderDetails = () => {
+    setShowOrderDetails(false);
     setSelectedOrder(null);
   };
 
@@ -301,74 +339,18 @@ export default function CompletedPage({ isAdmin }: CompletedPageProps) {
         ))}
       </div>
 
-      {/* Order Details Dialog */}
-      <Dialog open={!!selectedOrder} onOpenChange={closeOrderDetails}>
-        {selectedOrder && (
-          <DialogContent className="max-w-3xl">
-            <DialogHeader>
-              <DialogTitle>Order #{selectedOrder.orderNumber} Details</DialogTitle>
-            </DialogHeader>
-            
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm text-gray-500">Company</p>
-                  <p>{selectedOrder.companyName}</p>
-                </div>
-                <div>
-                  <div className="space-y-1">
-                    <div>
-                      <p className="text-sm text-gray-500">Order Date</p>
-                      <p>{format(selectedOrder.orderDate, 'MMM d, yyyy')}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-500">Completed Date</p>
-                      <p>{format(selectedOrder.completedDate || selectedOrder.orderDate, 'MMM d, yyyy')}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-500">Status</p>
-                      <Badge variant="outline" className="bg-green-100 text-green-800">
-                        Completed
-                      </Badge>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              <div>
-                <h3 className="font-medium mb-2">Items Delivered</h3>
-                <div className="border rounded-md divide-y">
-                  {selectedOrder.items.map((item) => (
-                    <div key={item.id} className="p-3">
-                      <div className="flex justify-between">
-                        <div>
-                          <p className="font-medium">{item.name}</p>
-                          <p className="text-sm text-gray-500">
-                            Quantity: {item.quantity} | Delivered: {item.delivered || item.quantity}
-                          </p>
-                        </div>
-                        <div className="text-green-600 text-sm font-medium">
-                          ✓ Completed
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="flex justify-end pt-4">
-                <Button 
-                  variant="outline"
-                  onClick={() => openFilesDialog(selectedOrder)}
-                >
-                  <FileText className="h-4 w-4 mr-2" />
-                  View All Files
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        )}
-      </Dialog>
+      {/* Order Details Dialog - Using the same component as other pages with properly parsed items */}
+      {selectedOrder && (
+        <OrderDetailsDialog
+          open={showOrderDetails}
+          onOpenChange={closeOrderDetails}
+          orderNumber={selectedOrder.order_number}
+          companyName={selectedOrder.companyName}
+          status={selectedOrder.status}
+          createdAt={selectedOrder.created_at}
+          items={selectedOrder.items}
+        />
+      )}
 
       <ProcessingOrderFilesDialog
         order={filesDialogOrder}
