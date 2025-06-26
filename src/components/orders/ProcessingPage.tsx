@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -163,7 +162,33 @@ export default function ProcessingPage({ isAdmin }: ProcessingPageProps) {
     }
   }, [orders]);
 
-  // View order details - now uses the same format as OrdersPage
+  // Parse order items from description - same logic as OrderRow component
+  const parseOrderItems = (description: string | null) => {
+    if (!description) {
+      return [];
+    }
+
+    // Parse the description to extract items and quantities
+    // Format: "Item Name (Qty: 2)\nAnother Item (Qty: 1)"
+    const items = description.split('\n').map(line => {
+      const match = line.match(/^(.+?)\s*\(Qty:\s*(\d+)\)$/);
+      if (match) {
+        return {
+          name: match[1].trim(),
+          quantity: parseInt(match[2])
+        };
+      }
+      // Fallback for items without quantity format
+      return {
+        name: line.trim(),
+        quantity: 1
+      };
+    }).filter(item => item.name);
+
+    return items;
+  };
+
+  // View order details - now properly parses items like OrdersPage
   const viewOrderDetails = (order: Order) => {
     // Find the original database order for the details dialog
     const fetchOrderForDetails = async () => {
@@ -181,15 +206,13 @@ export default function ProcessingPage({ isAdmin }: ProcessingPageProps) {
           .single();
 
         if (data) {
+          // Parse the items from the description
+          const parsedItems = parseOrderItems(data.description);
+          
           setSelectedOrder({
             ...data,
             companyName: data.companies?.name || "Unknown Company",
-            items: [
-              {
-                name: data.description || "Order items",
-                quantity: 1
-              }
-            ]
+            items: parsedItems
           });
           setShowOrderDetails(true);
         }
@@ -430,7 +453,7 @@ export default function ProcessingPage({ isAdmin }: ProcessingPageProps) {
         </div>
       </div>
 
-      {/* Order Details Dialog - Using the same component as OrdersPage */}
+      {/* Order Details Dialog - Using the same component as OrdersPage with properly parsed items */}
       {selectedOrder && (
         <OrderDetailsDialog
           open={showOrderDetails}
