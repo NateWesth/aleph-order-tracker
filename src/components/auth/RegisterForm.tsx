@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -102,8 +101,8 @@ const RegisterForm = () => {
         
         const { data: company, error: companyError } = await supabase
           .from('companies')
-          .select('id, code')
-          .eq('code', formData.companyCode)
+          .select('id, code, name')
+          .eq('code', formData.companyCode.trim())
           .maybeSingle();
 
         console.log("Company validation result:", { company, companyError });
@@ -126,6 +125,8 @@ const RegisterForm = () => {
           });
           return;
         }
+
+        console.log("Company found:", company.name, "with code:", company.code);
       } catch (error) {
         console.error("Network error during company validation:", error);
         toast({
@@ -143,14 +144,14 @@ const RegisterForm = () => {
       console.log("Attempting to sign up user with email:", formData.email);
       console.log("User type selected:", formData.userType);
       
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
         options: {
           emailRedirectTo: `${window.location.origin}/auth`,
           data: {
             full_name: formData.fullName,
-            company_code: formData.userType === "user" ? formData.companyCode : null,
+            company_code: formData.userType === "user" ? formData.companyCode.trim() : null,
             phone: formData.phone,
             position: formData.position,
             user_type: formData.userType // This will be "admin" or "user" - matches our trigger expectations
@@ -164,6 +165,7 @@ const RegisterForm = () => {
       }
 
       console.log("User signed up successfully with user_type:", formData.userType);
+      console.log("Sign up response:", data);
       
       toast({
         title: "Success",
@@ -269,10 +271,13 @@ const RegisterForm = () => {
             type="text"
             value={formData.companyCode}
             onChange={(e) => setFormData({...formData, companyCode: e.target.value})}
-            placeholder="Enter your company code"
+            placeholder="Enter your company code (e.g., TR1BET)"
             required
             className="dark:bg-gray-700 dark:border-gray-600"
           />
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            Enter the company code provided by your administrator
+          </p>
         </div>
       )}
 
