@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { getUserRole } from "@/utils/authService";
 
 interface Company {
   id: string;
@@ -22,6 +23,18 @@ export function useCompanyData() {
   const { user } = useAuth();
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
+  const [userRole, setUserRole] = useState<'admin' | 'user'>('user');
+
+  const fetchUserRole = async () => {
+    if (!user?.id) return;
+
+    try {
+      const role = await getUserRole(user.id);
+      setUserRole(role);
+    } catch (error) {
+      console.error("Error fetching user role:", error);
+    }
+  };
 
   const fetchCompanies = async () => {
     if (!user?.id) {
@@ -59,15 +72,34 @@ export function useCompanyData() {
 
   useEffect(() => {
     if (user?.id) {
-      fetchCompanies();
+      fetchUserRole();
     }
   }, [user?.id]);
+
+  useEffect(() => {
+    if (user?.id && userRole === 'admin') {
+      fetchCompanies();
+    } else {
+      setLoading(false);
+    }
+  }, [user?.id, userRole]);
+
+  const getCompanyByCode = (code: string) => {
+    return companies.find(company => company.code === code);
+  };
+
+  const getCompanyById = (id: string) => {
+    return companies.find(company => company.id === id);
+  };
 
   return {
     companies,
     setCompanies,
     loading,
     fetchCompanies,
+    getCompanyByCode,
+    getCompanyById,
+    userRole,
     toast
   };
 }

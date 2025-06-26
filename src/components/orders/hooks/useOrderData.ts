@@ -1,63 +1,57 @@
+
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { getUserRole } from "@/utils/authService";
+import { getUserRole, getUserProfile } from "@/utils/authService";
 
-interface Order {
-  id: string;
-  order_number: string;
-  description: string | null;
-  status: string | null;
-  total_amount: number | null;
-  created_at: string;
-  company_id: string | null;
-  user_id: string | null;
-}
-
-interface Company {
+export interface OrderItem {
   id: string;
   name: string;
-  code: string;
+  quantity: number;
+  delivered_quantity?: number;
+  unit?: string;
+  notes?: string;
 }
 
-interface Profile {
+export interface Order {
   id: string;
-  full_name: string;
-  email: string;
-  company_id: string;
+  order_number: string;
+  description?: string;
+  status: string;
+  progress_stage?: string;
+  total_amount?: number;
+  created_at: string;
+  updated_at: string;
+  completed_date?: string;
+  company_id?: string;
+  user_id?: string;
+  items?: OrderItem[];
 }
 
-export const useOrderData = (isAdmin: boolean) => {
+export function useOrderData() {
   const { toast } = useToast();
   const { user } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
-  const [companies, setCompanies] = useState<Company[]>([]);
-  const [profiles, setProfiles] = useState<Profile[]>([]);
-  const [userProfile, setUserProfile] = useState<any>(null);
+  const [userRole, setUserRole] = useState<'admin' | 'user'>('user');
+  const [userCompanyId, setUserCompanyId] = useState<string | null>(null);
 
-  const fetchUserProfile = async () => {
+  const fetchUserInfo = async () => {
     if (!user?.id) return;
-    
+
     try {
-      console.log("Fetching user profile for order creation:", user.id);
-      
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .maybeSingle();
-      
-      if (error) {
-        console.error('Error fetching user profile:', error);
-        return;
+      const [role, profile] = await Promise.all([
+        getUserRole(user.id),
+        getUserProfile(user.id)
+      ]);
+
+      setUserRole(role);
+      if (role === 'user' && profile?.company_id) {
+        setUserCompanyId(profile.company_id);
       }
-      
-      console.log("User profile fetched for orders:", data);
-      setUserProfile(data);
     } catch (error) {
-      console.error('Unexpected error fetching user profile:', error);
+      console.error("Error fetching user info:", error);
     }
   };
 
@@ -69,38 +63,40 @@ export const useOrderData = (isAdmin: boolean) => {
     }
 
     try {
-      console.log("Fetching orders for user:", user.id, "isAdmin:", isAdmin);
+      console.log("Fetching orders for user:", user.id);
       
       let query = supabase
         .from('orders')
         .select('*')
         .order('created_at', { ascending: false });
 
-      // If user is admin, fetch all orders; otherwise, fetch only user's orders
-      if (!isAdmin) {
-        query = query.eq('user_id', user.id);
+      // Filter by company for non-admin users
+      if (userRole === 'user' && userCompanyId) {
+        console.log("Filtering orders by company:", userCompanyId);
+        query = query.eq('company_id', userCompanyId);
       }
 
       const { data, error } = await query;
 
       if (error) {
         console.error("Orders fetch error:", error);
-        console.error("Error details:", {
-          code: error.code,
-          message: error.message,
-          details: error.details,
-          hint: error.hint
-        });
         throw error;
       }
       
       console.log("Orders fetched successfully:", data);
-      setOrders(data || []);
+      
+      // Parse items for each order
+      const ordersWithItems = (data || []).map(order => ({
+        ...order,
+        items: order.items ? (typeof order.items === 'string' ? JSON.parse(order.items) : order.items) : []
+      }));
+      
+      setOrders(ordersWithItems);
     } catch (error: any) {
       console.error("Failed to fetch orders:", error);
       toast({
         title: "Error",
-        description: "Failed to fetch orders. Please try again.",
+        description: "Failed to fetch orders: " + error.message,
         variant: "destructive",
       });
     } finally {
@@ -108,98 +104,79 @@ export const useOrderData = (isAdmin: boolean) => {
     }
   };
 
-  const fetchCompanies = async () => {
-    if (!user?.id) {
-      console.log("No user ID available for fetching companies");
-      return;
-    }
-
-    try {
-      console.log("Fetching companies...");
-      const { data, error } = await supabase
-        .from('companies')
-        .select('id, name, code')
-        .order('name');
-
-      if (error) {
-        console.error("Companies fetch error:", error);
-        console.error("Error details:", {
-          code: error.code,
-          message: error.message,
-          details: error.details,
-          hint: error.hint
-        });
-        throw error;
-      }
-      
-      console.log("Companies fetched successfully:", data);
-      setCompanies(data || []);
-    } catch (error: any) {
-      console.error('Error fetching companies:', error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch companies. Please try again.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const fetchProfiles = async () => {
-    if (!user?.id) {
-      console.log("No user ID available for fetching profiles");
-      return;
-    }
-
-    try {
-      console.log("Fetching profiles...");
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, full_name, email, company_id')
-        .order('full_name');
-
-      if (error) {
-        console.error("Profiles fetch error:", error);
-        console.error("Error details:", {
-          code: error.code,
-          message: error.message,
-          details: error.details,
-          hint: error.hint
-        });
-        throw error;
-      }
-      
-      console.log("Profiles fetched successfully:", data);
-      setProfiles(data || []);
-    } catch (error: any) {
-      console.error('Error fetching profiles:', error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch user profiles. Please try again.",
-        variant: "destructive",
-      });
-    }
-  };
-
   useEffect(() => {
     if (user?.id) {
-      fetchOrders();
-      fetchUserProfile();
-      if (isAdmin) {
-        fetchCompanies();
-        fetchProfiles();
-      }
+      fetchUserInfo();
     }
-  }, [isAdmin, user?.id]);
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (user?.id && (userRole === 'admin' || userCompanyId)) {
+      fetchOrders();
+    }
+  }, [user?.id, userRole, userCompanyId]);
+
+  const updateOrder = async (orderId: string, updates: Partial<Order>) => {
+    try {
+      const { error } = await supabase
+        .from('orders')
+        .update(updates)
+        .eq('id', orderId);
+
+      if (error) throw error;
+
+      // Update local state
+      setOrders(prev => prev.map(order => 
+        order.id === orderId ? { ...order, ...updates } : order
+      ));
+
+      return true;
+    } catch (error: any) {
+      console.error("Failed to update order:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update order: " + error.message,
+        variant: "destructive",
+      });
+      return false;
+    }
+  };
+
+  const updateOrderItems = async (orderId: string, items: OrderItem[]) => {
+    try {
+      const { error } = await supabase
+        .from('orders')
+        .update({ items: JSON.stringify(items) })
+        .eq('id', orderId);
+
+      if (error) throw error;
+
+      // Update local state
+      setOrders(prev => prev.map(order => 
+        order.id === orderId ? { ...order, items } : order
+      ));
+
+      return true;
+    } catch (error: any) {
+      console.error("Failed to update order items:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update order items: " + error.message,
+        variant: "destructive",
+      });
+      return false;
+    }
+  };
 
   return {
     orders,
     setOrders,
     loading,
-    companies,
-    profiles,
-    userProfile,
     fetchOrders,
-    toast,
-    user
+    updateOrder,
+    updateOrderItems,
+    userRole,
+    userCompanyId,
+    toast
   };
-};
+}
