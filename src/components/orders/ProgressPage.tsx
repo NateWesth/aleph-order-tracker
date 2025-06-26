@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -278,40 +277,63 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
     try {
       console.log(`Updating order ${orderId} progress stage to ${stage}`);
       
-      // Update the progress_stage field in the database to persist the stage
-      const { error } = await supabase
-        .from('orders')
-        .update({ 
-          progress_stage: stage,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', orderId);
-
-      if (error) throw error;
-
-      // Update local state
-      setOrders(orders.map(order => {
-        if (order.id === orderId) {
-          const updatedOrder = {
-            ...order,
-            progressStage: stage as 'awaiting-stock' | 'packing' | 'out-for-delivery' | 'completed',
-            progress: stageInfo.value,
-            progress_stage: stage // Update the raw database value
-          };
-          return updatedOrder;
-        }
-        return order;
-      }));
-
-      toast({
-        title: "Progress Updated",
-        description: `Order progress updated to ${stageInfo.name}.`,
-      });
-
+      // If stage is 'completed', move order to completed status
       if (stage === 'completed') {
+        // Update the order status to 'completed' and set completed_date
+        const { error } = await supabase
+          .from('orders')
+          .update({ 
+            status: 'completed',
+            progress_stage: stage,
+            completed_date: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', orderId);
+
+        if (error) throw error;
+
+        // Remove from local progress orders state
+        const remainingOrders = orders.filter(order => order.id !== orderId);
+        setOrders(remainingOrders);
+
         toast({
           title: "Order Completed",
-          description: "Order progress stage has been set to completed.",
+          description: "Order has been moved to completed status and will appear on the Completed page.",
+        });
+
+        console.log('Order successfully moved to completed status');
+        
+        // Refresh the orders to reflect the change immediately
+        fetchProgressOrders();
+      } else {
+        // Update the progress_stage field in the database to persist the stage
+        const { error } = await supabase
+          .from('orders')
+          .update({ 
+            progress_stage: stage,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', orderId);
+
+        if (error) throw error;
+
+        // Update local state
+        setOrders(orders.map(order => {
+          if (order.id === orderId) {
+            const updatedOrder = {
+              ...order,
+              progressStage: stage as 'awaiting-stock' | 'packing' | 'out-for-delivery' | 'completed',
+              progress: stageInfo.value,
+              progress_stage: stage // Update the raw database value
+            };
+            return updatedOrder;
+          }
+          return order;
+        }));
+
+        toast({
+          title: "Progress Updated",
+          description: `Order progress updated to ${stageInfo.name}.`,
         });
       }
     } catch (error) {
@@ -615,6 +637,7 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
                                 variant={order.progressStage === stage.id ? "default" : "outline"}
                                 size="sm"
                                 onClick={() => updateProgressStage(order.id, stage.id)}
+                                className={stage.id === 'completed' ? "bg-green-600 hover:bg-green-700 text-white" : ""}
                               >
                                 {stage.name}
                               </Button>
