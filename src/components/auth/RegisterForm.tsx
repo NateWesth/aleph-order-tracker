@@ -102,8 +102,17 @@ const RegisterForm = () => {
         
         // Normalize the company code for comparison
         const normalizedCode = formData.companyCode.trim().toUpperCase();
+        console.log("Normalized code:", normalizedCode);
         
-        // Use exact match instead of ilike to be more precise
+        // First, let's check what companies exist
+        const { data: allCompanies, error: allError } = await supabase
+          .from('companies')
+          .select('id, code, name');
+          
+        console.log("All companies in database:", allCompanies);
+        console.log("All companies error:", allError);
+        
+        // Now try the specific lookup
         const { data: company, error: companyError } = await supabase
           .from('companies')
           .select('id, code, name')
@@ -111,6 +120,7 @@ const RegisterForm = () => {
           .maybeSingle();
 
         console.log("Company validation result:", { company, companyError });
+        console.log("Specific lookup - normalized code used:", normalizedCode);
 
         if (companyError) {
           console.error("Company validation error:", companyError);
@@ -123,6 +133,7 @@ const RegisterForm = () => {
         }
 
         if (!company) {
+          console.log("No company found with code:", normalizedCode);
           toast({
             title: "Error",
             description: "Invalid company code. Please check with your company administrator.",
