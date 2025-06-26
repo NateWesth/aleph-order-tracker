@@ -129,9 +129,6 @@ export default function OrderRow({ order, isAdmin, onReceiveOrder, onDeleteOrder
               <Eye className="h-4 w-4 mr-1" />
               View Details
             </Button>
-            <Button variant="outline" size="sm">
-              Edit
-            </Button>
             {isAdmin && order.status === 'pending' && (
               <Button 
                 variant="outline" 

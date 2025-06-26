@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -57,6 +58,8 @@ interface Order {
   progressStage?: 'awaiting-stock' | 'packing' | 'out-for-delivery' | 'completed';
   reference?: string;
   attention?: string;
+  // Add progress_stage to track the current stage from database
+  progress_stage?: string;
 }
 
 interface ProgressPageProps {
@@ -94,8 +97,20 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
-  // Helper function to get proper progress stage based on status
-  const getProgressStage = (status: string): 'awaiting-stock' | 'packing' | 'out-for-delivery' | 'completed' => {
+  // Helper function to get proper progress stage based on status and progress_stage
+  const getProgressStage = (status: string, progressStage?: string): 'awaiting-stock' | 'packing' | 'out-for-delivery' | 'completed' => {
+    // If we have a specific progress_stage from database, use that
+    if (progressStage) {
+      switch (progressStage) {
+        case 'awaiting-stock':
+        case 'packing':
+        case 'out-for-delivery':
+        case 'completed':
+          return progressStage as 'awaiting-stock' | 'packing' | 'out-for-delivery' | 'completed';
+      }
+    }
+    
+    // Fallback to status-based logic
     switch (status) {
       case 'received':
         return 'awaiting-stock';
@@ -155,25 +170,33 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
 
       // Convert database orders to local format
       if (data && data.length > 0) {
-        const convertedOrders = data.map((dbOrder: any) => ({
-          id: dbOrder.id,
-          orderNumber: dbOrder.order_number,
-          companyName: dbOrder.companies?.name || "Unknown Company",
-          orderDate: new Date(dbOrder.created_at),
-          dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
-          status: dbOrder.status,
-          progress: dbOrder.status === 'received' ? 25 : dbOrder.status === 'in-progress' ? 50 : 0,
-          progressStage: getProgressStage(dbOrder.status),
-          items: [
-            {
-              id: "1",
-              name: dbOrder.description || "Order items",
-              quantity: 1,
-              delivered: 0,
-              completed: false
-            }
-          ]
-        }));
+        const convertedOrders = data.map((dbOrder: any) => {
+          const progressStage = getProgressStage(dbOrder.status, dbOrder.progress_stage);
+          const progressValue = progressStage === 'awaiting-stock' ? 25 : 
+                               progressStage === 'packing' ? 50 : 
+                               progressStage === 'out-for-delivery' ? 75 : 100;
+          
+          return {
+            id: dbOrder.id,
+            orderNumber: dbOrder.order_number,
+            companyName: dbOrder.companies?.name || "Unknown Company",
+            orderDate: new Date(dbOrder.created_at),
+            dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+            status: dbOrder.status,
+            progress: progressValue,
+            progressStage: progressStage,
+            progress_stage: dbOrder.progress_stage, // Keep the raw value from database
+            items: [
+              {
+                id: "1",
+                name: dbOrder.description || "Order items",
+                quantity: 1,
+                delivered: 0,
+                completed: false
+              }
+            ]
+          };
+        });
 
         console.log('Converted orders for progress page:', convertedOrders.length);
         setOrders(convertedOrders);
@@ -223,19 +246,11 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
     try {
       console.log(`Updating order ${orderId} progress stage to ${stage}`);
       
-      // Determine new status based on stage
-      let newStatus = 'in-progress';
-      if (stage === 'completed') {
-        newStatus = 'processing';
-      } else if (stage === 'awaiting-stock') {
-        newStatus = 'received';
-      }
-
-      // Update in database
+      // Update the progress_stage field in the database to persist the stage
       const { error } = await supabase
         .from('orders')
         .update({ 
-          status: newStatus,
+          progress_stage: stage,
           updated_at: new Date().toISOString()
         })
         .eq('id', orderId);
@@ -249,7 +264,7 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
             ...order,
             progressStage: stage as 'awaiting-stock' | 'packing' | 'out-for-delivery' | 'completed',
             progress: stageInfo.value,
-            status: newStatus as 'received' | 'in-progress' | 'processing'
+            progress_stage: stage // Update the raw database value
           };
           return updatedOrder;
         }
@@ -264,13 +279,8 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
       if (stage === 'completed') {
         toast({
           title: "Order Completed",
-          description: "Order has been moved to processing and will sync across all users.",
+          description: "Order progress stage has been set to completed.",
         });
-        
-        // Refresh to remove from progress page if moved to processing
-        setTimeout(() => {
-          fetchProgressOrders();
-        }, 500);
       }
     } catch (error) {
       console.error('Error updating progress stage:', error);
@@ -338,6 +348,7 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
         .from('orders')
         .update({ 
           status: 'processing',
+          progress_stage: 'completed',
           updated_at: new Date().toISOString()
         })
         .eq('id', orderId);
