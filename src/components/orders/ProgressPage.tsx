@@ -96,6 +96,8 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
   const { user } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Helper function to get proper progress stage based on status and progress_stage
   const getProgressStage = (status: string, progressStage?: string): 'awaiting-stock' | 'packing' | 'out-for-delivery' | 'completed' => {
@@ -125,12 +127,33 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
     }
   };
 
+  // Helper function to safely format dates
+  const formatSafeDate = (date: Date | string | number): string => {
+    try {
+      const dateObj = new Date(date);
+      if (isNaN(dateObj.getTime())) {
+        return 'Invalid Date';
+      }
+      return format(dateObj, 'MMM d, yyyy');
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return 'Invalid Date';
+    }
+  };
+
   // Fetch orders from database with company information
   const fetchProgressOrders = async () => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      setError('User not authenticated');
+      setLoading(false);
+      return;
+    }
 
     try {
       console.log('Fetching received and in-progress orders from Supabase...');
+      setLoading(true);
+      setError(null);
+      
       let query = supabase
         .from('orders')
         .select(`
@@ -159,10 +182,11 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
         }
       }
 
-      const { data, error } = await query;
+      const { data, error: fetchError } = await query;
 
-      if (error) {
-        console.error("Error fetching progress orders:", error);
+      if (fetchError) {
+        console.error("Error fetching progress orders:", fetchError);
+        setError(`Failed to fetch orders: ${fetchError.message}`);
         return;
       }
 
@@ -176,12 +200,17 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
                                progressStage === 'packing' ? 50 : 
                                progressStage === 'out-for-delivery' ? 75 : 100;
           
+          // Create safe date objects
+          const orderDate = new Date(dbOrder.created_at);
+          const dueDate = new Date();
+          dueDate.setDate(dueDate.getDate() + 30); // 30 days from now
+          
           return {
             id: dbOrder.id,
             orderNumber: dbOrder.order_number,
             companyName: dbOrder.companies?.name || "Unknown Company",
-            orderDate: new Date(dbOrder.created_at),
-            dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+            orderDate: orderDate,
+            dueDate: dueDate,
             status: dbOrder.status,
             progress: progressValue,
             progressStage: progressStage,
@@ -209,6 +238,9 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
       }
     } catch (error) {
       console.error("Failed to fetch progress orders:", error);
+      setError(`Failed to fetch orders: ${error}`);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -454,6 +486,40 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
     }
   };
 
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="container mx-auto p-4">
+        <div className="flex justify-center items-center h-64">
+          <div className="text-lg">Loading orders...</div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="container mx-auto p-4">
+        <div className="flex flex-col items-center justify-center h-64">
+          <div className="text-lg text-red-600 mb-4">Error: {error}</div>
+          <Button onClick={fetchProgressOrders}>Retry</Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Show authentication required message
+  if (!user) {
+    return (
+      <div className="container mx-auto p-4">
+        <div className="flex flex-col items-center justify-center h-64">
+          <div className="text-lg mb-4">Please log in to view orders</div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto p-4">
       <div className="flex justify-between items-center mb-6">
@@ -529,7 +595,7 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
                       </div>
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600">
-                      {format(order.dueDate, 'MMM d, yyyy')}
+                      {formatSafeDate(order.dueDate)}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
