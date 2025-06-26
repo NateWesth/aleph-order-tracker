@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -61,12 +60,15 @@ const LoginForm = () => {
         return;
       }
     } else {
-      // Validate company code exists
+      // Validate company code exists with improved matching
       try {
+        // Normalize the company code for comparison
+        const normalizedCode = formData.accessCode.trim().toUpperCase();
+        
         const { data: company, error: companyError } = await supabase
           .from('companies')
           .select('id, code')
-          .eq('code', formData.accessCode)
+          .ilike('code', normalizedCode)
           .maybeSingle();
 
         if (companyError) {
@@ -144,7 +146,7 @@ const LoginForm = () => {
         return;
       }
 
-      // For client users, validate company association
+      // For client users, validate company association with improved matching
       if (formData.userType === "client") {
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
@@ -163,7 +165,11 @@ const LoginForm = () => {
           return;
         }
 
-        if (!profile || profile.company_code !== formData.accessCode) {
+        // Normalize both codes for comparison
+        const normalizedAccessCode = formData.accessCode.trim().toUpperCase();
+        const normalizedProfileCode = profile?.company_code?.trim().toUpperCase();
+
+        if (!profile || normalizedProfileCode !== normalizedAccessCode) {
           await supabase.auth.signOut();
           toast({
             title: "Access Denied",

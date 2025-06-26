@@ -99,10 +99,13 @@ const RegisterForm = () => {
       try {
         console.log("Validating company code:", formData.companyCode);
         
+        // Normalize the company code for comparison
+        const normalizedCode = formData.companyCode.trim().toUpperCase();
+        
         const { data: company, error: companyError } = await supabase
           .from('companies')
           .select('id, code, name')
-          .eq('code', formData.companyCode.trim())
+          .ilike('code', normalizedCode)
           .maybeSingle();
 
         console.log("Company validation result:", { company, companyError });
@@ -151,7 +154,7 @@ const RegisterForm = () => {
           emailRedirectTo: `${window.location.origin}/auth`,
           data: {
             full_name: formData.fullName,
-            company_code: formData.userType === "user" ? formData.companyCode.trim() : null,
+            company_code: formData.userType === "user" ? formData.companyCode.trim().toUpperCase() : null,
             phone: formData.phone,
             position: formData.position,
             user_type: formData.userType // This will be "admin" or "user" - matches our trigger expectations
