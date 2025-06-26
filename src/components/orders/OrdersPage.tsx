@@ -6,6 +6,8 @@ import OrderTable from "./components/OrderTable";
 import CreateOrderDialog from "./components/CreateOrderDialog";
 import { useOrderData } from "./hooks/useOrderData";
 import { useGlobalRealtimeOrders } from "./hooks/useGlobalRealtimeOrders";
+import { useCompanyData } from "@/components/admin/hooks/useCompanyData";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface OrdersPageProps {
   isAdmin?: boolean;
@@ -14,17 +16,18 @@ interface OrdersPageProps {
 export default function OrdersPage({ isAdmin = false }: OrdersPageProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [ordersWithCompanies, setOrdersWithCompanies] = useState<any[]>([]);
+  const { user } = useAuth();
   const {
     orders,
     setOrders,
     loading,
-    companies,
-    profiles,
-    userProfile,
     fetchOrders,
     toast,
-    user
-  } = useOrderData(isAdmin);
+    userRole,
+    userCompanyId
+  } = useOrderData();
+
+  const { companies } = useCompanyData();
 
   // Set up real-time subscriptions using the enhanced global hook
   useGlobalRealtimeOrders({
@@ -150,8 +153,8 @@ export default function OrdersPage({ isAdmin = false }: OrdersPageProps) {
         <CreateOrderDialog
           isAdmin={isAdmin}
           companies={companies}
-          profiles={profiles}
-          userProfile={userProfile}
+          profiles={[]} // We'll handle this in CreateOrderDialog
+          userProfile={null} // We'll handle this in CreateOrderDialog
           onOrderCreated={fetchOrders}
         />
       </div>

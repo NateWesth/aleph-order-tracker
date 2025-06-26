@@ -85,10 +85,10 @@ export function useOrderData() {
       
       console.log("Orders fetched successfully:", data);
       
-      // Parse items for each order
+      // Parse items from description for each order
       const ordersWithItems = (data || []).map(order => ({
         ...order,
-        items: order.items ? (typeof order.items === 'string' ? JSON.parse(order.items) : order.items) : []
+        items: parseOrderItems(order.description || '')
       }));
       
       setOrders(ordersWithItems);
@@ -104,6 +104,41 @@ export function useOrderData() {
     }
   };
 
+  // Helper function to parse order items from description
+  const parseOrderItems = (description: string): OrderItem[] => {
+    if (!description) return [];
+
+    // Parse the description to extract items and quantities
+    // Format: "Item Name (Qty: 2)\nAnother Item (Qty: 1)"
+    const items = description.split('\n').map((line, index) => {
+      const match = line.match(/^(.+?)\s*\(Qty:\s*(\d+)\)$/);
+      if (match) {
+        return {
+          id: `item-${index}`,
+          name: match[1].trim(),
+          quantity: parseInt(match[2]),
+          delivered_quantity: 0,
+          unit: '',
+          notes: ''
+        };
+      }
+      // Fallback for items without quantity format
+      if (line.trim()) {
+        return {
+          id: `item-${index}`,
+          name: line.trim(),
+          quantity: 1,
+          delivered_quantity: 0,
+          unit: '',
+          notes: ''
+        };
+      }
+      return null;
+    }).filter(item => item !== null) as OrderItem[];
+
+    return items;
+  };
+
   useEffect(() => {
     if (user?.id) {
       fetchUserInfo();
@@ -116,7 +151,7 @@ export function useOrderData() {
     }
   }, [user?.id, userRole, userCompanyId]);
 
-  const updateOrder = async (orderId: string, updates: Partial<Order>) => {
+  const updateOrder = async (orderId: string, updates: Partial<Omit<Order, 'items'>>) => {
     try {
       const { error } = await supabase
         .from('orders')
@@ -144,9 +179,14 @@ export function useOrderData() {
 
   const updateOrderItems = async (orderId: string, items: OrderItem[]) => {
     try {
+      // Convert items back to description format for storage
+      const itemsDescription = items.map(item => 
+        `${item.name} (Qty: ${item.quantity})`
+      ).join('\n');
+
       const { error } = await supabase
         .from('orders')
-        .update({ items: JSON.stringify(items) })
+        .update({ description: itemsDescription })
         .eq('id', orderId);
 
       if (error) throw error;

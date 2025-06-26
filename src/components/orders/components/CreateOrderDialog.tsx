@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -13,12 +14,6 @@ import {
 } from "@/components/ui/dialog";
 import OrderForm from "./OrderForm";
 import { generateOrderNumber } from "../utils/orderUtils";
-
-interface OrderItem {
-  id: string;
-  name: string;
-  quantity: number;
-}
 
 interface CreateOrderDialogProps {
   isAdmin: boolean;
@@ -38,55 +33,48 @@ export default function CreateOrderDialog({
   const { toast } = useToast();
   const { user } = useAuth();
   const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [newOrder, setNewOrder] = useState({
-    order_number: '',
-    items: [{ id: 'item-1', name: '', quantity: 1 }] as OrderItem[],
-    company_id: '',
-    user_id: ''
-  });
+  const [loading, setLoading] = useState(false);
 
-  const createOrder = async () => {
-    if (!newOrder.order_number || newOrder.items.length === 0 || newOrder.items.some(item => !item.name.trim())) {
+  const handleOrderSubmit = async (orderData: {
+    description: string;
+    companyId: string;
+    totalAmount: number;
+    items: any[];
+  }) => {
+    if (!orderData.description.trim() || orderData.items.length === 0) {
       toast({
         title: "Error",
-        description: "Please fill in the order number and add at least one item with a description.",
+        description: "Please provide a description and add at least one item.",
         variant: "destructive",
       });
       return;
     }
 
+    setLoading(true);
+
     try {
       console.log("Creating order with real-time updates...");
       
-      // For client users, automatically use their company_id from their profile
-      let orderCompanyId = null;
-      if (isAdmin) {
-        orderCompanyId = newOrder.company_id || null;
-      } else {
-        // Client user - use their company_id from profile
-        orderCompanyId = userProfile?.company_id || null;
-      }
-
       // Convert items to a formatted description string
-      const itemsDescription = newOrder.items.map(item => 
+      const itemsDescription = orderData.items.map(item => 
         `${item.name} (Qty: ${item.quantity})`
       ).join('\n');
       
-      const orderData = {
-        order_number: newOrder.order_number,
+      const newOrderData = {
+        order_number: generateOrderNumber(),
         description: itemsDescription,
-        total_amount: null,
+        total_amount: orderData.totalAmount || null,
         status: 'pending',
-        company_id: orderCompanyId,
-        user_id: isAdmin ? (newOrder.user_id || user?.id) : user?.id
+        company_id: orderData.companyId || null,
+        user_id: user?.id
       };
 
-      console.log("Order data for real-time insert:", orderData);
+      console.log("Order data for real-time insert:", newOrderData);
 
       // Insert the order - this will trigger real-time updates automatically
       const { error } = await supabase
         .from('orders')
-        .insert([orderData]);
+        .insert([newOrderData]);
 
       if (error) {
         console.error("Order creation error:", error);
@@ -97,16 +85,10 @@ export default function CreateOrderDialog({
 
       toast({
         title: "Order Created",
-        description: `Order ${newOrder.order_number} has been created successfully with ${newOrder.items.length} item(s).`,
+        description: `Order ${newOrderData.order_number} has been created successfully with ${orderData.items.length} item(s).`,
       });
 
       setShowCreateDialog(false);
-      setNewOrder({
-        order_number: '',
-        items: [{ id: 'item-1', name: '', quantity: 1 }],
-        company_id: '',
-        user_id: ''
-      });
       
       // Call the callback to refresh local state
       onOrderCreated();
@@ -117,15 +99,9 @@ export default function CreateOrderDialog({
         description: "Failed to create order. Please try again.",
         variant: "destructive",
       });
+    } finally {
+      setLoading(false);
     }
-  };
-
-  const handleGenerateOrderNumber = () => {
-    setNewOrder({ ...newOrder, order_number: generateOrderNumber() });
-  };
-
-  const getCompanyProfiles = (companyId: string) => {
-    return profiles.filter(profile => profile.company_id === companyId);
   };
 
   return (
@@ -141,15 +117,8 @@ export default function CreateOrderDialog({
           <DialogTitle>Create New Order</DialogTitle>
         </DialogHeader>
         <OrderForm
-          newOrder={newOrder}
-          setNewOrder={setNewOrder}
-          isAdmin={isAdmin}
-          companies={companies}
-          profiles={getCompanyProfiles(newOrder.company_id)}
-          userProfile={userProfile}
-          onGenerateOrderNumber={handleGenerateOrderNumber}
-          onSubmit={createOrder}
-          onCancel={() => setShowCreateDialog(false)}
+          onSubmit={handleOrderSubmit}
+          loading={loading}
         />
       </DialogContent>
     </Dialog>
