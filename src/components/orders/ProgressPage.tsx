@@ -14,8 +14,21 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { format } from "date-fns";
-import { Trash2, Eye } from "lucide-react";
+import { Trash2, Eye, ChevronDown, ChevronRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useGlobalRealtimeOrders } from "./hooks/useGlobalRealtimeOrders";
@@ -57,8 +70,8 @@ interface Order {
   progressStage?: 'awaiting-stock' | 'packing' | 'out-for-delivery' | 'completed';
   reference?: string;
   attention?: string;
-  // Add progress_stage to track the current stage from database
   progress_stage?: string;
+  deliveryData?: { [itemName: string]: number };
 }
 
 interface ProgressPageProps {
@@ -97,10 +110,40 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
+  const [deliveryQuantities, setDeliveryQuantities] = useState<{ [orderId: string]: { [itemName: string]: number } }>({});
+
+  // Parse order items from description
+  const parseOrderItems = (description: string | null): OrderItem[] => {
+    if (!description) {
+      return [];
+    }
+
+    const items = description.split('\n').map((line, index) => {
+      const match = line.match(/^(.+?)\s*\(Qty:\s*(\d+)\)$/);
+      if (match) {
+        return {
+          id: `item-${index}`,
+          name: match[1].trim(),
+          quantity: parseInt(match[2]),
+          delivered: 0,
+          completed: false
+        };
+      }
+      return {
+        id: `item-${index}`,
+        name: line.trim(),
+        quantity: 1,
+        delivered: 0,
+        completed: false
+      };
+    }).filter(item => item.name);
+
+    return items;
+  };
 
   // Helper function to get proper progress stage based on status and progress_stage
   const getProgressStage = (status: string, progressStage?: string): 'awaiting-stock' | 'packing' | 'out-for-delivery' | 'completed' => {
-    // If we have a specific progress_stage from database, use that
     if (progressStage) {
       switch (progressStage) {
         case 'awaiting-stock':
@@ -111,7 +154,6 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
       }
     }
     
-    // Fallback to status-based logic
     switch (status) {
       case 'received':
         return 'awaiting-stock';
@@ -140,6 +182,55 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
     }
   };
 
+  // Load delivery quantities from localStorage
+  const loadDeliveryQuantities = () => {
+    try {
+      const saved = localStorage.getItem('deliveryQuantities');
+      if (saved) {
+        setDeliveryQuantities(JSON.parse(saved));
+      }
+    } catch (error) {
+      console.error('Error loading delivery quantities:', error);
+    }
+  };
+
+  // Save delivery quantities to localStorage
+  const saveDeliveryQuantities = (quantities: { [orderId: string]: { [itemName: string]: number } }) => {
+    try {
+      localStorage.setItem('deliveryQuantities', JSON.stringify(quantities));
+    } catch (error) {
+      console.error('Error saving delivery quantities:', error);
+    }
+  };
+
+  // Update delivery quantity for an item
+  const updateDeliveryQuantity = (orderId: string, itemName: string, delivered: number) => {
+    setDeliveryQuantities(prev => {
+      const updated = {
+        ...prev,
+        [orderId]: {
+          ...prev[orderId],
+          [itemName]: delivered
+        }
+      };
+      saveDeliveryQuantities(updated);
+      return updated;
+    });
+  };
+
+  // Toggle order expansion
+  const toggleOrderExpansion = (orderId: string) => {
+    setExpandedOrders(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(orderId)) {
+        newSet.delete(orderId);
+      } else {
+        newSet.add(orderId);
+      }
+      return newSet;
+    });
+  };
+
   // Fetch orders from database with company information
   const fetchProgressOrders = async () => {
     if (!user?.id) {
@@ -165,9 +256,7 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
         .in('status', ['received', 'in-progress'])
         .order('created_at', { ascending: false });
 
-      // If user is admin, fetch all orders; otherwise, fetch only user's orders or company orders
       if (!isAdmin) {
-        // For non-admin users, get their profile first to find their company
         const { data: profile } = await supabase
           .from('profiles')
           .select('company_id')
@@ -191,7 +280,6 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
 
       console.log('Fetched orders from database:', data?.length || 0);
 
-      // Convert database orders to local format
       if (data && data.length > 0) {
         const convertedOrders = data.map((dbOrder: any) => {
           const progressStage = getProgressStage(dbOrder.status, dbOrder.progress_stage);
@@ -199,10 +287,9 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
                                progressStage === 'packing' ? 50 : 
                                progressStage === 'out-for-delivery' ? 75 : 100;
           
-          // Create safe date objects
           const orderDate = new Date(dbOrder.created_at);
           const dueDate = new Date();
-          dueDate.setDate(dueDate.getDate() + 30); // 30 days from now
+          dueDate.setDate(dueDate.getDate() + 30);
           
           return {
             id: dbOrder.id,
@@ -213,23 +300,14 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
             status: dbOrder.status,
             progress: progressValue,
             progressStage: progressStage,
-            progress_stage: dbOrder.progress_stage, // Keep the raw value from database
-            items: [
-              {
-                id: "1",
-                name: dbOrder.description || "Order items",
-                quantity: 1,
-                delivered: 0,
-                completed: false
-              }
-            ]
+            progress_stage: dbOrder.progress_stage,
+            items: parseOrderItems(dbOrder.description)
           };
         });
 
         console.log('Converted orders for progress page:', convertedOrders.length);
         setOrders(convertedOrders);
         
-        // Update localStorage for consistency
         localStorage.setItem('progressOrders', JSON.stringify(convertedOrders));
       } else {
         setOrders([]);
@@ -257,6 +335,7 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
   useEffect(() => {
     console.log('Progress page mounted, fetching orders...');
     fetchProgressOrders();
+    loadDeliveryQuantities();
   }, [isAdmin, user?.id]);
 
   // Progress stages with corresponding percentage values
@@ -277,9 +356,7 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
     try {
       console.log(`Updating order ${orderId} progress stage to ${stage}`);
       
-      // If stage is 'completed', move order to completed status
       if (stage === 'completed') {
-        // Update the order status to 'completed' and set completed_date
         const { error } = await supabase
           .from('orders')
           .update({ 
@@ -292,7 +369,6 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
 
         if (error) throw error;
 
-        // Remove from local progress orders state
         const remainingOrders = orders.filter(order => order.id !== orderId);
         setOrders(remainingOrders);
 
@@ -302,11 +378,8 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
         });
 
         console.log('Order successfully moved to completed status');
-        
-        // Refresh the orders to reflect the change immediately
         fetchProgressOrders();
       } else {
-        // Update the progress_stage field in the database to persist the stage
         const { error } = await supabase
           .from('orders')
           .update({ 
@@ -317,14 +390,13 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
 
         if (error) throw error;
 
-        // Update local state
         setOrders(orders.map(order => {
           if (order.id === orderId) {
             const updatedOrder = {
               ...order,
               progressStage: stage as 'awaiting-stock' | 'packing' | 'out-for-delivery' | 'completed',
               progress: stageInfo.value,
-              progress_stage: stage // Update the raw database value
+              progress_stage: stage
             };
             return updatedOrder;
           }
@@ -364,14 +436,12 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
     setOrders(updatedOrders);
     localStorage.setItem('progressOrders', JSON.stringify(updatedOrders));
 
-    // Also update delivery orders if they exist
     const existingDeliveryOrders = JSON.parse(localStorage.getItem('deliveryOrders') || '[]');
     const updatedDeliveryOrders = existingDeliveryOrders.map((order: Order) => 
       order.id === orderId ? { ...order, ...updates } : order
     );
     localStorage.setItem('deliveryOrders', JSON.stringify(updatedDeliveryOrders));
 
-    // Update selected order if it matches
     if (selectedOrder && selectedOrder.id === orderId) {
       setSelectedOrder({ ...selectedOrder, ...updates });
     }
@@ -397,7 +467,6 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
     try {
       console.log('Completing order and moving to processing:', orderId);
       
-      // Update order status in database to 'processing'
       const { error } = await supabase
         .from('orders')
         .update({ 
@@ -409,7 +478,6 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
 
       if (error) throw error;
 
-      // Update all items to be fully delivered
       const completedOrder = {
         ...orderToComplete,
         items: orderToComplete.items.map(item => ({
@@ -422,17 +490,14 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
         progressStage: 'completed' as const
       };
 
-      // Remove from progress orders (localStorage)
       const remainingOrders = orders.filter(order => order.id !== orderId);
       setOrders(remainingOrders);
       localStorage.setItem('progressOrders', JSON.stringify(remainingOrders));
 
-      // Add to processing orders (localStorage)
       const existingProcessingOrders = JSON.parse(localStorage.getItem('processingOrders') || '[]');
       const updatedProcessingOrders = [...existingProcessingOrders, completedOrder];
       localStorage.setItem('processingOrders', JSON.stringify(updatedProcessingOrders));
 
-      // Also remove from delivery notes if exists
       const existingDeliveryOrders = JSON.parse(localStorage.getItem('deliveryOrders') || '[]');
       const updatedDeliveryOrders = existingDeliveryOrders.filter((order: Order) => order.id !== orderId);
       localStorage.setItem('deliveryOrders', JSON.stringify(updatedDeliveryOrders));
@@ -444,8 +509,6 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
 
       setSelectedOrder(null);
       console.log('Order successfully completed and moved to processing');
-      
-      // Refresh the orders to reflect the change immediately
       fetchProgressOrders();
     } catch (error: any) {
       console.error('Error completing order:', error);
@@ -464,7 +527,6 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
     try {
       console.log('Deleting order:', orderId);
       
-      // Delete from database
       const { error } = await supabase
         .from('orders')
         .delete()
@@ -472,12 +534,10 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
 
       if (error) throw error;
 
-      // Remove from local progress orders
       const remainingOrders = orders.filter(order => order.id !== orderId);
       setOrders(remainingOrders);
       localStorage.setItem('progressOrders', JSON.stringify(remainingOrders));
 
-      // Also remove from other localStorage arrays if exists
       ['deliveryOrders', 'processingOrders', 'completedOrders'].forEach(storageKey => {
         const existingOrders = JSON.parse(localStorage.getItem(storageKey) || '[]');
         const updatedOrders = existingOrders.filter((order: Order) => order.id !== orderId);
@@ -489,14 +549,11 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
         description: `Order ${orderNumber} has been permanently deleted from all systems.`,
       });
 
-      // Close dialog if the deleted order was being viewed
       if (selectedOrder && selectedOrder.id === orderId) {
         setSelectedOrder(null);
       }
 
       console.log('Order successfully deleted');
-      
-      // Refresh the orders to reflect the change immediately
       fetchProgressOrders();
     } catch (error: any) {
       console.error('Error deleting order:', error);
@@ -508,7 +565,6 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
     }
   };
 
-  // Show loading state
   if (loading) {
     return (
       <div className="container mx-auto p-4">
@@ -519,7 +575,6 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
     );
   }
 
-  // Show error state
   if (error) {
     return (
       <div className="container mx-auto p-4">
@@ -531,7 +586,6 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
     );
   }
 
-  // Show authentication required message
   if (!user) {
     return (
       <div className="container mx-auto p-4">
@@ -548,21 +602,18 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
         <h1 className="text-2xl font-bold">Order Progress Tracking</h1>
       </div>
 
-      {/* Real-time Status Indicator */}
       <div className="mb-4 p-2 bg-blue-50 rounded-md border border-blue-200">
         <p className="text-sm text-blue-800">
           🔄 Real-time updates enabled - Changes will appear automatically across all users
         </p>
       </div>
 
-      {/* Debug Information */}
       <div className="mb-4 p-2 bg-gray-50 rounded-md border border-gray-200">
         <p className="text-xs text-gray-600">
           Debug: Found {orders.length} progress orders | User: {user?.id ? 'Authenticated' : 'Not authenticated'} | Admin: {isAdmin ? 'Yes' : 'No'}
         </p>
       </div>
 
-      {/* In-Progress Orders Table */}
       <div className="bg-white rounded-lg shadow">
         <div className="p-4 border-b">
           <h2 className="text-lg font-semibold">Orders In Progress</h2>
@@ -573,22 +624,15 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
             No orders in progress. Orders marked as "received" should appear here automatically.
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Order</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Company</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Status</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Progress</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Due Date</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {orders.map(order => (
-                  <tr key={order.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3">
+          <div className="divide-y">
+            {orders.map(order => {
+              const isExpanded = expandedOrders.has(order.id);
+              const orderDeliveries = deliveryQuantities[order.id] || {};
+              
+              return (
+                <div key={order.id} className="p-4">
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-4">
                       <div className="flex items-center gap-2">
                         {order.company?.logo && (
                           <img 
@@ -599,91 +643,171 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
                         )}
                         <span className="font-medium">#{order.orderNumber}</span>
                       </div>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-600">
-                      {order.companyName}
-                    </td>
-                    <td className="px-4 py-3">
-                      <Badge variant={order.status === 'in-progress' ? 'default' : 'secondary'}>
-                        {order.status}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <Progress value={order.progress || 0} className="w-20 h-2" />
-                        <span className="text-xs text-gray-500">
-                          {progressStages.find(s => s.id === order.progressStage)?.name || 'Not started'}
-                        </span>
+                      <div>
+                        <p className="text-sm text-gray-600">{order.companyName}</p>
+                        <p className="text-sm text-gray-500">Due: {formatSafeDate(order.dueDate)}</p>
                       </div>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-600">
-                      {formatSafeDate(order.dueDate)}
-                    </td>
-                    <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => viewOrderDetails(order)}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        
-                        {isAdmin && (
-                          <>
-                            {progressStages.map((stage) => (
+                        <Badge variant={order.status === 'in-progress' ? 'default' : 'secondary'}>
+                          {order.status}
+                        </Badge>
+                        <div className="flex items-center gap-2">
+                          <Progress value={order.progress || 0} className="w-20 h-2" />
+                          <span className="text-xs text-gray-500">
+                            {progressStages.find(s => s.id === order.progressStage)?.name || 'Not started'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => toggleOrderExpansion(order.id)}
+                      >
+                        {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                        Items ({order.items.length})
+                      </Button>
+                      
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => viewOrderDetails(order)}
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                      
+                      {isAdmin && (
+                        <>
+                          {progressStages.map((stage) => (
+                            <Button 
+                              key={stage.id} 
+                              variant={order.progressStage === stage.id ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => updateProgressStage(order.id, stage.id)}
+                              className={stage.id === 'completed' ? "bg-green-600 hover:bg-green-700 text-white" : ""}
+                            >
+                              {stage.name}
+                            </Button>
+                          ))}
+                          
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
                               <Button 
-                                key={stage.id} 
-                                variant={order.progressStage === stage.id ? "default" : "outline"}
+                                variant="ghost" 
                                 size="sm"
-                                onClick={() => updateProgressStage(order.id, stage.id)}
-                                className={stage.id === 'completed' ? "bg-green-600 hover:bg-green-700 text-white" : ""}
+                                className="text-red-600 hover:text-red-700"
                               >
-                                {stage.name}
+                                <Trash2 className="h-4 w-4" />
                               </Button>
-                            ))}
-                            
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button 
-                                  variant="ghost" 
-                                  size="sm"
-                                  className="text-red-600 hover:text-red-700"
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete Order</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to delete order {order.orderNumber}? This action cannot be undone and will remove the order from all systems.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction 
+                                  onClick={() => deleteOrder(order.id, order.orderNumber)}
+                                  className="bg-red-600 hover:bg-red-700"
                                 >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Delete Order</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Are you sure you want to delete order {order.orderNumber}? This action cannot be undone and will remove the order from all systems.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction 
-                                    onClick={() => deleteOrder(order.id, order.orderNumber)}
-                                    className="bg-red-600 hover:bg-red-700"
-                                  >
-                                    Delete
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          </>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {isExpanded && (
+                    <div className="mt-4 border-t pt-4">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Item</TableHead>
+                            <TableHead>Quantity Ordered</TableHead>
+                            {isAdmin && (
+                              <>
+                                <TableHead>Quantity Delivered</TableHead>
+                                <TableHead>Status</TableHead>
+                              </>
+                            )}
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {order.items
+                            .sort((a, b) => {
+                              const aDelivered = orderDeliveries[a.name] || 0;
+                              const bDelivered = orderDeliveries[b.name] || 0;
+                              const aCompleted = aDelivered >= a.quantity;
+                              const bCompleted = bDelivered >= b.quantity;
+                              
+                              if (aCompleted && !bCompleted) return 1;
+                              if (!aCompleted && bCompleted) return -1;
+                              return 0;
+                            })
+                            .map((item) => {
+                              const delivered = orderDeliveries[item.name] || 0;
+                              const isCompleted = delivered >= item.quantity;
+                              
+                              return (
+                                <TableRow 
+                                  key={item.id} 
+                                  className={isCompleted ? "opacity-50" : ""}
+                                >
+                                  <TableCell className="font-medium">{item.name}</TableCell>
+                                  <TableCell>{item.quantity}</TableCell>
+                                  {isAdmin && (
+                                    <>
+                                      <TableCell>
+                                        <input
+                                          type="number"
+                                          min="0"
+                                          max={item.quantity}
+                                          value={delivered}
+                                          onChange={(e) => 
+                                            updateDeliveryQuantity(
+                                              order.id, 
+                                              item.name, 
+                                              parseInt(e.target.value) || 0
+                                            )
+                                          }
+                                          className="w-20 px-2 py-1 border rounded text-sm"
+                                        />
+                                      </TableCell>
+                                      <TableCell>
+                                        {isCompleted ? (
+                                          <Badge variant="outline" className="bg-green-100 text-green-800">
+                                            Complete
+                                          </Badge>
+                                        ) : (
+                                          <Badge variant="outline">
+                                            Pending
+                                          </Badge>
+                                        )}
+                                      </TableCell>
+                                    </>
+                                  )}
+                                </TableRow>
+                              );
+                            })}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
 
-      {/* Order Details Dialog */}
       <ProgressOrderDetailsDialog
         order={selectedOrder}
         isOpen={!!selectedOrder}

@@ -13,6 +13,14 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { format, startOfMonth, endOfMonth, isSameMonth } from "date-fns";
 import { Eye, ChevronDown, ChevronRight, FileText, Search } from "lucide-react";
@@ -23,8 +31,11 @@ import ProcessingOrderFilesDialog from "./components/ProcessingOrderFilesDialog"
 import OrderDetailsDialog from "./components/OrderDetailsDialog";
 
 interface OrderItem {
+  id: string;
   name: string;
   quantity: number;
+  delivered: number;
+  completed: boolean;
 }
 
 interface Order {
@@ -58,31 +69,48 @@ export default function CompletedPage({ isAdmin }: CompletedPageProps) {
   const [showFilesDialog, setShowFilesDialog] = useState(false);
   const [filesDialogOrder, setFilesDialogOrder] = useState<Order | null>(null);
   const [showOrderDetails, setShowOrderDetails] = useState(false);
+  const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
 
   // Parse order items from description - same logic as other components
-  const parseOrderItems = (description: string | null) => {
+  const parseOrderItems = (description: string | null): OrderItem[] => {
     if (!description) {
       return [];
     }
 
-    // Parse the description to extract items and quantities
-    // Format: "Item Name (Qty: 2)\nAnother Item (Qty: 1)"
-    const items = description.split('\n').map(line => {
+    const items = description.split('\n').map((line, index) => {
       const match = line.match(/^(.+?)\s*\(Qty:\s*(\d+)\)$/);
       if (match) {
         return {
+          id: `item-${index}`,
           name: match[1].trim(),
-          quantity: parseInt(match[2])
+          quantity: parseInt(match[2]),
+          delivered: parseInt(match[2]), // Completed orders are fully delivered
+          completed: true
         };
       }
-      // Fallback for items without quantity format
       return {
+        id: `item-${index}`,
         name: line.trim(),
-        quantity: 1
+        quantity: 1,
+        delivered: 1,
+        completed: true
       };
     }).filter(item => item.name);
 
     return items;
+  };
+
+  // Toggle order expansion
+  const toggleOrderExpansion = (orderId: string) => {
+    setExpandedOrders(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(orderId)) {
+        newSet.delete(orderId);
+      } else {
+        newSet.add(orderId);
+      }
+      return newSet;
+    });
   };
 
   // Fetch completed orders from database with company information
@@ -103,7 +131,6 @@ export default function CompletedPage({ isAdmin }: CompletedPageProps) {
         .eq('status', 'completed')
         .order('completed_date', { ascending: false });
 
-      // If user is admin, fetch all orders; otherwise, fetch only user's orders
       if (!isAdmin) {
         query = query.eq('user_id', user.id);
       }
@@ -117,13 +144,12 @@ export default function CompletedPage({ isAdmin }: CompletedPageProps) {
 
       console.log('Fetched completed orders:', data?.length || 0);
       
-      // Transform database orders to match UI format with properly parsed items
       const transformedOrders = (data || []).map(order => ({
         id: order.id,
         orderNumber: order.order_number,
         companyName: order.companies?.name || "Unknown Company",
         orderDate: new Date(order.created_at),
-        dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from creation
+        dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
         completedDate: order.completed_date ? new Date(order.completed_date) : new Date(),
         status: 'completed' as const,
         items: parseOrderItems(order.description)
@@ -145,7 +171,7 @@ export default function CompletedPage({ isAdmin }: CompletedPageProps) {
     pageType: 'completed'
   });
 
-  // Load orders from localStorage and database on component mount
+  // Load orders from database on component mount
   useEffect(() => {
     console.log('Loading completed orders...');
     fetchCompletedOrders();
@@ -158,7 +184,6 @@ export default function CompletedPage({ isAdmin }: CompletedPageProps) {
       order.companyName.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    // Group orders by completion month
     const monthMap = new Map<string, Order[]>();
     
     filteredOrders.forEach(order => {
@@ -171,17 +196,15 @@ export default function CompletedPage({ isAdmin }: CompletedPageProps) {
       monthMap.get(monthKey)!.push(order);
     });
 
-    // Convert to array and sort by month (newest first)
     const groups: MonthGroup[] = Array.from(monthMap.entries())
       .map(([month, orders]) => ({
         month,
         orders: orders.sort((a, b) => 
           (b.completedDate || b.orderDate).getTime() - (a.completedDate || a.orderDate).getTime()
         ),
-        isOpen: true // Default to open
+        isOpen: true
       }))
       .sort((a, b) => {
-        // Sort by month (newest first)
         const dateA = new Date(a.month);
         const dateB = new Date(b.month);
         return dateB.getTime() - dateA.getTime();
@@ -199,7 +222,6 @@ export default function CompletedPage({ isAdmin }: CompletedPageProps) {
 
   // View order details - now properly parses items like other pages
   const viewOrderDetails = (order: Order) => {
-    // Find the original database order for the details dialog
     const fetchOrderForDetails = async () => {
       try {
         const { data } = await supabase
@@ -215,7 +237,6 @@ export default function CompletedPage({ isAdmin }: CompletedPageProps) {
           .single();
 
         if (data) {
-          // Parse the items from the description
           const parsedItems = parseOrderItems(data.description);
           
           setSelectedOrder({
@@ -264,14 +285,12 @@ export default function CompletedPage({ isAdmin }: CompletedPageProps) {
         </div>
       </div>
 
-      {/* Real-time Status Indicator */}
       <div className="mb-4 p-2 bg-green-50 rounded-md border border-green-200">
         <p className="text-sm text-green-800">
           ✅ Real-time updates enabled - Completed orders sync automatically
         </p>
       </div>
 
-      {/* Completed Orders by Month */}
       <div className="space-y-4">
         {monthGroups.length === 0 && (
           <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
@@ -298,40 +317,84 @@ export default function CompletedPage({ isAdmin }: CompletedPageProps) {
               
               <CollapsibleContent>
                 <div className="divide-y">
-                  {monthGroup.orders.map(order => (
-                    <div key={order.id} className="p-4 hover:bg-gray-50">
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <h3 className="font-medium">Order #{order.orderNumber}</h3>
-                          <p className="text-sm text-gray-600">{order.companyName}</p>
-                          <p className="text-sm text-gray-600">
-                            Completed: {format(order.completedDate || order.orderDate, 'MMM d, yyyy')}
-                          </p>
+                  {monthGroup.orders.map(order => {
+                    const isExpanded = expandedOrders.has(order.id);
+                    
+                    return (
+                      <div key={order.id} className="p-4">
+                        <div className="flex justify-between items-center">
+                          <div className="flex items-center gap-4">
+                            <div>
+                              <h3 className="font-medium">Order #{order.orderNumber}</h3>
+                              <p className="text-sm text-gray-600">{order.companyName}</p>
+                              <p className="text-sm text-gray-600">
+                                Completed: {format(order.completedDate || order.orderDate, 'MMM d, yyyy')}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => toggleOrderExpansion(order.id)}
+                            >
+                              {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                              Items ({order.items.length})
+                            </Button>
+                            
+                            <Badge variant="outline" className="bg-green-100 text-green-800">
+                              Completed
+                            </Badge>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => openFilesDialog(order)}
+                            >
+                              <FileText className="h-4 w-4 mr-2" />
+                              Files
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => viewOrderDetails(order)}
+                            >
+                              <Eye className="h-4 w-4 mr-2" />
+                              View Details
+                            </Button>
+                          </div>
                         </div>
-                        <div className="flex items-center space-x-2">
-                          <Badge variant="outline" className="bg-green-100 text-green-800">
-                            Completed
-                          </Badge>
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => openFilesDialog(order)}
-                          >
-                            <FileText className="h-4 w-4 mr-2" />
-                            Files
-                          </Button>
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => viewOrderDetails(order)}
-                          >
-                            <Eye className="h-4 w-4 mr-2" />
-                            View Details
-                          </Button>
-                        </div>
+
+                        {isExpanded && (
+                          <div className="mt-4 border-t pt-4">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead>Item</TableHead>
+                                  <TableHead>Quantity Ordered</TableHead>
+                                  <TableHead>Quantity Delivered</TableHead>
+                                  <TableHead>Status</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {order.items.map((item) => (
+                                  <TableRow key={item.id}>
+                                    <TableCell className="font-medium">{item.name}</TableCell>
+                                    <TableCell>{item.quantity}</TableCell>
+                                    <TableCell>{item.delivered}</TableCell>
+                                    <TableCell>
+                                      <Badge variant="outline" className="bg-green-100 text-green-800">
+                                        Complete
+                                      </Badge>
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </CollapsibleContent>
             </Collapsible>
@@ -339,7 +402,6 @@ export default function CompletedPage({ isAdmin }: CompletedPageProps) {
         ))}
       </div>
 
-      {/* Order Details Dialog - Using the same component as other pages with properly parsed items */}
       {selectedOrder && (
         <OrderDetailsDialog
           open={showOrderDetails}
