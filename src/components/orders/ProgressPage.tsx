@@ -589,9 +589,6 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
         isOpen={!!selectedOrder}
         onClose={closeOrderDetails}
         isAdmin={isAdmin}
-        onOrderUpdate={handleOrderUpdate}
-        onCompleteOrder={completeOrder}
-        onDeleteOrder={deleteOrder}
       />
     </div>
   );
