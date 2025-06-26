@@ -357,12 +357,12 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
       console.log(`Updating order ${orderId} progress stage to ${stage}`);
       
       if (stage === 'completed') {
+        // Move to processing instead of completed
         const { error } = await supabase
           .from('orders')
           .update({ 
-            status: 'completed',
-            progress_stage: stage,
-            completed_date: new Date().toISOString(),
+            status: 'processing',
+            progress_stage: 'completed',
             updated_at: new Date().toISOString()
           })
           .eq('id', orderId);
@@ -373,11 +373,11 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
         setOrders(remainingOrders);
 
         toast({
-          title: "Order Completed",
-          description: "Order has been moved to completed status and will appear on the Completed page.",
+          title: "Order Moved to Processing",
+          description: "Order has been moved to processing stage and will appear on the Processing page.",
         });
 
-        console.log('Order successfully moved to completed status');
+        console.log('Order successfully moved to processing status');
         fetchProgressOrders();
       } else {
         const { error } = await supabase
@@ -478,33 +478,13 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
 
       if (error) throw error;
 
-      const completedOrder = {
-        ...orderToComplete,
-        items: orderToComplete.items.map(item => ({
-          ...item,
-          completed: true,
-          delivered: item.quantity
-        })),
-        status: 'processing' as const,
-        progress: 100,
-        progressStage: 'completed' as const
-      };
-
       const remainingOrders = orders.filter(order => order.id !== orderId);
       setOrders(remainingOrders);
       localStorage.setItem('progressOrders', JSON.stringify(remainingOrders));
 
-      const existingProcessingOrders = JSON.parse(localStorage.getItem('processingOrders') || '[]');
-      const updatedProcessingOrders = [...existingProcessingOrders, completedOrder];
-      localStorage.setItem('processingOrders', JSON.stringify(updatedProcessingOrders));
-
-      const existingDeliveryOrders = JSON.parse(localStorage.getItem('deliveryOrders') || '[]');
-      const updatedDeliveryOrders = existingDeliveryOrders.filter((order: Order) => order.id !== orderId);
-      localStorage.setItem('deliveryOrders', JSON.stringify(updatedDeliveryOrders));
-
       toast({
-        title: "Order Completed",
-        description: "Order has been moved to processing with all items marked as delivered. All users will see this update automatically.",
+        title: "Order Moved to Processing",
+        description: "Order has been moved to processing stage. All users will see this update automatically.",
       });
 
       setSelectedOrder(null);
