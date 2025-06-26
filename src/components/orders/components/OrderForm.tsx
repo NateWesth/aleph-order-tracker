@@ -1,5 +1,6 @@
 
 import { useState, useEffect } from "react";
+import { useForm, useFieldArray } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -7,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Trash2, Plus } from "lucide-react";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useCompanyData } from "@/components/admin/hooks/useCompanyData";
 import { getUserProfile, getUserRole } from "@/utils/authService";
 import { useAuth } from "@/contexts/AuthContext";
@@ -17,6 +19,13 @@ export interface OrderItem {
   quantity: number;
   unit?: string;
   notes?: string;
+}
+
+interface OrderFormData {
+  description: string;
+  companyId: string;
+  totalAmount: number;
+  items: OrderItem[];
 }
 
 interface OrderFormProps {
@@ -33,12 +42,20 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
   const { user } = useAuth();
   const { companies, loading: companiesLoading, userRole } = useCompanyData();
   const [userCompanyId, setUserCompanyId] = useState<string | null>(null);
-  const [description, setDescription] = useState("");
-  const [selectedCompanyId, setSelectedCompanyId] = useState("");
-  const [totalAmount, setTotalAmount] = useState<number>(0);
-  const [items, setItems] = useState<OrderItem[]>([
-    { id: crypto.randomUUID(), name: "", quantity: 1, unit: "", notes: "" }
-  ]);
+
+  const form = useForm<OrderFormData>({
+    defaultValues: {
+      description: "",
+      companyId: "",
+      totalAmount: 0,
+      items: [{ id: crypto.randomUUID(), name: "", quantity: 1, unit: "", notes: "" }]
+    }
+  });
+
+  const { fields, append, remove } = useFieldArray({
+    control: form.control,
+    name: "items"
+  });
 
   useEffect(() => {
     const fetchUserInfo = async () => {
@@ -52,7 +69,7 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
 
         if (role === 'user' && profile?.company_id) {
           setUserCompanyId(profile.company_id);
-          setSelectedCompanyId(profile.company_id);
+          form.setValue('companyId', profile.company_id);
         }
       } catch (error) {
         console.error("Error fetching user info:", error);
@@ -60,180 +77,241 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
     };
 
     fetchUserInfo();
-  }, [user?.id]);
+  }, [user?.id, form]);
 
   const addItem = () => {
-    setItems([...items, { 
+    append({ 
       id: crypto.randomUUID(), 
       name: "", 
       quantity: 1, 
       unit: "", 
       notes: "" 
-    }]);
+    });
   };
 
-  const removeItem = (id: string) => {
-    if (items.length > 1) {
-      setItems(items.filter(item => item.id !== id));
+  const removeItem = (index: number) => {
+    if (fields.length > 1) {
+      remove(index);
     }
   };
 
-  const updateItem = (id: string, field: keyof OrderItem, value: string | number) => {
-    setItems(items.map(item => 
-      item.id === id ? { ...item, [field]: value } : item
-    ));
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!selectedCompanyId) {
-      return;
-    }
-
-    const validItems = items.filter(item => item.name.trim() && item.quantity > 0);
+  const handleSubmit = (data: OrderFormData) => {
+    const validItems = data.items.filter(item => item.name.trim() && item.quantity > 0);
     
     if (validItems.length === 0) {
+      form.setError("items", { 
+        type: "manual", 
+        message: "Please add at least one valid item" 
+      });
       return;
     }
 
     onSubmit({
-      description,
-      companyId: selectedCompanyId,
-      totalAmount,
+      description: data.description,
+      companyId: data.companyId,
+      totalAmount: data.totalAmount,
       items: validItems
     });
   };
 
   if (companiesLoading) {
-    return <div>Loading companies...</div>;
+    return (
+      <div className="flex items-center justify-center py-8">
+        <div className="text-sm text-gray-600">Loading companies...</div>
+      </div>
+    );
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="space-y-2">
-        <Label htmlFor="description">Order Description</Label>
-        <Textarea
-          id="description"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          placeholder="Describe the order requirements..."
-          required
-        />
-      </div>
+    <div className="space-y-6">
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+          <FormField
+            control={form.control}
+            name="description"
+            rules={{ required: "Order description is required" }}
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Order Description</FormLabel>
+                <FormControl>
+                  <Textarea
+                    {...field}
+                    placeholder="Describe the order requirements..."
+                    className="min-h-[100px]"
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
 
-      {userRole === 'admin' && (
-        <div className="space-y-2">
-          <Label htmlFor="company">Company</Label>
-          <Select value={selectedCompanyId} onValueChange={setSelectedCompanyId} required>
-            <SelectTrigger>
-              <SelectValue placeholder="Select a company" />
-            </SelectTrigger>
-            <SelectContent>
-              {companies.map((company) => (
-                <SelectItem key={company.id} value={company.id}>
-                  {company.name} ({company.code})
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      )}
+          {userRole === 'admin' && (
+            <FormField
+              control={form.control}
+              name="companyId"
+              rules={{ required: "Please select a company" }}
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Company</FormLabel>
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a company" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {companies.map((company) => (
+                        <SelectItem key={company.id} value={company.id}>
+                          {company.name} ({company.code})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          )}
 
-      {userRole === 'user' && userCompanyId && (
-        <div className="space-y-2">
-          <Label>Company</Label>
-          <div className="text-sm text-gray-600 dark:text-gray-400">
-            {companies.find(c => c.id === userCompanyId)?.name || 'Your Company'}
-          </div>
-        </div>
-      )}
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            Order Items
-            <Button type="button" onClick={addItem} size="sm" variant="outline">
-              <Plus className="w-4 h-4 mr-2" />
-              Add Item
-            </Button>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {items.map((item, index) => (
-            <div key={item.id} className="grid grid-cols-12 gap-2 items-end">
-              <div className="col-span-4">
-                <Label htmlFor={`item-name-${item.id}`}>Item Name</Label>
-                <Input
-                  id={`item-name-${item.id}`}
-                  value={item.name}
-                  onChange={(e) => updateItem(item.id, 'name', e.target.value)}
-                  placeholder="Enter item name"
-                  required
-                />
-              </div>
-              <div className="col-span-2">
-                <Label htmlFor={`item-quantity-${item.id}`}>Quantity</Label>
-                <Input
-                  id={`item-quantity-${item.id}`}
-                  type="number"
-                  value={item.quantity}
-                  onChange={(e) => updateItem(item.id, 'quantity', parseInt(e.target.value) || 0)}
-                  min="1"
-                  required
-                />
-              </div>
-              <div className="col-span-2">
-                <Label htmlFor={`item-unit-${item.id}`}>Unit</Label>
-                <Input
-                  id={`item-unit-${item.id}`}
-                  value={item.unit || ''}
-                  onChange={(e) => updateItem(item.id, 'unit', e.target.value)}
-                  placeholder="e.g., kg, pcs"
-                />
-              </div>
-              <div className="col-span-3">
-                <Label htmlFor={`item-notes-${item.id}`}>Notes</Label>
-                <Input
-                  id={`item-notes-${item.id}`}
-                  value={item.notes || ''}
-                  onChange={(e) => updateItem(item.id, 'notes', e.target.value)}
-                  placeholder="Additional notes"
-                />
-              </div>
-              <div className="col-span-1">
-                <Button
-                  type="button"
-                  onClick={() => removeItem(item.id)}
-                  size="sm"
-                  variant="outline"
-                  disabled={items.length === 1}
-                >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
+          {userRole === 'user' && userCompanyId && (
+            <div className="space-y-2">
+              <Label>Company</Label>
+              <div className="text-sm text-gray-600 dark:text-gray-400 p-3 bg-gray-50 dark:bg-gray-800 rounded-md">
+                {companies.find(c => c.id === userCompanyId)?.name || 'Your Company'}
               </div>
             </div>
-          ))}
-        </CardContent>
-      </Card>
+          )}
 
-      <div className="space-y-2">
-        <Label htmlFor="totalAmount">Total Amount (Optional)</Label>
-        <Input
-          id="totalAmount"
-          type="number"
-          value={totalAmount}
-          onChange={(e) => setTotalAmount(parseFloat(e.target.value) || 0)}
-          placeholder="0.00"
-          step="0.01"
-          min="0"
-        />
-      </div>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                Order Items
+                <Button type="button" onClick={addItem} size="sm" variant="outline">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Item
+                </Button>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {fields.map((field, index) => (
+                <div key={field.id} className="grid grid-cols-12 gap-3 items-end p-4 border rounded-lg">
+                  <div className="col-span-4">
+                    <FormField
+                      control={form.control}
+                      name={`items.${index}.name`}
+                      rules={{ required: "Item name is required" }}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Item Name</FormLabel>
+                          <FormControl>
+                            <Input {...field} placeholder="Enter item name" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <FormField
+                      control={form.control}
+                      name={`items.${index}.quantity`}
+                      rules={{ 
+                        required: "Quantity is required",
+                        min: { value: 1, message: "Quantity must be at least 1" }
+                      }}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Quantity</FormLabel>
+                          <FormControl>
+                            <Input 
+                              {...field} 
+                              type="number" 
+                              min="1"
+                              onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <FormField
+                      control={form.control}
+                      name={`items.${index}.unit`}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Unit</FormLabel>
+                          <FormControl>
+                            <Input {...field} placeholder="e.g., kg, pcs" />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <div className="col-span-3">
+                    <FormField
+                      control={form.control}
+                      name={`items.${index}.notes`}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Notes</FormLabel>
+                          <FormControl>
+                            <Input {...field} placeholder="Additional notes" />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <div className="col-span-1">
+                    <Button
+                      type="button"
+                      onClick={() => removeItem(index)}
+                      size="sm"
+                      variant="outline"
+                      disabled={fields.length === 1}
+                      className="w-full"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+              <FormMessage>{form.formState.errors.items?.message}</FormMessage>
+            </CardContent>
+          </Card>
 
-      <Button type="submit" className="w-full" disabled={loading}>
-        {loading ? "Creating Order..." : "Create Order"}
-      </Button>
-    </form>
+          <FormField
+            control={form.control}
+            name="totalAmount"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Total Amount (Optional)</FormLabel>
+                <FormControl>
+                  <Input
+                    {...field}
+                    type="number"
+                    placeholder="0.00"
+                    step="0.01"
+                    min="0"
+                    onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <Button 
+            type="submit" 
+            className="w-full" 
+            disabled={loading || companiesLoading}
+          >
+            {loading ? "Creating Order..." : "Create Order"}
+          </Button>
+        </form>
+      </Form>
+    </div>
   );
 };
 
