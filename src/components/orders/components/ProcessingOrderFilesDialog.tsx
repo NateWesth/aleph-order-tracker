@@ -7,11 +7,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Upload, Download, Eye, Trash2, FileText } from "lucide-react";
+import { Download, Eye, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -61,7 +59,6 @@ export default function ProcessingOrderFilesDialog({
   const { toast } = useToast();
   const { user } = useAuth();
   const [files, setFiles] = useState<OrderFile[]>([]);
-  const [uploading, setUploading] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   // Fetch files for the order
@@ -104,61 +101,6 @@ export default function ProcessingOrderFilesDialog({
     }
   };
 
-  // Upload file to Supabase storage and database
-  const handleFileUpload = async (file: File, fileType: string) => {
-    if (!order?.id || !user?.id) return;
-
-    setUploading(fileType);
-    try {
-      // Upload to Supabase storage
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${order.id}/${fileType}_${Date.now()}.${fileExt}`;
-      
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('order-files')
-        .upload(fileName, file);
-
-      if (uploadError) throw uploadError;
-
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('order-files')
-        .getPublicUrl(fileName);
-
-      // Save to database
-      const { error: dbError } = await supabase
-        .from('order_files')
-        .insert({
-          order_id: order.id,
-          file_name: file.name,
-          file_url: publicUrl,
-          file_type: fileType,
-          uploaded_by_role: isAdmin ? 'admin' : 'client',
-          uploaded_by_user_id: user.id,
-          file_size: file.size,
-          mime_type: file.type
-        });
-
-      if (dbError) throw dbError;
-
-      toast({
-        title: "File Uploaded",
-        description: `${fileTypeLabels[fileType as keyof typeof fileTypeLabels]} has been uploaded successfully.`,
-      });
-
-      fetchOrderFiles(); // Refresh files list
-    } catch (error) {
-      console.error('Error uploading file:', error);
-      toast({
-        title: "Upload Failed",
-        description: "Failed to upload file. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setUploading(null);
-    }
-  };
-
   // Download file
   const handleFileDownload = (file: OrderFile) => {
     const link = document.createElement('a');
@@ -183,57 +125,9 @@ export default function ProcessingOrderFilesDialog({
     }
   };
 
-  const handleFileDelete = async (file: OrderFile) => {
-    if (!user?.id || file.uploaded_by_user_id !== user.id) return;
-
-    try {
-      // Delete from storage
-      const fileName = file.file_url.split('/').pop();
-      if (fileName) {
-        await supabase.storage
-          .from('order-files')
-          .remove([`${order?.id}/${fileName}`]);
-      }
-
-      // Delete from database
-      const { error } = await supabase
-        .from('order_files')
-        .delete()
-        .eq('id', file.id);
-
-      if (error) throw error;
-
-      toast({
-        title: "File Deleted",
-        description: "File has been deleted successfully.",
-      });
-
-      fetchOrderFiles(); // Refresh files list
-    } catch (error) {
-      console.error('Error deleting file:', error);
-      toast({
-        title: "Delete Failed",
-        description: "Failed to delete file. Please try again.",
-        variant: "destructive",
-      });
-    }
-  };
-
   // Get files by type
   const getFilesByType = (type: string) => {
     return files.filter(file => file.file_type === type);
-  };
-
-  const canUpload = (fileType: string) => {
-    if (isAdmin) {
-      return fileType === 'quote' || fileType === 'invoice' || fileType === 'delivery-note';
-    } else {
-      return fileType === 'purchase-order';
-    }
-  };
-
-  const canDelete = (file: OrderFile) => {
-    return file.uploaded_by_user_id === user?.id;
   };
 
   useEffect(() => {
@@ -288,28 +182,6 @@ export default function ProcessingOrderFilesDialog({
           <TabsContent value="quote" className="space-y-4">
             <div className="flex justify-between items-center">
               <h3 className="text-lg font-medium">Quote Files</h3>
-              {canUpload('quote') && (
-                <div>
-                  <Input
-                    type="file"
-                    id="quote-upload"
-                    className="hidden"
-                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) handleFileUpload(file, 'quote');
-                    }}
-                  />
-                  <Button
-                    onClick={() => document.getElementById('quote-upload')?.click()}
-                    disabled={uploading === 'quote'}
-                    size="sm"
-                  >
-                    <Upload className="h-4 w-4 mr-2" />
-                    {uploading === 'quote' ? 'Uploading...' : 'Upload Quote'}
-                  </Button>
-                </div>
-              )}
             </div>
 
             <div className="space-y-2">
@@ -334,11 +206,6 @@ export default function ProcessingOrderFilesDialog({
                     <Button variant="ghost" size="sm" onClick={() => handleFilePrint(file)}>
                       Print
                     </Button>
-                    {canDelete(file) && (
-                      <Button variant="ghost" size="sm" onClick={() => handleFileDelete(file)}>
-                        <Trash2 className="h-4 w-4 text-red-500" />
-                      </Button>
-                    )}
                   </div>
                 </div>
               ))}
@@ -352,28 +219,6 @@ export default function ProcessingOrderFilesDialog({
           <TabsContent value="purchase-order" className="space-y-4">
             <div className="flex justify-between items-center">
               <h3 className="text-lg font-medium">Purchase Order Files</h3>
-              {canUpload('purchase-order') && (
-                <div>
-                  <Input
-                    type="file"
-                    id="po-upload"
-                    className="hidden"
-                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) handleFileUpload(file, 'purchase-order');
-                    }}
-                  />
-                  <Button
-                    onClick={() => document.getElementById('po-upload')?.click()}
-                    disabled={uploading === 'purchase-order'}
-                    size="sm"
-                  >
-                    <Upload className="h-4 w-4 mr-2" />
-                    {uploading === 'purchase-order' ? 'Uploading...' : 'Upload Purchase Order'}
-                  </Button>
-                </div>
-              )}
             </div>
 
             <div className="space-y-2">
@@ -398,11 +243,6 @@ export default function ProcessingOrderFilesDialog({
                     <Button variant="ghost" size="sm" onClick={() => handleFilePrint(file)}>
                       Print
                     </Button>
-                    {canDelete(file) && (
-                      <Button variant="ghost" size="sm" onClick={() => handleFileDelete(file)}>
-                        <Trash2 className="h-4 w-4 text-red-500" />
-                      </Button>
-                    )}
                   </div>
                 </div>
               ))}
@@ -416,28 +256,6 @@ export default function ProcessingOrderFilesDialog({
           <TabsContent value="invoice" className="space-y-4">
             <div className="flex justify-between items-center">
               <h3 className="text-lg font-medium">Invoice Files</h3>
-              {canUpload('invoice') && (
-                <div>
-                  <Input
-                    type="file"
-                    id="invoice-upload"
-                    className="hidden"
-                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) handleFileUpload(file, 'invoice');
-                    }}
-                  />
-                  <Button
-                    onClick={() => document.getElementById('invoice-upload')?.click()}
-                    disabled={uploading === 'invoice'}
-                    size="sm"
-                  >
-                    <Upload className="h-4 w-4 mr-2" />
-                    {uploading === 'invoice' ? 'Uploading...' : 'Upload Invoice'}
-                  </Button>
-                </div>
-              )}
             </div>
 
             <div className="space-y-2">
@@ -462,11 +280,6 @@ export default function ProcessingOrderFilesDialog({
                     <Button variant="ghost" size="sm" onClick={() => handleFilePrint(file)}>
                       Print
                     </Button>
-                    {canDelete(file) && (
-                      <Button variant="ghost" size="sm" onClick={() => handleFileDelete(file)}>
-                        <Trash2 className="h-4 w-4 text-red-500" />
-                      </Button>
-                    )}
                   </div>
                 </div>
               ))}
@@ -480,28 +293,6 @@ export default function ProcessingOrderFilesDialog({
           <TabsContent value="delivery-note" className="space-y-4">
             <div className="flex justify-between items-center">
               <h3 className="text-lg font-medium">Delivery Note Files</h3>
-              {canUpload('delivery-note') && (
-                <div>
-                  <Input
-                    type="file"
-                    id="delivery-note-upload"
-                    className="hidden"
-                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) handleFileUpload(file, 'delivery-note');
-                    }}
-                  />
-                  <Button
-                    onClick={() => document.getElementById('delivery-note-upload')?.click()}
-                    disabled={uploading === 'delivery-note'}
-                    size="sm"
-                  >
-                    <Upload className="h-4 w-4 mr-2" />
-                    {uploading === 'delivery-note' ? 'Uploading...' : 'Upload Delivery Note'}
-                  </Button>
-                </div>
-              )}
             </div>
 
             <div className="space-y-2">
@@ -526,11 +317,6 @@ export default function ProcessingOrderFilesDialog({
                     <Button variant="ghost" size="sm" onClick={() => handleFilePrint(file)}>
                       Print
                     </Button>
-                    {canDelete(file) && (
-                      <Button variant="ghost" size="sm" onClick={() => handleFileDelete(file)}>
-                        <Trash2 className="h-4 w-4 text-red-500" />
-                      </Button>
-                    )}
                   </div>
                 </div>
               ))}
