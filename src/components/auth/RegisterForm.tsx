@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -102,10 +103,11 @@ const RegisterForm = () => {
         // Normalize the company code for comparison
         const normalizedCode = formData.companyCode.trim().toUpperCase();
         
+        // Use exact match instead of ilike to be more precise
         const { data: company, error: companyError } = await supabase
           .from('companies')
           .select('id, code, name')
-          .ilike('code', normalizedCode)
+          .eq('code', normalizedCode)
           .maybeSingle();
 
         console.log("Company validation result:", { company, companyError });
