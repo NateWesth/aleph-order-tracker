@@ -32,6 +32,21 @@ interface ProgressOrderDetailsDialogProps {
   isAdmin: boolean;
 }
 
+// Helper function to safely format dates
+const formatSafeDate = (date: Date | string | number | null | undefined): string => {
+  try {
+    if (!date) return 'No date';
+    const dateObj = new Date(date);
+    if (isNaN(dateObj.getTime())) {
+      return 'Invalid Date';
+    }
+    return format(dateObj, 'MMM d, yyyy h:mm a');
+  } catch (error) {
+    console.error('Error formatting date:', error, 'Date value:', date);
+    return 'Invalid Date';
+  }
+};
+
 // Parse order items from description - same logic as other components
 const parseOrderItems = (description: string | null): OrderItem[] => {
   if (!description) {
@@ -160,29 +175,34 @@ export default function ProgressOrderDetailsDialog({
     }
   };
 
+  // Don't render if order is not available
+  if (!order) {
+    return null;
+  }
+
   return (
     <AlertDialog open={isOpen} onOpenChange={onClose}>
       <AlertDialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <AlertDialogHeader>
-          <AlertDialogTitle>Order #{order?.order_number} Details</AlertDialogTitle>
+          <AlertDialogTitle>Order #{order?.order_number || 'Unknown'} Details</AlertDialogTitle>
         </AlertDialogHeader>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <p className="text-sm text-gray-500">Order Number</p>
-            <p>{order?.order_number}</p>
+            <p>{order?.order_number || 'Unknown'}</p>
           </div>
           <div>
             <p className="text-sm text-gray-500">Company</p>
-            <p>{order?.companyName}</p>
+            <p>{order?.companyName || 'Unknown Company'}</p>
           </div>
           <div>
             <p className="text-sm text-gray-500">Created At</p>
-            <p>{format(new Date(order?.created_at), 'MMM d, yyyy h:mm a')}</p>
+            <p>{formatSafeDate(order?.created_at)}</p>
           </div>
           <div>
             <p className="text-sm text-gray-500">Status</p>
-            <Badge variant="secondary">{order?.status}</Badge>
+            <Badge variant="secondary">{order?.status || 'Unknown'}</Badge>
           </div>
         </div>
 
@@ -207,36 +227,46 @@ export default function ProgressOrderDetailsDialog({
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {items.map((item) => (
-                  <tr key={item.name}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {item.name}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {item.quantity}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      <input
-                        type="number"
-                        value={deliveredQuantities[item.name] || 0}
-                        onChange={(e) =>
-                          updateDeliveredQuantity(item.name, parseInt(e.target.value))
-                        }
-                        className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-24 sm:text-sm border-gray-300 rounded-md"
-                      />
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      <input
-                        type="checkbox"
-                        checked={item.completed}
-                        onChange={(e) =>
-                          toggleItemCompletion(item.name, e.target.checked)
-                        }
-                        className="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300 rounded"
-                      />
+                {items.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="px-6 py-4 text-center text-gray-500">
+                      No items found for this order
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  items.map((item) => (
+                    <tr key={item.name}>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        {item.name}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {item.quantity}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <input
+                          type="number"
+                          value={deliveredQuantities[item.name] || 0}
+                          onChange={(e) =>
+                            updateDeliveredQuantity(item.name, parseInt(e.target.value) || 0)
+                          }
+                          className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-24 sm:text-sm border-gray-300 rounded-md"
+                          min="0"
+                          max={item.quantity}
+                        />
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <input
+                          type="checkbox"
+                          checked={item.completed}
+                          onChange={(e) =>
+                            toggleItemCompletion(item.name, e.target.checked)
+                          }
+                          className="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300 rounded"
+                        />
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
