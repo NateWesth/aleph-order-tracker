@@ -20,7 +20,7 @@ interface OrderFile {
   id: string;
   file_name: string;
   file_url: string;
-  file_type: 'quote' | 'purchase-order' | 'invoice';
+  file_type: 'quote' | 'purchase-order' | 'invoice' | 'delivery-note';
   uploaded_by_role: 'admin' | 'client';
   uploaded_by_user_id: string;
   file_size?: number;
@@ -48,7 +48,8 @@ interface ProcessingOrderFilesDialogProps {
 const fileTypeLabels = {
   'quote': 'Quote',
   'purchase-order': 'Purchase Order',
-  'invoice': 'Invoice'
+  'invoice': 'Invoice',
+  'delivery-note': 'Delivery Note'
 };
 
 export default function ProcessingOrderFilesDialog({
@@ -82,7 +83,7 @@ export default function ProcessingOrderFilesDialog({
         id: file.id,
         file_name: file.file_name,
         file_url: file.file_url,
-        file_type: file.file_type as 'quote' | 'purchase-order' | 'invoice',
+        file_type: file.file_type as 'quote' | 'purchase-order' | 'invoice' | 'delivery-note',
         uploaded_by_role: file.uploaded_by_role as 'admin' | 'client',
         uploaded_by_user_id: file.uploaded_by_user_id,
         file_size: file.file_size || undefined,
@@ -225,7 +226,7 @@ export default function ProcessingOrderFilesDialog({
 
   const canUpload = (fileType: string) => {
     if (isAdmin) {
-      return fileType === 'quote' || fileType === 'invoice';
+      return fileType === 'quote' || fileType === 'invoice' || fileType === 'delivery-note';
     } else {
       return fileType === 'purchase-order';
     }
@@ -276,10 +277,11 @@ export default function ProcessingOrderFilesDialog({
         </DialogHeader>
 
         <Tabs defaultValue="quote" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="quote">Quote</TabsTrigger>
             <TabsTrigger value="purchase-order">Purchase Order</TabsTrigger>
             <TabsTrigger value="invoice">Invoice</TabsTrigger>
+            <TabsTrigger value="delivery-note">Delivery Notes</TabsTrigger>
           </TabsList>
 
           {/* Quote Tab */}
@@ -410,6 +412,7 @@ export default function ProcessingOrderFilesDialog({
             </div>
           </TabsContent>
 
+          {/* Invoice Tab */}
           <TabsContent value="invoice" className="space-y-4">
             <div className="flex justify-between items-center">
               <h3 className="text-lg font-medium">Invoice Files</h3>
@@ -469,6 +472,70 @@ export default function ProcessingOrderFilesDialog({
               ))}
               {getFilesByType('invoice').length === 0 && (
                 <p className="text-center text-gray-500 py-8">No invoice files uploaded yet.</p>
+              )}
+            </div>
+          </TabsContent>
+
+          {/* Delivery Notes Tab */}
+          <TabsContent value="delivery-note" className="space-y-4">
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg font-medium">Delivery Note Files</h3>
+              {canUpload('delivery-note') && (
+                <div>
+                  <Input
+                    type="file"
+                    id="delivery-note-upload"
+                    className="hidden"
+                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleFileUpload(file, 'delivery-note');
+                    }}
+                  />
+                  <Button
+                    onClick={() => document.getElementById('delivery-note-upload')?.click()}
+                    disabled={uploading === 'delivery-note'}
+                    size="sm"
+                  >
+                    <Upload className="h-4 w-4 mr-2" />
+                    {uploading === 'delivery-note' ? 'Uploading...' : 'Upload Delivery Note'}
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              {getFilesByType('delivery-note').map((file) => (
+                <div key={file.id} className="flex items-center justify-between p-3 border rounded-lg">
+                  <div className="flex items-center space-x-3">
+                    <FileText className="h-5 w-5 text-orange-500" />
+                    <div>
+                      <p className="font-medium">{file.file_name}</p>
+                      <p className="text-sm text-gray-500">
+                        Uploaded by {file.uploaded_by_role} • {new Date(file.created_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Button variant="ghost" size="sm" onClick={() => handleFileView(file)}>
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => handleFileDownload(file)}>
+                      <Download className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => handleFilePrint(file)}>
+                      Print
+                    </Button>
+                    {canDelete(file) && (
+                      <Button variant="ghost" size="sm" onClick={() => handleFileDelete(file)}>
+                        <Trash2 className="h-4 w-4 text-red-500" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))}
+              {getFilesByType('delivery-note').length === 0 && (
+                <p className="text-center text-gray-500 py-8">No delivery note files uploaded yet.</p>
               )}
             </div>
           </TabsContent>
