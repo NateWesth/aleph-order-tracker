@@ -1,4 +1,3 @@
-
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
@@ -14,14 +13,13 @@ import {
   SidebarMenuButton,
   SidebarFooter
 } from "@/components/ui/sidebar";
-import { Home, FileText, ListOrdered, BarChart2, Settings, Files, Building2, Users, Truck } from "lucide-react";
+import { Home, FileText, ListOrdered, BarChart2, Settings, Files, Building2, Users } from "lucide-react";
 import OrdersPage from "@/components/orders/OrdersPage";
 import ProgressPage from "@/components/orders/ProgressPage";
 import ProcessingPage from "@/components/orders/ProcessingPage";
 import CompletedPage from "@/components/orders/CompletedPage";
 import FilesPage from "@/components/orders/FilesPage";
 import ClientCompaniesPage from "@/components/admin/ClientCompaniesPage";
-import DeliveryNotePage from "@/components/admin/DeliveryNotePage";
 import UsersManagementPage from "@/components/admin/UsersManagementPage";
 
 const AdminDashboard = () => {
@@ -135,16 +133,6 @@ const AdminDashboard = () => {
               </SidebarMenuItem>
               <SidebarMenuItem>
                 <SidebarMenuButton 
-                  tooltip="Delivery Notes"
-                  onClick={() => handleMenuClick("delivery-notes")}
-                  className={`sidebar-hover ${activeView === "delivery-notes" ? "sidebar-active" : ""}`}
-                >
-                  <Truck />
-                  <span>Delivery Notes</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton 
                   tooltip="Completed"
                   onClick={() => handleMenuClick("completed")}
                   className={`sidebar-hover ${activeView === "completed" ? "sidebar-active" : ""}`}
@@ -251,10 +239,6 @@ const AdminDashboard = () => {
             ) : activeView === "processing" ? (
               <div className="bg-white dark:bg-gray-800 min-h-full">
                 <ProcessingPage isAdmin={true} />
-              </div>
-            ) : activeView === "delivery-notes" ? (
-              <div className="bg-white dark:bg-gray-800 min-h-full">
-                <DeliveryNotePage isAdmin={true} />
               </div>
             ) : activeView === "completed" ? (
               <div className="bg-white dark:bg-gray-800 min-h-full">
