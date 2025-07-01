@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useGlobalRealtimeOrders } from "./hooks/useGlobalRealtimeOrders";
 import ProcessingOrderFilesDialog from "./components/ProcessingOrderFilesDialog";
+
 interface OrderItem {
   id: string;
   name: string;
@@ -307,7 +308,7 @@ export default function ProcessingPage({
 
       <div className="bg-white rounded-lg shadow">
         <div className="p-4 border-b">
-          <h2 className="text-lg font-semibold">Supporting Documents </h2>
+          <h2 className="text-lg font-semibold">Supporting Documents</h2>
         </div>
         
         {orders.length === 0 ? <div className="p-4 text-center text-gray-500">
