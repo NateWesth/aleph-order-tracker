@@ -33,6 +33,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useGlobalRealtimeOrders } from "./hooks/useGlobalRealtimeOrders";
 import ProgressOrderDetailsDialog from "./components/ProgressOrderDetailsDialog";
+import OrderExportActions from "./components/OrderExportActions";
 
 // Define the order item interface
 interface OrderItem {
@@ -580,6 +581,19 @@ export default function ProgressPage({ isAdmin }: ProgressPageProps) {
     <div className="container mx-auto p-4">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Order Progress Tracking</h1>
+        <OrderExportActions 
+          orders={orders.map(order => ({
+            id: order.id,
+            order_number: order.orderNumber,
+            description: order.items.map(item => `${item.name} (Qty: ${item.quantity})`).join('\n'),
+            status: order.status,
+            total_amount: null,
+            created_at: order.orderDate.toISOString(),
+            company_id: null,
+            companyName: order.companyName
+          }))} 
+          title="Progress Orders" 
+        />
       </div>
 
       <div className="mb-4 p-2 bg-blue-50 rounded-md border border-blue-200">

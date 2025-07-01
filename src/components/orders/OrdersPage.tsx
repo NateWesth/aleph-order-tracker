@@ -1,9 +1,9 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import OrdersHeader from "./components/OrdersHeader";
 import OrderTable from "./components/OrderTable";
 import CreateOrderDialog from "./components/CreateOrderDialog";
+import OrderExportActions from "./components/OrderExportActions";
 import { useOrderData } from "./hooks/useOrderData";
 import { useGlobalRealtimeOrders } from "./hooks/useGlobalRealtimeOrders";
 import { useCompanyData } from "@/components/admin/hooks/useCompanyData";
@@ -150,13 +150,16 @@ export default function OrdersPage({ isAdmin = false }: OrdersPageProps) {
     <div className="container mx-auto p-6">
       <div className="flex justify-between items-center mb-6">
         <OrdersHeader searchTerm={searchTerm} onSearchChange={setSearchTerm} />
-        <CreateOrderDialog
-          isAdmin={isAdmin}
-          companies={companies}
-          profiles={[]} // We'll handle this in CreateOrderDialog
-          userProfile={null} // We'll handle this in CreateOrderDialog
-          onOrderCreated={fetchOrders}
-        />
+        <div className="flex gap-2">
+          <OrderExportActions orders={filteredOrders} title="Orders" />
+          <CreateOrderDialog
+            isAdmin={isAdmin}
+            companies={companies}
+            profiles={[]} // We'll handle this in CreateOrderDialog
+            userProfile={null} // We'll handle this in CreateOrderDialog
+            onOrderCreated={fetchOrders}
+          />
+        </div>
       </div>
 
       {/* Enhanced Real-time Status Indicator */}
