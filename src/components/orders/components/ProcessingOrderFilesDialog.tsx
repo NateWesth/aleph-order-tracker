@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import {
   Dialog,
@@ -463,7 +462,7 @@ export default function ProcessingOrderFilesDialog({
 
             <FileUploadSection fileType="delivery-note" />
           </TabsContent>
-        </tabs>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );
