@@ -7,11 +7,12 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Trash2, Plus } from "lucide-react";
+import { Trash2, Plus, RefreshCw } from "lucide-react";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useCompanyData } from "@/components/admin/hooks/useCompanyData";
 import { getUserProfile, getUserRole } from "@/utils/authService";
 import { useAuth } from "@/contexts/AuthContext";
+import { generateOrderNumber } from "../utils/orderUtils";
 
 export interface OrderItem {
   id: string;
@@ -22,6 +23,7 @@ export interface OrderItem {
 }
 
 interface OrderFormData {
+  orderNumber: string;
   description: string;
   companyId: string;
   totalAmount: number;
@@ -30,6 +32,7 @@ interface OrderFormData {
 
 interface OrderFormProps {
   onSubmit: (orderData: {
+    orderNumber: string;
     description: string;
     companyId: string;
     totalAmount: number;
@@ -45,6 +48,7 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
 
   const form = useForm<OrderFormData>({
     defaultValues: {
+      orderNumber: "",
       description: "",
       companyId: "",
       totalAmount: 0,
@@ -79,6 +83,19 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
     fetchUserInfo();
   }, [user?.id, form]);
 
+  // Generate a new order number
+  const handleGenerateOrderNumber = () => {
+    const newOrderNumber = generateOrderNumber();
+    form.setValue('orderNumber', newOrderNumber);
+  };
+
+  // Generate order number on component mount if empty
+  useEffect(() => {
+    if (!form.getValues('orderNumber')) {
+      handleGenerateOrderNumber();
+    }
+  }, []);
+
   const addItem = () => {
     append({ 
       id: crypto.randomUUID(), 
@@ -106,7 +123,16 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
       return;
     }
 
+    if (!data.orderNumber.trim()) {
+      form.setError("orderNumber", { 
+        type: "manual", 
+        message: "Order number is required" 
+      });
+      return;
+    }
+
     onSubmit({
+      orderNumber: data.orderNumber,
       description: data.description,
       companyId: data.companyId,
       totalAmount: data.totalAmount,
@@ -126,6 +152,36 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
     <div className="space-y-6">
       <Form {...form}>
         <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+          <FormField
+            control={form.control}
+            name="orderNumber"
+            rules={{ required: "Order number is required" }}
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Order Number</FormLabel>
+                <div className="flex gap-2">
+                  <FormControl>
+                    <Input
+                      {...field}
+                      placeholder="Enter order number or generate one"
+                    />
+                  </FormControl>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleGenerateOrderNumber}
+                    className="shrink-0"
+                  >
+                    <RefreshCw className="w-4 h-4 mr-1" />
+                    Generate
+                  </Button>
+                </div>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
           <FormField
             control={form.control}
             name="description"

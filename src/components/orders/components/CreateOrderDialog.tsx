@@ -13,7 +13,6 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import OrderForm from "./OrderForm";
-import { generateOrderNumber } from "../utils/orderUtils";
 
 interface CreateOrderDialogProps {
   isAdmin: boolean;
@@ -36,6 +35,7 @@ export default function CreateOrderDialog({
   const [loading, setLoading] = useState(false);
 
   const handleOrderSubmit = async (orderData: {
+    orderNumber: string;
     description: string;
     companyId: string;
     totalAmount: number;
@@ -50,10 +50,19 @@ export default function CreateOrderDialog({
       return;
     }
 
+    if (!orderData.orderNumber.trim()) {
+      toast({
+        title: "Error",
+        description: "Please provide an order number.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setLoading(true);
 
     try {
-      console.log("Creating order with real-time updates...");
+      console.log("Creating order with custom order number...");
       
       // Convert items to a formatted description string
       const itemsDescription = orderData.items.map(item => 
@@ -61,7 +70,7 @@ export default function CreateOrderDialog({
       ).join('\n');
       
       const newOrderData = {
-        order_number: generateOrderNumber(),
+        order_number: orderData.orderNumber,
         description: itemsDescription,
         total_amount: orderData.totalAmount || null,
         status: 'pending',
@@ -69,7 +78,7 @@ export default function CreateOrderDialog({
         user_id: user?.id
       };
 
-      console.log("Order data for real-time insert:", newOrderData);
+      console.log("Order data for insert:", newOrderData);
 
       // Insert the order - this will trigger real-time updates automatically
       const { error } = await supabase
@@ -81,11 +90,11 @@ export default function CreateOrderDialog({
         throw error;
       }
 
-      console.log("Order created successfully - real-time updates should be triggered");
+      console.log("Order created successfully with custom order number");
 
       toast({
         title: "Order Created",
-        description: `Order ${newOrderData.order_number} has been created successfully with ${orderData.items.length} item(s).`,
+        description: `Order ${orderData.orderNumber} has been created successfully with ${orderData.items.length} item(s).`,
       });
 
       setShowCreateDialog(false);
