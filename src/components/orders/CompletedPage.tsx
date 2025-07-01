@@ -1,26 +1,9 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { format, startOfMonth, endOfMonth, isSameMonth } from "date-fns";
 import { Eye, ChevronDown, ChevronRight, FileText, Search } from "lucide-react";
@@ -29,7 +12,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useGlobalRealtimeOrders } from "./hooks/useGlobalRealtimeOrders";
 import ProcessingOrderFilesDialog from "./components/ProcessingOrderFilesDialog";
 import OrderDetailsDialog from "./components/OrderDetailsDialog";
-
 interface OrderItem {
   id: string;
   name: string;
@@ -37,7 +19,6 @@ interface OrderItem {
   delivered: number;
   completed: boolean;
 }
-
 interface Order {
   id: string;
   orderNumber: string;
@@ -48,20 +29,23 @@ interface Order {
   items: OrderItem[];
   status: 'completed';
 }
-
 interface CompletedPageProps {
   isAdmin: boolean;
 }
-
 interface MonthGroup {
   month: string;
   orders: Order[];
   isOpen: boolean;
 }
-
-export default function CompletedPage({ isAdmin }: CompletedPageProps) {
-  const { toast } = useToast();
-  const { user } = useAuth();
+export default function CompletedPage({
+  isAdmin
+}: CompletedPageProps) {
+  const {
+    toast
+  } = useToast();
+  const {
+    user
+  } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -76,7 +60,6 @@ export default function CompletedPage({ isAdmin }: CompletedPageProps) {
     if (!description) {
       return [];
     }
-
     const items = description.split('\n').map((line, index) => {
       const match = line.match(/^(.+?)\s*\(Qty:\s*(\d+)\)$/);
       if (match) {
@@ -84,7 +67,8 @@ export default function CompletedPage({ isAdmin }: CompletedPageProps) {
           id: `item-${index}`,
           name: match[1].trim(),
           quantity: parseInt(match[2]),
-          delivered: parseInt(match[2]), // Completed orders are fully delivered
+          delivered: parseInt(match[2]),
+          // Completed orders are fully delivered
           completed: true
         };
       }
@@ -96,7 +80,6 @@ export default function CompletedPage({ isAdmin }: CompletedPageProps) {
         completed: true
       };
     }).filter(item => item.name);
-
     return items;
   };
 
@@ -116,34 +99,29 @@ export default function CompletedPage({ isAdmin }: CompletedPageProps) {
   // Fetch completed orders from database with company information
   const fetchCompletedOrders = async () => {
     if (!user?.id) return;
-
     try {
       console.log('Fetching completed orders from Supabase...');
-      let query = supabase
-        .from('orders')
-        .select(`
+      let query = supabase.from('orders').select(`
           *,
           companies (
             name,
             code
           )
-        `)
-        .eq('status', 'completed')
-        .order('completed_date', { ascending: false });
-
+        `).eq('status', 'completed').order('completed_date', {
+        ascending: false
+      });
       if (!isAdmin) {
         query = query.eq('user_id', user.id);
       }
-
-      const { data, error } = await query;
-
+      const {
+        data,
+        error
+      } = await query;
       if (error) {
         console.error("Error fetching completed orders:", error);
         return;
       }
-
       console.log('Fetched completed orders:', data?.length || 0);
-      
       const transformedOrders = (data || []).map(order => ({
         id: order.id,
         orderNumber: order.order_number,
@@ -154,7 +132,6 @@ export default function CompletedPage({ isAdmin }: CompletedPageProps) {
         status: 'completed' as const,
         items: parseOrderItems(order.description)
       }));
-
       setOrders(transformedOrders);
     } catch (error) {
       console.error("Failed to fetch completed orders:", error);
@@ -179,66 +156,51 @@ export default function CompletedPage({ isAdmin }: CompletedPageProps) {
 
   // Group orders by completion month
   useEffect(() => {
-    const filteredOrders = orders.filter(order => 
-      order.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.companyName.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-
+    const filteredOrders = orders.filter(order => order.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) || order.companyName.toLowerCase().includes(searchTerm.toLowerCase()));
     const monthMap = new Map<string, Order[]>();
-    
     filteredOrders.forEach(order => {
       const completionDate = order.completedDate || order.orderDate;
       const monthKey = format(completionDate, 'MMMM yyyy');
-      
       if (!monthMap.has(monthKey)) {
         monthMap.set(monthKey, []);
       }
       monthMap.get(monthKey)!.push(order);
     });
-
-    const groups: MonthGroup[] = Array.from(monthMap.entries())
-      .map(([month, orders]) => ({
-        month,
-        orders: orders.sort((a, b) => 
-          (b.completedDate || b.orderDate).getTime() - (a.completedDate || a.orderDate).getTime()
-        ),
-        isOpen: true
-      }))
-      .sort((a, b) => {
-        const dateA = new Date(a.month);
-        const dateB = new Date(b.month);
-        return dateB.getTime() - dateA.getTime();
-      });
-
+    const groups: MonthGroup[] = Array.from(monthMap.entries()).map(([month, orders]) => ({
+      month,
+      orders: orders.sort((a, b) => (b.completedDate || b.orderDate).getTime() - (a.completedDate || a.orderDate).getTime()),
+      isOpen: true
+    })).sort((a, b) => {
+      const dateA = new Date(a.month);
+      const dateB = new Date(b.month);
+      return dateB.getTime() - dateA.getTime();
+    });
     setMonthGroups(groups);
   }, [orders, searchTerm]);
 
   // Toggle month group
   const toggleMonthGroup = (monthIndex: number) => {
-    setMonthGroups(prev => prev.map((group, index) => 
-      index === monthIndex ? { ...group, isOpen: !group.isOpen } : group
-    ));
+    setMonthGroups(prev => prev.map((group, index) => index === monthIndex ? {
+      ...group,
+      isOpen: !group.isOpen
+    } : group));
   };
 
   // View order details - now properly parses items like other pages
   const viewOrderDetails = (order: Order) => {
     const fetchOrderForDetails = async () => {
       try {
-        const { data } = await supabase
-          .from('orders')
-          .select(`
+        const {
+          data
+        } = await supabase.from('orders').select(`
             *,
             companies (
               name,
               code
             )
-          `)
-          .eq('id', order.id)
-          .single();
-
+          `).eq('id', order.id).single();
         if (data) {
           const parsedItems = parseOrderItems(data.description);
-          
           setSelectedOrder({
             ...data,
             companyName: data.companies?.name || "Unknown Company",
@@ -250,65 +212,42 @@ export default function CompletedPage({ isAdmin }: CompletedPageProps) {
         console.error('Error fetching order details:', error);
       }
     };
-
     fetchOrderForDetails();
   };
-
   const closeOrderDetails = () => {
     setShowOrderDetails(false);
     setSelectedOrder(null);
   };
-
   const openFilesDialog = (order: Order) => {
     setFilesDialogOrder(order);
     setShowFilesDialog(true);
   };
-
   const closeFilesDialog = () => {
     setShowFilesDialog(false);
     setFilesDialogOrder(null);
   };
-
-  return (
-    <div className="container mx-auto p-4">
+  return <div className="container mx-auto p-4">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Completed Orders</h1>
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search orders..."
-            className="pl-10 pr-4 py-2 border rounded-md"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+          <input type="text" placeholder="Search orders..." className="pl-10 pr-4 py-2 border rounded-md" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
         </div>
       </div>
 
-      <div className="mb-4 p-2 bg-green-50 rounded-md border border-green-200">
-        <p className="text-sm text-green-800">
-          ✅ Real-time updates enabled - Completed orders sync automatically
-        </p>
-      </div>
+      
 
       <div className="space-y-4">
-        {monthGroups.length === 0 && (
-          <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
+        {monthGroups.length === 0 && <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
             No completed orders found.
-          </div>
-        )}
+          </div>}
 
-        {monthGroups.map((monthGroup, monthIndex) => (
-          <div key={monthGroup.month} className="bg-white rounded-lg shadow">
+        {monthGroups.map((monthGroup, monthIndex) => <div key={monthGroup.month} className="bg-white rounded-lg shadow">
             <Collapsible open={monthGroup.isOpen} onOpenChange={() => toggleMonthGroup(monthIndex)}>
               <CollapsibleTrigger asChild>
                 <div className="p-4 border-b cursor-pointer hover:bg-gray-50 flex items-center justify-between">
                   <div className="flex items-center space-x-2">
-                    {monthGroup.isOpen ? (
-                      <ChevronDown className="h-4 w-4" />
-                    ) : (
-                      <ChevronRight className="h-4 w-4" />
-                    )}
+                    {monthGroup.isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                     <h2 className="text-lg font-semibold">{monthGroup.month}</h2>
                     <Badge variant="outline">{monthGroup.orders.length} orders</Badge>
                   </div>
@@ -318,10 +257,8 @@ export default function CompletedPage({ isAdmin }: CompletedPageProps) {
               <CollapsibleContent>
                 <div className="divide-y">
                   {monthGroup.orders.map(order => {
-                    const isExpanded = expandedOrders.has(order.id);
-                    
-                    return (
-                      <div key={order.id} className="p-4">
+                const isExpanded = expandedOrders.has(order.id);
+                return <div key={order.id} className="p-4">
                         <div className="flex justify-between items-center">
                           <div className="flex items-center gap-4">
                             <div>
@@ -333,11 +270,7 @@ export default function CompletedPage({ isAdmin }: CompletedPageProps) {
                             </div>
                           </div>
                           <div className="flex items-center space-x-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => toggleOrderExpansion(order.id)}
-                            >
+                            <Button variant="ghost" size="sm" onClick={() => toggleOrderExpansion(order.id)}>
                               {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                               Items ({order.items.length})
                             </Button>
@@ -345,27 +278,18 @@ export default function CompletedPage({ isAdmin }: CompletedPageProps) {
                             <Badge variant="outline" className="bg-green-100 text-green-800">
                               Completed
                             </Badge>
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => openFilesDialog(order)}
-                            >
+                            <Button variant="outline" size="sm" onClick={() => openFilesDialog(order)}>
                               <FileText className="h-4 w-4 mr-2" />
                               Files
                             </Button>
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => viewOrderDetails(order)}
-                            >
+                            <Button variant="outline" size="sm" onClick={() => viewOrderDetails(order)}>
                               <Eye className="h-4 w-4 mr-2" />
                               View Details
                             </Button>
                           </div>
                         </div>
 
-                        {isExpanded && (
-                          <div className="mt-4 border-t pt-4">
+                        {isExpanded && <div className="mt-4 border-t pt-4">
                             <Table>
                               <TableHeader>
                                 <TableRow>
@@ -376,8 +300,7 @@ export default function CompletedPage({ isAdmin }: CompletedPageProps) {
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
-                                {order.items.map((item) => (
-                                  <TableRow key={item.id}>
+                                {order.items.map(item => <TableRow key={item.id}>
                                     <TableCell className="font-medium">{item.name}</TableCell>
                                     <TableCell>{item.quantity}</TableCell>
                                     <TableCell>{item.delivered}</TableCell>
@@ -386,40 +309,20 @@ export default function CompletedPage({ isAdmin }: CompletedPageProps) {
                                         Complete
                                       </Badge>
                                     </TableCell>
-                                  </TableRow>
-                                ))}
+                                  </TableRow>)}
                               </TableBody>
                             </Table>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
+                          </div>}
+                      </div>;
+              })}
                 </div>
               </CollapsibleContent>
             </Collapsible>
-          </div>
-        ))}
+          </div>)}
       </div>
 
-      {selectedOrder && (
-        <OrderDetailsDialog
-          open={showOrderDetails}
-          onOpenChange={closeOrderDetails}
-          orderNumber={selectedOrder.order_number}
-          companyName={selectedOrder.companyName}
-          status={selectedOrder.status}
-          createdAt={selectedOrder.created_at}
-          items={selectedOrder.items}
-        />
-      )}
+      {selectedOrder && <OrderDetailsDialog open={showOrderDetails} onOpenChange={closeOrderDetails} orderNumber={selectedOrder.order_number} companyName={selectedOrder.companyName} status={selectedOrder.status} createdAt={selectedOrder.created_at} items={selectedOrder.items} />}
 
-      <ProcessingOrderFilesDialog
-        order={filesDialogOrder}
-        isOpen={showFilesDialog}
-        onClose={closeFilesDialog}
-        isAdmin={isAdmin}
-      />
-    </div>
-  );
+      <ProcessingOrderFilesDialog order={filesDialogOrder} isOpen={showFilesDialog} onClose={closeFilesDialog} isAdmin={isAdmin} />
+    </div>;
 }
