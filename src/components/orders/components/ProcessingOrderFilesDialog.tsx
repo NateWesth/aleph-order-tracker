@@ -110,7 +110,7 @@ export default function ProcessingOrderFilesDialog({
     }
   };
 
-  // Upload file function
+  // Upload file function - now more permissive
   const handleFileUpload = async (file: File, fileType: 'quote' | 'purchase-order' | 'invoice' | 'delivery-note') => {
     if (!order?.id || !user?.id) {
       console.error('Missing order ID or user ID');
@@ -230,13 +230,20 @@ export default function ProcessingOrderFilesDialog({
     return files.filter(file => file.file_type === type);
   };
 
-  // Check if user can upload specific file type
+  // Updated check for upload permissions - now more permissive but still shows user guidance
   const canUploadFileType = (fileType: 'quote' | 'purchase-order' | 'invoice' | 'delivery-note') => {
     console.log('Checking upload permissions:', { fileType, isAdmin });
+    // Now all authenticated users can upload any file type
+    // But we still show guidance about what they typically should upload
+    return true;
+  };
+
+  // Get upload guidance text
+  const getUploadGuidanceText = (fileType: 'quote' | 'purchase-order' | 'invoice' | 'delivery-note') => {
     if (isAdmin) {
-      return ['quote', 'invoice', 'delivery-note'].includes(fileType);
+      return fileType === 'purchase-order' ? 'Typically uploaded by clients' : 'Admin can upload';
     } else {
-      return fileType === 'purchase-order';
+      return fileType === 'purchase-order' ? 'Client can upload' : 'Typically uploaded by admin';
     }
   };
 
@@ -349,9 +356,7 @@ export default function ProcessingOrderFilesDialog({
           <TabsContent value="quote" className="space-y-4">
             <div className="flex justify-between items-center">
               <h3 className="text-lg font-medium">Quote Files</h3>
-              {isAdmin && (
-                <Badge variant="secondary">Admin can upload</Badge>
-              )}
+              <Badge variant="secondary">{getUploadGuidanceText('quote')}</Badge>
             </div>
 
             <div className="space-y-2">
@@ -391,9 +396,7 @@ export default function ProcessingOrderFilesDialog({
           <TabsContent value="purchase-order" className="space-y-4">
             <div className="flex justify-between items-center">
               <h3 className="text-lg font-medium">Purchase Order Files</h3>
-              {!isAdmin && (
-                <Badge variant="secondary">Client can upload</Badge>
-              )}
+              <Badge variant="secondary">{getUploadGuidanceText('purchase-order')}</Badge>
             </div>
 
             <div className="space-y-2">
@@ -433,9 +436,7 @@ export default function ProcessingOrderFilesDialog({
           <TabsContent value="invoice" className="space-y-4">
             <div className="flex justify-between items-center">
               <h3 className="text-lg font-medium">Invoice Files</h3>
-              {isAdmin && (
-                <Badge variant="secondary">Admin can upload</Badge>
-              )}
+              <Badge variant="secondary">{getUploadGuidanceText('invoice')}</Badge>
             </div>
 
             <div className="space-y-2">
@@ -475,9 +476,7 @@ export default function ProcessingOrderFilesDialog({
           <TabsContent value="delivery-note" className="space-y-4">
             <div className="flex justify-between items-center">
               <h3 className="text-lg font-medium">Delivery Note Files</h3>
-              {isAdmin && (
-                <Badge variant="secondary">Admin can upload</Badge>
-              )}
+              <Badge variant="secondary">{getUploadGuidanceText('delivery-note')}</Badge>
             </div>
 
             <div className="space-y-2">
