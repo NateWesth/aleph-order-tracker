@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import {
   Dialog,
@@ -69,13 +70,19 @@ export default function ProcessingOrderFilesDialog({
 
     setLoading(true);
     try {
+      console.log('Fetching files for order:', order.id);
       const { data, error } = await supabase
         .from('order_files')
         .select('*')
         .eq('order_id', order.id)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching order files:', error);
+        throw error;
+      }
+      
+      console.log('Files fetched successfully:', data?.length || 0);
       
       // Transform the data to match our OrderFile interface
       const transformedFiles: OrderFile[] = (data || []).map(file => ({
@@ -105,7 +112,18 @@ export default function ProcessingOrderFilesDialog({
 
   // Upload file function
   const handleFileUpload = async (file: File, fileType: 'quote' | 'purchase-order' | 'invoice' | 'delivery-note') => {
-    if (!order?.id || !user?.id) return;
+    if (!order?.id || !user?.id) {
+      console.error('Missing order ID or user ID');
+      return;
+    }
+
+    console.log('Starting file upload:', {
+      fileName: file.name,
+      fileType,
+      orderId: order.id,
+      userId: user.id,
+      isAdmin
+    });
 
     setUploadingFiles(prev => ({ ...prev, [fileType]: true }));
 
@@ -114,32 +132,49 @@ export default function ProcessingOrderFilesDialog({
       const fileExt = file.name.split('.').pop();
       const fileName = `${order.id}/${fileType}/${Date.now()}.${fileExt}`;
       
+      console.log('Uploading to storage:', fileName);
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('order-files')
         .upload(fileName, file);
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error('Storage upload error:', uploadError);
+        throw uploadError;
+      }
+
+      console.log('File uploaded to storage successfully:', uploadData);
 
       // Get public URL
       const { data: urlData } = supabase.storage
         .from('order-files')
         .getPublicUrl(fileName);
 
+      console.log('Public URL generated:', urlData.publicUrl);
+
       // Save file record to database
+      const fileRecord = {
+        order_id: order.id,
+        file_name: file.name,
+        file_url: urlData.publicUrl,
+        file_type: fileType,
+        uploaded_by_role: isAdmin ? 'admin' : 'client',
+        uploaded_by_user_id: user.id,
+        file_size: file.size,
+        mime_type: file.type
+      };
+
+      console.log('Inserting file record:', fileRecord);
+
       const { error: dbError } = await supabase
         .from('order_files')
-        .insert({
-          order_id: order.id,
-          file_name: file.name,
-          file_url: urlData.publicUrl,
-          file_type: fileType,
-          uploaded_by_role: isAdmin ? 'admin' : 'client',
-          uploaded_by_user_id: user.id,
-          file_size: file.size,
-          mime_type: file.type
-        });
+        .insert(fileRecord);
 
-      if (dbError) throw dbError;
+      if (dbError) {
+        console.error('Database insert error:', dbError);
+        throw dbError;
+      }
+
+      console.log('File record inserted successfully');
 
       toast({
         title: "File Uploaded",
@@ -148,11 +183,17 @@ export default function ProcessingOrderFilesDialog({
 
       // Refresh files list
       fetchOrderFiles();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error uploading file:', error);
+      
+      let errorMessage = "Failed to upload file. Please try again.";
+      if (error?.message) {
+        errorMessage = `Upload failed: ${error.message}`;
+      }
+      
       toast({
         title: "Upload Failed",
-        description: "Failed to upload file. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -191,6 +232,7 @@ export default function ProcessingOrderFilesDialog({
 
   // Check if user can upload specific file type
   const canUploadFileType = (fileType: 'quote' | 'purchase-order' | 'invoice' | 'delivery-note') => {
+    console.log('Checking upload permissions:', { fileType, isAdmin });
     if (isAdmin) {
       return ['quote', 'invoice', 'delivery-note'].includes(fileType);
     } else {
@@ -202,7 +244,10 @@ export default function ProcessingOrderFilesDialog({
   const FileUploadSection = ({ fileType }: { fileType: 'quote' | 'purchase-order' | 'invoice' | 'delivery-note' }) => {
     const inputId = `file-upload-${fileType}`;
     
-    if (!canUploadFileType(fileType)) return null;
+    if (!canUploadFileType(fileType)) {
+      console.log('Upload not allowed for file type:', fileType);
+      return null;
+    }
 
     return (
       <div className="border-t pt-4 mt-4">
@@ -217,6 +262,7 @@ export default function ProcessingOrderFilesDialog({
             onChange={(e) => {
               const file = e.target.files?.[0];
               if (file) {
+                console.log('File selected for upload:', file.name);
                 handleFileUpload(file, fileType);
                 e.target.value = ''; // Reset input
               }
@@ -249,6 +295,7 @@ export default function ProcessingOrderFilesDialog({
 
   useEffect(() => {
     if (isOpen && order) {
+      console.log('Dialog opened for order:', order.id);
       fetchOrderFiles();
     }
   }, [isOpen, order?.id]);
@@ -257,6 +304,7 @@ export default function ProcessingOrderFilesDialog({
   useEffect(() => {
     if (!order?.id) return;
 
+    console.log('Setting up real-time subscription for order files:', order.id);
     const channel = supabase
       .channel(`order-files-${order.id}`)
       .on(
@@ -267,13 +315,15 @@ export default function ProcessingOrderFilesDialog({
           table: 'order_files',
           filter: `order_id=eq.${order.id}`
         },
-        () => {
+        (payload) => {
+          console.log('Real-time file change detected:', payload);
           fetchOrderFiles();
         }
       )
       .subscribe();
 
     return () => {
+      console.log('Cleaning up real-time subscription for order files');
       supabase.removeChannel(channel);
     };
   }, [order?.id]);
