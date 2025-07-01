@@ -5,13 +5,25 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { format, startOfMonth, endOfMonth, isSameMonth } from "date-fns";
-import { Eye, ChevronDown, ChevronRight, FileText, Search } from "lucide-react";
+import { Eye, ChevronDown, ChevronRight, FileText, Search, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useGlobalRealtimeOrders } from "./hooks/useGlobalRealtimeOrders";
 import ProcessingOrderFilesDialog from "./components/ProcessingOrderFilesDialog";
 import OrderDetailsDialog from "./components/OrderDetailsDialog";
+
 interface OrderItem {
   id: string;
   name: string;
@@ -138,6 +150,42 @@ export default function CompletedPage({
     }
   };
 
+  // Add delete order functionality
+  const handleDeleteOrder = async (orderId: string, orderNumber: string) => {
+    if (!isAdmin) {
+      toast({
+        title: "Access Denied",
+        description: "Only administrators can delete orders.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('orders')
+        .delete()
+        .eq('id', orderId);
+
+      if (error) throw error;
+
+      // Remove from local state
+      setOrders(prev => prev.filter(order => order.id !== orderId));
+
+      toast({
+        title: "Order Deleted",
+        description: `Order ${orderNumber} has been successfully deleted.`,
+      });
+    } catch (error: any) {
+      console.error("Error deleting order:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete order: " + error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
   // Set up real-time subscriptions
   useGlobalRealtimeOrders({
     onOrdersChange: () => {
@@ -235,8 +283,6 @@ export default function CompletedPage({
         </div>
       </div>
 
-      
-
       <div className="space-y-4">
         {monthGroups.length === 0 && <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
             No completed orders found.
@@ -286,6 +332,32 @@ export default function CompletedPage({
                               <Eye className="h-4 w-4 mr-2" />
                               View Details
                             </Button>
+                            {isAdmin && (
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700">
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Delete Completed Order</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Are you sure you want to delete completed order #{order.orderNumber}? This action cannot be undone and will permanently remove the order from all systems.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction 
+                                      onClick={() => handleDeleteOrder(order.id, order.orderNumber)}
+                                      className="bg-red-600 hover:bg-red-700"
+                                    >
+                                      Delete
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            )}
                           </div>
                         </div>
 
