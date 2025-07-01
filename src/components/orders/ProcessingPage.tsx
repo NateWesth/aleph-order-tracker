@@ -10,7 +10,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useGlobalRealtimeOrders } from "./hooks/useGlobalRealtimeOrders";
 import ProcessingOrderFilesDialog from "./components/ProcessingOrderFilesDialog";
-
 interface OrderItem {
   id: string;
   name: string;
@@ -294,17 +293,9 @@ export default function ProcessingPage({
         <h1 className="text-2xl font-bold">Processing Orders</h1>
       </div>
 
-      <div className="mb-4 p-2 bg-blue-50 rounded-md border border-blue-200">
-        <p className="text-sm text-blue-800">
-          🔄 Real-time updates enabled - Changes will appear automatically across all users
-        </p>
-      </div>
+      
 
-      <div className="mb-4 p-2 bg-gray-50 rounded-md border border-gray-200">
-        <p className="text-xs text-gray-600">
-          Debug: Found {orders.length} processing orders | User: {user?.id ? 'Authenticated' : 'Not authenticated'} | Admin: {isAdmin ? 'Yes' : 'No'}
-        </p>
-      </div>
+      
 
       <div className="bg-white rounded-lg shadow">
         <div className="p-4 border-b">
