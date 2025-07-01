@@ -26,7 +26,7 @@ import { Trash2, Eye, CheckCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useGlobalRealtimeOrders } from "./hooks/useGlobalRealtimeOrders";
-import ProcessingOrderDetailsDialog from "./components/ProcessingOrderDetailsDialog";
+import ProcessingOrderFilesDialog from "./components/ProcessingOrderFilesDialog";
 
 interface OrderItem {
   id: string;
@@ -472,7 +472,7 @@ export default function ProcessingPage({ isAdmin }: ProcessingPageProps) {
         )}
       </div>
 
-      <ProcessingOrderDetailsDialog
+      <ProcessingOrderFilesDialog
         order={selectedOrder}
         isOpen={!!selectedOrder}
         onClose={closeOrderDetails}
