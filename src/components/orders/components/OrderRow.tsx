@@ -40,7 +40,7 @@ interface OrderRowProps {
 export default function OrderRow({ order, isAdmin, onReceiveOrder, onDeleteOrder }: OrderRowProps) {
   const [showDetails, setShowDetails] = useState(false);
   const [companyName, setCompanyName] = useState<string>(order.companyName || 'Unknown Company');
-  const [orderItems, setOrderItems] = useState<Array<{name: string, quantity: number}>>([]);
+  const [orderItems, setOrderItems] = useState<Array<{id: string, name: string, quantity: number}>>([]);
 
   const getStatusColor = (status: string | null) => {
     switch (status?.toLowerCase()) {
@@ -79,16 +79,18 @@ export default function OrderRow({ order, isAdmin, onReceiveOrder, onDeleteOrder
 
     // Parse the description to extract items and quantities
     // Format: "Item Name (Qty: 2)\nAnother Item (Qty: 1)"
-    const items = order.description.split('\n').map(line => {
+    const items = order.description.split('\n').map((line, index) => {
       const match = line.match(/^(.+?)\s*\(Qty:\s*(\d+)\)$/);
       if (match) {
         return {
+          id: `item-${index}`,
           name: match[1].trim(),
           quantity: parseInt(match[2])
         };
       }
       // Fallback for items without quantity format
       return {
+        id: `item-${index}`,
         name: line.trim(),
         quantity: 1
       };
