@@ -137,29 +137,20 @@ export default function OrderExportActions({
               padding: 0;
               font-size: 12px;
               line-height: 1.4;
-              background: linear-gradient(135deg, #fef7ff 0%, #f8fafc 100%);
             }
             .header { 
               text-align: center; 
               margin-bottom: 30px; 
-              border-bottom: 3px solid #3b82f6;
+              border-bottom: 2px solid #333;
               padding-bottom: 20px;
-              background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
-              color: white;
-              padding: 20px;
-              border-radius: 8px;
-              box-shadow: 0 4px 6px rgba(0,0,0,0.1);
             }
             .header h1 {
               font-size: 28px;
               margin-bottom: 10px;
-              text-shadow: 0 2px 4px rgba(0,0,0,0.3);
             }
             .header .order-number {
-              font-size: 22px;
+              font-size: 26px;
               font-weight: bold;
-              color: #fbbf24;
-              text-shadow: 0 1px 2px rgba(0,0,0,0.2);
             }
             .company-details { 
               display: flex; 
@@ -170,69 +161,55 @@ export default function OrderExportActions({
             .company-section { 
               width: 45%; 
               padding: 15px;
-              border: 1px solid #e2e8f0;
+              background-color: #f8f9fa;
               border-radius: 8px;
-              background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-              box-shadow: 0 2px 4px rgba(0,0,0,0.05);
             }
             .company-title { 
               font-weight: bold; 
               font-size: 14px; 
               margin-bottom: 15px;
-              color: #1e40af;
               text-decoration: underline;
               text-transform: uppercase;
             }
             .company-info {
               line-height: 1.6;
-              color: #374151;
+              color: #333;
               font-weight: 500;
             }
             .order-info { 
               text-align: center; 
               margin: 30px 0; 
               padding: 15px;
-              background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+              border: 1px solid #ddd;
               border-radius: 8px;
-              border: 2px solid #3b82f6;
-              color: #1e40af;
-              font-weight: bold;
             }
             table { 
               width: 100%; 
               border-collapse: collapse; 
               margin: 20px 0;
-              box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-              border-radius: 8px;
-              overflow: hidden;
             }
             th, td { 
-              border: 1px solid #e2e8f0; 
+              border: 1px solid #ddd; 
               padding: 12px; 
               text-align: left;
             }
             th { 
-              background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
-              color: white;
+              background-color: #f2f2f2;
               font-weight: bold;
               font-size: 12px;
               text-transform: uppercase;
             }
             tr:nth-child(even) { 
-              background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
-            }
-            tr:nth-child(odd) { 
-              background-color: white;
+              background-color: #f9f9f9;
             }
             .signature-section { 
               margin-top: 20px; 
               padding: 15px;
-              border: 2px solid #10b981;
+              border: 1px solid #ddd;
               border-radius: 8px;
-              background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
             }
             .signature-line { 
-              border-bottom: 2px solid #059669; 
+              border-bottom: 1px solid #333; 
               width: 150px; 
               height: 15px; 
               margin: 5px 0;
@@ -242,10 +219,8 @@ export default function OrderExportActions({
               text-align: center; 
               margin-top: 20px; 
               font-size: 10px;
-              color: #6b7280;
+              color: #666;
               padding: 10px;
-              background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
-              border-radius: 4px;
             }
           </style>
         </head>
@@ -347,29 +322,20 @@ export default function OrderExportActions({
         ? orderToExport.items 
         : parseOrderItems(orderToExport.description);
       
-      // Header with blue background
-      doc.setFillColor(30, 64, 175); // Blue background
-      doc.rect(0, 0, 210, 40, 'F'); // Full width blue header
-      
-      doc.setTextColor(255, 255, 255); // White text
+      // Header
       doc.setFontSize(20);
       doc.text('PURCHASE ORDER', 105, 20, { align: 'center' });
-      doc.setFontSize(16);
-      doc.setTextColor(251, 191, 36); // Yellow/gold color for order number
+      doc.setFontSize(18);
       doc.text(`Order #${orderToExport.order_number}`, 105, 30, { align: 'center' });
       
       // Company details with light grey blocks
-      // FROM block (Client) - Light grey background
-      doc.setFillColor(248, 250, 252); // Very light grey
-      doc.rect(15, 45, 85, 65, 'F'); // Filled rectangle
-      doc.setDrawColor(226, 232, 240); // Light grey border
-      doc.rect(15, 45, 85, 65); // Border
+      // FROM block (Client)
+      doc.setFillColor(248, 249, 250); // Very light grey
+      doc.rect(15, 45, 85, 65, 'F');
       
       doc.setFontSize(10);
-      doc.setTextColor(30, 64, 175); // Blue text
       doc.text('FROM:', 20, 55);
       doc.setFontSize(11);
-      doc.setTextColor(31, 41, 55); // Dark gray text
       doc.text(companyDetails?.name || orderToExport.companyName || 'Client Company', 20, 65);
       doc.setFontSize(9);
       const fromLines = [
@@ -391,17 +357,13 @@ export default function OrderExportActions({
         yPosition += 6;
       });
       
-      // TO block (Aleph) - Light grey background
-      doc.setFillColor(248, 250, 252); // Very light grey
-      doc.rect(110, 45, 85, 65, 'F'); // Filled rectangle
-      doc.setDrawColor(226, 232, 240); // Light grey border
-      doc.rect(110, 45, 85, 65); // Border
+      // TO block (Aleph)
+      doc.setFillColor(248, 249, 250); // Very light grey
+      doc.rect(110, 45, 85, 65, 'F');
       
       doc.setFontSize(10);
-      doc.setTextColor(30, 64, 175); // Blue text
       doc.text('TO:', 115, 55);
       doc.setFontSize(11);
-      doc.setTextColor(31, 41, 55); // Dark gray text
       doc.text(adminCompany.name, 115, 65);
       doc.setFontSize(9);
       const toLines = [
@@ -417,21 +379,12 @@ export default function OrderExportActions({
         yPosition += 6;
       });
       
-      // Order info with colored background
-      doc.setFillColor(219, 234, 254); // Light blue background
-      doc.rect(15, 120, 180, 20, 'F');
-      doc.setDrawColor(59, 130, 246); // Blue border
-      doc.rect(15, 120, 180, 20);
-      
-      doc.setTextColor(30, 64, 175); // Blue text
+      // Order info
       doc.setFontSize(11);
-      doc.text(`Order Date: ${new Date(orderToExport.created_at).toLocaleDateString()}`, 20, 128);
+      doc.text(`Order Date: ${new Date(orderToExport.created_at).toLocaleDateString()}`, 20, 125);
       doc.text(`Status: ${orderToExport.status || 'Pending'}`, 20, 135);
       
-      // Reset text color for the rest of the document
-      doc.setTextColor(0, 0, 0);
-      
-      // Items table with colorful styling
+      // Items table
       const tableData = items.map(item => [
         item.name,
         item.quantity.toString(),
@@ -442,18 +395,18 @@ export default function OrderExportActions({
       autoTable(doc, {
         head: [['Item Description', 'Quantity', 'Unit', 'Notes']],
         body: tableData,
-        startY: 150,
+        startY: 145,
         styles: {
           fontSize: 9,
           cellPadding: 4,
         },
         headStyles: {
-          fillColor: [30, 64, 175], // Blue header
-          textColor: 255,
+          fillColor: [242, 242, 242],
+          textColor: 0,
           fontStyle: 'bold',
         },
         alternateRowStyles: {
-          fillColor: [240, 249, 255], // Light blue alternating rows
+          fillColor: [249, 249, 249],
         },
         columnStyles: {
           0: { cellWidth: 80 },
@@ -463,32 +416,21 @@ export default function OrderExportActions({
         }
       });
 
-      // Colorful signature section
+      // Signature section
       const finalY = (doc as any).lastAutoTable.finalY + 15;
-      doc.setFillColor(236, 253, 245); // Light green background
-      doc.rect(15, finalY - 5, 180, 25, 'F');
-      doc.setDrawColor(16, 185, 129); // Green border
-      doc.rect(15, finalY - 5, 180, 25);
-      
-      doc.setTextColor(22, 101, 52); // Green text
       doc.setFontSize(11);
       doc.text('Client Sign-off:', 20, finalY + 5);
       
-      doc.setDrawColor(5, 150, 105); // Green lines
       doc.line(20, finalY + 15, 80, finalY + 15);
       doc.line(90, finalY + 15, 130, finalY + 15);
       doc.line(140, finalY + 15, 190, finalY + 15);
       doc.setFontSize(8);
-      doc.setTextColor(0, 0, 0);
       doc.text('Signature', 20, finalY + 20);
       doc.text('Date', 90, finalY + 20);
       doc.text('Print Name', 140, finalY + 20);
       
-      // Colorful footer
-      doc.setFillColor(243, 244, 246); // Light grey background
-      doc.rect(0, 270, 210, 15, 'F');
+      // Footer
       doc.setFontSize(8);
-      doc.setTextColor(107, 114, 128); // Grey text
       doc.text(`Generated on: ${new Date().toLocaleDateString()} | ${adminCompany.name}`, 105, 280, { align: 'center' });
 
       // Save the PDF
