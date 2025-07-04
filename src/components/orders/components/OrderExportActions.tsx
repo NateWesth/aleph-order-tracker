@@ -137,21 +137,29 @@ export default function OrderExportActions({
               padding: 0;
               font-size: 12px;
               line-height: 1.4;
+              background: linear-gradient(135deg, #fef7ff 0%, #f8fafc 100%);
             }
             .header { 
               text-align: center; 
               margin-bottom: 30px; 
-              border-bottom: 2px solid #333;
+              border-bottom: 3px solid #3b82f6;
               padding-bottom: 20px;
+              background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+              color: white;
+              padding: 20px;
+              border-radius: 8px;
+              box-shadow: 0 4px 6px rgba(0,0,0,0.1);
             }
             .header h1 {
-              font-size: 24px;
+              font-size: 28px;
               margin-bottom: 10px;
+              text-shadow: 0 2px 4px rgba(0,0,0,0.3);
             }
             .header .order-number {
-              font-size: 20px;
+              font-size: 22px;
               font-weight: bold;
-              color: #333;
+              color: #fbbf24;
+              text-shadow: 0 1px 2px rgba(0,0,0,0.2);
             }
             .company-details { 
               display: flex; 
@@ -162,13 +170,10 @@ export default function OrderExportActions({
             .company-section { 
               width: 45%; 
               padding: 15px;
-              border: 1px solid rgba(51, 51, 51, 0.2);
+              border: 1px solid #e2e8f0;
               border-radius: 8px;
-              background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
-              box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            }
-            .company-section.aleph { 
-              background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+              background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+              box-shadow: 0 2px 4px rgba(0,0,0,0.05);
             }
             .company-title { 
               font-weight: bold; 
@@ -178,47 +183,56 @@ export default function OrderExportActions({
               text-decoration: underline;
               text-transform: uppercase;
             }
-            .company-title.aleph { 
-              color: #166534;
-            }
             .company-info {
               line-height: 1.6;
-              color: #1f2937;
+              color: #374151;
               font-weight: 500;
             }
             .order-info { 
               text-align: center; 
               margin: 30px 0; 
               padding: 15px;
-              background-color: #f5f5f5;
-              border-radius: 5px;
+              background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+              border-radius: 8px;
+              border: 2px solid #3b82f6;
+              color: #1e40af;
+              font-weight: bold;
             }
             table { 
               width: 100%; 
               border-collapse: collapse; 
               margin: 20px 0;
+              box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+              border-radius: 8px;
+              overflow: hidden;
             }
             th, td { 
-              border: 1px solid #ddd; 
-              padding: 8px; 
+              border: 1px solid #e2e8f0; 
+              padding: 12px; 
               text-align: left;
             }
             th { 
-              background-color: #f2f2f2; 
+              background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+              color: white;
               font-weight: bold;
               font-size: 12px;
+              text-transform: uppercase;
             }
             tr:nth-child(even) { 
-              background-color: #f9f9f9; 
+              background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+            }
+            tr:nth-child(odd) { 
+              background-color: white;
             }
             .signature-section { 
               margin-top: 20px; 
-              padding: 10px;
-              border: 1px solid #ddd;
-              border-radius: 5px;
+              padding: 15px;
+              border: 2px solid #10b981;
+              border-radius: 8px;
+              background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
             }
             .signature-line { 
-              border-bottom: 1px solid #333; 
+              border-bottom: 2px solid #059669; 
               width: 150px; 
               height: 15px; 
               margin: 5px 0;
@@ -228,7 +242,10 @@ export default function OrderExportActions({
               text-align: center; 
               margin-top: 20px; 
               font-size: 10px;
-              color: #666;
+              color: #6b7280;
+              padding: 10px;
+              background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+              border-radius: 4px;
             }
           </style>
         </head>
@@ -252,8 +269,8 @@ export default function OrderExportActions({
               </div>
             </div>
             
-            <div class="company-section aleph">
-              <div class="company-title aleph">TO:</div>
+            <div class="company-section">
+              <div class="company-title">TO:</div>
               <div class="company-info">
                 <strong>${adminCompany.name}</strong><br>
                 ${adminCompany.address}<br>
@@ -330,17 +347,22 @@ export default function OrderExportActions({
         ? orderToExport.items 
         : parseOrderItems(orderToExport.description);
       
-      // Header
-      doc.setFontSize(18);
+      // Header with blue background
+      doc.setFillColor(30, 64, 175); // Blue background
+      doc.rect(0, 0, 210, 40, 'F'); // Full width blue header
+      
+      doc.setTextColor(255, 255, 255); // White text
+      doc.setFontSize(20);
       doc.text('PURCHASE ORDER', 105, 20, { align: 'center' });
       doc.setFontSize(16);
+      doc.setTextColor(251, 191, 36); // Yellow/gold color for order number
       doc.text(`Order #${orderToExport.order_number}`, 105, 30, { align: 'center' });
       
-      // Company details with colored blocks
-      // FROM block (Client) - Light blue background
-      doc.setFillColor(240, 249, 255); // Light blue
+      // Company details with light grey blocks
+      // FROM block (Client) - Light grey background
+      doc.setFillColor(248, 250, 252); // Very light grey
       doc.rect(15, 45, 85, 65, 'F'); // Filled rectangle
-      doc.setDrawColor(59, 130, 246, 50); // Blue border with low opacity
+      doc.setDrawColor(226, 232, 240); // Light grey border
       doc.rect(15, 45, 85, 65); // Border
       
       doc.setFontSize(10);
@@ -369,14 +391,14 @@ export default function OrderExportActions({
         yPosition += 6;
       });
       
-      // TO block (Aleph) - Light green background
-      doc.setFillColor(240, 253, 244); // Light green
+      // TO block (Aleph) - Light grey background
+      doc.setFillColor(248, 250, 252); // Very light grey
       doc.rect(110, 45, 85, 65, 'F'); // Filled rectangle
-      doc.setDrawColor(34, 197, 94, 50); // Green border with low opacity
+      doc.setDrawColor(226, 232, 240); // Light grey border
       doc.rect(110, 45, 85, 65); // Border
       
       doc.setFontSize(10);
-      doc.setTextColor(22, 101, 52); // Green text
+      doc.setTextColor(30, 64, 175); // Blue text
       doc.text('TO:', 115, 55);
       doc.setFontSize(11);
       doc.setTextColor(31, 41, 55); // Dark gray text
@@ -395,15 +417,21 @@ export default function OrderExportActions({
         yPosition += 6;
       });
       
+      // Order info with colored background
+      doc.setFillColor(219, 234, 254); // Light blue background
+      doc.rect(15, 120, 180, 20, 'F');
+      doc.setDrawColor(59, 130, 246); // Blue border
+      doc.rect(15, 120, 180, 20);
+      
+      doc.setTextColor(30, 64, 175); // Blue text
+      doc.setFontSize(11);
+      doc.text(`Order Date: ${new Date(orderToExport.created_at).toLocaleDateString()}`, 20, 128);
+      doc.text(`Status: ${orderToExport.status || 'Pending'}`, 20, 135);
+      
       // Reset text color for the rest of the document
       doc.setTextColor(0, 0, 0);
       
-      // Order info
-      doc.setFontSize(10);
-      doc.text(`Order Date: ${new Date(orderToExport.created_at).toLocaleDateString()}`, 20, 125);
-      doc.text(`Status: ${orderToExport.status || 'Pending'}`, 20, 133);
-      
-      // Items table - using the parsed items with their actual names and quantities
+      // Items table with colorful styling
       const tableData = items.map(item => [
         item.name,
         item.quantity.toString(),
@@ -414,35 +442,53 @@ export default function OrderExportActions({
       autoTable(doc, {
         head: [['Item Description', 'Quantity', 'Unit', 'Notes']],
         body: tableData,
-        startY: 145,
+        startY: 150,
         styles: {
           fontSize: 9,
-          cellPadding: 3,
+          cellPadding: 4,
         },
         headStyles: {
-          fillColor: [41, 128, 185],
+          fillColor: [30, 64, 175], // Blue header
           textColor: 255,
           fontStyle: 'bold',
         },
         alternateRowStyles: {
-          fillColor: [245, 245, 245],
+          fillColor: [240, 249, 255], // Light blue alternating rows
         },
+        columnStyles: {
+          0: { cellWidth: 80 },
+          1: { cellWidth: 30, halign: 'center' },
+          2: { cellWidth: 30, halign: 'center' },
+          3: { cellWidth: 50 }
+        }
       });
 
-      // Compact signature section
+      // Colorful signature section
       const finalY = (doc as any).lastAutoTable.finalY + 15;
-      doc.setFontSize(10);
-      doc.text('Client Sign-off:', 20, finalY);
+      doc.setFillColor(236, 253, 245); // Light green background
+      doc.rect(15, finalY - 5, 180, 25, 'F');
+      doc.setDrawColor(16, 185, 129); // Green border
+      doc.rect(15, finalY - 5, 180, 25);
       
-      doc.line(20, finalY + 10, 80, finalY + 10);
-      doc.line(90, finalY + 10, 130, finalY + 10);
-      doc.setFontSize(8);
-      doc.text('Signature', 20, finalY + 15);
-      doc.text('Date', 90, finalY + 15);
-      doc.text('Print Name', 140, finalY + 15);
+      doc.setTextColor(22, 101, 52); // Green text
+      doc.setFontSize(11);
+      doc.text('Client Sign-off:', 20, finalY + 5);
       
-      // Footer
+      doc.setDrawColor(5, 150, 105); // Green lines
+      doc.line(20, finalY + 15, 80, finalY + 15);
+      doc.line(90, finalY + 15, 130, finalY + 15);
+      doc.line(140, finalY + 15, 190, finalY + 15);
       doc.setFontSize(8);
+      doc.setTextColor(0, 0, 0);
+      doc.text('Signature', 20, finalY + 20);
+      doc.text('Date', 90, finalY + 20);
+      doc.text('Print Name', 140, finalY + 20);
+      
+      // Colorful footer
+      doc.setFillColor(243, 244, 246); // Light grey background
+      doc.rect(0, 270, 210, 15, 'F');
+      doc.setFontSize(8);
+      doc.setTextColor(107, 114, 128); // Grey text
       doc.text(`Generated on: ${new Date().toLocaleDateString()} | ${adminCompany.name}`, 105, 280, { align: 'center' });
 
       // Save the PDF
