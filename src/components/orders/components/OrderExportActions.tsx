@@ -141,86 +141,96 @@ export default function OrderExportActions({
             .header { 
               text-align: center; 
               margin-bottom: 30px; 
-              border-bottom: 2px solid #333;
-              padding-bottom: 20px;
+              border-bottom: 1px solid #333;
+              padding-bottom: 15px;
             }
             .header h1 {
-              font-size: 28px;
-              margin-bottom: 10px;
+              font-size: 24px;
+              margin-bottom: 8px;
+              font-weight: bold;
             }
             .header .order-number {
-              font-size: 26px;
-              font-weight: bold;
+              font-size: 14px;
+              color: #666;
             }
             .company-details { 
               display: flex; 
               justify-content: space-between; 
-              margin-bottom: 30px;
-              gap: 20px;
+              margin-bottom: 25px;
+              gap: 30px;
             }
             .company-section { 
               width: 45%; 
               padding: 15px;
-              background-color: #f8f9fa;
-              border-radius: 8px;
+              background-color: #f5f5f5;
+              border: 1px solid #ddd;
             }
             .company-title { 
               font-weight: bold; 
-              font-size: 14px; 
-              margin-bottom: 15px;
-              text-decoration: underline;
-              text-transform: uppercase;
+              font-size: 12px; 
+              margin-bottom: 10px;
             }
             .company-info {
-              line-height: 1.6;
+              line-height: 1.5;
               color: #333;
-              font-weight: 500;
+              font-size: 11px;
             }
             .order-info { 
               text-align: center; 
-              margin: 30px 0; 
-              padding: 15px;
-              border: 1px solid #ddd;
-              border-radius: 8px;
+              margin: 25px 0; 
+            }
+            .order-info div {
+              margin-bottom: 5px;
             }
             table { 
               width: 100%; 
               border-collapse: collapse; 
               margin: 20px 0;
             }
-            th, td { 
-              border: 1px solid #ddd; 
-              padding: 12px; 
-              text-align: left;
-            }
             th { 
-              background-color: #f2f2f2;
+              background-color: #4a90c2;
+              color: white;
+              padding: 12px;
+              text-align: left;
               font-weight: bold;
               font-size: 12px;
-              text-transform: uppercase;
+            }
+            td { 
+              border: 1px solid #ddd; 
+              padding: 10px; 
+              text-align: left;
             }
             tr:nth-child(even) { 
               background-color: #f9f9f9;
             }
             .signature-section { 
-              margin-top: 20px; 
-              padding: 15px;
-              border: 1px solid #ddd;
-              border-radius: 8px;
+              margin-top: 30px; 
+            }
+            .signature-section p {
+              margin-bottom: 10px;
+              font-weight: bold;
             }
             .signature-line { 
               border-bottom: 1px solid #333; 
-              width: 150px; 
+              width: 120px; 
               height: 15px; 
-              margin: 5px 0;
+              margin: 5px 10px;
               display: inline-block;
+            }
+            .signature-row {
+              display: flex;
+              justify-content: space-between;
+              margin-top: 15px;
+            }
+            .signature-item {
+              text-align: center;
+              font-size: 10px;
             }
             .footer { 
               text-align: center; 
-              margin-top: 20px; 
+              margin-top: 30px; 
               font-size: 10px;
               color: #666;
-              padding: 10px;
             }
           </style>
         </head>
@@ -257,8 +267,8 @@ export default function OrderExportActions({
           </div>
 
           <div class="order-info">
-            <strong>Order Date:</strong> ${new Date(orderToPrint.created_at).toLocaleDateString()}<br>
-            <strong>Status:</strong> ${orderToPrint.status || 'Pending'}
+            <div><strong>Order Date:</strong> ${new Date(orderToPrint.created_at).toLocaleDateString()}</div>
+            <div><strong>Status:</strong> ${orderToPrint.status || 'pending'}</div>
           </div>
 
           <table>
@@ -283,9 +293,21 @@ export default function OrderExportActions({
           </table>
 
           <div class="signature-section">
-            <p><strong>Client Sign-off:</strong></p>
-            <p>Signature: <span class="signature-line"></span> Date: <span class="signature-line"></span></p>
-            <p>Print Name: <span class="signature-line"></span></p>
+            <p>Client Sign-off:</p>
+            <div class="signature-row">
+              <div class="signature-item">
+                <div class="signature-line"></div>
+                <div>Signature</div>
+              </div>
+              <div class="signature-item">
+                <div class="signature-line"></div>
+                <div>Date</div>
+              </div>
+              <div class="signature-item">
+                <div class="signature-line"></div>
+                <div>Print Name</div>
+              </div>
+            </div>
           </div>
 
           <div class="footer">
@@ -325,19 +347,24 @@ export default function OrderExportActions({
       // Header
       doc.setFontSize(20);
       doc.text('PURCHASE ORDER', 105, 20, { align: 'center' });
-      doc.setFontSize(18);
+      doc.setFontSize(12);
       doc.text(`Order #${orderToExport.order_number}`, 105, 30, { align: 'center' });
+      
+      // Add line under header
+      doc.line(20, 35, 190, 35);
       
       // Company details with light grey blocks
       // FROM block (Client)
-      doc.setFillColor(248, 249, 250); // Very light grey
-      doc.rect(15, 45, 85, 65, 'F');
+      doc.setFillColor(245, 245, 245);
+      doc.rect(20, 45, 75, 50, 'F');
+      doc.setDrawColor(221, 221, 221);
+      doc.rect(20, 45, 75, 50, 'S');
       
       doc.setFontSize(10);
-      doc.text('FROM:', 20, 55);
-      doc.setFontSize(11);
-      doc.text(companyDetails?.name || orderToExport.companyName || 'Client Company', 20, 65);
+      doc.text('FROM:', 25, 55);
       doc.setFontSize(9);
+      doc.text(companyDetails?.name || orderToExport.companyName || 'Client Company', 25, 63);
+      
       const fromLines = [
         companyDetails?.address || 'Address not available',
         `Phone: ${companyDetails?.phone || 'N/A'}`,
@@ -351,21 +378,23 @@ export default function OrderExportActions({
         fromLines.push(`Account Manager: ${companyDetails.account_manager}`);
       }
       
-      let yPosition = 73;
+      let yPosition = 70;
       fromLines.forEach(line => {
-        doc.text(line, 20, yPosition);
-        yPosition += 6;
+        doc.text(line, 25, yPosition);
+        yPosition += 5;
       });
       
       // TO block (Aleph)
-      doc.setFillColor(248, 249, 250); // Very light grey
-      doc.rect(110, 45, 85, 65, 'F');
+      doc.setFillColor(245, 245, 245);
+      doc.rect(105, 45, 75, 50, 'F');
+      doc.setDrawColor(221, 221, 221);
+      doc.rect(105, 45, 75, 50, 'S');
       
       doc.setFontSize(10);
-      doc.text('TO:', 115, 55);
-      doc.setFontSize(11);
-      doc.text(adminCompany.name, 115, 65);
+      doc.text('TO:', 110, 55);
       doc.setFontSize(9);
+      doc.text(adminCompany.name, 110, 63);
+      
       const toLines = [
         adminCompany.address,
         `Phone: ${adminCompany.phone}`,
@@ -373,18 +402,18 @@ export default function OrderExportActions({
         `Contact: ${adminCompany.contactPerson}`
       ];
       
-      yPosition = 73;
+      yPosition = 70;
       toLines.forEach(line => {
-        doc.text(line, 115, yPosition);
-        yPosition += 6;
+        doc.text(line, 110, yPosition);
+        yPosition += 5;
       });
       
-      // Order info
-      doc.setFontSize(11);
-      doc.text(`Order Date: ${new Date(orderToExport.created_at).toLocaleDateString()}`, 20, 125);
-      doc.text(`Status: ${orderToExport.status || 'Pending'}`, 20, 135);
+      // Order info - centered
+      doc.setFontSize(10);
+      doc.text(`Order Date: ${new Date(orderToExport.created_at).toLocaleDateString()}`, 105, 110, { align: 'center' });
+      doc.text(`Status: ${orderToExport.status || 'pending'}`, 105, 118, { align: 'center' });
       
-      // Items table
+      // Items table with blue header
       const tableData = items.map(item => [
         item.name,
         item.quantity.toString(),
@@ -395,14 +424,14 @@ export default function OrderExportActions({
       autoTable(doc, {
         head: [['Item Description', 'Quantity', 'Unit', 'Notes']],
         body: tableData,
-        startY: 145,
+        startY: 130,
         styles: {
           fontSize: 9,
           cellPadding: 4,
         },
         headStyles: {
-          fillColor: [242, 242, 242],
-          textColor: 0,
+          fillColor: [74, 144, 194], // Blue color matching the reference
+          textColor: 255,
           fontStyle: 'bold',
         },
         alternateRowStyles: {
@@ -417,17 +446,19 @@ export default function OrderExportActions({
       });
 
       // Signature section
-      const finalY = (doc as any).lastAutoTable.finalY + 15;
-      doc.setFontSize(11);
-      doc.text('Client Sign-off:', 20, finalY + 5);
+      const finalY = (doc as any).lastAutoTable.finalY + 20;
+      doc.setFontSize(10);
+      doc.text('Client Sign-off:', 20, finalY);
       
-      doc.line(20, finalY + 15, 80, finalY + 15);
-      doc.line(90, finalY + 15, 130, finalY + 15);
-      doc.line(140, finalY + 15, 190, finalY + 15);
+      // Signature lines
+      doc.line(20, finalY + 15, 70, finalY + 15);
+      doc.line(85, finalY + 15, 125, finalY + 15);
+      doc.line(140, finalY + 15, 180, finalY + 15);
+      
       doc.setFontSize(8);
-      doc.text('Signature', 20, finalY + 20);
-      doc.text('Date', 90, finalY + 20);
-      doc.text('Print Name', 140, finalY + 20);
+      doc.text('Signature', 45, finalY + 20, { align: 'center' });
+      doc.text('Date', 105, finalY + 20, { align: 'center' });
+      doc.text('Print Name', 160, finalY + 20, { align: 'center' });
       
       // Footer
       doc.setFontSize(8);
