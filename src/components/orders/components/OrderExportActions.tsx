@@ -149,18 +149,24 @@ export default function OrderExportActions({
               display: flex; 
               justify-content: space-between; 
               margin-bottom: 30px;
+              gap: 20px;
             }
             .company-section { 
               width: 45%; 
               padding: 15px;
-              border: 1px solid #ddd;
-              border-radius: 5px;
+              border: 2px solid #333;
+              border-radius: 8px;
+              background-color: #f9f9f9;
             }
             .company-title { 
               font-weight: bold; 
               font-size: 14px; 
-              margin-bottom: 10px;
+              margin-bottom: 15px;
               color: #333;
+              text-decoration: underline;
+            }
+            .company-info {
+              line-height: 1.6;
             }
             .order-info { 
               text-align: center; 
@@ -217,22 +223,26 @@ export default function OrderExportActions({
           <div class="company-details">
             <div class="company-section">
               <div class="company-title">FROM:</div>
-              <strong>${companyDetails?.name || orderToPrint.companyName || 'Client Company'}</strong><br>
-              ${companyDetails?.address || 'Address not available'}<br>
-              Phone: ${companyDetails?.phone || 'N/A'}<br>
-              Email: ${companyDetails?.email || 'N/A'}<br>
-              Contact: ${companyDetails?.contact_person || 'N/A'}<br>
-              ${companyDetails?.vat_number ? `VAT: ${companyDetails.vat_number}<br>` : ''}
-              ${companyDetails?.account_manager ? `Account Manager: ${companyDetails.account_manager}` : ''}
+              <div class="company-info">
+                <strong>${companyDetails?.name || orderToPrint.companyName || 'Client Company'}</strong><br>
+                ${companyDetails?.address || 'Address not available'}<br>
+                Phone: ${companyDetails?.phone || 'N/A'}<br>
+                Email: ${companyDetails?.email || 'N/A'}<br>
+                Contact: ${companyDetails?.contact_person || 'N/A'}<br>
+                ${companyDetails?.vat_number ? `VAT: ${companyDetails.vat_number}<br>` : ''}
+                ${companyDetails?.account_manager ? `Account Manager: ${companyDetails.account_manager}` : ''}
+              </div>
             </div>
             
             <div class="company-section">
               <div class="company-title">TO:</div>
-              <strong>${adminCompany.name}</strong><br>
-              ${adminCompany.address}<br>
-              Phone: ${adminCompany.phone}<br>
-              Email: ${adminCompany.email}<br>
-              Contact: ${adminCompany.contactPerson}
+              <div class="company-info">
+                <strong>${adminCompany.name}</strong><br>
+                ${adminCompany.address}<br>
+                Phone: ${adminCompany.phone}<br>
+                Email: ${adminCompany.email}<br>
+                Contact: ${adminCompany.contactPerson}
+              </div>
             </div>
           </div>
 
@@ -308,32 +318,52 @@ export default function OrderExportActions({
       doc.setFontSize(12);
       doc.text(`Order #${orderToExport.order_number}`, 105, 30, { align: 'center' });
       
-      // Company details
+      // Company details with blocks
+      // FROM block
+      doc.rect(15, 45, 85, 65); // x, y, width, height
       doc.setFontSize(10);
-      doc.text('FROM:', 20, 50);
+      doc.text('FROM:', 20, 55);
       doc.setFontSize(11);
-      doc.text(companyDetails?.name || orderToExport.companyName || 'Client Company', 20, 60);
+      doc.text(companyDetails?.name || orderToExport.companyName || 'Client Company', 20, 65);
       doc.setFontSize(9);
-      doc.text(companyDetails?.address || 'Address not available', 20, 68);
-      doc.text(`Phone: ${companyDetails?.phone || 'N/A'}`, 20, 76);
-      doc.text(`Email: ${companyDetails?.email || 'N/A'}`, 20, 84);
-      doc.text(`Contact: ${companyDetails?.contact_person || 'N/A'}`, 20, 92);
+      const fromLines = [
+        companyDetails?.address || 'Address not available',
+        `Phone: ${companyDetails?.phone || 'N/A'}`,
+        `Email: ${companyDetails?.email || 'N/A'}`,
+        `Contact: ${companyDetails?.contact_person || 'N/A'}`
+      ];
       if (companyDetails?.vat_number) {
-        doc.text(`VAT: ${companyDetails.vat_number}`, 20, 100);
+        fromLines.push(`VAT: ${companyDetails.vat_number}`);
       }
       if (companyDetails?.account_manager) {
-        doc.text(`Account Manager: ${companyDetails.account_manager}`, 20, 108);
+        fromLines.push(`Account Manager: ${companyDetails.account_manager}`);
       }
       
+      let yPosition = 73;
+      fromLines.forEach(line => {
+        doc.text(line, 20, yPosition);
+        yPosition += 6;
+      });
+      
+      // TO block
+      doc.rect(110, 45, 85, 65); // x, y, width, height
       doc.setFontSize(10);
-      doc.text('TO:', 110, 50);
+      doc.text('TO:', 115, 55);
       doc.setFontSize(11);
-      doc.text(adminCompany.name, 110, 60);
+      doc.text(adminCompany.name, 115, 65);
       doc.setFontSize(9);
-      doc.text(adminCompany.address, 110, 68);
-      doc.text(`Phone: ${adminCompany.phone}`, 110, 76);
-      doc.text(`Email: ${adminCompany.email}`, 110, 84);
-      doc.text(`Contact: ${adminCompany.contactPerson}`, 110, 92);
+      const toLines = [
+        adminCompany.address,
+        `Phone: ${adminCompany.phone}`,
+        `Email: ${adminCompany.email}`,
+        `Contact: ${adminCompany.contactPerson}`
+      ];
+      
+      yPosition = 73;
+      toLines.forEach(line => {
+        doc.text(line, 115, yPosition);
+        yPosition += 6;
+      });
       
       // Order info
       doc.setFontSize(10);
