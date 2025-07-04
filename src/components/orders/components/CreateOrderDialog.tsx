@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -21,8 +22,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { PlusCircle } from "lucide-react";
-import { v4 as uuidv4 } from 'uuid';
+import { PlusCircle, Plus, Trash2 } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -35,7 +35,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { sendOrderNotification } from "@/utils/emailNotifications";
 
 const itemSchema = z.object({
-  id: z.string().optional(),
+  id: z.string(),
   name: z.string().min(2, {
     message: "Item name must be at least 2 characters.",
   }),
@@ -75,6 +75,7 @@ const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [items, setItems] = useState([{ id: crypto.randomUUID(), name: "", quantity: 1 }]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -82,19 +83,31 @@ const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
       orderNumber: "",
       companyId: userProfile?.company_id || "",
       totalAmount: 0,
-      items: [{ id: uuidv4(), name: "", quantity: 1 }],
+      items: [{ id: crypto.randomUUID(), name: "", quantity: 1 }],
     },
   });
 
   const handleAddItem = () => {
-    form.setValue("items", [...form.getValues().items, { id: uuidv4(), name: "", quantity: 1 }]);
+    const newItem = { id: crypto.randomUUID(), name: "", quantity: 1 };
+    const updatedItems = [...items, newItem];
+    setItems(updatedItems);
+    form.setValue("items", updatedItems);
   };
 
-  const handleRemoveItem = (id: string) => {
-    form.setValue(
-      "items",
-      form.getValues().items.filter((item) => item.id !== id)
+  const handleRemoveItem = (itemId: string) => {
+    if (items.length <= 1) return; // Prevent removing the last item
+    
+    const updatedItems = items.filter((item) => item.id !== itemId);
+    setItems(updatedItems);
+    form.setValue("items", updatedItems);
+  };
+
+  const handleItemChange = (itemId: string, field: 'name' | 'quantity', value: string | number) => {
+    const updatedItems = items.map(item => 
+      item.id === itemId ? { ...item, [field]: value } : item
     );
+    setItems(updatedItems);
+    form.setValue("items", updatedItems);
   };
 
   const handleSubmit = async (values: z.infer<typeof formSchema>) => {
@@ -153,7 +166,11 @@ const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
         description: "Order created successfully!",
       });
 
+      // Reset form and items state
       form.reset();
+      const resetItems = [{ id: crypto.randomUUID(), name: "", quantity: 1 }];
+      setItems(resetItems);
+      form.setValue("items", resetItems);
       setOpen(false);
       onOrderCreated?.();
     } catch (error: any) {
@@ -176,7 +193,7 @@ const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
           Create Order
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[625px]">
+      <DialogContent className="sm:max-w-[625px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Create New Order</DialogTitle>
           <DialogDescription>
@@ -262,56 +279,62 @@ const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
                 </FormItem>
               )}
             />
-            <div>
-              <FormLabel>Items</FormLabel>
-              {form.getValues().items.map((item, index) => (
-                <div key={item.id} className="flex space-x-2 mb-2">
-                  <FormField
-                    control={form.control}
-                    name={`items.${index}.name`}
-                    render={({ field }) => (
-                      <FormItem className="w-1/2">
-                        <FormLabel>Item Name</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Item Name" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
+            
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <FormLabel>Order Items</FormLabel>
+                <Button type="button" variant="outline" size="sm" onClick={handleAddItem}>
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add Item
+                </Button>
+              </div>
+              
+              {items.map((item, index) => (
+                <div key={item.id} className="border rounded-md p-4 space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium">Item {index + 1}</span>
+                    {items.length > 1 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleRemoveItem(item.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name={`items.${index}.quantity`}
-                    render={({ field }) => (
-                      <FormItem className="w-1/4">
-                        <FormLabel>Quantity</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            placeholder="Quantity"
-                            {...field}
-                            onChange={(e) => field.onChange(Number(e.target.value))}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => handleRemoveItem(item.id || '')}
-                  >
-                    Remove
-                  </Button>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <FormLabel htmlFor={`item-name-${item.id}`}>Item Name</FormLabel>
+                      <Input
+                        id={`item-name-${item.id}`}
+                        value={item.name}
+                        onChange={(e) => handleItemChange(item.id, 'name', e.target.value)}
+                        placeholder="Enter item name"
+                        required
+                      />
+                    </div>
+                    
+                    <div>
+                      <FormLabel htmlFor={`item-quantity-${item.id}`}>Quantity</FormLabel>
+                      <Input
+                        id={`item-quantity-${item.id}`}
+                        type="number"
+                        min="1"
+                        value={item.quantity}
+                        onChange={(e) => handleItemChange(item.id, 'quantity', parseInt(e.target.value) || 1)}
+                        placeholder="Enter quantity"
+                        required
+                      />
+                    </div>
+                  </div>
                 </div>
               ))}
-              <Button type="button" variant="secondary" size="sm" onClick={handleAddItem}>
-                Add Item
-              </Button>
             </div>
-            <Button type="submit" disabled={isSubmitting}>
+            
+            <Button type="submit" disabled={isSubmitting} className="w-full">
               {isSubmitting ? "Creating..." : "Create Order"}
             </Button>
           </form>
