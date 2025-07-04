@@ -17,6 +17,7 @@ import {
 import { Trash2, CheckCircle, Eye } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import OrderDetailsDialog from "./OrderDetailsDialog";
+import OrderExportActions from "./OrderExportActions";
 
 interface Order {
   id: string;
@@ -121,6 +122,20 @@ export default function OrderRow({ order, isAdmin, onReceiveOrder, onDeleteOrder
         </TableCell>
         <TableCell>
           <div className="flex items-center gap-2">
+            <OrderExportActions 
+              order={{
+                id: order.id,
+                order_number: order.order_number,
+                description: order.description,
+                status: order.status,
+                total_amount: order.total_amount,
+                created_at: order.created_at,
+                company_id: order.company_id,
+                companyName: order.companyName,
+                items: orderItems
+              }}
+            />
+            
             <Button 
               variant="outline" 
               size="sm"

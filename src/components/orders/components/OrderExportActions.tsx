@@ -491,8 +491,8 @@ export default function OrderExportActions({
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="outline" disabled={loading}>
-            <Download className="h-4 w-4 mr-2" />
-            Export Order
+            <Printer className="h-4 w-4 mr-2" />
+            Print Order
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
