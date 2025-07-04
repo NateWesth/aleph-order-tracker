@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { 
@@ -145,6 +146,15 @@ export default function OrderExportActions({
               border-bottom: 2px solid #333;
               padding-bottom: 20px;
             }
+            .header h1 {
+              font-size: 24px;
+              margin-bottom: 10px;
+            }
+            .header .order-number {
+              font-size: 18px;
+              font-weight: bold;
+              color: #333;
+            }
             .company-details { 
               display: flex; 
               justify-content: space-between; 
@@ -217,7 +227,7 @@ export default function OrderExportActions({
         <body>
           <div class="header">
             <h1>PURCHASE ORDER</h1>
-            <p>Order #${orderToPrint.order_number}</p>
+            <p class="order-number">Order #${orderToPrint.order_number}</p>
           </div>
 
           <div class="company-details">
@@ -315,7 +325,7 @@ export default function OrderExportActions({
       // Header
       doc.setFontSize(18);
       doc.text('PURCHASE ORDER', 105, 20, { align: 'center' });
-      doc.setFontSize(12);
+      doc.setFontSize(16);
       doc.text(`Order #${orderToExport.order_number}`, 105, 30, { align: 'center' });
       
       // Company details with blocks
