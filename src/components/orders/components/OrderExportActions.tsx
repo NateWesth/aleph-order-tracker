@@ -10,6 +10,7 @@ import { Download, Printer, FileText, Sheet } from "lucide-react";
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
+import { supabase } from "@/integrations/supabase/client";
 
 interface OrderItem {
   id: string;
@@ -28,6 +29,17 @@ interface Order {
   company_id: string | null;
   companyName?: string;
   items?: OrderItem[];
+}
+
+interface Company {
+  id: string;
+  name: string;
+  contact_person: string | null;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+  vat_number: string | null;
+  account_manager: string | null;
 }
 
 interface OrderExportActionsProps {
@@ -80,7 +92,35 @@ export default function OrderExportActions({
     }).filter(item => item.name);
   };
 
-  const handlePrintSingleOrder = (orderToPrint: Order) => {
+  const fetchCompanyDetails = async (companyId: string): Promise<Company | null> => {
+    try {
+      const { data, error } = await supabase
+        .from('companies')
+        .select('*')
+        .eq('id', companyId)
+        .single();
+
+      if (error) {
+        console.error('Error fetching company details:', error);
+        return null;
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error fetching company details:', error);
+      return null;
+    }
+  };
+
+  const handlePrintSingleOrder = async (orderToPrint: Order) => {
+    setLoading(true);
+    
+    // Fetch company details if company_id exists
+    let companyDetails: Company | null = null;
+    if (orderToPrint.company_id) {
+      companyDetails = await fetchCompanyDetails(orderToPrint.company_id);
+    }
+
     // Parse items from description if not already provided
     const items = orderToPrint.items && orderToPrint.items.length > 0 
       ? orderToPrint.items 
@@ -148,16 +188,16 @@ export default function OrderExportActions({
               background-color: #f9f9f9; 
             }
             .signature-section { 
-              margin-top: 30px; 
+              margin-top: 20px; 
               padding: 10px;
               border: 1px solid #ddd;
               border-radius: 5px;
             }
             .signature-line { 
               border-bottom: 1px solid #333; 
-              width: 200px; 
-              height: 20px; 
-              margin: 10px 0;
+              width: 150px; 
+              height: 15px; 
+              margin: 5px 0;
               display: inline-block;
             }
             .footer { 
@@ -177,11 +217,13 @@ export default function OrderExportActions({
           <div class="company-details">
             <div class="company-section">
               <div class="company-title">FROM:</div>
-              <strong>${clientCompany?.name || orderToPrint.companyName || 'Client Company'}</strong><br>
-              ${clientCompany?.address || 'Client Address'}<br>
-              Phone: ${clientCompany?.phone || 'N/A'}<br>
-              Email: ${clientCompany?.email || 'N/A'}<br>
-              Contact: ${clientCompany?.contactPerson || 'N/A'}
+              <strong>${companyDetails?.name || orderToPrint.companyName || 'Client Company'}</strong><br>
+              ${companyDetails?.address || 'Address not available'}<br>
+              Phone: ${companyDetails?.phone || 'N/A'}<br>
+              Email: ${companyDetails?.email || 'N/A'}<br>
+              Contact: ${companyDetails?.contact_person || 'N/A'}<br>
+              ${companyDetails?.vat_number ? `VAT: ${companyDetails.vat_number}<br>` : ''}
+              ${companyDetails?.account_manager ? `Account Manager: ${companyDetails.account_manager}` : ''}
             </div>
             
             <div class="company-section">
@@ -222,9 +264,8 @@ export default function OrderExportActions({
 
           <div class="signature-section">
             <p><strong>Client Sign-off:</strong></p>
-            <p>I acknowledge receipt and approve this order as specified above.</p>
-            <p>Signature: <span class="signature-line"></span> Date: _____________</p>
-            <p>Print Name: _________________________ Position: ___________________________</p>
+            <p>Signature: <span class="signature-line"></span> Date: <span class="signature-line"></span></p>
+            <p>Print Name: <span class="signature-line"></span></p>
           </div>
 
           <div class="footer">
@@ -241,12 +282,20 @@ export default function OrderExportActions({
       printWindow.focus();
       printWindow.print();
     }
+    
+    setLoading(false);
   };
 
   const handleExportSingleOrderPDF = async (orderToExport: Order) => {
     setLoading(true);
     try {
       const doc = new jsPDF();
+      
+      // Fetch company details if company_id exists
+      let companyDetails: Company | null = null;
+      if (orderToExport.company_id) {
+        companyDetails = await fetchCompanyDetails(orderToExport.company_id);
+      }
       
       // Parse items from description if not already provided
       const items = orderToExport.items && orderToExport.items.length > 0 
@@ -263,12 +312,18 @@ export default function OrderExportActions({
       doc.setFontSize(10);
       doc.text('FROM:', 20, 50);
       doc.setFontSize(11);
-      doc.text(clientCompany?.name || orderToExport.companyName || 'Client Company', 20, 60);
+      doc.text(companyDetails?.name || orderToExport.companyName || 'Client Company', 20, 60);
       doc.setFontSize(9);
-      doc.text(clientCompany?.address || 'Client Address', 20, 68);
-      doc.text(`Phone: ${clientCompany?.phone || 'N/A'}`, 20, 76);
-      doc.text(`Email: ${clientCompany?.email || 'N/A'}`, 20, 84);
-      doc.text(`Contact: ${clientCompany?.contactPerson || 'N/A'}`, 20, 92);
+      doc.text(companyDetails?.address || 'Address not available', 20, 68);
+      doc.text(`Phone: ${companyDetails?.phone || 'N/A'}`, 20, 76);
+      doc.text(`Email: ${companyDetails?.email || 'N/A'}`, 20, 84);
+      doc.text(`Contact: ${companyDetails?.contact_person || 'N/A'}`, 20, 92);
+      if (companyDetails?.vat_number) {
+        doc.text(`VAT: ${companyDetails.vat_number}`, 20, 100);
+      }
+      if (companyDetails?.account_manager) {
+        doc.text(`Account Manager: ${companyDetails.account_manager}`, 20, 108);
+      }
       
       doc.setFontSize(10);
       doc.text('TO:', 110, 50);
@@ -282,8 +337,8 @@ export default function OrderExportActions({
       
       // Order info
       doc.setFontSize(10);
-      doc.text(`Order Date: ${new Date(orderToExport.created_at).toLocaleDateString()}`, 20, 110);
-      doc.text(`Status: ${orderToExport.status || 'Pending'}`, 20, 118);
+      doc.text(`Order Date: ${new Date(orderToExport.created_at).toLocaleDateString()}`, 20, 125);
+      doc.text(`Status: ${orderToExport.status || 'Pending'}`, 20, 133);
       
       // Items table - using the parsed items with their actual names and quantities
       const tableData = items.map(item => [
@@ -296,7 +351,7 @@ export default function OrderExportActions({
       autoTable(doc, {
         head: [['Item Description', 'Quantity', 'Unit', 'Notes']],
         body: tableData,
-        startY: 130,
+        startY: 145,
         styles: {
           fontSize: 9,
           cellPadding: 3,
@@ -315,18 +370,14 @@ export default function OrderExportActions({
       const finalY = (doc as any).lastAutoTable.finalY + 15;
       doc.setFontSize(10);
       doc.text('Client Sign-off:', 20, finalY);
-      doc.setFontSize(9);
-      doc.text('I acknowledge receipt and approve this order as specified above.', 20, finalY + 8);
       
-      doc.line(20, finalY + 20, 100, finalY + 20);
-      doc.line(110, finalY + 20, 160, finalY + 20);
-      doc.text('Signature', 20, finalY + 25);
-      doc.text('Date', 110, finalY + 25);
-      
-      doc.line(20, finalY + 35, 100, finalY + 35);
-      doc.line(110, finalY + 35, 160, finalY + 35);
-      doc.text('Print Name', 20, finalY + 40);
-      doc.text('Position', 110, finalY + 40);
+      doc.line(20, finalY + 10, 80, finalY + 10);
+      doc.line(90, finalY + 10, 130, finalY + 10);
+      doc.line(140, finalY + 10, 180, finalY + 10);
+      doc.setFontSize(8);
+      doc.text('Signature', 20, finalY + 15);
+      doc.text('Date', 90, finalY + 15);
+      doc.text('Print Name', 140, finalY + 15);
       
       // Footer
       doc.setFontSize(8);
