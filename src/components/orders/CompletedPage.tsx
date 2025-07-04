@@ -17,12 +17,13 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { format, startOfMonth, endOfMonth, isSameMonth } from "date-fns";
-import { Eye, ChevronDown, ChevronRight, FileText, Search, Trash2 } from "lucide-react";
+import { Eye, ChevronDown, ChevronRight, FileText, Search, Trash2, Download } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useGlobalRealtimeOrders } from "./hooks/useGlobalRealtimeOrders";
 import ProcessingOrderFilesDialog from "./components/ProcessingOrderFilesDialog";
 import OrderDetailsDialog from "./components/OrderDetailsDialog";
+import OrderExportActions from "./components/OrderExportActions";
 
 interface OrderItem {
   id: string;
@@ -93,6 +94,28 @@ export default function CompletedPage({
       };
     }).filter(item => item.name);
     return items;
+  };
+
+  // Fetch company details for orders
+  const fetchCompanyDetails = async (companyId: string) => {
+    try {
+      const { data } = await supabase
+        .from('companies')
+        .select('name, address, phone, email, contact_person')
+        .eq('id', companyId)
+        .single();
+      
+      return data ? {
+        name: data.name,
+        address: data.address || '',
+        phone: data.phone || '',
+        email: data.email || '',
+        contactPerson: data.contact_person || ''
+      } : null;
+    } catch (error) {
+      console.error('Error fetching company details:', error);
+      return null;
+    }
   };
 
   // Toggle order expansion
@@ -324,6 +347,21 @@ export default function CompletedPage({
                             <Badge variant="outline" className="bg-green-100 text-green-800">
                               Completed
                             </Badge>
+                            
+                            <OrderExportActions 
+                              order={{
+                                id: order.id,
+                                order_number: order.orderNumber,
+                                description: order.items.map(item => `${item.name} (Qty: ${item.quantity})`).join('\n'),
+                                status: order.status,
+                                total_amount: null,
+                                created_at: order.orderDate.toISOString(),
+                                company_id: null,
+                                companyName: order.companyName,
+                                items: order.items
+                              }}
+                            />
+                            
                             <Button variant="outline" size="sm" onClick={() => openFilesDialog(order)}>
                               <FileText className="h-4 w-4 mr-2" />
                               Files

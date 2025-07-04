@@ -10,6 +10,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useGlobalRealtimeOrders } from "./hooks/useGlobalRealtimeOrders";
 import ProcessingOrderFilesDialog from "./components/ProcessingOrderFilesDialog";
+import OrderExportActions from "./components/OrderExportActions";
+
 interface OrderItem {
   id: string;
   name: string;
@@ -18,6 +20,7 @@ interface OrderItem {
   unit?: string;
   notes?: string;
 }
+
 interface Company {
   id: string;
   name: string;
@@ -29,6 +32,7 @@ interface Company {
   vatNumber: string;
   logo?: string;
 }
+
 interface Order {
   id: string;
   orderNumber: string;
@@ -47,9 +51,11 @@ interface Order {
     [itemName: string]: number;
   };
 }
+
 interface ProcessingPageProps {
   isAdmin: boolean;
 }
+
 export default function ProcessingPage({
   isAdmin
 }: ProcessingPageProps) {
@@ -266,6 +272,7 @@ export default function ProcessingPage({
       });
     }
   };
+
   if (loading) {
     return <div className="container mx-auto p-4">
         <div className="flex justify-center items-center h-64">
@@ -273,6 +280,7 @@ export default function ProcessingPage({
         </div>
       </div>;
   }
+
   if (error) {
     return <div className="container mx-auto p-4">
         <div className="flex flex-col items-center justify-center h-64">
@@ -281,6 +289,7 @@ export default function ProcessingPage({
         </div>
       </div>;
   }
+
   if (!user) {
     return <div className="container mx-auto p-4">
         <div className="flex flex-col items-center justify-center h-64">
@@ -288,14 +297,11 @@ export default function ProcessingPage({
         </div>
       </div>;
   }
+
   return <div className="container mx-auto p-4">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Processing Orders</h1>
       </div>
-
-      
-
-      
 
       <div className="bg-white rounded-lg shadow">
         <div className="p-4 border-b">
@@ -328,6 +334,20 @@ export default function ProcessingPage({
                   <TableCell>{order.items.length} items</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
+                      <OrderExportActions 
+                        order={{
+                          id: order.id,
+                          order_number: order.orderNumber,
+                          description: order.items.map(item => `${item.name} (Qty: ${item.quantity})`).join('\n'),
+                          status: order.status,
+                          total_amount: null,
+                          created_at: order.orderDate.toISOString(),
+                          company_id: null,
+                          companyName: order.companyName,
+                          items: order.items
+                        }}
+                      />
+                      
                       <Button variant="ghost" size="sm" onClick={() => viewOrderDetails(order)}>
                         <Eye className="h-4 w-4" />
                       </Button>
