@@ -23,14 +23,29 @@ const supabase = createClient(
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 );
 
-const resend = new Resend(Deno.env.get('RESEND_API_KEY'));
-
 serve(async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
+    console.log('Starting order notification process...');
+    
+    // Check if RESEND_API_KEY is available
+    const resendApiKey = Deno.env.get('RESEND_API_KEY');
+    if (!resendApiKey) {
+      console.error('RESEND_API_KEY is not configured');
+      return new Response(
+        JSON.stringify({ error: 'Email service not configured' }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    const resend = new Resend(resendApiKey);
+
     const { orderId, orderNumber, companyName, changeType, oldStatus, newStatus, description }: NotificationRequest = await req.json();
 
     console.log('Processing order notification:', { orderId, orderNumber, changeType });
@@ -47,6 +62,8 @@ serve(async (req: Request): Promise<Response> => {
       throw orderError;
     }
 
+    console.log('Order data:', orderData);
+
     // Get all admin users
     const { data: adminUsers, error: adminError } = await supabase
       .from('user_roles')
@@ -61,6 +78,8 @@ serve(async (req: Request): Promise<Response> => {
       throw adminError;
     }
 
+    console.log('Admin users found:', adminUsers?.length || 0);
+
     // Get client users linked to the company
     let clientUsers: any[] = [];
     if (orderData.company_id) {
@@ -74,6 +93,7 @@ serve(async (req: Request): Promise<Response> => {
         console.error('Error fetching company users:', companyError);
       } else {
         clientUsers = companyUsers || [];
+        console.log('Company users found:', clientUsers.length);
       }
     }
 
@@ -87,6 +107,7 @@ serve(async (req: Request): Promise<Response> => {
 
       if (!creatorError && orderCreator && !clientUsers.find(u => u.id === orderCreator.id)) {
         clientUsers.push(orderCreator);
+        console.log('Added order creator to recipients');
       }
     }
 
@@ -105,6 +126,22 @@ serve(async (req: Request): Promise<Response> => {
     ].filter(recipient => recipient.email);
 
     console.log(`Sending notifications to ${allRecipients.length} recipients`);
+
+    if (allRecipients.length === 0) {
+      console.log('No recipients found, skipping email send');
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          message: 'No recipients found',
+          sent: 0, 
+          failed: 0,
+          recipients: 0 
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
 
     // Generate email content based on change type
     let subject = '';
@@ -172,6 +209,8 @@ serve(async (req: Request): Promise<Response> => {
     // Send emails to all recipients
     const emailPromises = allRecipients.map(async (recipient) => {
       try {
+        console.log(`Sending email to: ${recipient.email}`);
+        
         const personalizedContent = `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
             <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px;">
@@ -187,23 +226,39 @@ serve(async (req: Request): Promise<Response> => {
           </div>
         `;
 
-        return resend.emails.send({
+        const result = await resend.emails.send({
           from: 'Order Management <orders@resend.dev>',
           to: [recipient.email],
           subject: subject,
           html: personalizedContent,
         });
+
+        console.log(`Email sent successfully to ${recipient.email}:`, result);
+        return { success: true, email: recipient.email, result };
       } catch (error) {
         console.error(`Failed to send email to ${recipient.email}:`, error);
-        return { error };
+        return { success: false, email: recipient.email, error };
       }
     });
 
     const results = await Promise.allSettled(emailPromises);
-    const successful = results.filter(result => result.status === 'fulfilled').length;
-    const failed = results.filter(result => result.status === 'rejected').length;
+    const successful = results.filter(result => 
+      result.status === 'fulfilled' && result.value.success
+    ).length;
+    const failed = results.filter(result => 
+      result.status === 'rejected' || (result.status === 'fulfilled' && !result.value.success)
+    ).length;
 
-    console.log(`Email notifications sent: ${successful} successful, ${failed} failed`);
+    console.log(`Email notifications completed: ${successful} successful, ${failed} failed`);
+
+    // Log failed attempts for debugging
+    results.forEach((result, index) => {
+      if (result.status === 'rejected') {
+        console.error(`Email ${index} rejected:`, result.reason);
+      } else if (result.status === 'fulfilled' && !result.value.success) {
+        console.error(`Email ${index} failed:`, result.value.error);
+      }
+    });
 
     return new Response(
       JSON.stringify({ 

@@ -28,6 +28,8 @@ export const sendOrderNotification = async (params: EmailNotificationParams) => 
     return data;
   } catch (error) {
     console.error('Failed to send order notification:', error);
-    throw error;
+    // Don't re-throw the error to avoid breaking the main operation
+    // Instead, just log it and continue
+    return null;
   }
 };
