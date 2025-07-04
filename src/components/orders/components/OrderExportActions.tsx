@@ -133,32 +133,33 @@ export default function OrderExportActions({
             }
             th, td { 
               border: 1px solid #ddd; 
-              padding: 12px 8px; 
+              padding: 8px; 
               text-align: left;
             }
             th { 
               background-color: #f2f2f2; 
               font-weight: bold;
-              font-size: 13px;
+              font-size: 12px;
             }
             tr:nth-child(even) { 
               background-color: #f9f9f9; 
             }
             .signature-section { 
-              margin-top: 50px; 
-              padding: 20px;
+              margin-top: 30px; 
+              padding: 10px;
               border: 1px solid #ddd;
               border-radius: 5px;
             }
             .signature-line { 
               border-bottom: 1px solid #333; 
-              width: 300px; 
-              height: 40px; 
-              margin: 20px 0;
+              width: 200px; 
+              height: 20px; 
+              margin: 10px 0;
+              display: inline-block;
             }
             .footer { 
               text-align: center; 
-              margin-top: 30px; 
+              margin-top: 20px; 
               font-size: 10px;
               color: #666;
             }
@@ -219,12 +220,8 @@ export default function OrderExportActions({
           <div class="signature-section">
             <p><strong>Client Sign-off:</strong></p>
             <p>I acknowledge receipt and approve this order as specified above.</p>
-            <br>
-            <div class="signature-line"></div>
-            <p>Signature: _________________________ Date: _____________</p>
-            <br>
-            <p>Print Name: _________________________</p>
-            <p>Position: ___________________________</p>
+            <p>Signature: <span class="signature-line"></span> Date: _____________</p>
+            <p>Print Name: _________________________ Position: ___________________________</p>
           </div>
 
           <div class="footer">
@@ -307,17 +304,22 @@ export default function OrderExportActions({
         },
       });
 
-      // Signature section
-      const finalY = (doc as any).lastAutoTable.finalY + 20;
-      doc.setFontSize(11);
+      // Compact signature section
+      const finalY = (doc as any).lastAutoTable.finalY + 15;
+      doc.setFontSize(10);
       doc.text('Client Sign-off:', 20, finalY);
       doc.setFontSize(9);
-      doc.text('I acknowledge receipt and approve this order as specified above.', 20, finalY + 10);
+      doc.text('I acknowledge receipt and approve this order as specified above.', 20, finalY + 8);
       
-      doc.line(20, finalY + 30, 120, finalY + 30);
-      doc.text('Signature: _________________________ Date: _____________', 20, finalY + 40);
-      doc.text('Print Name: _________________________', 20, finalY + 50);
-      doc.text('Position: ___________________________', 20, finalY + 60);
+      doc.line(20, finalY + 20, 100, finalY + 20);
+      doc.line(110, finalY + 20, 160, finalY + 20);
+      doc.text('Signature', 20, finalY + 25);
+      doc.text('Date', 110, finalY + 25);
+      
+      doc.line(20, finalY + 35, 100, finalY + 35);
+      doc.line(110, finalY + 35, 160, finalY + 35);
+      doc.text('Print Name', 20, finalY + 40);
+      doc.text('Position', 110, finalY + 40);
       
       // Footer
       doc.setFontSize(8);
