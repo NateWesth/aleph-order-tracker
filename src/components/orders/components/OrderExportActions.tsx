@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { 
@@ -146,12 +147,13 @@ export default function OrderExportActions({
             }
             .header h1 {
               font-size: 24px;
-              margin-bottom: 8px;
+              margin-bottom: 2px;
               font-weight: bold;
             }
-            .header .order-number {
-              font-size: 14px;
+            .header .purchase-order {
+              font-size: 12px;
               color: #666;
+              margin-bottom: 5px;
             }
             .company-details { 
               display: flex; 
@@ -236,19 +238,19 @@ export default function OrderExportActions({
         </head>
         <body>
           <div class="header">
-            <h1>PURCHASE ORDER</h1>
-            <p class="order-number">Order #${orderToPrint.order_number}</p>
+            <h1>${orderToPrint.order_number}</h1>
+            <p class="purchase-order">Purchase Order</p>
           </div>
 
           <div class="company-details">
             <div class="company-section">
               <div class="company-title">FROM:</div>
               <div class="company-info">
-                <strong>${companyDetails?.name || orderToPrint.companyName || 'Client Company'}</strong><br>
-                ${companyDetails?.address || 'Address not available'}<br>
-                Phone: ${companyDetails?.phone || 'N/A'}<br>
-                Email: ${companyDetails?.email || 'N/A'}<br>
-                Contact: ${companyDetails?.contact_person || 'N/A'}<br>
+                <strong>${companyDetails?.name || orderToPrint.companyName || clientCompany?.name || 'Client Company'}</strong><br>
+                ${companyDetails?.address || clientCompany?.address || 'Address not available'}<br>
+                Phone: ${companyDetails?.phone || clientCompany?.phone || 'N/A'}<br>
+                Email: ${companyDetails?.email || clientCompany?.email || 'N/A'}<br>
+                Contact: ${companyDetails?.contact_person || clientCompany?.contactPerson || 'N/A'}<br>
                 ${companyDetails?.vat_number ? `VAT: ${companyDetails.vat_number}<br>` : ''}
                 ${companyDetails?.account_manager ? `Account Manager: ${companyDetails.account_manager}` : ''}
               </div>
@@ -344,11 +346,11 @@ export default function OrderExportActions({
         ? orderToExport.items 
         : parseOrderItems(orderToExport.description);
       
-      // Header
+      // Header - swapped order number and purchase order
       doc.setFontSize(20);
-      doc.text('PURCHASE ORDER', 105, 20, { align: 'center' });
-      doc.setFontSize(12);
-      doc.text(`Order #${orderToExport.order_number}`, 105, 30, { align: 'center' });
+      doc.text(orderToExport.order_number, 105, 20, { align: 'center' });
+      doc.setFontSize(10);
+      doc.text('Purchase Order', 105, 28, { align: 'center' });
       
       // Add line under header
       doc.line(20, 35, 190, 35);
@@ -363,13 +365,13 @@ export default function OrderExportActions({
       doc.setFontSize(10);
       doc.text('FROM:', 25, 55);
       doc.setFontSize(9);
-      doc.text(companyDetails?.name || orderToExport.companyName || 'Client Company', 25, 63);
+      doc.text(companyDetails?.name || orderToExport.companyName || clientCompany?.name || 'Client Company', 25, 63);
       
       const fromLines = [
-        companyDetails?.address || 'Address not available',
-        `Phone: ${companyDetails?.phone || 'N/A'}`,
-        `Email: ${companyDetails?.email || 'N/A'}`,
-        `Contact: ${companyDetails?.contact_person || 'N/A'}`
+        companyDetails?.address || clientCompany?.address || 'Address not available',
+        `Phone: ${companyDetails?.phone || clientCompany?.phone || 'N/A'}`,
+        `Email: ${companyDetails?.email || clientCompany?.email || 'N/A'}`,
+        `Contact: ${companyDetails?.contact_person || clientCompany?.contactPerson || 'N/A'}`
       ];
       if (companyDetails?.vat_number) {
         fromLines.push(`VAT: ${companyDetails.vat_number}`);
