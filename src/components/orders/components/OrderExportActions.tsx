@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { 
@@ -64,7 +63,6 @@ export default function OrderExportActions({
 }: OrderExportActionsProps) {
   const [loading, setLoading] = useState(false);
 
-  // Updated admin company details
   const adminCompany = {
     name: "Aleph Engineering and Supplies",
     address: "Unit F, Maritz and Donley Properties, 4 Skew Road, Anderbolt, Boksburg, 1459",
@@ -151,7 +149,7 @@ export default function OrderExportActions({
               margin-bottom: 10px;
             }
             .header .order-number {
-              font-size: 18px;
+              font-size: 20px;
               font-weight: bold;
               color: #333;
             }
@@ -164,19 +162,29 @@ export default function OrderExportActions({
             .company-section { 
               width: 45%; 
               padding: 15px;
-              border: 2px solid #333;
+              border: 1px solid rgba(51, 51, 51, 0.2);
               border-radius: 8px;
-              background-color: #f9f9f9;
+              background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+              box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+            .company-section.aleph { 
+              background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
             }
             .company-title { 
               font-weight: bold; 
               font-size: 14px; 
               margin-bottom: 15px;
-              color: #333;
+              color: #1e40af;
               text-decoration: underline;
+              text-transform: uppercase;
+            }
+            .company-title.aleph { 
+              color: #166534;
             }
             .company-info {
               line-height: 1.6;
+              color: #1f2937;
+              font-weight: 500;
             }
             .order-info { 
               text-align: center; 
@@ -244,8 +252,8 @@ export default function OrderExportActions({
               </div>
             </div>
             
-            <div class="company-section">
-              <div class="company-title">TO:</div>
+            <div class="company-section aleph">
+              <div class="company-title aleph">TO:</div>
               <div class="company-info">
                 <strong>${adminCompany.name}</strong><br>
                 ${adminCompany.address}<br>
@@ -328,12 +336,18 @@ export default function OrderExportActions({
       doc.setFontSize(16);
       doc.text(`Order #${orderToExport.order_number}`, 105, 30, { align: 'center' });
       
-      // Company details with blocks
-      // FROM block
-      doc.rect(15, 45, 85, 65); // x, y, width, height
+      // Company details with colored blocks
+      // FROM block (Client) - Light blue background
+      doc.setFillColor(240, 249, 255); // Light blue
+      doc.rect(15, 45, 85, 65, 'F'); // Filled rectangle
+      doc.setDrawColor(59, 130, 246, 50); // Blue border with low opacity
+      doc.rect(15, 45, 85, 65); // Border
+      
       doc.setFontSize(10);
+      doc.setTextColor(30, 64, 175); // Blue text
       doc.text('FROM:', 20, 55);
       doc.setFontSize(11);
+      doc.setTextColor(31, 41, 55); // Dark gray text
       doc.text(companyDetails?.name || orderToExport.companyName || 'Client Company', 20, 65);
       doc.setFontSize(9);
       const fromLines = [
@@ -355,11 +369,17 @@ export default function OrderExportActions({
         yPosition += 6;
       });
       
-      // TO block
-      doc.rect(110, 45, 85, 65); // x, y, width, height
+      // TO block (Aleph) - Light green background
+      doc.setFillColor(240, 253, 244); // Light green
+      doc.rect(110, 45, 85, 65, 'F'); // Filled rectangle
+      doc.setDrawColor(34, 197, 94, 50); // Green border with low opacity
+      doc.rect(110, 45, 85, 65); // Border
+      
       doc.setFontSize(10);
+      doc.setTextColor(22, 101, 52); // Green text
       doc.text('TO:', 115, 55);
       doc.setFontSize(11);
+      doc.setTextColor(31, 41, 55); // Dark gray text
       doc.text(adminCompany.name, 115, 65);
       doc.setFontSize(9);
       const toLines = [
@@ -374,6 +394,9 @@ export default function OrderExportActions({
         doc.text(line, 115, yPosition);
         yPosition += 6;
       });
+      
+      // Reset text color for the rest of the document
+      doc.setTextColor(0, 0, 0);
       
       // Order info
       doc.setFontSize(10);
