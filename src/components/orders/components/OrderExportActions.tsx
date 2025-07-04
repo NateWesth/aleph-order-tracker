@@ -63,13 +63,13 @@ export default function OrderExportActions({
 }: OrderExportActionsProps) {
   const [loading, setLoading] = useState(false);
 
-  // Default admin company details
+  // Updated admin company details
   const adminCompany = {
     name: "Aleph Engineering and Supplies",
-    address: "123 Industrial Avenue, Cape Town, South Africa",
-    phone: "+27 21 123 4567",
-    email: "info@alephengineering.co.za",
-    contactPerson: "Operations Manager"
+    address: "Unit F, Maritz and Donley Properties, 4 Skew Road, Anderbolt, Boksburg, 1459",
+    phone: "+27 72 887 6908 / +27 63 609 7571",
+    email: "admin@alepheng.co.za",
+    contactPerson: "Neels Van Der Westhuizen"
   };
 
   const parseOrderItems = (description: string | null): OrderItem[] => {
@@ -373,7 +373,6 @@ export default function OrderExportActions({
       
       doc.line(20, finalY + 10, 80, finalY + 10);
       doc.line(90, finalY + 10, 130, finalY + 10);
-      doc.line(140, finalY + 10, 180, finalY + 10);
       doc.setFontSize(8);
       doc.text('Signature', 20, finalY + 15);
       doc.text('Date', 90, finalY + 15);
