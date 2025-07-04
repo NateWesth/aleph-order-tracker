@@ -1,135 +1,324 @@
-
 import { useState } from "react";
-import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
-import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import OrderForm from "./OrderForm";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
+import { PlusCircle } from "lucide-react";
+import { v4 as uuidv4 } from 'uuid';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { sendOrderNotification } from "@/utils/emailNotifications";
+
+const itemSchema = z.object({
+  id: z.string().optional(),
+  name: z.string().min(2, {
+    message: "Item name must be at least 2 characters.",
+  }),
+  quantity: z.coerce.number().min(1, {
+    message: "Quantity must be at least 1.",
+  }),
+});
+
+const formSchema = z.object({
+  orderNumber: z.string().min(3, {
+    message: "Order number must be at least 3 characters.",
+  }),
+  companyId: z.string().optional(),
+  companyName: z.string().optional(),
+  totalAmount: z.number().optional(),
+  items: z.array(itemSchema).min(1, {
+    message: "You must add at least one item.",
+  }),
+});
 
 interface CreateOrderDialogProps {
   isAdmin: boolean;
-  companies: Array<{ id: string; name: string; code: string }>;
-  profiles: Array<{ id: string; full_name: string; email: string; company_id: string }>;
+  companies: any[];
+  profiles: any[];
   userProfile: any;
-  onOrderCreated: () => void;
+  onOrderCreated?: () => void;
 }
 
-export default function CreateOrderDialog({
+const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
   isAdmin,
   companies,
   profiles,
   userProfile,
-  onOrderCreated
-}: CreateOrderDialogProps) {
+  onOrderCreated,
+}) => {
   const { toast } = useToast();
   const { user } = useAuth();
-  const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleOrderSubmit = async (orderData: {
-    orderNumber: string;
-    description: string;
-    companyId: string;
-    totalAmount: number;
-    items: any[];
-  }) => {
-    if (!orderData.description.trim() || orderData.items.length === 0) {
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      orderNumber: "",
+      companyId: userProfile?.company_id || "",
+      totalAmount: 0,
+      items: [{ id: uuidv4(), name: "", quantity: 1 }],
+    },
+  });
+
+  const handleAddItem = () => {
+    form.setValue("items", [...form.getValues().items, { id: uuidv4(), name: "", quantity: 1 }]);
+  };
+
+  const handleRemoveItem = (id: string) => {
+    form.setValue(
+      "items",
+      form.getValues().items.filter((item) => item.id !== id)
+    );
+  };
+
+  const handleSubmit = async (values: z.infer<typeof formSchema>) => {
+    if (!user?.id) {
       toast({
         title: "Error",
-        description: "Please provide a description and add at least one item.",
+        description: "You must be logged in to create an order.",
         variant: "destructive",
       });
       return;
     }
-
-    if (!orderData.orderNumber.trim()) {
-      toast({
-        title: "Error",
-        description: "Please provide an order number.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setLoading(true);
 
     try {
-      console.log("Creating order with custom order number...");
+      setIsSubmitting(true);
       
-      // Convert items to a formatted description string
-      const itemsDescription = orderData.items.map(item => 
-        `${item.name} (Qty: ${item.quantity})`
-      ).join('\n');
-      
-      const newOrderData = {
-        order_number: orderData.orderNumber,
-        description: itemsDescription,
-        total_amount: orderData.totalAmount || null,
-        status: 'pending',
-        company_id: orderData.companyId || null,
-        user_id: user?.id
-      };
+      // Format items for description
+      const itemsDescription = values.items
+        .map(item => `${item.name} (Qty: ${item.quantity})`)
+        .join('\n');
 
-      console.log("Order data for insert:", newOrderData);
-
-      // Insert the order - this will trigger real-time updates automatically
-      const { error } = await supabase
+      // Create the order
+      const { data: newOrder, error } = await supabase
         .from('orders')
-        .insert([newOrderData]);
+        .insert([
+          {
+            order_number: values.orderNumber,
+            description: itemsDescription,
+            status: 'pending',
+            company_id: values.companyId || null,
+            user_id: user.id,
+            total_amount: values.totalAmount || null,
+          }
+        ])
+        .select('*, companies(name)')
+        .single();
 
-      if (error) {
-        console.error("Order creation error:", error);
-        throw error;
+      if (error) throw error;
+
+      // Send email notification for new order
+      try {
+        await sendOrderNotification({
+          orderId: newOrder.id,
+          orderNumber: newOrder.order_number,
+          companyName: newOrder.companies?.name || values.companyName || 'Unknown Company',
+          changeType: 'created',
+          newStatus: 'pending',
+          description: itemsDescription
+        });
+      } catch (emailError) {
+        console.error('Failed to send email notification:', emailError);
+        // Don't fail the entire operation if email fails
       }
 
-      console.log("Order created successfully with custom order number");
-
       toast({
-        title: "Order Created",
-        description: `Order ${orderData.orderNumber} has been created successfully with ${orderData.items.length} item(s).`,
+        title: "Success",
+        description: "Order created successfully!",
       });
 
-      setShowCreateDialog(false);
-      
-      // Call the callback to refresh local state
-      onOrderCreated();
+      form.reset();
+      setOpen(false);
+      onOrderCreated?.();
     } catch (error: any) {
-      console.error("Failed to create order:", error);
+      console.error('Error creating order:', error);
       toast({
         title: "Error",
         description: "Failed to create order. Please try again.",
         variant: "destructive",
       });
     } finally {
-      setLoading(false);
+      setIsSubmitting(false);
     }
   };
 
   return (
-    <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+    <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button>
-          <Plus className="h-4 w-4 mr-2" />
+        <Button variant="outline">
+          <PlusCircle className="mr-2 h-4 w-4" />
           Create Order
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[625px]">
         <DialogHeader>
           <DialogTitle>Create New Order</DialogTitle>
+          <DialogDescription>
+            Create a new order in the system.
+          </DialogDescription>
         </DialogHeader>
-        <OrderForm
-          onSubmit={handleOrderSubmit}
-          loading={loading}
-        />
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="orderNumber"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Order Number</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Order Number" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            {isAdmin && (
+              <FormField
+                control={form.control}
+                name="companyId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Company</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a company" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {companies.map((company) => (
+                          <SelectItem key={company.id} value={company.id}>
+                            {company.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+            {!isAdmin && (
+              <FormField
+                control={form.control}
+                name="companyName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Company Name</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Company Name"
+                        {...field}
+                        disabled={true}
+                        defaultValue={userProfile?.company?.name || "N/A"}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+            <FormField
+              control={form.control}
+              name="totalAmount"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Total Amount</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="Total Amount"
+                      type="number"
+                      {...field}
+                      onChange={(e) => field.onChange(Number(e.target.value))}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <div>
+              <FormLabel>Items</FormLabel>
+              {form.getValues().items.map((item, index) => (
+                <div key={item.id} className="flex space-x-2 mb-2">
+                  <FormField
+                    control={form.control}
+                    name={`items.${index}.name`}
+                    render={({ field }) => (
+                      <FormItem className="w-1/2">
+                        <FormLabel>Item Name</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Item Name" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name={`items.${index}.quantity`}
+                    render={({ field }) => (
+                      <FormItem className="w-1/4">
+                        <FormLabel>Quantity</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            placeholder="Quantity"
+                            {...field}
+                            onChange={(e) => field.onChange(Number(e.target.value))}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => handleRemoveItem(item.id || '')}
+                  >
+                    Remove
+                  </Button>
+                </div>
+              ))}
+              <Button type="button" variant="secondary" size="sm" onClick={handleAddItem}>
+                Add Item
+              </Button>
+            </div>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? "Creating..." : "Create Order"}
+            </Button>
+          </form>
+        </Form>
       </DialogContent>
     </Dialog>
   );
-}
+};
+
+export default CreateOrderDialog;

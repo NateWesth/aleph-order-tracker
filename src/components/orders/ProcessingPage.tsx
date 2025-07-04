@@ -11,6 +11,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useGlobalRealtimeOrders } from "./hooks/useGlobalRealtimeOrders";
 import ProcessingOrderFilesDialog from "./components/ProcessingOrderFilesDialog";
 import OrderExportActions from "./components/OrderExportActions";
+import { sendOrderNotification } from "@/utils/emailNotifications";
 
 interface OrderItem {
   id: string;
@@ -200,27 +201,50 @@ export default function ProcessingPage({
   // Mark order as completed and move to completed status
   const completeOrder = async (orderId: string, orderNumber: string) => {
     if (!isAdmin) return;
+    
+    const orderToComplete = orders.find(order => order.id === orderId);
+    
     try {
       console.log('Marking order as completed and moving to completed status:', orderId);
-      const {
-        error
-      } = await supabase.from('orders').update({
-        status: 'completed',
-        completed_date: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      }).eq('id', orderId);
+      
+      const { error } = await supabase
+        .from('orders')
+        .update({
+          status: 'completed',
+          completed_date: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', orderId);
+
       if (error) throw error;
 
       // Remove from processing orders
       const remainingOrders = orders.filter(order => order.id !== orderId);
       setOrders(remainingOrders);
+
+      // Send email notification
+      try {
+        await sendOrderNotification({
+          orderId,
+          orderNumber,
+          companyName: orderToComplete?.companyName || 'Unknown Company',
+          changeType: 'status_change',
+          oldStatus: 'processing',
+          newStatus: 'completed'
+        });
+      } catch (emailError) {
+        console.error('Failed to send email notification:', emailError);
+      }
+
       toast({
         title: "Order Completed",
         description: `Order ${orderNumber} has been moved to completed status and will appear on the Completed page.`
       });
+
       if (selectedOrder && selectedOrder.id === orderId) {
         setSelectedOrder(null);
       }
+      
       console.log('Order successfully moved to completed status');
       fetchProcessingOrders();
     } catch (error: any) {
@@ -246,21 +270,43 @@ export default function ProcessingPage({
   // Delete order function for admins
   const deleteOrder = async (orderId: string, orderNumber: string) => {
     if (!isAdmin) return;
+    
+    const orderToDelete = orders.find(order => order.id === orderId);
+    
     try {
       console.log('Deleting order:', orderId);
-      const {
-        error
-      } = await supabase.from('orders').delete().eq('id', orderId);
+      
+      const { error } = await supabase
+        .from('orders')
+        .delete()
+        .eq('id', orderId);
+
       if (error) throw error;
+
       const remainingOrders = orders.filter(order => order.id !== orderId);
       setOrders(remainingOrders);
+
+      // Send email notification
+      try {
+        await sendOrderNotification({
+          orderId,
+          orderNumber,
+          companyName: orderToDelete?.companyName || 'Unknown Company',
+          changeType: 'deleted'
+        });
+      } catch (emailError) {
+        console.error('Failed to send email notification:', emailError);
+      }
+
       toast({
         title: "Order Deleted",
         description: `Order ${orderNumber} has been permanently deleted.`
       });
+
       if (selectedOrder && selectedOrder.id === orderId) {
         setSelectedOrder(null);
       }
+      
       console.log('Order successfully deleted');
       fetchProcessingOrders();
     } catch (error: any) {

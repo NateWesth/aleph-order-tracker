@@ -8,9 +8,12 @@ import { useOrderData } from "./hooks/useOrderData";
 import { useGlobalRealtimeOrders } from "./hooks/useGlobalRealtimeOrders";
 import { useCompanyData } from "@/components/admin/hooks/useCompanyData";
 import { useAuth } from "@/contexts/AuthContext";
+import { sendOrderNotification } from "@/utils/emailNotifications";
+
 interface OrdersPageProps {
   isAdmin?: boolean;
 }
+
 export default function OrdersPage({
   isAdmin = false
 }: OrdersPageProps) {
@@ -70,13 +73,83 @@ export default function OrdersPage({
     };
     fetchOrdersWithCompanies();
   }, [orders]);
+
+  const receiveOrder = async (order: any) => {
+    try {
+      console.log('Receiving order and updating status to received:', order.id);
+
+      // Update order status in database to 'received' - this will trigger real-time updates
+      const { error } = await supabase
+        .from('orders')
+        .update({
+          status: 'received',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', order.id);
+
+      if (error) throw error;
+
+      // Update local state immediately
+      setOrders(orders.map(o => 
+        o.id === order.id ? { ...o, status: 'received' } : o
+      ));
+
+      // Send email notification
+      try {
+        await sendOrderNotification({
+          orderId: order.id,
+          orderNumber: order.order_number,
+          companyName: order.companyName || 'Unknown Company',
+          changeType: 'status_change',
+          oldStatus: 'pending',
+          newStatus: 'received'
+        });
+      } catch (emailError) {
+        console.error('Failed to send email notification:', emailError);
+        // Don't fail the entire operation if email fails
+      }
+
+      toast({
+        title: "Order Received",
+        description: `Order ${order.order_number} has been received and moved to progress tracking. All users will see this update automatically.`
+      });
+
+      console.log('Order successfully received and database updated');
+    } catch (error: any) {
+      console.error('Error receiving order:', error);
+      toast({
+        title: "Error",
+        description: "Failed to receive order. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
   const deleteOrder = async (orderId: string, orderNumber: string) => {
     try {
-      const {
-        error
-      } = await supabase.from('orders').delete().eq('id', orderId);
+      const orderToDelete = orders.find(o => o.id === orderId);
+      
+      const { error } = await supabase
+        .from('orders')
+        .delete()
+        .eq('id', orderId);
+
       if (error) throw error;
+
       setOrders(orders.filter(order => order.id !== orderId));
+
+      // Send email notification
+      try {
+        await sendOrderNotification({
+          orderId,
+          orderNumber,
+          companyName: orderToDelete?.companyName || 'Unknown Company',
+          changeType: 'deleted'
+        });
+      } catch (emailError) {
+        console.error('Failed to send email notification:', emailError);
+      }
+
       toast({
         title: "Order Deleted",
         description: `Order ${orderNumber} has been successfully deleted.`
@@ -89,44 +162,15 @@ export default function OrdersPage({
       });
     }
   };
-  const receiveOrder = async (order: any) => {
-    try {
-      console.log('Receiving order and updating status to received:', order.id);
 
-      // Update order status in database to 'received' - this will trigger real-time updates
-      const {
-        error
-      } = await supabase.from('orders').update({
-        status: 'received',
-        updated_at: new Date().toISOString()
-      }).eq('id', order.id);
-      if (error) throw error;
-
-      // Update local state immediately
-      setOrders(orders.map(o => o.id === order.id ? {
-        ...o,
-        status: 'received'
-      } : o));
-      toast({
-        title: "Order Received",
-        description: `Order ${order.order_number} has been received and moved to progress tracking. All users will see this update automatically.`
-      });
-      console.log('Order successfully received and database updated');
-    } catch (error: any) {
-      console.error('Error receiving order:', error);
-      toast({
-        title: "Error",
-        description: "Failed to receive order. Please try again.",
-        variant: "destructive"
-      });
-    }
-  };
   const filteredOrders = ordersWithCompanies.filter(order => order.order_number.toLowerCase().includes(searchTerm.toLowerCase()) || order.companyName?.toLowerCase().includes(searchTerm.toLowerCase()) || order.status?.toLowerCase().includes(searchTerm.toLowerCase()));
+
   if (loading) {
     return <div className="flex items-center justify-center h-64">
         <div className="text-lg">Loading orders...</div>
       </div>;
   }
+
   return <div className="container mx-auto p-6">
       <div className="flex justify-between items-center mb-6">
         <OrdersHeader searchTerm={searchTerm} onSearchChange={setSearchTerm} />
