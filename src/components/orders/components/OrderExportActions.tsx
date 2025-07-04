@@ -81,7 +81,10 @@ export default function OrderExportActions({
   };
 
   const handlePrintSingleOrder = (orderToPrint: Order) => {
-    const items = orderToPrint.items || parseOrderItems(orderToPrint.description);
+    // Parse items from description if not already provided
+    const items = orderToPrint.items && orderToPrint.items.length > 0 
+      ? orderToPrint.items 
+      : parseOrderItems(orderToPrint.description);
     
     const printContent = `
       <html>
@@ -244,7 +247,11 @@ export default function OrderExportActions({
     setLoading(true);
     try {
       const doc = new jsPDF();
-      const items = orderToExport.items || parseOrderItems(orderToExport.description);
+      
+      // Parse items from description if not already provided
+      const items = orderToExport.items && orderToExport.items.length > 0 
+        ? orderToExport.items 
+        : parseOrderItems(orderToExport.description);
       
       // Header
       doc.setFontSize(18);
@@ -278,7 +285,7 @@ export default function OrderExportActions({
       doc.text(`Order Date: ${new Date(orderToExport.created_at).toLocaleDateString()}`, 20, 110);
       doc.text(`Status: ${orderToExport.status || 'Pending'}`, 20, 118);
       
-      // Items table
+      // Items table - using the parsed items with their actual names and quantities
       const tableData = items.map(item => [
         item.name,
         item.quantity.toString(),
