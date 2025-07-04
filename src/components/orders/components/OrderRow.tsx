@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -19,21 +18,22 @@ import { supabase } from "@/integrations/supabase/client";
 import OrderDetailsDialog from "./OrderDetailsDialog";
 import OrderExportActions from "./OrderExportActions";
 
-interface Order {
+interface OrderWithCompany {
   id: string;
   order_number: string;
   description: string | null;
   status: string | null;
   total_amount: number | null;
   created_at: string;
+  updated_at: string;
   company_id: string | null;
-  companyName?: string;
+  companyName: string;
 }
 
 interface OrderRowProps {
-  order: Order;
+  order: OrderWithCompany;
   isAdmin: boolean;
-  onReceiveOrder: (order: Order) => void;
+  onReceiveOrder: (order: OrderWithCompany) => void;
   onDeleteOrder: (orderId: string, orderNumber: string) => void;
 }
 

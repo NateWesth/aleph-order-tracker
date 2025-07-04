@@ -181,11 +181,28 @@ export default function OrdersPage({
       </div>;
   }
 
+  // Convert OrderWithCompany[] to Order[] for OrderExportActions
+  const exportOrders = filteredOrders.map(order => ({
+    id: order.id,
+    order_number: order.order_number,
+    description: order.description || '',
+    status: order.status,
+    total_amount: order.total_amount,
+    created_at: order.created_at,
+    updated_at: order.updated_at,
+    completed_date: order.completed_date,
+    company_id: order.company_id,
+    user_id: order.user_id,
+    progress_stage: order.progress_stage,
+    items: order.items,
+    companyName: order.companyName
+  }));
+
   return <div className="container mx-auto p-6">
       <div className="flex justify-between items-center mb-6">
         <OrdersHeader searchTerm={searchTerm} onSearchChange={setSearchTerm} />
         <div className="flex gap-2">
-          <OrderExportActions orders={filteredOrders} title="Orders" />
+          <OrderExportActions orders={exportOrders} title="Orders" />
           <CreateOrderDialog 
             isAdmin={isAdmin} 
             companies={companies} 
