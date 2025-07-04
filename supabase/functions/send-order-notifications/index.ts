@@ -26,7 +26,6 @@ serve(async (req: Request): Promise<Response> => {
   try {
     console.log('=== Order Notification Function Started ===');
     
-    // Check if RESEND_API_KEY is available
     const resendApiKey = Deno.env.get('RESEND_API_KEY');
     console.log('RESEND_API_KEY configured:', !!resendApiKey);
     
@@ -73,24 +72,27 @@ serve(async (req: Request): Promise<Response> => {
 
     console.log('📋 Order data retrieved:', orderData);
 
-    // Get all admin users
+    // 1. Get ALL admin users from user_roles table
+    console.log('🔍 Fetching admin users...');
     const { data: adminUsers, error: adminError } = await supabase
       .from('user_roles')
       .select(`
         user_id,
         profiles!inner(email, full_name)
       `)
-      .eq('role', 'admin');
+      .eq('role', 'admin')
+      .not('profiles.email', 'is', null);
 
     if (adminError) {
       console.error('❌ Error fetching admin users:', adminError);
     } else {
-      console.log('👥 Admin users found:', adminUsers?.length || 0);
+      console.log('👥 Admin users found:', adminUsers?.length || 0, adminUsers);
     }
 
-    // Get client users linked to the company
+    // 2. Get client users linked to the company
     let clientUsers: any[] = [];
     if (orderData.company_id) {
+      console.log('🔍 Fetching company users for company_id:', orderData.company_id);
       const { data: companyUsers, error: companyError } = await supabase
         .from('profiles')
         .select('email, full_name, id')
@@ -101,12 +103,13 @@ serve(async (req: Request): Promise<Response> => {
         console.error('❌ Error fetching company users:', companyError);
       } else {
         clientUsers = companyUsers || [];
-        console.log('🏢 Company users found:', clientUsers.length);
+        console.log('🏢 Company users found:', clientUsers.length, clientUsers);
       }
     }
 
-    // Also include the order creator if they're not already included
+    // 3. Also include the order creator if they're not already included
     if (orderData.user_id) {
+      console.log('🔍 Fetching order creator:', orderData.user_id);
       const { data: orderCreator, error: creatorError } = await supabase
         .from('profiles')
         .select('email, full_name, id')
@@ -119,22 +122,26 @@ serve(async (req: Request): Promise<Response> => {
       }
     }
 
-    // Combine all email recipients
-    const allRecipients = [
-      ...(adminUsers || []).map((admin: any) => ({
-        email: admin.profiles.email,
-        name: admin.profiles.full_name || 'Admin User',
-        role: 'admin'
-      })),
-      ...clientUsers.map((client: any) => ({
-        email: client.email,
-        name: client.full_name || 'Client User',
-        role: 'client'
-      }))
-    ].filter(recipient => recipient.email);
+    // 4. Combine all email recipients (admins + clients)
+    const adminRecipients = (adminUsers || []).map((admin: any) => ({
+      email: admin.profiles.email,
+      name: admin.profiles.full_name || 'Admin User',
+      role: 'admin'
+    }));
 
+    const clientRecipients = clientUsers.map((client: any) => ({
+      email: client.email,
+      name: client.full_name || 'Client User',
+      role: 'client'
+    }));
+
+    const allRecipients = [...adminRecipients, ...clientRecipients]
+      .filter(recipient => recipient.email);
+
+    console.log(`📧 Admin recipients: ${adminRecipients.length}`);
+    console.log(`📧 Client recipients: ${clientRecipients.length}`);
     console.log(`📧 Total recipients found: ${allRecipients.length}`);
-    console.log('📧 Recipients:', allRecipients.map(r => ({ email: r.email, role: r.role })));
+    console.log('📧 All recipients:', allRecipients.map(r => ({ email: r.email, role: r.role })));
 
     if (allRecipients.length === 0) {
       console.log('⚠️ No recipients found, skipping email send');
@@ -222,7 +229,7 @@ serve(async (req: Request): Promise<Response> => {
     // Send emails to all recipients
     const emailPromises = allRecipients.map(async (recipient, index) => {
       try {
-        console.log(`📤 Sending email ${index + 1}/${allRecipients.length} to: ${recipient.email}`);
+        console.log(`📤 Sending email ${index + 1}/${allRecipients.length} to: ${recipient.email} (${recipient.role})`);
         
         const personalizedContent = `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -281,8 +288,11 @@ serve(async (req: Request): Promise<Response> => {
       sent: successful, 
       failed: failed,
       recipients: allRecipients.length,
+      adminRecipients: adminRecipients.length,
+      clientRecipients: clientRecipients.length,
       details: results.map((result, index) => ({
         recipient: allRecipients[index]?.email,
+        role: allRecipients[index]?.role,
         status: result.status === 'fulfilled' && result.value.success ? 'sent' : 'failed',
         error: result.status === 'fulfilled' && !result.value.success ? result.value.error : 
                result.status === 'rejected' ? result.reason : null
