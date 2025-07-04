@@ -17,18 +17,7 @@ import { Trash2, CheckCircle, Eye } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import OrderDetailsDialog from "./OrderDetailsDialog";
 import OrderExportActions from "./OrderExportActions";
-
-interface OrderWithCompany {
-  id: string;
-  order_number: string;
-  description: string | null;
-  status: string | null;
-  total_amount: number | null;
-  created_at: string;
-  updated_at: string;
-  company_id: string | null;
-  companyName: string;
-}
+import { OrderWithCompany } from "../types/orderTypes";
 
 interface OrderRowProps {
   order: OrderWithCompany;

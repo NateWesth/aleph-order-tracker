@@ -10,14 +10,10 @@ import { useGlobalRealtimeOrders } from "./hooks/useGlobalRealtimeOrders";
 import { useCompanyData } from "@/components/admin/hooks/useCompanyData";
 import { useAuth } from "@/contexts/AuthContext";
 import { sendOrderNotification } from "@/utils/emailNotifications";
+import { OrderWithCompany } from "./types/orderTypes";
 
 interface OrdersPageProps {
   isAdmin?: boolean;
-}
-
-// Extend the Order interface to include companyName
-interface OrderWithCompany extends Order {
-  companyName: string;
 }
 
 export default function OrdersPage({

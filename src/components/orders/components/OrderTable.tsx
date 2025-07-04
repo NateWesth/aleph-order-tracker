@@ -1,4 +1,3 @@
-
 import {
   Table,
   TableBody,
@@ -8,18 +7,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import OrderRow from "./OrderRow";
-
-interface OrderWithCompany {
-  id: string;
-  order_number: string;
-  description: string | null;
-  status: string | null;
-  total_amount: number | null;
-  created_at: string;
-  updated_at: string;
-  company_id: string | null;
-  companyName: string;
-}
+import { OrderWithCompany } from "../types/orderTypes";
 
 interface OrderTableProps {
   orders: OrderWithCompany[];
