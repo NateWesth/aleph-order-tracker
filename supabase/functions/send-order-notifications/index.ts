@@ -72,24 +72,47 @@ serve(async (req: Request): Promise<Response> => {
 
     console.log('📋 Order data retrieved:', orderData);
 
-    // 1. Get ALL admin users from user_roles table
-    console.log('🔍 Fetching admin users...');
-    const { data: adminUsers, error: adminError } = await supabase
+    // 1. Get admin user IDs first
+    console.log('🔍 Fetching admin user IDs...');
+    const { data: adminRoles, error: adminRolesError } = await supabase
       .from('user_roles')
-      .select(`
-        user_id,
-        profiles!inner(email, full_name)
-      `)
-      .eq('role', 'admin')
-      .not('profiles.email', 'is', null);
+      .select('user_id')
+      .eq('role', 'admin');
 
-    if (adminError) {
-      console.error('❌ Error fetching admin users:', adminError);
-    } else {
-      console.log('👥 Admin users found:', adminUsers?.length || 0, adminUsers);
+    if (adminRolesError) {
+      console.error('❌ Error fetching admin roles:', adminRolesError);
+      return new Response(
+        JSON.stringify({ error: `Failed to fetch admin roles: ${adminRolesError.message}` }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
     }
 
-    // 2. Get client users linked to the company
+    console.log('👥 Admin roles found:', adminRoles?.length || 0);
+
+    // 2. Get admin user profiles
+    let adminUsers: any[] = [];
+    if (adminRoles && adminRoles.length > 0) {
+      const adminUserIds = adminRoles.map(role => role.user_id);
+      console.log('🔍 Fetching admin profiles for IDs:', adminUserIds);
+      
+      const { data: adminProfiles, error: adminProfilesError } = await supabase
+        .from('profiles')
+        .select('email, full_name, id')
+        .in('id', adminUserIds)
+        .not('email', 'is', null);
+
+      if (adminProfilesError) {
+        console.error('❌ Error fetching admin profiles:', adminProfilesError);
+      } else {
+        adminUsers = adminProfiles || [];
+        console.log('👥 Admin users found:', adminUsers.length, adminUsers);
+      }
+    }
+
+    // 3. Get client users linked to the company
     let clientUsers: any[] = [];
     if (orderData.company_id) {
       console.log('🔍 Fetching company users for company_id:', orderData.company_id);
@@ -107,7 +130,7 @@ serve(async (req: Request): Promise<Response> => {
       }
     }
 
-    // 3. Also include the order creator if they're not already included
+    // 4. Also include the order creator if they're not already included
     if (orderData.user_id) {
       console.log('🔍 Fetching order creator:', orderData.user_id);
       const { data: orderCreator, error: creatorError } = await supabase
@@ -122,10 +145,10 @@ serve(async (req: Request): Promise<Response> => {
       }
     }
 
-    // 4. Combine all email recipients (admins + clients)
-    const adminRecipients = (adminUsers || []).map((admin: any) => ({
-      email: admin.profiles.email,
-      name: admin.profiles.full_name || 'Admin User',
+    // 5. Combine all email recipients (admins + clients)
+    const adminRecipients = adminUsers.map((admin: any) => ({
+      email: admin.email,
+      name: admin.full_name || 'Admin User',
       role: 'admin'
     }));
 
