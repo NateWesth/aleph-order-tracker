@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import OrdersHeader from "./components/OrdersHeader";
@@ -127,7 +128,7 @@ export default function OrdersPage({
 
   const deleteOrder = async (orderId: string, orderNumber: string) => {
     try {
-      const orderToDelete = orders.find(o => o.id === orderId);
+      const orderToDelete = ordersWithCompanies.find(o => o.id === orderId);
       
       const { error } = await supabase
         .from('orders')

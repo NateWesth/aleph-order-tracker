@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -27,6 +26,7 @@ export interface Order {
   company_id?: string;
   user_id?: string;
   items?: OrderItem[];
+  companyName?: string;
 }
 
 export function useOrderData() {
