@@ -13,23 +13,39 @@ interface EmailNotificationParams {
 
 export const sendOrderNotification = async (params: EmailNotificationParams) => {
   try {
-    console.log('Sending order notification:', params);
+    console.log('Starting order notification process with params:', params);
     
     const { data, error } = await supabase.functions.invoke('send-order-notifications', {
       body: params
     });
 
     if (error) {
-      console.error('Error sending order notification:', error);
-      throw error;
+      console.error('Supabase function invoke error:', error);
+      throw new Error(`Function invoke failed: ${error.message}`);
     }
 
-    console.log('Order notification sent successfully:', data);
+    console.log('Order notification function response:', data);
+    
+    // Check if the response indicates any issues
+    if (data?.error) {
+      console.error('Function returned error:', data.error);
+      throw new Error(`Function error: ${data.error}`);
+    }
+
+    if (data?.failed && data.failed > 0) {
+      console.warn(`Some emails failed to send: ${data.failed} failed, ${data.sent} sent`);
+    }
+
+    console.log('Order notification process completed successfully:', {
+      sent: data?.sent || 0,
+      failed: data?.failed || 0,
+      recipients: data?.recipients || 0
+    });
+    
     return data;
   } catch (error) {
     console.error('Failed to send order notification:', error);
-    // Don't re-throw the error to avoid breaking the main operation
-    // Instead, just log it and continue
-    return null;
+    // Re-throw the error so it can be handled by the calling code
+    throw error;
   }
 };

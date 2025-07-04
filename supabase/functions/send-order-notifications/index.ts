@@ -18,25 +18,22 @@ interface NotificationRequest {
   description?: string;
 }
 
-const supabase = createClient(
-  Deno.env.get('SUPABASE_URL') ?? '',
-  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-);
-
 serve(async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    console.log('Starting order notification process...');
+    console.log('=== Order Notification Function Started ===');
     
     // Check if RESEND_API_KEY is available
     const resendApiKey = Deno.env.get('RESEND_API_KEY');
+    console.log('RESEND_API_KEY configured:', !!resendApiKey);
+    
     if (!resendApiKey) {
-      console.error('RESEND_API_KEY is not configured');
+      console.error('❌ RESEND_API_KEY is not configured in Supabase secrets');
       return new Response(
-        JSON.stringify({ error: 'Email service not configured' }),
+        JSON.stringify({ error: 'Email service not configured - RESEND_API_KEY missing' }),
         {
           status: 500,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -44,11 +41,17 @@ serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    const resend = new Resend(resendApiKey);
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
 
-    const { orderId, orderNumber, companyName, changeType, oldStatus, newStatus, description }: NotificationRequest = await req.json();
+    const requestBody = await req.json();
+    console.log('📨 Request body received:', requestBody);
 
-    console.log('Processing order notification:', { orderId, orderNumber, changeType });
+    const { orderId, orderNumber, companyName, changeType, oldStatus, newStatus, description }: NotificationRequest = requestBody;
+
+    console.log('🔍 Processing notification for:', { orderId, orderNumber, changeType });
 
     // Get the order details including company_id
     const { data: orderData, error: orderError } = await supabase
@@ -58,11 +61,17 @@ serve(async (req: Request): Promise<Response> => {
       .single();
 
     if (orderError) {
-      console.error('Error fetching order:', orderError);
-      throw orderError;
+      console.error('❌ Error fetching order:', orderError);
+      return new Response(
+        JSON.stringify({ error: `Failed to fetch order: ${orderError.message}` }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
     }
 
-    console.log('Order data:', orderData);
+    console.log('📋 Order data retrieved:', orderData);
 
     // Get all admin users
     const { data: adminUsers, error: adminError } = await supabase
@@ -74,11 +83,10 @@ serve(async (req: Request): Promise<Response> => {
       .eq('role', 'admin');
 
     if (adminError) {
-      console.error('Error fetching admin users:', adminError);
-      throw adminError;
+      console.error('❌ Error fetching admin users:', adminError);
+    } else {
+      console.log('👥 Admin users found:', adminUsers?.length || 0);
     }
-
-    console.log('Admin users found:', adminUsers?.length || 0);
 
     // Get client users linked to the company
     let clientUsers: any[] = [];
@@ -90,10 +98,10 @@ serve(async (req: Request): Promise<Response> => {
         .not('email', 'is', null);
 
       if (companyError) {
-        console.error('Error fetching company users:', companyError);
+        console.error('❌ Error fetching company users:', companyError);
       } else {
         clientUsers = companyUsers || [];
-        console.log('Company users found:', clientUsers.length);
+        console.log('🏢 Company users found:', clientUsers.length);
       }
     }
 
@@ -107,13 +115,13 @@ serve(async (req: Request): Promise<Response> => {
 
       if (!creatorError && orderCreator && !clientUsers.find(u => u.id === orderCreator.id)) {
         clientUsers.push(orderCreator);
-        console.log('Added order creator to recipients');
+        console.log('👤 Added order creator to recipients');
       }
     }
 
     // Combine all email recipients
     const allRecipients = [
-      ...adminUsers.map((admin: any) => ({
+      ...(adminUsers || []).map((admin: any) => ({
         email: admin.profiles.email,
         name: admin.profiles.full_name || 'Admin User',
         role: 'admin'
@@ -125,10 +133,11 @@ serve(async (req: Request): Promise<Response> => {
       }))
     ].filter(recipient => recipient.email);
 
-    console.log(`Sending notifications to ${allRecipients.length} recipients`);
+    console.log(`📧 Total recipients found: ${allRecipients.length}`);
+    console.log('📧 Recipients:', allRecipients.map(r => ({ email: r.email, role: r.role })));
 
     if (allRecipients.length === 0) {
-      console.log('No recipients found, skipping email send');
+      console.log('⚠️ No recipients found, skipping email send');
       return new Response(
         JSON.stringify({ 
           success: true, 
@@ -206,10 +215,14 @@ serve(async (req: Request): Promise<Response> => {
         break;
     }
 
+    console.log('📝 Email subject:', subject);
+
+    const resend = new Resend(resendApiKey);
+
     // Send emails to all recipients
-    const emailPromises = allRecipients.map(async (recipient) => {
+    const emailPromises = allRecipients.map(async (recipient, index) => {
       try {
-        console.log(`Sending email to: ${recipient.email}`);
+        console.log(`📤 Sending email ${index + 1}/${allRecipients.length} to: ${recipient.email}`);
         
         const personalizedContent = `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -233,48 +246,65 @@ serve(async (req: Request): Promise<Response> => {
           html: personalizedContent,
         });
 
-        console.log(`Email sent successfully to ${recipient.email}:`, result);
+        console.log(`✅ Email sent successfully to ${recipient.email}:`, result);
         return { success: true, email: recipient.email, result };
       } catch (error) {
-        console.error(`Failed to send email to ${recipient.email}:`, error);
-        return { success: false, email: recipient.email, error };
+        console.error(`❌ Failed to send email to ${recipient.email}:`, error);
+        return { success: false, email: recipient.email, error: error.message };
       }
     });
 
+    console.log('⏳ Waiting for all emails to be sent...');
     const results = await Promise.allSettled(emailPromises);
+    
     const successful = results.filter(result => 
       result.status === 'fulfilled' && result.value.success
     ).length;
+    
     const failed = results.filter(result => 
       result.status === 'rejected' || (result.status === 'fulfilled' && !result.value.success)
     ).length;
 
-    console.log(`Email notifications completed: ${successful} successful, ${failed} failed`);
+    console.log(`📊 Email sending completed: ${successful} successful, ${failed} failed`);
 
     // Log failed attempts for debugging
     results.forEach((result, index) => {
       if (result.status === 'rejected') {
-        console.error(`Email ${index} rejected:`, result.reason);
+        console.error(`❌ Email ${index + 1} rejected:`, result.reason);
       } else if (result.status === 'fulfilled' && !result.value.success) {
-        console.error(`Email ${index} failed:`, result.value.error);
+        console.error(`❌ Email ${index + 1} failed:`, result.value.error);
       }
     });
 
+    const response = { 
+      success: true, 
+      sent: successful, 
+      failed: failed,
+      recipients: allRecipients.length,
+      details: results.map((result, index) => ({
+        recipient: allRecipients[index]?.email,
+        status: result.status === 'fulfilled' && result.value.success ? 'sent' : 'failed',
+        error: result.status === 'fulfilled' && !result.value.success ? result.value.error : 
+               result.status === 'rejected' ? result.reason : null
+      }))
+    };
+
+    console.log('🎯 Final response:', response);
+    console.log('=== Order Notification Function Completed ===');
+
     return new Response(
-      JSON.stringify({ 
-        success: true, 
-        sent: successful, 
-        failed: failed,
-        recipients: allRecipients.length 
-      }),
+      JSON.stringify(response),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     );
   } catch (error: any) {
-    console.error('Error in send-order-notifications function:', error);
+    console.error('💥 Critical error in send-order-notifications function:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: error.message,
+        stack: error.stack 
+      }),
       {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
