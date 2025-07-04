@@ -5,7 +5,7 @@ import OrdersHeader from "./components/OrdersHeader";
 import OrderTable from "./components/OrderTable";
 import CreateOrderDialog from "./components/CreateOrderDialog";
 import OrderExportActions from "./components/OrderExportActions";
-import { useOrderData } from "./hooks/useOrderData";
+import { useOrderData, Order } from "./hooks/useOrderData";
 import { useGlobalRealtimeOrders } from "./hooks/useGlobalRealtimeOrders";
 import { useCompanyData } from "@/components/admin/hooks/useCompanyData";
 import { useAuth } from "@/contexts/AuthContext";
@@ -15,11 +15,16 @@ interface OrdersPageProps {
   isAdmin?: boolean;
 }
 
+// Extend the Order interface to include companyName
+interface OrderWithCompany extends Order {
+  companyName: string;
+}
+
 export default function OrdersPage({
   isAdmin = false
 }: OrdersPageProps) {
   const [searchTerm, setSearchTerm] = useState('');
-  const [ordersWithCompanies, setOrdersWithCompanies] = useState<any[]>([]);
+  const [ordersWithCompanies, setOrdersWithCompanies] = useState<OrderWithCompany[]>([]);
   const {
     user
   } = useAuth();
@@ -69,13 +74,13 @@ export default function OrdersPage({
       const ordersWithNames = orders.map(order => ({
         ...order,
         companyName: order.company_id ? companyMap.get(order.company_id) || 'Unknown Company' : 'No Company'
-      }));
+      })) as OrderWithCompany[];
       setOrdersWithCompanies(ordersWithNames);
     };
     fetchOrdersWithCompanies();
   }, [orders]);
 
-  const receiveOrder = async (order: any) => {
+  const receiveOrder = async (order: OrderWithCompany) => {
     try {
       console.log('Receiving order and updating status to received:', order.id);
 
@@ -164,7 +169,11 @@ export default function OrdersPage({
     }
   };
 
-  const filteredOrders = ordersWithCompanies.filter(order => order.order_number.toLowerCase().includes(searchTerm.toLowerCase()) || order.companyName?.toLowerCase().includes(searchTerm.toLowerCase()) || order.status?.toLowerCase().includes(searchTerm.toLowerCase()));
+  const filteredOrders = ordersWithCompanies.filter(order => 
+    order.order_number.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    order.companyName?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    order.status?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   if (loading) {
     return <div className="flex items-center justify-center h-64">
@@ -177,9 +186,13 @@ export default function OrdersPage({
         <OrdersHeader searchTerm={searchTerm} onSearchChange={setSearchTerm} />
         <div className="flex gap-2">
           <OrderExportActions orders={filteredOrders} title="Orders" />
-          <CreateOrderDialog isAdmin={isAdmin} companies={companies} profiles={[]} // We'll handle this in CreateOrderDialog
-        userProfile={null} // We'll handle this in CreateOrderDialog
-        onOrderCreated={fetchOrders} />
+          <CreateOrderDialog 
+            isAdmin={isAdmin} 
+            companies={companies} 
+            profiles={[]} // We'll handle this in CreateOrderDialog
+            userProfile={null} // We'll handle this in CreateOrderDialog
+            onOrderCreated={fetchOrders} 
+          />
         </div>
       </div>
 
