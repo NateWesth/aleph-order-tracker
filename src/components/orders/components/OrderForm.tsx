@@ -65,11 +65,17 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
 
   useEffect(() => {
     const fetchUserInfo = async () => {
-      if (!user?.id || companies.length === 0) return;
+      if (!user?.id || companies.length === 0) {
+        console.log("🔍 OrderForm: Skipping fetchUserInfo - userId:", user?.id, "companies:", companies.length);
+        return;
+      }
 
       setIsLoadingUserInfo(true);
       try {
-        console.log("🔍 OrderForm: Fetching user info for:", user.id);
+        console.log("🔍 OrderForm: Starting user info fetch for:", user.id);
+        console.log("🔍 OrderForm: Available companies count:", companies.length);
+        console.log("🔍 OrderForm: All companies:", companies.map(c => ({ id: c.id, name: c.name, code: c.code })));
+        
         const [role, profile] = await Promise.all([
           getUserRole(user.id),
           getUserProfile(user.id)
@@ -77,7 +83,8 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
 
         console.log("🔍 OrderForm: User role:", role);
         console.log("🔍 OrderForm: User profile:", profile);
-        console.log("🔍 OrderForm: All available companies:", companies);
+        console.log("🔍 OrderForm: Profile company_id:", profile?.company_id);
+        console.log("🔍 OrderForm: Profile company_code:", profile?.company_code);
         
         setCurrentUserRole(role);
         setUserProfile(profile);
@@ -86,39 +93,49 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
           console.log("👑 OrderForm: Admin user - showing all companies:", companies.length);
           setAvailableCompanies(companies);
         } else if (role === 'user') {
-          // For regular users, we need to filter by either company_code OR company_id
+          console.log("👤 OrderForm: Regular user - filtering companies");
           let matchingCompanies = [];
           
+          // First, try to match by company_id (more reliable)
           if (profile?.company_id) {
-            // First try to match by company_id (more reliable)
             console.log("🔍 OrderForm: Filtering by company_id:", profile.company_id);
-            matchingCompanies = companies.filter(company => 
-              company.id === profile.company_id
-            );
-            console.log("🏢 OrderForm: Companies matching by ID:", matchingCompanies.length, matchingCompanies);
+            matchingCompanies = companies.filter(company => {
+              const match = company.id === profile.company_id;
+              console.log(`🏢 OrderForm: Checking company ${company.name} (${company.id}) against ${profile.company_id}: ${match}`);
+              return match;
+            });
+            console.log("🏢 OrderForm: Companies matching by ID:", matchingCompanies.length, matchingCompanies.map(c => c.name));
           }
           
           // If no matches by ID and we have a company_code, try that
           if (matchingCompanies.length === 0 && profile?.company_code) {
-            console.log("🔍 OrderForm: Filtering by company_code:", profile.company_code);
-            matchingCompanies = companies.filter(company => 
-              company.code === profile.company_code
-            );
-            console.log("🏢 OrderForm: Companies matching by code:", matchingCompanies.length, matchingCompanies);
+            console.log("🔍 OrderForm: No ID matches, filtering by company_code:", profile.company_code);
+            matchingCompanies = companies.filter(company => {
+              const match = company.code === profile.company_code;
+              console.log(`🏢 OrderForm: Checking company ${company.name} (${company.code}) against ${profile.company_code}: ${match}`);
+              return match;
+            });
+            console.log("🏢 OrderForm: Companies matching by code:", matchingCompanies.length, matchingCompanies.map(c => c.name));
           }
           
           setAvailableCompanies(matchingCompanies);
+          console.log("✅ OrderForm: Final available companies:", matchingCompanies.length, matchingCompanies.map(c => ({ id: c.id, name: c.name, code: c.code })));
           
           if (matchingCompanies.length === 1) {
             const companyId = matchingCompanies[0].id;
             console.log("✅ OrderForm: Auto-selecting single company:", matchingCompanies[0].name, "ID:", companyId);
             form.setValue('companyId', companyId, { shouldValidate: true, shouldDirty: true });
           } else if (matchingCompanies.length === 0) {
-            console.warn("⚠️ OrderForm: No matching companies found for user");
-            console.warn("⚠️ OrderForm: User company_id:", profile?.company_id);
-            console.warn("⚠️ OrderForm: User company_code:", profile?.company_code);
-            console.warn("⚠️ OrderForm: Available company IDs:", companies.map(c => c.id));
-            console.warn("⚠️ OrderForm: Available company codes:", companies.map(c => c.code));
+            console.error("❌ OrderForm: No matching companies found for user");
+            console.error("❌ OrderForm: User profile details:");
+            console.error("   - company_id:", profile?.company_id);
+            console.error("   - company_code:", profile?.company_code);
+            console.error("❌ OrderForm: Available companies details:");
+            companies.forEach(company => {
+              console.error(`   - ${company.name}: ID=${company.id}, Code=${company.code}`);
+            });
+          } else {
+            console.log("🎯 OrderForm: Multiple companies available, user needs to select");
           }
         } else {
           console.log("❌ OrderForm: Unknown user role:", role);
@@ -240,7 +257,9 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
     currentUserRole,
     availableCompanies: availableCompanies.length,
     userProfile: userProfile?.company_code,
-    selectedCompanyId: form.watch('companyId')
+    selectedCompanyId: form.watch('companyId'),
+    allCompanies: companies.length,
+    userCompanyId: userProfile?.company_id
   });
 
   return (
@@ -303,6 +322,15 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Company</FormLabel>
+                {/* Debug info display */}
+                <div className="text-xs text-blue-600 bg-blue-50 p-2 rounded mb-2">
+                  <div>Role: {currentUserRole}</div>
+                  <div>Available companies: {availableCompanies.length}</div>
+                  <div>Total companies: {companies.length}</div>
+                  <div>User company_id: {userProfile?.company_id}</div>
+                  <div>User company_code: {userProfile?.company_code}</div>
+                </div>
+                
                 {currentUserRole === 'user' && availableCompanies.length === 1 ? (
                   // For client users with only one company, show it as confirmed
                   <div className="space-y-2">
@@ -343,8 +371,13 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
                 )}
                 <FormMessage />
                 {currentUserRole === 'user' && availableCompanies.length === 0 && (
-                  <div className="text-sm text-red-600">
-                    No companies found matching your profile. Please contact an administrator.
+                  <div className="text-sm text-red-600 bg-red-50 p-3 rounded">
+                    <div className="font-medium">No companies found matching your profile.</div>
+                    <div className="text-xs mt-1">
+                      Profile company_id: {userProfile?.company_id || 'None'}<br/>
+                      Profile company_code: {userProfile?.company_code || 'None'}<br/>
+                      Please contact an administrator to link your profile to a company.
+                    </div>
                   </div>
                 )}
                 {availableCompanies.length > 0 && (
