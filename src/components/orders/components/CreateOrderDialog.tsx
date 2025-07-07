@@ -1,347 +1,176 @@
 
 import { useState } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import { Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { PlusCircle, Plus, Trash2 } from "lucide-react";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { sendOrderNotification } from "@/utils/emailNotifications";
-
-const itemSchema = z.object({
-  id: z.string(),
-  name: z.string().min(2, {
-    message: "Item name must be at least 2 characters.",
-  }),
-  quantity: z.coerce.number().min(1, {
-    message: "Quantity must be at least 1.",
-  }),
-});
-
-const formSchema = z.object({
-  orderNumber: z.string().min(3, {
-    message: "Order number must be at least 3 characters.",
-  }),
-  companyId: z.string().optional(),
-  companyName: z.string().optional(),
-  totalAmount: z.number().optional(),
-  items: z.array(itemSchema).min(1, {
-    message: "You must add at least one item.",
-  }),
-});
+import { useAuth } from "@/contexts/AuthContext";
+import OrderForm from "./OrderForm";
+import { getUserRole } from "@/utils/authService";
 
 interface CreateOrderDialogProps {
-  isAdmin: boolean;
+  isAdmin?: boolean;
   companies: any[];
   profiles: any[];
   userProfile: any;
-  onOrderCreated?: () => void;
+  onOrderCreated: () => void;
 }
 
-const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
-  isAdmin,
+export default function CreateOrderDialog({
+  isAdmin = false,
   companies,
   profiles,
   userProfile,
-  onOrderCreated,
-}) => {
+  onOrderCreated
+}: CreateOrderDialogProps) {
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
-  const [open, setOpen] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [items, setItems] = useState([{ id: crypto.randomUUID(), name: "", quantity: 1 }]);
 
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      orderNumber: "",
-      companyId: userProfile?.company_id || "",
-      totalAmount: 0,
-      items: [{ id: crypto.randomUUID(), name: "", quantity: 1 }],
-    },
-  });
-
-  const handleAddItem = () => {
-    const newItem = { id: crypto.randomUUID(), name: "", quantity: 1 };
-    const updatedItems = [...items, newItem];
-    setItems(updatedItems);
-    form.setValue("items", updatedItems);
-  };
-
-  const handleRemoveItem = (itemId: string) => {
-    if (items.length <= 1) return; // Prevent removing the last item
-    
-    const updatedItems = items.filter((item) => item.id !== itemId);
-    setItems(updatedItems);
-    form.setValue("items", updatedItems);
-  };
-
-  const handleItemChange = (itemId: string, field: 'name' | 'quantity', value: string | number) => {
-    const updatedItems = items.map(item => 
-      item.id === itemId ? { ...item, [field]: value } : item
-    );
-    setItems(updatedItems);
-    form.setValue("items", updatedItems);
-  };
-
-  const handleSubmit = async (values: z.infer<typeof formSchema>) => {
+  const handleSubmit = async (orderData: {
+    orderNumber: string;
+    description: string;
+    companyId: string;
+    totalAmount: number;
+    items: any[];
+  }) => {
     if (!user?.id) {
+      console.error("❌ CreateOrderDialog: No user ID available");
       toast({
         title: "Error",
-        description: "You must be logged in to create an order.",
+        description: "User not authenticated. Please log in again.",
         variant: "destructive",
       });
       return;
     }
 
+    setLoading(true);
+    console.log("🚀 CreateOrderDialog: Starting order creation process");
+    console.log("📋 CreateOrderDialog: Order data received:", orderData);
+    console.log("👤 CreateOrderDialog: Current user ID:", user.id);
+    
     try {
-      setIsSubmitting(true);
+      // Get user role for additional context
+      const userRole = await getUserRole(user.id);
+      console.log("🔐 CreateOrderDialog: User role:", userRole);
       
-      // Format items for description
-      const itemsDescription = values.items
-        .map(item => `${item.name} (Qty: ${item.quantity})`)
-        .join('\n');
+      // Prepare order data for database insertion
+      const orderInsertData = {
+        order_number: orderData.orderNumber,
+        description: orderData.description,
+        company_id: orderData.companyId,
+        total_amount: orderData.totalAmount || 0,
+        user_id: user.id,
+        status: 'pending',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
 
-      // Create the order
-      const { data: newOrder, error } = await supabase
+      console.log("💾 CreateOrderDialog: Final order data for database:", orderInsertData);
+      console.log("🏢 CreateOrderDialog: Company ID being saved:", orderInsertData.company_id);
+      console.log("👤 CreateOrderDialog: User ID being saved:", orderInsertData.user_id);
+
+      // Verify company exists before creating order
+      if (orderInsertData.company_id) {
+        const { data: companyCheck, error: companyError } = await supabase
+          .from('companies')
+          .select('id, name, code')
+          .eq('id', orderInsertData.company_id)
+          .single();
+
+        if (companyError) {
+          console.error("❌ CreateOrderDialog: Company verification failed:", companyError);
+          throw new Error(`Company verification failed: ${companyError.message}`);
+        }
+
+        console.log("✅ CreateOrderDialog: Company verified:", companyCheck);
+      } else {
+        console.warn("⚠️ CreateOrderDialog: No company ID provided - order will be created without company link");
+      }
+
+      // Insert the order into the database
+      const { data: createdOrder, error: insertError } = await supabase
         .from('orders')
-        .insert([
-          {
-            order_number: values.orderNumber,
-            description: itemsDescription,
-            status: 'pending',
-            company_id: values.companyId || null,
-            user_id: user.id,
-            total_amount: values.totalAmount || null,
-          }
-        ])
-        .select('*, companies(name)')
+        .insert([orderInsertData])
+        .select('*')
         .single();
 
-      if (error) throw error;
-
-      // Send email notification for new order
-      try {
-        await sendOrderNotification({
-          orderId: newOrder.id,
-          orderNumber: newOrder.order_number,
-          companyName: newOrder.companies?.name || values.companyName || 'Unknown Company',
-          changeType: 'created',
-          newStatus: 'pending',
-          description: itemsDescription
+      if (insertError) {
+        console.error("❌ CreateOrderDialog: Database insertion failed:", insertError);
+        console.error("❌ CreateOrderDialog: Insert error details:", {
+          code: insertError.code,
+          message: insertError.message,
+          details: insertError.details,
+          hint: insertError.hint
         });
-      } catch (emailError) {
-        console.error('Failed to send email notification:', emailError);
-        // Don't fail the entire operation if email fails
+        throw insertError;
+      }
+
+      console.log("🎉 CreateOrderDialog: Order created successfully in database:", createdOrder);
+      console.log("🔍 CreateOrderDialog: Created order company_id:", createdOrder.company_id);
+      console.log("🔍 CreateOrderDialog: Created order user_id:", createdOrder.user_id);
+
+      // Verify the order was saved with correct company_id
+      const { data: verificationOrder, error: verificationError } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('id', createdOrder.id)
+        .single();
+
+      if (verificationError) {
+        console.error("❌ CreateOrderDialog: Order verification failed:", verificationError);
+      } else {
+        console.log("✅ CreateOrderDialog: Order verification successful:", verificationOrder);
+        console.log("🏢 CreateOrderDialog: Verified company_id in database:", verificationOrder.company_id);
       }
 
       toast({
-        title: "Success",
-        description: "Order created successfully!",
+        title: "Order Created Successfully",
+        description: `Order ${orderData.orderNumber} has been created and linked to the company.`,
       });
 
-      // Reset form and items state
-      form.reset();
-      const resetItems = [{ id: crypto.randomUUID(), name: "", quantity: 1 }];
-      setItems(resetItems);
-      form.setValue("items", resetItems);
       setOpen(false);
-      onOrderCreated?.();
+      onOrderCreated();
+      
     } catch (error: any) {
-      console.error('Error creating order:', error);
+      console.error("❌ CreateOrderDialog: Order creation failed:", error);
       toast({
-        title: "Error",
-        description: "Failed to create order. Please try again.",
+        title: "Error Creating Order",
+        description: error.message || "Failed to create order. Please try again.",
         variant: "destructive",
       });
     } finally {
-      setIsSubmitting(false);
+      setLoading(false);
     }
   };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline">
-          <PlusCircle className="mr-2 h-4 w-4" />
+        <Button>
+          <Plus className="w-4 h-4 mr-2" />
           Create Order
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[625px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Create New Order</DialogTitle>
           <DialogDescription>
-            Create a new order in the system.
+            Fill in the order details below. All fields marked with * are required.
           </DialogDescription>
         </DialogHeader>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="orderNumber"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Order Number</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Order Number" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            {isAdmin && (
-              <FormField
-                control={form.control}
-                name="companyId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Company</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a company" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {companies.map((company) => (
-                          <SelectItem key={company.id} value={company.id}>
-                            {company.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
-            {!isAdmin && (
-              <FormField
-                control={form.control}
-                name="companyName"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Company Name</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="Company Name"
-                        {...field}
-                        disabled={true}
-                        defaultValue={userProfile?.company?.name || "N/A"}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
-            <FormField
-              control={form.control}
-              name="totalAmount"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Total Amount</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="Total Amount"
-                      type="number"
-                      {...field}
-                      onChange={(e) => field.onChange(Number(e.target.value))}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <FormLabel>Order Items</FormLabel>
-                <Button type="button" variant="outline" size="sm" onClick={handleAddItem}>
-                  <Plus className="h-4 w-4 mr-1" />
-                  Add Item
-                </Button>
-              </div>
-              
-              {items.map((item, index) => (
-                <div key={item.id} className="border rounded-md p-4 space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium">Item {index + 1}</span>
-                    {items.length > 1 && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleRemoveItem(item.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <FormLabel htmlFor={`item-name-${item.id}`}>Item Name</FormLabel>
-                      <Input
-                        id={`item-name-${item.id}`}
-                        value={item.name}
-                        onChange={(e) => handleItemChange(item.id, 'name', e.target.value)}
-                        placeholder="Enter item name"
-                        required
-                      />
-                    </div>
-                    
-                    <div>
-                      <FormLabel htmlFor={`item-quantity-${item.id}`}>Quantity</FormLabel>
-                      <Input
-                        id={`item-quantity-${item.id}`}
-                        type="number"
-                        min="1"
-                        value={item.quantity}
-                        onChange={(e) => handleItemChange(item.id, 'quantity', parseInt(e.target.value) || 1)}
-                        placeholder="Enter quantity"
-                        required
-                      />
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-            
-            <Button type="submit" disabled={isSubmitting} className="w-full">
-              {isSubmitting ? "Creating..." : "Create Order"}
-            </Button>
-          </form>
-        </Form>
+        <OrderForm onSubmit={handleSubmit} loading={loading} />
       </DialogContent>
     </Dialog>
   );
-};
-
-export default CreateOrderDialog;
+}

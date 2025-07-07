@@ -84,11 +84,9 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
         setUserProfile(profile);
 
         if (role === 'admin') {
-          // Admins can see all companies
           console.log("👑 OrderForm: Admin user - showing all companies:", companies.length);
           setAvailableCompanies(companies);
         } else if (role === 'user' && profile?.company_code) {
-          // Users can only see companies that match their company code
           console.log("👤 OrderForm: Regular user with company code:", profile.company_code);
           const matchingCompanies = companies.filter(company => 
             company.code === profile.company_code
@@ -96,11 +94,19 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
           console.log("🏢 OrderForm: Matching companies found:", matchingCompanies.length, matchingCompanies);
           setAvailableCompanies(matchingCompanies);
           
-          // Auto-select the company if user has only one matching company
           if (matchingCompanies.length === 1) {
             const companyId = matchingCompanies[0].id;
             console.log("✅ OrderForm: Auto-selecting single company:", matchingCompanies[0].name, "ID:", companyId);
-            form.setValue('companyId', companyId);
+            
+            // Force set the form value immediately
+            form.setValue('companyId', companyId, { shouldValidate: true, shouldDirty: true });
+            
+            // Also trigger a form state update
+            setTimeout(() => {
+              form.setValue('companyId', companyId, { shouldValidate: true, shouldDirty: true });
+              console.log("🔧 OrderForm: Form companyId value after timeout:", form.getValues('companyId'));
+            }, 100);
+            
             console.log("🔧 OrderForm: Form companyId value set to:", form.getValues('companyId'));
           } else if (matchingCompanies.length > 1) {
             console.log("⚠️ OrderForm: Multiple companies found, user needs to select one");
@@ -154,6 +160,7 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
     console.log("📝 OrderForm: Current user role:", currentUserRole);
     console.log("📝 OrderForm: Available companies:", availableCompanies);
     console.log("📝 OrderForm: Form companyId value:", data.companyId);
+    console.log("📝 OrderForm: User profile:", userProfile);
     
     const validItems = data.items.filter(item => item.name.trim() && item.quantity > 0);
     
@@ -180,9 +187,17 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
     console.log("🏢 OrderForm: Initial companyId from form:", finalCompanyId);
     
     // For client users with single company, ensure company ID is set
-    if (currentUserRole === 'user' && availableCompanies.length === 1 && !finalCompanyId) {
-      finalCompanyId = availableCompanies[0].id;
-      console.log("🔄 OrderForm: Auto-setting companyId for single company user:", finalCompanyId);
+    if (currentUserRole === 'user' && availableCompanies.length === 1) {
+      if (!finalCompanyId) {
+        finalCompanyId = availableCompanies[0].id;
+        console.log("🔄 OrderForm: Auto-setting companyId for single company user:", finalCompanyId);
+      }
+      
+      // Double-check that we have the right company ID
+      if (finalCompanyId !== availableCompanies[0].id) {
+        console.log("⚠️ OrderForm: CompanyId mismatch, correcting...");
+        finalCompanyId = availableCompanies[0].id;
+      }
     }
 
     if (!finalCompanyId) {
@@ -206,6 +221,12 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
     console.log("🚀 OrderForm: Submitting order with final data:", finalOrderData);
     console.log("🔍 OrderForm: Company details:", availableCompanies.find(c => c.id === finalCompanyId));
     console.log("🎯 OrderForm: Final companyId being passed:", finalOrderData.companyId);
+    console.log("📊 OrderForm: Final order data structure:", {
+      orderNumber: finalOrderData.orderNumber,
+      companyId: finalOrderData.companyId,
+      itemCount: finalOrderData.items.length,
+      totalAmount: finalOrderData.totalAmount
+    });
     
     onSubmit(finalOrderData);
   };
@@ -286,9 +307,9 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
               <FormItem>
                 <FormLabel>Company</FormLabel>
                 {currentUserRole === 'user' && availableCompanies.length === 1 ? (
-                  // For client users with only one company, show it as selected and make it hidden
+                  // For client users with only one company, show it as confirmed and use hidden input
                   <div className="space-y-2">
-                    <div className="p-3 bg-green-50 border border-green-200 rounded-md">
+                    <div className="p-4 bg-green-50 border border-green-200 rounded-md">
                       <div className="font-medium text-green-900">
                         ✅ {availableCompanies[0].name} ({availableCompanies[0].code})
                       </div>
@@ -298,6 +319,9 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
                       <div className="text-xs text-green-600 mt-1">
                         Company ID: {availableCompanies[0].id}
                       </div>
+                      <div className="text-xs text-blue-600 mt-1">
+                        Form Value: {form.watch('companyId') || 'Not set'}
+                      </div>
                     </div>
                     {/* Ensure the company ID is set in the form */}
                     <FormControl>
@@ -305,6 +329,7 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
                         type="hidden" 
                         {...field} 
                         value={availableCompanies[0].id}
+                        onChange={() => {}} // Prevent changes
                       />
                     </FormControl>
                   </div>
