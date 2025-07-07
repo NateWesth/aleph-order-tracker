@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { Button } from "@/components/ui/button";
@@ -44,7 +43,8 @@ interface OrderFormProps {
 const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
   const { user } = useAuth();
   const { companies, loading: companiesLoading, userRole } = useCompanyData();
-  const [userCompanyId, setUserCompanyId] = useState<string | null>(null);
+  const [userProfile, setUserProfile] = useState<any>(null);
+  const [availableCompanies, setAvailableCompanies] = useState<any[]>([]);
 
   const form = useForm<OrderFormData>({
     defaultValues: {
@@ -71,17 +71,32 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
           getUserProfile(user.id)
         ]);
 
-        if (role === 'user' && profile?.company_id) {
-          setUserCompanyId(profile.company_id);
-          form.setValue('companyId', profile.company_id);
+        setUserProfile(profile);
+
+        if (role === 'admin') {
+          // Admins can see all companies
+          setAvailableCompanies(companies);
+        } else if (role === 'user' && profile?.company_code) {
+          // Users can only see companies that match their company code
+          const matchingCompanies = companies.filter(company => 
+            company.code === profile.company_code
+          );
+          setAvailableCompanies(matchingCompanies);
+          
+          // If user has only one matching company, auto-select it
+          if (matchingCompanies.length === 1) {
+            form.setValue('companyId', matchingCompanies[0].id);
+          }
         }
       } catch (error) {
         console.error("Error fetching user info:", error);
       }
     };
 
-    fetchUserInfo();
-  }, [user?.id, form]);
+    if (companies.length > 0) {
+      fetchUserInfo();
+    }
+  }, [user?.id, companies, form]);
 
   // Generate a new order number
   const handleGenerateOrderNumber = () => {
@@ -127,6 +142,14 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
       form.setError("orderNumber", { 
         type: "manual", 
         message: "Order number is required" 
+      });
+      return;
+    }
+
+    if (!data.companyId) {
+      form.setError("companyId", { 
+        type: "manual", 
+        message: "Please select a company" 
       });
       return;
     }
@@ -201,42 +224,41 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
             )}
           />
 
-          {userRole === 'admin' && (
-            <FormField
-              control={form.control}
-              name="companyId"
-              rules={{ required: "Please select a company" }}
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Company</FormLabel>
-                  <Select value={field.value} onValueChange={field.onChange}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a company" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {companies.map((company) => (
-                        <SelectItem key={company.id} value={company.id}>
-                          {company.name} ({company.code})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          )}
-
-          {userRole === 'user' && userCompanyId && (
-            <div className="space-y-2">
-              <Label>Company</Label>
-              <div className="text-sm text-gray-600 dark:text-gray-400 p-3 bg-gray-50 dark:bg-gray-800 rounded-md">
-                {companies.find(c => c.id === userCompanyId)?.name || 'Your Company'}
-              </div>
-            </div>
-          )}
+          <FormField
+            control={form.control}
+            name="companyId"
+            rules={{ required: "Please select a company" }}
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Company</FormLabel>
+                <Select value={field.value} onValueChange={field.onChange}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a company" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {availableCompanies.map((company) => (
+                      <SelectItem key={company.id} value={company.id}>
+                        {company.name} ({company.code})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+                {userRole === 'user' && availableCompanies.length === 0 && (
+                  <div className="text-sm text-red-600">
+                    No companies found matching your company code. Please contact an administrator.
+                  </div>
+                )}
+                {userRole === 'user' && userProfile?.company_code && (
+                  <div className="text-sm text-gray-600">
+                    Showing companies for code: {userProfile.company_code}
+                  </div>
+                )}
+              </FormItem>
+            )}
+          />
 
           <Card>
             <CardHeader>
