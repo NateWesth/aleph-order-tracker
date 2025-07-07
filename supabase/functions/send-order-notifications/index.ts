@@ -1,5 +1,4 @@
 
-
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.8';
 import { Resend } from "npm:resend@2.0.0";
@@ -53,7 +52,7 @@ serve(async (req: Request): Promise<Response> => {
 
     console.log('🔍 Processing notification for:', { orderId, orderNumber, changeType });
 
-    // Get the order details including company_id
+    // Get the order details
     const { data: orderData, error: orderError } = await supabase
       .from('orders')
       .select('company_id, user_id')
@@ -73,138 +72,122 @@ serve(async (req: Request): Promise<Response> => {
 
     console.log('📋 Order data retrieved:', orderData);
 
-    // 1. Get ALL admin users - simplified approach
-    console.log('🔍 Fetching ALL admin users...');
-    const adminUsers: any[] = [];
-    
-    // Get admin user IDs
+    // Collect all recipients
+    const allRecipients: Array<{email: string, name: string, role: string}> = [];
+
+    // 1. Get ALL admin users
+    console.log('🔍 Fetching admin users...');
     const { data: adminRoles, error: adminRolesError } = await supabase
       .from('user_roles')
-      .select('user_id')
+      .select(`
+        user_id,
+        profiles!inner(email, full_name)
+      `)
       .eq('role', 'admin');
 
     if (adminRolesError) {
-      console.error('❌ Error fetching admin roles:', adminRolesError);
+      console.error('❌ Error fetching admin users:', adminRolesError);
     } else if (adminRoles && adminRoles.length > 0) {
-      console.log('👥 Admin role records found:', adminRoles.length);
-      
-      // Get profiles for admin users
-      const adminUserIds = adminRoles.map(role => role.user_id);
-      const { data: adminProfiles, error: adminProfilesError } = await supabase
-        .from('profiles')
-        .select('email, full_name, id')
-        .in('id', adminUserIds);
-
-      if (adminProfilesError) {
-        console.error('❌ Error fetching admin profiles:', adminProfilesError);
-      } else if (adminProfiles) {
-        adminUsers.push(...adminProfiles);
-        console.log('👥 Admin users with profiles:', adminUsers.length);
-        console.log('👥 Admin user emails:', adminUsers.map(u => u.email));
-      }
+      console.log('👥 Admin users found:', adminRoles.length);
+      adminRoles.forEach(adminRole => {
+        if (adminRole.profiles && adminRole.profiles.email) {
+          allRecipients.push({
+            email: adminRole.profiles.email,
+            name: adminRole.profiles.full_name || 'Admin User',
+            role: 'admin'
+          });
+          console.log('✅ Added admin:', adminRole.profiles.email);
+        }
+      });
     }
 
-    // 2. Get ALL client users - broader approach
-    console.log('🔍 Fetching ALL client users...');
-    const clientUsers: any[] = [];
-
-    // Method 1: Get users by company_id if available
+    // 2. Get ALL users from the same company as the order
     if (orderData.company_id) {
-      console.log('🔍 Fetching users by company_id:', orderData.company_id);
-      const { data: companyUsers, error: companyError } = await supabase
+      console.log('🔍 Fetching company users for company_id:', orderData.company_id);
+      
+      const { data: companyUsers, error: companyUsersError } = await supabase
         .from('profiles')
-        .select('email, full_name, id, company_id')
+        .select('email, full_name')
         .eq('company_id', orderData.company_id);
 
-      if (companyError) {
-        console.error('❌ Error fetching company users by company_id:', companyError);
-      } else if (companyUsers) {
-        clientUsers.push(...companyUsers);
-        console.log('🏢 Users found by company_id:', companyUsers.length);
+      if (companyUsersError) {
+        console.error('❌ Error fetching company users:', companyUsersError);
+      } else if (companyUsers && companyUsers.length > 0) {
+        console.log('🏢 Company users found:', companyUsers.length);
+        companyUsers.forEach(user => {
+          if (user.email && !allRecipients.find(r => r.email === user.email)) {
+            allRecipients.push({
+              email: user.email,
+              name: user.full_name || 'Company User',
+              role: 'client'
+            });
+            console.log('✅ Added company user:', user.email);
+          }
+        });
       }
     }
 
-    // Method 2: Get users by company_code (fallback)
-    if (companyName && clientUsers.length === 0) {
-      console.log('🔍 Trying to fetch users by company code...');
+    // 3. If no company users found by company_id, try by company_code
+    if (orderData.company_id && allRecipients.filter(r => r.role === 'client').length === 0 && companyName) {
+      console.log('🔍 Trying to find users by company name/code...');
       
-      // First get the company by name to find its code
-      const { data: company, error: companyLookupError } = await supabase
+      // First get the company code
+      const { data: company, error: companyError } = await supabase
         .from('companies')
-        .select('code, id')
+        .select('code')
         .eq('name', companyName)
         .single();
 
-      if (!companyLookupError && company) {
-        console.log('🏢 Found company:', company);
+      if (!companyError && company?.code) {
+        console.log('🏢 Found company code:', company.code);
         
         const { data: codeUsers, error: codeUsersError } = await supabase
           .from('profiles')
-          .select('email, full_name, id, company_code')
+          .select('email, full_name')
           .eq('company_code', company.code);
 
-        if (!codeUsersError && codeUsers) {
-          clientUsers.push(...codeUsers);
+        if (!codeUsersError && codeUsers && codeUsers.length > 0) {
           console.log('🏢 Users found by company_code:', codeUsers.length);
+          codeUsers.forEach(user => {
+            if (user.email && !allRecipients.find(r => r.email === user.email)) {
+              allRecipients.push({
+                email: user.email,
+                name: user.full_name || 'Company User',
+                role: 'client'
+              });
+              console.log('✅ Added user by company_code:', user.email);
+            }
+          });
         }
       }
     }
 
-    // 3. Always include the order creator
+    // 4. Always include the order creator
     if (orderData.user_id) {
       console.log('🔍 Fetching order creator:', orderData.user_id);
       const { data: orderCreator, error: creatorError } = await supabase
         .from('profiles')
-        .select('email, full_name, id')
+        .select('email, full_name')
         .eq('id', orderData.user_id)
         .single();
 
-      if (!creatorError && orderCreator) {
-        // Check if not already in clientUsers
-        if (!clientUsers.find(u => u.id === orderCreator.id)) {
-          clientUsers.push(orderCreator);
-          console.log('👤 Added order creator to recipients');
+      if (!creatorError && orderCreator?.email) {
+        if (!allRecipients.find(r => r.email === orderCreator.email)) {
+          allRecipients.push({
+            email: orderCreator.email,
+            name: orderCreator.full_name || 'Order Creator',
+            role: 'creator'
+          });
+          console.log('✅ Added order creator:', orderCreator.email);
         }
       }
     }
 
-    // 4. Remove duplicates and create recipient lists
-    const allUsers = [...adminUsers, ...clientUsers];
-    const uniqueUsers = allUsers.filter((user, index, self) => 
-      index === self.findIndex(u => u.id === user.id)
-    );
-
-    console.log('📊 Summary before filtering:');
-    console.log('  - Admin users:', adminUsers.length);
-    console.log('  - Client users:', clientUsers.length);
-    console.log('  - Total unique users:', uniqueUsers.length);
-
-    // 5. Create final recipient lists with valid emails
-    const adminRecipients = adminUsers
-      .filter(admin => admin.email && admin.email.trim() !== '')
-      .map(admin => ({
-        email: admin.email,
-        name: admin.full_name || 'Admin User',
-        role: 'admin'
-      }));
-
-    const clientRecipients = clientUsers
-      .filter(client => client.email && client.email.trim() !== '')
-      .map(client => ({
-        email: client.email,
-        name: client.full_name || 'Client User',
-        role: 'client'
-      }));
-
-    const allRecipients = [...adminRecipients, ...clientRecipients]
-      .filter((recipient, index, self) => 
-        index === self.findIndex(r => r.email === recipient.email)
-      );
-
-    console.log(`📧 Final recipient counts:`);
-    console.log(`  - Admin recipients: ${adminRecipients.length}`);
-    console.log(`  - Client recipients: ${clientRecipients.length}`);
-    console.log(`  - Total unique recipients: ${allRecipients.length}`);
+    console.log('📊 Final recipient summary:');
+    console.log(`  - Total recipients: ${allRecipients.length}`);
+    console.log(`  - Admin recipients: ${allRecipients.filter(r => r.role === 'admin').length}`);
+    console.log(`  - Client recipients: ${allRecipients.filter(r => r.role === 'client').length}`);
+    console.log(`  - Creator recipients: ${allRecipients.filter(r => r.role === 'creator').length}`);
     console.log('📧 All recipient emails:', allRecipients.map(r => ({ email: r.email, role: r.role })));
 
     if (allRecipients.length === 0) {
@@ -217,8 +200,6 @@ serve(async (req: Request): Promise<Response> => {
           failed: 0,
           recipients: 0,
           debug: {
-            adminUsersFound: adminUsers.length,
-            clientUsersFound: clientUsers.length,
             orderData: orderData
           }
         }),
@@ -308,7 +289,7 @@ serve(async (req: Request): Promise<Response> => {
               ${emailContent}
               <hr style="margin: 20px 0; border: none; border-top: 1px solid #ddd;">
               <p style="color: #666; font-size: 12px;">
-                You are receiving this notification as ${recipient.role === 'admin' ? 'an administrator' : 'a client user'} 
+                You are receiving this notification as ${recipient.role === 'admin' ? 'an administrator' : recipient.role === 'creator' ? 'the order creator' : 'a client user'} 
                 of the Order Management System.
               </p>
             </div>
@@ -323,10 +304,10 @@ serve(async (req: Request): Promise<Response> => {
         });
 
         console.log(`✅ Email sent successfully to ${recipient.email}:`, result);
-        return { success: true, email: recipient.email, result };
+        return { success: true, email: recipient.email, result, role: recipient.role };
       } catch (error) {
         console.error(`❌ Failed to send email to ${recipient.email}:`, error);
-        return { success: false, email: recipient.email, error: error.message };
+        return { success: false, email: recipient.email, error: error.message, role: recipient.role };
       }
     });
 
@@ -357,8 +338,6 @@ serve(async (req: Request): Promise<Response> => {
       sent: successful, 
       failed: failed,
       recipients: allRecipients.length,
-      adminRecipients: adminRecipients.length,
-      clientRecipients: clientRecipients.length,
       details: results.map((result, index) => ({
         recipient: allRecipients[index]?.email,
         role: allRecipients[index]?.role,
@@ -368,9 +347,12 @@ serve(async (req: Request): Promise<Response> => {
       })),
       debug: {
         orderData,
-        adminUsersFound: adminUsers.length,
-        clientUsersFound: clientUsers.length,
-        totalUniqueUsers: uniqueUsers.length
+        totalRecipientsFound: allRecipients.length,
+        recipientBreakdown: {
+          admins: allRecipients.filter(r => r.role === 'admin').length,
+          clients: allRecipients.filter(r => r.role === 'client').length,
+          creators: allRecipients.filter(r => r.role === 'creator').length
+        }
       }
     };
 
@@ -397,4 +379,3 @@ serve(async (req: Request): Promise<Response> => {
     );
   }
 });
-
