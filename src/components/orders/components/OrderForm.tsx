@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { Button } from "@/components/ui/button";
@@ -45,6 +46,7 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
   const { companies, loading: companiesLoading, userRole } = useCompanyData();
   const [userProfile, setUserProfile] = useState<any>(null);
   const [availableCompanies, setAvailableCompanies] = useState<any[]>([]);
+  const [currentUserRole, setCurrentUserRole] = useState<string>('');
 
   const form = useForm<OrderFormData>({
     defaultValues: {
@@ -66,30 +68,43 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
       if (!user?.id) return;
 
       try {
+        console.log("Fetching user info for:", user.id);
         const [role, profile] = await Promise.all([
           getUserRole(user.id),
           getUserProfile(user.id)
         ]);
 
+        console.log("User role:", role);
+        console.log("User profile:", profile);
+        
+        setCurrentUserRole(role);
         setUserProfile(profile);
 
         if (role === 'admin') {
           // Admins can see all companies
+          console.log("Admin user - showing all companies:", companies.length);
           setAvailableCompanies(companies);
         } else if (role === 'user' && profile?.company_code) {
           // Users can only see companies that match their company code
+          console.log("Regular user with company code:", profile.company_code);
           const matchingCompanies = companies.filter(company => 
             company.code === profile.company_code
           );
+          console.log("Matching companies found:", matchingCompanies.length, matchingCompanies);
           setAvailableCompanies(matchingCompanies);
           
           // If user has only one matching company, auto-select it
           if (matchingCompanies.length === 1) {
+            console.log("Auto-selecting single company:", matchingCompanies[0].name);
             form.setValue('companyId', matchingCompanies[0].id);
           }
+        } else {
+          console.log("User role or company code not found");
+          setAvailableCompanies([]);
         }
       } catch (error) {
         console.error("Error fetching user info:", error);
+        setAvailableCompanies([]);
       }
     };
 
@@ -154,6 +169,7 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
       return;
     }
 
+    console.log("Submitting order with data:", data);
     onSubmit({
       orderNumber: data.orderNumber,
       description: data.description,
@@ -170,6 +186,12 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
       </div>
     );
   }
+
+  console.log("Rendering form with:", {
+    currentUserRole,
+    availableCompanies: availableCompanies.length,
+    userProfile: userProfile?.company_code
+  });
 
   return (
     <div className="space-y-6">
@@ -246,14 +268,19 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
                   </SelectContent>
                 </Select>
                 <FormMessage />
-                {userRole === 'user' && availableCompanies.length === 0 && (
+                {currentUserRole === 'user' && availableCompanies.length === 0 && (
                   <div className="text-sm text-red-600">
                     No companies found matching your company code. Please contact an administrator.
                   </div>
                 )}
-                {userRole === 'user' && userProfile?.company_code && (
+                {currentUserRole === 'user' && userProfile?.company_code && (
                   <div className="text-sm text-gray-600">
                     Showing companies for code: {userProfile.company_code}
+                  </div>
+                )}
+                {availableCompanies.length > 0 && (
+                  <div className="text-sm text-blue-600">
+                    {availableCompanies.length} company(ies) available
                   </div>
                 )}
               </FormItem>
