@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import {
   Dialog,
@@ -9,12 +8,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Download, Eye, FileText, Upload, Plus } from "lucide-react";
+import { Download, Eye, FileText, Upload, Plus, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 interface OrderFile {
   id: string;
@@ -63,6 +63,7 @@ export default function ProcessingOrderFilesDialog({
   const [files, setFiles] = useState<OrderFile[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploadingFiles, setUploadingFiles] = useState<{ [key: string]: boolean }>({});
+  const [deletingFiles, setDeletingFiles] = useState<{ [key: string]: boolean }>({});
 
   // Fetch files for the order
   const fetchOrderFiles = async () => {
@@ -201,6 +202,93 @@ export default function ProcessingOrderFilesDialog({
     }
   };
 
+  // Delete file function
+  const handleFileDelete = async (file: OrderFile) => {
+    if (!user?.id) {
+      console.error('Missing user ID');
+      return;
+    }
+
+    // Check if user can delete this file (either admin or file owner)
+    const canDelete = isAdmin || file.uploaded_by_user_id === user.id;
+    if (!canDelete) {
+      toast({
+        title: "Permission Denied",
+        description: "You don't have permission to delete this file.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    console.log('Starting file deletion:', {
+      fileName: file.file_name,
+      fileId: file.id,
+      userId: user.id,
+      isAdmin
+    });
+
+    setDeletingFiles(prev => ({ ...prev, [file.id]: true }));
+
+    try {
+      // Extract the file path from the URL for storage deletion
+      const urlParts = file.file_url.split('/');
+      const fileName = urlParts[urlParts.length - 1];
+      const fileType = file.file_type;
+      const orderId = order?.id;
+      const filePath = `${orderId}/${fileType}/${fileName}`;
+      
+      console.log('Deleting from storage:', filePath);
+      
+      // Delete from Supabase Storage
+      const { error: storageError } = await supabase.storage
+        .from('order-files')
+        .remove([filePath]);
+
+      if (storageError) {
+        console.error('Storage deletion error:', storageError);
+        // Continue with database deletion even if storage deletion fails
+      }
+
+      console.log('File deleted from storage, now deleting database record');
+
+      // Delete from database
+      const { error: dbError } = await supabase
+        .from('order_files')
+        .delete()
+        .eq('id', file.id);
+
+      if (dbError) {
+        console.error('Database deletion error:', dbError);
+        throw dbError;
+      }
+
+      console.log('File record deleted from database successfully');
+
+      toast({
+        title: "File Deleted",
+        description: `${file.file_name} has been deleted successfully.`,
+      });
+
+      // Refresh files list
+      fetchOrderFiles();
+    } catch (error: any) {
+      console.error('Error deleting file:', error);
+      
+      let errorMessage = "Failed to delete file. Please try again.";
+      if (error?.message) {
+        errorMessage = `Deletion failed: ${error.message}`;
+      }
+      
+      toast({
+        title: "Deletion Failed",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setDeletingFiles(prev => ({ ...prev, [file.id]: false }));
+    }
+  };
+
   // Download file
   const handleFileDownload = (file: OrderFile) => {
     const link = document.createElement('a');
@@ -236,6 +324,11 @@ export default function ProcessingOrderFilesDialog({
     // Now all authenticated users can upload any file type
     // But we still show guidance about what they typically should upload
     return true;
+  };
+
+  // Check if user can delete a file
+  const canDeleteFile = (file: OrderFile) => {
+    return isAdmin || file.uploaded_by_user_id === user?.id;
   };
 
   // Get upload guidance text
@@ -300,6 +393,72 @@ export default function ProcessingOrderFilesDialog({
     );
   };
 
+  // File row component with delete functionality
+  const FileRow = ({ file }: { file: OrderFile }) => (
+    <div key={file.id} className="flex items-center justify-between p-3 border rounded-lg">
+      <div className="flex items-center space-x-3">
+        <FileText className={`h-5 w-5 ${
+          file.file_type === 'quote' ? 'text-blue-500' :
+          file.file_type === 'purchase-order' ? 'text-green-500' :
+          file.file_type === 'invoice' ? 'text-purple-500' :
+          'text-orange-500'
+        }`} />
+        <div>
+          <p className="font-medium">{file.file_name}</p>
+          <p className="text-sm text-gray-500">
+            Uploaded by {file.uploaded_by_role} • {new Date(file.created_at).toLocaleDateString()}
+          </p>
+        </div>
+      </div>
+      <div className="flex items-center space-x-2">
+        <Button variant="ghost" size="sm" onClick={() => handleFileView(file)}>
+          <Eye className="h-4 w-4" />
+        </Button>
+        <Button variant="ghost" size="sm" onClick={() => handleFileDownload(file)}>
+          <Download className="h-4 w-4" />
+        </Button>
+        <Button variant="ghost" size="sm" onClick={() => handleFilePrint(file)}>
+          Print
+        </Button>
+        {canDeleteFile(file) && (
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="text-red-600 hover:text-red-700"
+                disabled={deletingFiles[file.id]}
+              >
+                {deletingFiles[file.id] ? (
+                  <Upload className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Trash2 className="h-4 w-4" />
+                )}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete File</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Are you sure you want to delete "{file.file_name}"? This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction 
+                  onClick={() => handleFileDelete(file)}
+                  className="bg-red-600 hover:bg-red-700"
+                >
+                  Delete
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
+      </div>
+    </div>
+  );
+
   useEffect(() => {
     if (isOpen && order) {
       console.log('Dialog opened for order:', order.id);
@@ -361,28 +520,7 @@ export default function ProcessingOrderFilesDialog({
 
             <div className="space-y-2">
               {getFilesByType('quote').map((file) => (
-                <div key={file.id} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div className="flex items-center space-x-3">
-                    <FileText className="h-5 w-5 text-blue-500" />
-                    <div>
-                      <p className="font-medium">{file.file_name}</p>
-                      <p className="text-sm text-gray-500">
-                        Uploaded by {file.uploaded_by_role} • {new Date(file.created_at).toLocaleDateString()}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Button variant="ghost" size="sm" onClick={() => handleFileView(file)}>
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={() => handleFileDownload(file)}>
-                      <Download className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={() => handleFilePrint(file)}>
-                      Print
-                    </Button>
-                  </div>
-                </div>
+                <FileRow key={file.id} file={file} />
               ))}
               {getFilesByType('quote').length === 0 && (
                 <p className="text-center text-gray-500 py-8">No quote files uploaded yet.</p>
@@ -401,28 +539,7 @@ export default function ProcessingOrderFilesDialog({
 
             <div className="space-y-2">
               {getFilesByType('purchase-order').map((file) => (
-                <div key={file.id} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div className="flex items-center space-x-3">
-                    <FileText className="h-5 w-5 text-green-500" />
-                    <div>
-                      <p className="font-medium">{file.file_name}</p>
-                      <p className="text-sm text-gray-500">
-                        Uploaded by {file.uploaded_by_role} • {new Date(file.created_at).toLocaleDateString()}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Button variant="ghost" size="sm" onClick={() => handleFileView(file)}>
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={() => handleFileDownload(file)}>
-                      <Download className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={() => handleFilePrint(file)}>
-                      Print
-                    </Button>
-                  </div>
-                </div>
+                <FileRow key={file.id} file={file} />
               ))}
               {getFilesByType('purchase-order').length === 0 && (
                 <p className="text-center text-gray-500 py-8">No purchase order files uploaded yet.</p>
@@ -441,28 +558,7 @@ export default function ProcessingOrderFilesDialog({
 
             <div className="space-y-2">
               {getFilesByType('invoice').map((file) => (
-                <div key={file.id} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div className="flex items-center space-x-3">
-                    <FileText className="h-5 w-5 text-purple-500" />
-                    <div>
-                      <p className="font-medium">{file.file_name}</p>
-                      <p className="text-sm text-gray-500">
-                        Uploaded by {file.uploaded_by_role} • {new Date(file.created_at).toLocaleDateString()}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Button variant="ghost" size="sm" onClick={() => handleFileView(file)}>
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={() => handleFileDownload(file)}>
-                      <Download className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={() => handleFilePrint(file)}>
-                      Print
-                    </Button>
-                  </div>
-                </div>
+                <FileRow key={file.id} file={file} />
               ))}
               {getFilesByType('invoice').length === 0 && (
                 <p className="text-center text-gray-500 py-8">No invoice files uploaded yet.</p>
@@ -481,28 +577,7 @@ export default function ProcessingOrderFilesDialog({
 
             <div className="space-y-2">
               {getFilesByType('delivery-note').map((file) => (
-                <div key={file.id} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div className="flex items-center space-x-3">
-                    <FileText className="h-5 w-5 text-orange-500" />
-                    <div>
-                      <p className="font-medium">{file.file_name}</p>
-                      <p className="text-sm text-gray-500">
-                        Uploaded by {file.uploaded_by_role} • {new Date(file.created_at).toLocaleDateString()}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Button variant="ghost" size="sm" onClick={() => handleFileView(file)}>
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={() => handleFileDownload(file)}>
-                      <Download className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={() => handleFilePrint(file)}>
-                      Print
-                    </Button>
-                  </div>
-                </div>
+                <FileRow key={file.id} file={file} />
               ))}
               {getFilesByType('delivery-note').length === 0 && (
                 <p className="text-center text-gray-500 py-8">No delivery note files uploaded yet.</p>
