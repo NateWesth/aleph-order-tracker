@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { Button } from "@/components/ui/button";
@@ -166,7 +165,13 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
       return;
     }
 
-    if (!data.companyId) {
+    // Ensure company ID is set for client users
+    let finalCompanyId = data.companyId;
+    if (currentUserRole === 'user' && availableCompanies.length === 1) {
+      finalCompanyId = availableCompanies[0].id;
+    }
+
+    if (!finalCompanyId) {
       form.setError("companyId", { 
         type: "manual", 
         message: "Please select a company" 
@@ -174,11 +179,15 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
       return;
     }
 
-    console.log("Submitting order with data:", data);
+    console.log("Submitting order with data:", {
+      ...data,
+      companyId: finalCompanyId
+    });
+    
     onSubmit({
       orderNumber: data.orderNumber,
       description: data.description,
-      companyId: data.companyId,
+      companyId: finalCompanyId,
       totalAmount: data.totalAmount,
       items: validItems
     });
@@ -260,17 +269,22 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
               <FormItem>
                 <FormLabel>Company</FormLabel>
                 {currentUserRole === 'user' && availableCompanies.length === 1 ? (
-                  // For client users with only one company, show it as read-only but still functional
+                  // For client users with only one company, show it as read-only but ensure it's selected
                   <div className="space-y-2">
                     <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
                       <div className="font-medium text-blue-900">
                         {availableCompanies[0].name} ({availableCompanies[0].code})
                       </div>
                       <div className="text-sm text-blue-700">
-                        Your linked company
+                        Your linked company - this order will be automatically linked to this company
                       </div>
                     </div>
-                    <input type="hidden" {...field} value={availableCompanies[0].id} />
+                    {/* Hidden input to ensure the company ID is properly set */}
+                    <input 
+                      type="hidden" 
+                      {...field} 
+                      value={availableCompanies[0].id}
+                    />
                   </div>
                 ) : (
                   <Select value={field.value} onValueChange={field.onChange}>
