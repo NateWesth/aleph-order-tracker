@@ -43,10 +43,11 @@ interface OrderFormProps {
 
 const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
   const { user } = useAuth();
-  const { companies, loading: companiesLoading, userRole } = useCompanyData();
+  const { companies, loading: companiesLoading } = useCompanyData();
   const [userProfile, setUserProfile] = useState<any>(null);
   const [availableCompanies, setAvailableCompanies] = useState<any[]>([]);
   const [currentUserRole, setCurrentUserRole] = useState<string>('');
+  const [isLoadingUserInfo, setIsLoadingUserInfo] = useState(false);
 
   const form = useForm<OrderFormData>({
     defaultValues: {
@@ -65,8 +66,9 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
 
   useEffect(() => {
     const fetchUserInfo = async () => {
-      if (!user?.id) return;
+      if (!user?.id || companies.length === 0) return;
 
+      setIsLoadingUserInfo(true);
       try {
         console.log("Fetching user info for:", user.id);
         const [role, profile] = await Promise.all([
@@ -76,6 +78,7 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
 
         console.log("User role:", role);
         console.log("User profile:", profile);
+        console.log("Available companies:", companies);
         
         setCurrentUserRole(role);
         setUserProfile(profile);
@@ -93,24 +96,26 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
           console.log("Matching companies found:", matchingCompanies.length, matchingCompanies);
           setAvailableCompanies(matchingCompanies);
           
-          // If user has only one matching company, auto-select it
+          // Auto-select the company if user has only one matching company
           if (matchingCompanies.length === 1) {
             console.log("Auto-selecting single company:", matchingCompanies[0].name);
             form.setValue('companyId', matchingCompanies[0].id);
+          } else if (matchingCompanies.length > 1) {
+            console.log("Multiple companies found, user needs to select one");
           }
         } else {
-          console.log("User role or company code not found");
+          console.log("User role or company code not found - role:", role, "company_code:", profile?.company_code);
           setAvailableCompanies([]);
         }
       } catch (error) {
         console.error("Error fetching user info:", error);
         setAvailableCompanies([]);
+      } finally {
+        setIsLoadingUserInfo(false);
       }
     };
 
-    if (companies.length > 0) {
-      fetchUserInfo();
-    }
+    fetchUserInfo();
   }, [user?.id, companies, form]);
 
   // Generate a new order number
@@ -179,10 +184,10 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
     });
   };
 
-  if (companiesLoading) {
+  if (companiesLoading || isLoadingUserInfo) {
     return (
       <div className="flex items-center justify-center py-8">
-        <div className="text-sm text-gray-600">Loading companies...</div>
+        <div className="text-sm text-gray-600">Loading...</div>
       </div>
     );
   }
@@ -190,7 +195,8 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
   console.log("Rendering form with:", {
     currentUserRole,
     availableCompanies: availableCompanies.length,
-    userProfile: userProfile?.company_code
+    userProfile: userProfile?.company_code,
+    selectedCompanyId: form.getValues('companyId')
   });
 
   return (
@@ -253,29 +259,44 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Company</FormLabel>
-                <Select value={field.value} onValueChange={field.onChange}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a company" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {availableCompanies.map((company) => (
-                      <SelectItem key={company.id} value={company.id}>
-                        {company.name} ({company.code})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {currentUserRole === 'user' && availableCompanies.length === 1 ? (
+                  // For client users with only one company, show it as read-only but still functional
+                  <div className="space-y-2">
+                    <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
+                      <div className="font-medium text-blue-900">
+                        {availableCompanies[0].name} ({availableCompanies[0].code})
+                      </div>
+                      <div className="text-sm text-blue-700">
+                        Your linked company
+                      </div>
+                    </div>
+                    <input type="hidden" {...field} value={availableCompanies[0].id} />
+                  </div>
+                ) : (
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a company" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {availableCompanies.map((company) => (
+                        <SelectItem key={company.id} value={company.id}>
+                          {company.name} ({company.code})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
                 <FormMessage />
                 {currentUserRole === 'user' && availableCompanies.length === 0 && (
                   <div className="text-sm text-red-600">
                     No companies found matching your company code. Please contact an administrator.
                   </div>
                 )}
-                {currentUserRole === 'user' && userProfile?.company_code && (
+                {currentUserRole === 'user' && userProfile?.company_code && availableCompanies.length > 1 && (
                   <div className="text-sm text-gray-600">
-                    Showing companies for code: {userProfile.company_code}
+                    Select from companies matching your code: {userProfile.company_code}
                   </div>
                 )}
                 {availableCompanies.length > 0 && (
@@ -410,7 +431,7 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
           <Button 
             type="submit" 
             className="w-full" 
-            disabled={loading || companiesLoading}
+            disabled={loading || companiesLoading || isLoadingUserInfo}
           >
             {loading ? "Creating Order..." : "Create Order"}
           </Button>
