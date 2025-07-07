@@ -69,45 +69,45 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
 
       setIsLoadingUserInfo(true);
       try {
-        console.log("Fetching user info for:", user.id);
+        console.log("🔍 OrderForm: Fetching user info for:", user.id);
         const [role, profile] = await Promise.all([
           getUserRole(user.id),
           getUserProfile(user.id)
         ]);
 
-        console.log("User role:", role);
-        console.log("User profile:", profile);
-        console.log("Available companies:", companies);
+        console.log("🔍 OrderForm: User role:", role);
+        console.log("🔍 OrderForm: User profile:", profile);
+        console.log("🔍 OrderForm: Available companies:", companies);
         
         setCurrentUserRole(role);
         setUserProfile(profile);
 
         if (role === 'admin') {
           // Admins can see all companies
-          console.log("Admin user - showing all companies:", companies.length);
+          console.log("👑 OrderForm: Admin user - showing all companies:", companies.length);
           setAvailableCompanies(companies);
         } else if (role === 'user' && profile?.company_code) {
           // Users can only see companies that match their company code
-          console.log("Regular user with company code:", profile.company_code);
+          console.log("👤 OrderForm: Regular user with company code:", profile.company_code);
           const matchingCompanies = companies.filter(company => 
             company.code === profile.company_code
           );
-          console.log("Matching companies found:", matchingCompanies.length, matchingCompanies);
+          console.log("🏢 OrderForm: Matching companies found:", matchingCompanies.length, matchingCompanies);
           setAvailableCompanies(matchingCompanies);
           
           // Auto-select the company if user has only one matching company
           if (matchingCompanies.length === 1) {
-            console.log("Auto-selecting single company:", matchingCompanies[0].name);
+            console.log("✅ OrderForm: Auto-selecting single company:", matchingCompanies[0].name, "ID:", matchingCompanies[0].id);
             form.setValue('companyId', matchingCompanies[0].id);
           } else if (matchingCompanies.length > 1) {
-            console.log("Multiple companies found, user needs to select one");
+            console.log("⚠️ OrderForm: Multiple companies found, user needs to select one");
           }
         } else {
-          console.log("User role or company code not found - role:", role, "company_code:", profile?.company_code);
+          console.log("❌ OrderForm: User role or company code not found - role:", role, "company_code:", profile?.company_code);
           setAvailableCompanies([]);
         }
       } catch (error) {
-        console.error("Error fetching user info:", error);
+        console.error("❌ OrderForm: Error fetching user info:", error);
         setAvailableCompanies([]);
       } finally {
         setIsLoadingUserInfo(false);
@@ -147,9 +147,14 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
   };
 
   const handleSubmit = (data: OrderFormData) => {
+    console.log("📝 OrderForm: Starting handleSubmit with data:", data);
+    console.log("📝 OrderForm: Current user role:", currentUserRole);
+    console.log("📝 OrderForm: Available companies:", availableCompanies);
+    
     const validItems = data.items.filter(item => item.name.trim() && item.quantity > 0);
     
     if (validItems.length === 0) {
+      console.log("❌ OrderForm: No valid items found");
       form.setError("items", { 
         type: "manual", 
         message: "Please add at least one valid item" 
@@ -158,6 +163,7 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
     }
 
     if (!data.orderNumber.trim()) {
+      console.log("❌ OrderForm: Order number is missing");
       form.setError("orderNumber", { 
         type: "manual", 
         message: "Order number is required" 
@@ -167,11 +173,15 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
 
     // Ensure company ID is set for client users
     let finalCompanyId = data.companyId;
+    console.log("🏢 OrderForm: Initial companyId from form:", finalCompanyId);
+    
     if (currentUserRole === 'user' && availableCompanies.length === 1) {
       finalCompanyId = availableCompanies[0].id;
+      console.log("🔄 OrderForm: Auto-setting companyId for single company user:", finalCompanyId);
     }
 
     if (!finalCompanyId) {
+      console.log("❌ OrderForm: Final companyId is missing");
       form.setError("companyId", { 
         type: "manual", 
         message: "Please select a company" 
@@ -179,18 +189,18 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
       return;
     }
 
-    console.log("Submitting order with data:", {
-      ...data,
-      companyId: finalCompanyId
-    });
-    
-    onSubmit({
+    const finalOrderData = {
       orderNumber: data.orderNumber,
       description: data.description,
       companyId: finalCompanyId,
       totalAmount: data.totalAmount,
       items: validItems
-    });
+    };
+
+    console.log("🚀 OrderForm: Submitting order with final data:", finalOrderData);
+    console.log("🔍 OrderForm: Company details:", availableCompanies.find(c => c.id === finalCompanyId));
+    
+    onSubmit(finalOrderData);
   };
 
   if (companiesLoading || isLoadingUserInfo) {
@@ -201,7 +211,7 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
     );
   }
 
-  console.log("Rendering form with:", {
+  console.log("🎨 OrderForm: Rendering form with:", {
     currentUserRole,
     availableCompanies: availableCompanies.length,
     userProfile: userProfile?.company_code,
@@ -271,12 +281,15 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
                 {currentUserRole === 'user' && availableCompanies.length === 1 ? (
                   // For client users with only one company, show it as read-only but ensure it's selected
                   <div className="space-y-2">
-                    <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
-                      <div className="font-medium text-blue-900">
-                        {availableCompanies[0].name} ({availableCompanies[0].code})
+                    <div className="p-3 bg-green-50 border border-green-200 rounded-md">
+                      <div className="font-medium text-green-900">
+                        ✅ {availableCompanies[0].name} ({availableCompanies[0].code})
                       </div>
-                      <div className="text-sm text-blue-700">
-                        Your linked company - this order will be automatically linked to this company
+                      <div className="text-sm text-green-700">
+                        🔗 This order will be automatically linked to your company
+                      </div>
+                      <div className="text-xs text-green-600 mt-1">
+                        Company ID: {availableCompanies[0].id}
                       </div>
                     </div>
                     {/* Hidden input to ensure the company ID is properly set */}
