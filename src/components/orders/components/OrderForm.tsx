@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { Button } from "@/components/ui/button";
@@ -97,8 +98,10 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
           
           // Auto-select the company if user has only one matching company
           if (matchingCompanies.length === 1) {
-            console.log("✅ OrderForm: Auto-selecting single company:", matchingCompanies[0].name, "ID:", matchingCompanies[0].id);
-            form.setValue('companyId', matchingCompanies[0].id);
+            const companyId = matchingCompanies[0].id;
+            console.log("✅ OrderForm: Auto-selecting single company:", matchingCompanies[0].name, "ID:", companyId);
+            form.setValue('companyId', companyId);
+            console.log("🔧 OrderForm: Form companyId value set to:", form.getValues('companyId'));
           } else if (matchingCompanies.length > 1) {
             console.log("⚠️ OrderForm: Multiple companies found, user needs to select one");
           }
@@ -150,6 +153,7 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
     console.log("📝 OrderForm: Starting handleSubmit with data:", data);
     console.log("📝 OrderForm: Current user role:", currentUserRole);
     console.log("📝 OrderForm: Available companies:", availableCompanies);
+    console.log("📝 OrderForm: Form companyId value:", data.companyId);
     
     const validItems = data.items.filter(item => item.name.trim() && item.quantity > 0);
     
@@ -171,17 +175,19 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
       return;
     }
 
-    // Ensure company ID is set for client users
+    // Determine the final company ID to use
     let finalCompanyId = data.companyId;
     console.log("🏢 OrderForm: Initial companyId from form:", finalCompanyId);
     
-    if (currentUserRole === 'user' && availableCompanies.length === 1) {
+    // For client users with single company, ensure company ID is set
+    if (currentUserRole === 'user' && availableCompanies.length === 1 && !finalCompanyId) {
       finalCompanyId = availableCompanies[0].id;
       console.log("🔄 OrderForm: Auto-setting companyId for single company user:", finalCompanyId);
     }
 
     if (!finalCompanyId) {
       console.log("❌ OrderForm: Final companyId is missing");
+      console.log("❌ OrderForm: Debug info - role:", currentUserRole, "companies:", availableCompanies.length);
       form.setError("companyId", { 
         type: "manual", 
         message: "Please select a company" 
@@ -199,6 +205,7 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
 
     console.log("🚀 OrderForm: Submitting order with final data:", finalOrderData);
     console.log("🔍 OrderForm: Company details:", availableCompanies.find(c => c.id === finalCompanyId));
+    console.log("🎯 OrderForm: Final companyId being passed:", finalOrderData.companyId);
     
     onSubmit(finalOrderData);
   };
@@ -215,7 +222,7 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
     currentUserRole,
     availableCompanies: availableCompanies.length,
     userProfile: userProfile?.company_code,
-    selectedCompanyId: form.getValues('companyId')
+    selectedCompanyId: form.watch('companyId')
   });
 
   return (
@@ -279,7 +286,7 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
               <FormItem>
                 <FormLabel>Company</FormLabel>
                 {currentUserRole === 'user' && availableCompanies.length === 1 ? (
-                  // For client users with only one company, show it as read-only but ensure it's selected
+                  // For client users with only one company, show it as selected and make it hidden
                   <div className="space-y-2">
                     <div className="p-3 bg-green-50 border border-green-200 rounded-md">
                       <div className="font-medium text-green-900">
@@ -292,15 +299,23 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
                         Company ID: {availableCompanies[0].id}
                       </div>
                     </div>
-                    {/* Hidden input to ensure the company ID is properly set */}
-                    <input 
-                      type="hidden" 
-                      {...field} 
-                      value={availableCompanies[0].id}
-                    />
+                    {/* Ensure the company ID is set in the form */}
+                    <FormControl>
+                      <Input 
+                        type="hidden" 
+                        {...field} 
+                        value={availableCompanies[0].id}
+                      />
+                    </FormControl>
                   </div>
                 ) : (
-                  <Select value={field.value} onValueChange={field.onChange}>
+                  <Select 
+                    value={field.value} 
+                    onValueChange={(value) => {
+                      console.log("🔄 OrderForm: Company selection changed to:", value);
+                      field.onChange(value);
+                    }}
+                  >
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Select a company" />
