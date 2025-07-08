@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { Button } from "@/components/ui/button";
@@ -47,6 +48,7 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
   const [availableCompanies, setAvailableCompanies] = useState<any[]>([]);
   const [currentUserRole, setCurrentUserRole] = useState<string>('');
   const [isLoadingUserInfo, setIsLoadingUserInfo] = useState(false);
+  const [userCompany, setUserCompany] = useState<any>(null);
 
   const form = useForm<OrderFormData>({
     defaultValues: {
@@ -74,7 +76,6 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
       try {
         console.log("🔍 OrderForm: Starting user info fetch for:", user.id);
         console.log("🔍 OrderForm: Available companies count:", companies.length);
-        console.log("🔍 OrderForm: All companies:", companies.map(c => ({ id: c.id, name: c.name, code: c.code })));
         
         const [role, profile] = await Promise.all([
           getUserRole(user.id),
@@ -83,8 +84,6 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
 
         console.log("🔍 OrderForm: User role:", role);
         console.log("🔍 OrderForm: User profile:", profile);
-        console.log("🔍 OrderForm: Profile company_id:", profile?.company_id);
-        console.log("🔍 OrderForm: Profile company_code:", profile?.company_code);
         
         setCurrentUserRole(role);
         setUserProfile(profile);
@@ -93,57 +92,32 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
           console.log("👑 OrderForm: Admin user - showing all companies:", companies.length);
           setAvailableCompanies(companies);
         } else if (role === 'user') {
-          console.log("👤 OrderForm: Regular user - filtering companies");
-          let matchingCompanies = [];
+          console.log("👤 OrderForm: Client user - auto-linking to their company");
           
-          // First, try to match by company_id (more reliable)
+          // For client users, find their company and auto-set it
+          let userLinkedCompany = null;
+          
           if (profile?.company_id) {
-            console.log("🔍 OrderForm: Filtering by company_id:", profile.company_id);
-            matchingCompanies = companies.filter(company => {
-              const match = company.id === profile.company_id;
-              console.log(`🏢 OrderForm: Checking company ${company.name} (${company.id}) against ${profile.company_id}: ${match}`);
-              return match;
-            });
-            console.log("🏢 OrderForm: Companies matching by ID:", matchingCompanies.length, matchingCompanies.map(c => c.name));
+            userLinkedCompany = companies.find(company => company.id === profile.company_id);
+          } else if (profile?.company_code) {
+            userLinkedCompany = companies.find(company => company.code === profile.company_code);
           }
           
-          // If no matches by ID and we have a company_code, try that
-          if (matchingCompanies.length === 0 && profile?.company_code) {
-            console.log("🔍 OrderForm: No ID matches, filtering by company_code:", profile.company_code);
-            matchingCompanies = companies.filter(company => {
-              const match = company.code === profile.company_code;
-              console.log(`🏢 OrderForm: Checking company ${company.name} (${company.code}) against ${profile.company_code}: ${match}`);
-              return match;
-            });
-            console.log("🏢 OrderForm: Companies matching by code:", matchingCompanies.length, matchingCompanies.map(c => c.name));
-          }
-          
-          setAvailableCompanies(matchingCompanies);
-          console.log("✅ OrderForm: Final available companies:", matchingCompanies.length, matchingCompanies.map(c => ({ id: c.id, name: c.name, code: c.code })));
-          
-          if (matchingCompanies.length === 1) {
-            const companyId = matchingCompanies[0].id;
-            console.log("✅ OrderForm: Auto-selecting single company:", matchingCompanies[0].name, "ID:", companyId);
-            form.setValue('companyId', companyId, { shouldValidate: true, shouldDirty: true });
-          } else if (matchingCompanies.length === 0) {
-            console.error("❌ OrderForm: No matching companies found for user");
-            console.error("❌ OrderForm: User profile details:");
-            console.error("   - company_id:", profile?.company_id);
-            console.error("   - company_code:", profile?.company_code);
-            console.error("❌ OrderForm: Available companies details:");
-            companies.forEach(company => {
-              console.error(`   - ${company.name}: ID=${company.id}, Code=${company.code}`);
-            });
+          if (userLinkedCompany) {
+            console.log("✅ OrderForm: Found user's company:", userLinkedCompany.name);
+            setUserCompany(userLinkedCompany);
+            form.setValue('companyId', userLinkedCompany.id, { shouldValidate: true, shouldDirty: true });
           } else {
-            console.log("🎯 OrderForm: Multiple companies available, user needs to select");
+            console.error("❌ OrderForm: No matching company found for client user");
+            setUserCompany(null);
           }
-        } else {
-          console.log("❌ OrderForm: Unknown user role:", role);
-          setAvailableCompanies([]);
+          
+          setAvailableCompanies([]); // Client users don't need to see the dropdown
         }
       } catch (error) {
         console.error("❌ OrderForm: Error fetching user info:", error);
         setAvailableCompanies([]);
+        setUserCompany(null);
       } finally {
         setIsLoadingUserInfo(false);
       }
@@ -184,9 +158,7 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
   const handleSubmit = (data: OrderFormData) => {
     console.log("📝 OrderForm: Starting handleSubmit with data:", data);
     console.log("📝 OrderForm: Current user role:", currentUserRole);
-    console.log("📝 OrderForm: Available companies:", availableCompanies);
-    console.log("📝 OrderForm: Form companyId value:", data.companyId);
-    console.log("📝 OrderForm: User profile:", userProfile);
+    console.log("📝 OrderForm: User company:", userCompany);
     
     const validItems = data.items.filter(item => item.name.trim() && item.quantity > 0);
     
@@ -210,19 +182,25 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
 
     // Determine the final company ID to use
     let finalCompanyId = data.companyId;
-    console.log("🏢 OrderForm: Initial companyId from form:", finalCompanyId);
     
-    // For client users with single company, ensure company ID is set
-    if (currentUserRole === 'user' && availableCompanies.length === 1) {
+    // For client users, ensure they have a company
+    if (currentUserRole === 'user') {
+      if (!finalCompanyId && userCompany) {
+        finalCompanyId = userCompany.id;
+      }
+      
       if (!finalCompanyId) {
-        finalCompanyId = availableCompanies[0].id;
-        console.log("🔄 OrderForm: Auto-setting companyId for single company user:", finalCompanyId);
+        console.log("❌ OrderForm: Client user has no associated company");
+        form.setError("companyId", { 
+          type: "manual", 
+          message: "Your account is not linked to a company. Please contact an administrator." 
+        });
+        return;
       }
     }
 
     if (!finalCompanyId) {
       console.log("❌ OrderForm: Final companyId is missing");
-      console.log("❌ OrderForm: Debug info - role:", currentUserRole, "companies:", availableCompanies.length);
       form.setError("companyId", { 
         type: "manual", 
         message: "Please select a company" 
@@ -239,9 +217,6 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
     };
 
     console.log("🚀 OrderForm: Submitting order with final data:", finalOrderData);
-    console.log("🔍 OrderForm: Company details:", availableCompanies.find(c => c.id === finalCompanyId));
-    console.log("🎯 OrderForm: Final companyId being passed:", finalOrderData.companyId);
-    
     onSubmit(finalOrderData);
   };
 
@@ -252,15 +227,6 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
       </div>
     );
   }
-
-  console.log("🎨 OrderForm: Rendering form with:", {
-    currentUserRole,
-    availableCompanies: availableCompanies.length,
-    userProfile: userProfile?.company_code,
-    selectedCompanyId: form.watch('companyId'),
-    allCompanies: companies.length,
-    userCompanyId: userProfile?.company_id
-  });
 
   return (
     <div className="space-y-6">
@@ -315,42 +281,45 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
             )}
           />
 
+          {/* Company field - different display for admin vs client users */}
           <FormField
             control={form.control}
             name="companyId"
-            rules={{ required: "Please select a company" }}
+            rules={{ required: "Company is required" }}
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Company</FormLabel>
-                {/* Debug info display */}
-                <div className="text-xs text-blue-600 bg-blue-50 p-2 rounded mb-2">
-                  <div>Role: {currentUserRole}</div>
-                  <div>Available companies: {availableCompanies.length}</div>
-                  <div>Total companies: {companies.length}</div>
-                  <div>User company_id: {userProfile?.company_id}</div>
-                  <div>User company_code: {userProfile?.company_code}</div>
-                </div>
                 
-                {currentUserRole === 'user' && availableCompanies.length === 1 ? (
-                  // For client users with only one company, show it as confirmed
+                {currentUserRole === 'user' ? (
+                  // Client users see their linked company (read-only)
                   <div className="space-y-2">
-                    <div className="p-4 bg-green-50 border border-green-200 rounded-md">
-                      <div className="font-medium text-green-900">
-                        ✅ {availableCompanies[0].name} ({availableCompanies[0].code})
+                    {userCompany ? (
+                      <div className="p-4 bg-green-50 border border-green-200 rounded-md">
+                        <div className="font-medium text-green-900">
+                          ✅ {userCompany.name} ({userCompany.code})
+                        </div>
+                        <div className="text-sm text-green-700">
+                          🔗 This order will be automatically linked to your company
+                        </div>
                       </div>
-                      <div className="text-sm text-green-700">
-                        🔗 This order will be automatically linked to your company
+                    ) : (
+                      <div className="text-sm text-red-600 bg-red-50 p-3 rounded">
+                        <div className="font-medium">No company association found.</div>
+                        <div className="text-xs mt-1">
+                          Your account is not linked to any company. Please contact an administrator to resolve this issue.
+                        </div>
                       </div>
-                    </div>
+                    )}
                     <FormControl>
                       <Input 
                         type="hidden" 
                         {...field} 
-                        value={availableCompanies[0].id}
+                        value={userCompany?.id || ''}
                       />
                     </FormControl>
                   </div>
                 ) : (
+                  // Admin users see dropdown to select company
                   <Select 
                     value={field.value} 
                     onValueChange={field.onChange}
@@ -370,21 +339,6 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
                   </Select>
                 )}
                 <FormMessage />
-                {currentUserRole === 'user' && availableCompanies.length === 0 && (
-                  <div className="text-sm text-red-600 bg-red-50 p-3 rounded">
-                    <div className="font-medium">No companies found matching your profile.</div>
-                    <div className="text-xs mt-1">
-                      Profile company_id: {userProfile?.company_id || 'None'}<br/>
-                      Profile company_code: {userProfile?.company_code || 'None'}<br/>
-                      Please contact an administrator to link your profile to a company.
-                    </div>
-                  </div>
-                )}
-                {availableCompanies.length > 0 && (
-                  <div className="text-sm text-blue-600">
-                    {availableCompanies.length} company(ies) available
-                  </div>
-                )}
               </FormItem>
             )}
           />
