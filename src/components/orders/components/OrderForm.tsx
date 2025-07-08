@@ -12,7 +12,6 @@ import { useCompanyData } from "@/components/admin/hooks/useCompanyData";
 import { getUserProfile, getUserRole } from "@/utils/authService";
 import { useAuth } from "@/contexts/AuthContext";
 import { generateOrderNumber } from "../utils/orderUtils";
-
 export interface OrderItem {
   id: string;
   name: string;
@@ -20,7 +19,6 @@ export interface OrderItem {
   unit?: string;
   notes?: string;
 }
-
 interface OrderFormData {
   orderNumber: string;
   description: string;
@@ -28,7 +26,6 @@ interface OrderFormData {
   totalAmount: number;
   items: OrderItem[];
 }
-
 interface OrderFormProps {
   onSubmit: (orderData: {
     orderNumber: string;
@@ -39,7 +36,6 @@ interface OrderFormProps {
   }) => void;
   loading?: boolean;
 }
-
 const OrderForm = ({
   onSubmit,
   loading = false
@@ -56,7 +52,6 @@ const OrderForm = ({
   const [currentUserRole, setCurrentUserRole] = useState<string>('');
   const [isLoadingUserInfo, setIsLoadingUserInfo] = useState(false);
   const [userCompany, setUserCompany] = useState<any>(null);
-  
   const form = useForm<OrderFormData>({
     defaultValues: {
       orderNumber: "",
@@ -72,7 +67,6 @@ const OrderForm = ({
       }]
     }
   });
-  
   const {
     fields,
     append,
@@ -81,7 +75,6 @@ const OrderForm = ({
     control: form.control,
     name: "items"
   });
-
   useEffect(() => {
     const fetchUserInfo = async () => {
       if (!user?.id || companies.length === 0) {
@@ -147,7 +140,6 @@ const OrderForm = ({
       handleGenerateOrderNumber();
     }
   }, []);
-  
   const addItem = () => {
     append({
       id: crypto.randomUUID(),
@@ -157,13 +149,11 @@ const OrderForm = ({
       notes: ""
     });
   };
-  
   const removeItem = (index: number) => {
     if (fields.length > 1) {
       remove(index);
     }
   };
-
   const handleSubmit = (data: OrderFormData) => {
     console.log("📝 OrderForm: Starting handleSubmit with data:", data);
     console.log("📝 OrderForm: Current user role:", currentUserRole);
@@ -221,13 +211,11 @@ const OrderForm = ({
     console.log("🚀 OrderForm: Submitting order with final data:", finalOrderData);
     onSubmit(finalOrderData);
   };
-
   if (companiesLoading || isLoadingUserInfo) {
     return <div className="flex items-center justify-center py-8">
         <div className="text-sm text-gray-600">Loading...</div>
       </div>;
   }
-
   return <div className="space-y-6">
       <Form {...form}>
         <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
@@ -280,10 +268,9 @@ const OrderForm = ({
                     </SelectContent>
                   </Select>
                   <FormMessage />
-                </FormItem>} /> :
-        <div className="space-y-2">
+                </FormItem>} /> : <div className="space-y-2">
               <Label>Company</Label>
-              {userCompany ? <div className="p-4 bg-white dark:bg-black border border-gray-300 dark:border-gray-600 rounded-md">
+              {userCompany ? <div className="p-4 bg-white dark:bg-black border border-gray-300 dark:border-gray-600 rounded-md py-0">
                   <div className="font-medium text-black dark:text-white">
                     {userCompany.name}
                   </div>
@@ -385,5 +372,4 @@ const OrderForm = ({
       </Form>
     </div>;
 };
-
 export default OrderForm;
