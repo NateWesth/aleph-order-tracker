@@ -281,45 +281,15 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
             )}
           />
 
-          {/* Company field - different display for admin vs client users */}
-          <FormField
-            control={form.control}
-            name="companyId"
-            rules={{ required: "Company is required" }}
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Company</FormLabel>
-                
-                {currentUserRole === 'user' ? (
-                  // Client users see their linked company (read-only)
-                  <div className="space-y-2">
-                    {userCompany ? (
-                      <div className="p-4 bg-green-50 border border-green-200 rounded-md">
-                        <div className="font-medium text-green-900">
-                          ✅ {userCompany.name} ({userCompany.code})
-                        </div>
-                        <div className="text-sm text-green-700">
-                          🔗 This order will be automatically linked to your company
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="text-sm text-red-600 bg-red-50 p-3 rounded">
-                        <div className="font-medium">No company association found.</div>
-                        <div className="text-xs mt-1">
-                          Your account is not linked to any company. Please contact an administrator to resolve this issue.
-                        </div>
-                      </div>
-                    )}
-                    <FormControl>
-                      <Input 
-                        type="hidden" 
-                        {...field} 
-                        value={userCompany?.id || ''}
-                      />
-                    </FormControl>
-                  </div>
-                ) : (
-                  // Admin users see dropdown to select company
+          {/* Company field - only show for admin users, auto-link for client users */}
+          {currentUserRole === 'admin' ? (
+            <FormField
+              control={form.control}
+              name="companyId"
+              rules={{ required: "Company is required" }}
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Company</FormLabel>
                   <Select 
                     value={field.value} 
                     onValueChange={field.onChange}
@@ -337,11 +307,47 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
                       ))}
                     </SelectContent>
                   </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          ) : (
+            // For client users, show their linked company info and hide the field
+            <div className="space-y-2">
+              <Label>Company</Label>
+              {userCompany ? (
+                <div className="p-4 bg-green-50 border border-green-200 rounded-md">
+                  <div className="font-medium text-green-900">
+                    ✅ {userCompany.name} ({userCompany.code})
+                  </div>
+                  <div className="text-sm text-green-700">
+                    🔗 This order will be automatically linked to your company
+                  </div>
+                </div>
+              ) : (
+                <div className="text-sm text-red-600 bg-red-50 p-3 rounded">
+                  <div className="font-medium">No company association found.</div>
+                  <div className="text-xs mt-1">
+                    Your account is not linked to any company. Please contact an administrator to resolve this issue.
+                  </div>
+                </div>
+              )}
+              {/* Hidden field to store the company ID */}
+              <FormField
+                control={form.control}
+                name="companyId"
+                render={({ field }) => (
+                  <FormControl>
+                    <Input 
+                      type="hidden" 
+                      {...field} 
+                      value={userCompany?.id || ''}
+                    />
+                  </FormControl>
                 )}
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+              />
+            </div>
+          )}
 
           <Card>
             <CardHeader>
