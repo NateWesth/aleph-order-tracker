@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 import {
   Dialog,
   DialogContent,
@@ -20,7 +21,8 @@ import { useCompanyData } from "./hooks/useCompanyData";
 import { generateCompanyCode, copyToClipboard } from "./utils/companyUtils";
 
 export default function ClientCompaniesPage() {
-  const { companies, setCompanies, loading, fetchCompanies, toast } = useCompanyData();
+  const { companies, loading, refetch } = useCompanyData();
+  const { toast } = useToast();
   const [isNewCompanyDialogOpen, setIsNewCompanyDialogOpen] = useState(false);
   const [isEditCompanyDialogOpen, setIsEditCompanyDialogOpen] = useState(false);
   const [editingCompany, setEditingCompany] = useState<any>(null);
@@ -61,7 +63,7 @@ export default function ClientCompaniesPage() {
 
       if (error) throw error;
 
-      await fetchCompanies();
+      await refetch();
       setIsNewCompanyDialogOpen(false);
       form.reset();
 
@@ -113,7 +115,7 @@ export default function ClientCompaniesPage() {
 
       if (error) throw error;
 
-      await fetchCompanies();
+      await refetch();
       setIsEditCompanyDialogOpen(false);
       setEditingCompany(null);
       form.reset();
@@ -143,7 +145,7 @@ export default function ClientCompaniesPage() {
 
       if (error) throw error;
 
-      await fetchCompanies();
+      await refetch();
       setDeleteDialogOpen(false);
       setCompanyToDelete(null);
 
@@ -206,7 +208,10 @@ export default function ClientCompaniesPage() {
       </div>
 
       <CompanyTable 
-        companies={filteredCompanies}
+        companies={filteredCompanies.map(company => ({
+          ...company,
+          created_at: company.created_at || new Date().toISOString()
+        }))}
         onCopyCode={(code) => copyToClipboard(code, toast)}
         onEditCompany={handleEditCompany}
         onDeleteCompany={(company) => {
