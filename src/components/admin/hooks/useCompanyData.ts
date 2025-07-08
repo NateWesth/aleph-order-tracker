@@ -37,7 +37,7 @@ export const useCompanyData = () => {
     setError(null);
 
     try {
-      // Get user role and profile to determine access level
+      // Get user role and profile for logging purposes
       const [userRole, userProfile] = await Promise.all([
         getUserRole(user.id),
         getUserProfile(user.id)
@@ -46,31 +46,12 @@ export const useCompanyData = () => {
       console.log("🔍 useCompanyData: User role:", userRole);
       console.log("🔍 useCompanyData: User profile:", userProfile);
 
-      let query = supabase.from('companies').select('*').order('name');
-
-      if (userRole === 'admin') {
-        console.log("👑 useCompanyData: Admin user - fetching all companies");
-        // Admin users can see all companies
-      } else {
-        console.log("👤 useCompanyData: Client user - filtering by company association");
-        
-        if (userProfile?.company_id) {
-          // Filter by company_id if available
-          console.log("🔍 useCompanyData: Filtering by company_id:", userProfile.company_id);
-          query = query.eq('id', userProfile.company_id);
-        } else if (userProfile?.company_code) {
-          // Filter by company_code if available
-          console.log("🔍 useCompanyData: Filtering by company_code:", userProfile.company_code);
-          query = query.eq('code', userProfile.company_code);
-        } else {
-          console.log("⚠️ useCompanyData: No company association found for client user");
-          setCompanies([]);
-          setLoading(false);
-          return;
-        }
-      }
-
-      const { data, error: fetchError } = await query;
+      // Fetch companies - RLS policies will handle the access control
+      // Admin users will see all companies, client users will only see their associated company
+      const { data, error: fetchError } = await supabase
+        .from('companies')
+        .select('*')
+        .order('name');
 
       if (fetchError) {
         console.error("❌ useCompanyData: Error fetching companies:", fetchError);
