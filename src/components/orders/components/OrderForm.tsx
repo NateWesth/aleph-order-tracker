@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { Button } from "@/components/ui/button";
@@ -106,6 +105,7 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
           if (userLinkedCompany) {
             console.log("✅ OrderForm: Found user's company:", userLinkedCompany.name);
             setUserCompany(userLinkedCompany);
+            // Automatically set the company ID in the form for client users
             form.setValue('companyId', userLinkedCompany.id, { shouldValidate: true, shouldDirty: true });
           } else {
             console.error("❌ OrderForm: No matching company found for client user");
@@ -281,7 +281,7 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
             )}
           />
 
-          {/* Company field - only show for admin users, auto-link for client users */}
+          {/* Company field - only show dropdown for admin users */}
           {currentUserRole === 'admin' ? (
             <FormField
               control={form.control}
@@ -312,7 +312,7 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
               )}
             />
           ) : (
-            // For client users, show their linked company info and hide the field
+            // For client users, show their linked company info (no dropdown)
             <div className="space-y-2">
               <Label>Company</Label>
               {userCompany ? (
@@ -332,19 +332,11 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
                   </div>
                 </div>
               )}
-              {/* Hidden field to store the company ID */}
-              <FormField
-                control={form.control}
-                name="companyId"
-                render={({ field }) => (
-                  <FormControl>
-                    <Input 
-                      type="hidden" 
-                      {...field} 
-                      value={userCompany?.id || ''}
-                    />
-                  </FormControl>
-                )}
+              {/* Hidden field to maintain form structure */}
+              <input 
+                type="hidden" 
+                {...form.register('companyId')} 
+                value={userCompany?.id || ''}
               />
             </div>
           )}
