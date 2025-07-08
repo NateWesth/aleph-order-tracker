@@ -1,11 +1,10 @@
 
-import { useState, useEffect } from "react";
-import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
-import { getUserRole } from "@/utils/authService";
+import { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { getUserRole } from '@/utils/authService';
 
-interface Company {
+export interface Company {
   id: string;
   name: string;
   code: string;
@@ -15,91 +14,70 @@ interface Company {
   address?: string;
   vat_number?: string;
   account_manager?: string;
-  created_at: string;
+  logo?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
-export function useCompanyData() {
-  const { toast } = useToast();
+export const useCompanyData = () => {
   const { user } = useAuth();
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
-  const [userRole, setUserRole] = useState<'admin' | 'user'>('user');
-
-  const fetchUserRole = async () => {
-    if (!user?.id) return;
-
-    try {
-      const role = await getUserRole(user.id);
-      setUserRole(role);
-    } catch (error) {
-      console.error("Error fetching user role:", error);
-    }
-  };
+  const [error, setError] = useState<string | null>(null);
 
   const fetchCompanies = async () => {
     if (!user?.id) {
-      console.log("No user ID available for fetching companies");
+      console.log("🔍 useCompanyData: No user ID available");
       setLoading(false);
       return;
     }
 
+    console.log("🔍 useCompanyData: Fetching companies for user:", user.id);
+    setLoading(true);
+    setError(null);
+
     try {
-      console.log("Fetching companies for user:", user.id);
-      
-      const { data, error } = await supabase
+      // Get user role to determine access level
+      const userRole = await getUserRole(user.id);
+      console.log("🔍 useCompanyData: User role:", userRole);
+
+      // Fetch all companies - both admin and client users need to see companies
+      // The RLS policies will handle the access control
+      const { data, error: fetchError } = await supabase
         .from('companies')
         .select('*')
-        .order('created_at', { ascending: false });
+        .order('name');
 
-      if (error) {
-        console.error("Companies fetch error:", error);
-        throw error;
+      if (fetchError) {
+        console.error("❌ useCompanyData: Error fetching companies:", fetchError);
+        throw fetchError;
       }
+
+      console.log("✅ useCompanyData: Companies fetched successfully:", data?.length || 0);
+      console.log("🏢 useCompanyData: Company details:", data?.map(c => ({ id: c.id, name: c.name, code: c.code })));
       
-      console.log("Companies fetched successfully:", data);
       setCompanies(data || []);
-    } catch (error: any) {
-      console.error("Failed to fetch companies:", error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch companies: " + error.message,
-        variant: "destructive",
-      });
+    } catch (err: any) {
+      console.error("❌ useCompanyData: Error in fetchCompanies:", err);
+      setError(err.message || 'Failed to fetch companies');
+      setCompanies([]);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (user?.id) {
-      fetchUserRole();
-    }
+    fetchCompanies();
   }, [user?.id]);
 
-  useEffect(() => {
-    if (user?.id && userRole === 'admin') {
-      fetchCompanies();
-    } else {
-      setLoading(false);
-    }
-  }, [user?.id, userRole]);
-
-  const getCompanyByCode = (code: string) => {
-    return companies.find(company => company.code === code);
-  };
-
-  const getCompanyById = (id: string) => {
-    return companies.find(company => company.id === id);
+  const refetch = () => {
+    fetchCompanies();
   };
 
   return {
     companies,
-    setCompanies,
     loading,
-    fetchCompanies,
-    getCompanyByCode,
-    getCompanyById,
-    userRole,
-    toast
+    error,
+    refetch
   };
-}
+};
