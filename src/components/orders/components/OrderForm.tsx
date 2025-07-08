@@ -12,6 +12,7 @@ import { useCompanyData } from "@/components/admin/hooks/useCompanyData";
 import { getUserProfile, getUserRole } from "@/utils/authService";
 import { useAuth } from "@/contexts/AuthContext";
 import { generateOrderNumber } from "../utils/orderUtils";
+
 export interface OrderItem {
   id: string;
   name: string;
@@ -19,6 +20,7 @@ export interface OrderItem {
   unit?: string;
   notes?: string;
 }
+
 interface OrderFormData {
   orderNumber: string;
   description: string;
@@ -26,6 +28,7 @@ interface OrderFormData {
   totalAmount: number;
   items: OrderItem[];
 }
+
 interface OrderFormProps {
   onSubmit: (orderData: {
     orderNumber: string;
@@ -36,6 +39,7 @@ interface OrderFormProps {
   }) => void;
   loading?: boolean;
 }
+
 const OrderForm = ({
   onSubmit,
   loading = false
@@ -52,6 +56,7 @@ const OrderForm = ({
   const [currentUserRole, setCurrentUserRole] = useState<string>('');
   const [isLoadingUserInfo, setIsLoadingUserInfo] = useState(false);
   const [userCompany, setUserCompany] = useState<any>(null);
+  
   const form = useForm<OrderFormData>({
     defaultValues: {
       orderNumber: "",
@@ -67,6 +72,7 @@ const OrderForm = ({
       }]
     }
   });
+  
   const {
     fields,
     append,
@@ -75,6 +81,7 @@ const OrderForm = ({
     control: form.control,
     name: "items"
   });
+
   useEffect(() => {
     const fetchUserInfo = async () => {
       if (!user?.id || companies.length === 0) {
@@ -140,6 +147,7 @@ const OrderForm = ({
       handleGenerateOrderNumber();
     }
   }, []);
+  
   const addItem = () => {
     append({
       id: crypto.randomUUID(),
@@ -149,11 +157,13 @@ const OrderForm = ({
       notes: ""
     });
   };
+  
   const removeItem = (index: number) => {
     if (fields.length > 1) {
       remove(index);
     }
   };
+
   const handleSubmit = (data: OrderFormData) => {
     console.log("📝 OrderForm: Starting handleSubmit with data:", data);
     console.log("📝 OrderForm: Current user role:", currentUserRole);
@@ -211,11 +221,13 @@ const OrderForm = ({
     console.log("🚀 OrderForm: Submitting order with final data:", finalOrderData);
     onSubmit(finalOrderData);
   };
+
   if (companiesLoading || isLoadingUserInfo) {
     return <div className="flex items-center justify-center py-8">
         <div className="text-sm text-gray-600">Loading...</div>
       </div>;
   }
+
   return <div className="space-y-6">
       <Form {...form}>
         <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
@@ -249,7 +261,6 @@ const OrderForm = ({
                 <FormMessage />
               </FormItem>} />
 
-          {/* Company field - only show dropdown for admin users */}
           {currentUserRole === 'admin' ? <FormField control={form.control} name="companyId" rules={{
           required: "Company is required"
         }} render={({
@@ -270,12 +281,11 @@ const OrderForm = ({
                   </Select>
                   <FormMessage />
                 </FormItem>} /> :
-        // For client users, show their linked company info (no dropdown)
         <div className="space-y-2">
               <Label>Company</Label>
-              {userCompany ? <div className="p-4 bg-white dark:bg-black border border-gray-300 dark:border-gray-600 rounded-md py-px px-px">
+              {userCompany ? <div className="p-4 bg-white dark:bg-black border border-gray-300 dark:border-gray-600 rounded-md">
                   <div className="font-medium text-black dark:text-white">
-                    {userCompany.name} ({userCompany.code})
+                    {userCompany.name}
                   </div>
                 </div> : <div className="text-sm text-red-600 bg-red-50 p-3 rounded">
                   <div className="font-medium">No company association found.</div>
@@ -283,7 +293,6 @@ const OrderForm = ({
                     Your account is not linked to any company. Please contact an administrator to resolve this issue.
                   </div>
                 </div>}
-              {/* Hidden field to maintain form structure */}
               <input type="hidden" {...form.register('companyId')} value={userCompany?.id || ''} />
             </div>}
 
@@ -376,4 +385,5 @@ const OrderForm = ({
       </Form>
     </div>;
 };
+
 export default OrderForm;
