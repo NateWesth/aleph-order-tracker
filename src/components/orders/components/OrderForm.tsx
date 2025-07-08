@@ -12,7 +12,6 @@ import { useCompanyData } from "@/components/admin/hooks/useCompanyData";
 import { getUserProfile, getUserRole } from "@/utils/authService";
 import { useAuth } from "@/contexts/AuthContext";
 import { generateOrderNumber } from "../utils/orderUtils";
-
 export interface OrderItem {
   id: string;
   name: string;
@@ -20,7 +19,6 @@ export interface OrderItem {
   unit?: string;
   notes?: string;
 }
-
 interface OrderFormData {
   orderNumber: string;
   description: string;
@@ -28,7 +26,6 @@ interface OrderFormData {
   totalAmount: number;
   items: OrderItem[];
 }
-
 interface OrderFormProps {
   onSubmit: (orderData: {
     orderNumber: string;
@@ -39,7 +36,6 @@ interface OrderFormProps {
   }) => void;
   loading?: boolean;
 }
-
 const OrderForm = ({
   onSubmit,
   loading = false
@@ -79,7 +75,6 @@ const OrderForm = ({
     control: form.control,
     name: "items"
   });
-
   useEffect(() => {
     const fetchUserInfo = async () => {
       if (!user?.id || companies.length === 0) {
@@ -278,7 +273,7 @@ const OrderForm = ({
         // For client users, show their linked company info (no dropdown)
         <div className="space-y-2">
               <Label>Company</Label>
-              {userCompany ? <div className="p-4 bg-white dark:bg-black border border-gray-300 dark:border-gray-600 rounded-md">
+              {userCompany ? <div className="p-4 bg-white dark:bg-black border border-gray-300 dark:border-gray-600 rounded-md py-px px-px">
                   <div className="font-medium text-black dark:text-white">
                     {userCompany.name} ({userCompany.code})
                   </div>
@@ -381,5 +376,4 @@ const OrderForm = ({
       </Form>
     </div>;
 };
-
 export default OrderForm;
