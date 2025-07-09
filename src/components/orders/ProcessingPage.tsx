@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -431,6 +430,7 @@ export default function ProcessingPage({
                           status: order.status,
                           total_amount: null,
                           created_at: order.orderDate.toISOString(),
+                          updated_at: order.orderDate.toISOString(),
                           company_id: null,
                           companyName: order.companyName,
                           items: order.items

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -408,12 +407,14 @@ export default function CompletedPage({
                                 status: order.status,
                                 total_amount: null,
                                 created_at: order.orderDate.toISOString(),
+                                updated_at: order.orderDate.toISOString(),
                                 company_id: null,
                                 companyName: order.companyName,
                                 items: order.items.map(item => ({
                                   id: item.id,
                                   name: item.name,
-                                  quantity: item.quantity
+                                  quantity: item.quantity,
+                                  notes: undefined
                                 }))
                               }}
                             />

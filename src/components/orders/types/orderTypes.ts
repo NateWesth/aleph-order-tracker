@@ -6,12 +6,12 @@ export interface OrderWithCompany {
   status: string | null;
   total_amount?: number | null;
   created_at: string;
-  updated_at: string;
+  updated_at?: string;
   completed_date?: string;
   company_id?: string | null;
   user_id?: string;
   progress_stage?: string;
   urgency?: string;
-  items?: Array<{id: string, name: string, quantity: number}>;
+  items?: Array<{id: string, name: string, quantity: number, notes?: string}>;
   companyName: string;
 }
