@@ -1,58 +1,54 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { Badge } from "@/components/ui/badge";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Input } from "@/components/ui/input";
-import { format } from "date-fns";
-import { Trash2, Eye, Search, Download } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { format, startOfMonth, endOfMonth, isSameMonth } from "date-fns";
+import { Eye, ChevronDown, ChevronRight, FileText, Search, Trash2, Download } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useGlobalRealtimeOrders } from "./hooks/useGlobalRealtimeOrders";
 import ProcessingOrderFilesDialog from "./components/ProcessingOrderFilesDialog";
+import OrderDetailsDialog from "./components/OrderDetailsDialog";
 import OrderExportActions from "./components/OrderExportActions";
-import { sendOrderNotification } from "@/utils/emailNotifications";
+
 interface OrderItem {
   id: string;
   name: string;
   quantity: number;
-  delivered_quantity?: number;
-  unit?: string;
-  notes?: string;
-}
-interface Company {
-  id: string;
-  name: string;
-  code: string;
-  contactPerson: string;
-  email: string;
-  phone: string;
-  address: string;
-  vatNumber: string;
-  logo?: string;
+  delivered: number;
+  completed: boolean;
 }
 interface Order {
   id: string;
   orderNumber: string;
   companyName: string;
-  company?: Company;
   orderDate: Date;
   dueDate: Date;
-  items: OrderItem[];
-  status: 'pending' | 'received' | 'in-progress' | 'processing' | 'completed';
-  progress?: number;
-  progressStage?: 'awaiting-stock' | 'packing' | 'out-for-delivery' | 'completed';
-  reference?: string;
-  attention?: string;
-  progress_stage?: string;
   completedDate?: Date;
-  deliveryData?: {
-    [itemName: string]: number;
-  };
+  items: OrderItem[];
+  status: 'completed';
 }
 interface CompletedPageProps {
   isAdmin: boolean;
+}
+interface MonthGroup {
+  month: string;
+  orders: Order[];
+  isOpen: boolean;
 }
 export default function CompletedPage({
   isAdmin
@@ -64,13 +60,15 @@ export default function CompletedPage({
     user
   } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
-  const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedOrder, setSelectedOrder] = useState<any>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [monthGroups, setMonthGroups] = useState<MonthGroup[]>([]);
+  const [showFilesDialog, setShowFilesDialog] = useState(false);
+  const [filesDialogOrder, setFilesDialogOrder] = useState<Order | null>(null);
+  const [showOrderDetails, setShowOrderDetails] = useState(false);
+  const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
 
-  // Parse order items from description
+  // Parse order items from description - same logic as other components
   const parseOrderItems = (description: string | null): OrderItem[] => {
     if (!description) {
       return [];
@@ -82,48 +80,62 @@ export default function CompletedPage({
           id: `item-${index}`,
           name: match[1].trim(),
           quantity: parseInt(match[2]),
-          delivered_quantity: 0,
-          unit: '',
-          notes: ''
+          delivered: parseInt(match[2]),
+          // Completed orders are fully delivered
+          completed: true
         };
       }
       return {
         id: `item-${index}`,
         name: line.trim(),
         quantity: 1,
-        delivered_quantity: 0,
-        unit: '',
-        notes: ''
+        delivered: 1,
+        completed: true
       };
     }).filter(item => item.name);
     return items;
   };
 
-  // Helper function to safely format dates
-  const formatSafeDate = (date: Date | string | number): string => {
+  // Fetch company details for orders
+  const fetchCompanyDetails = async (companyId: string) => {
     try {
-      const dateObj = new Date(date);
-      if (isNaN(dateObj.getTime())) {
-        return 'Invalid Date';
-      }
-      return format(dateObj, 'MMM d, yyyy');
+      const { data } = await supabase
+        .from('companies')
+        .select('name, address, phone, email, contact_person')
+        .eq('id', companyId)
+        .single();
+      
+      return data ? {
+        name: data.name,
+        address: data.address || '',
+        phone: data.phone || '',
+        email: data.email || '',
+        contactPerson: data.contact_person || ''
+      } : null;
     } catch (error) {
-      console.error('Error formatting date:', error);
-      return 'Invalid Date';
+      console.error('Error fetching company details:', error);
+      return null;
     }
   };
 
-  // Fetch orders with completed status from database
+  // Toggle order expansion
+  const toggleOrderExpansion = (orderId: string) => {
+    setExpandedOrders(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(orderId)) {
+        newSet.delete(orderId);
+      } else {
+        newSet.add(orderId);
+      }
+      return newSet;
+    });
+  };
+
+  // Fetch completed orders from database with company information
   const fetchCompletedOrders = async () => {
-    if (!user?.id) {
-      setError('User not authenticated');
-      setLoading(false);
-      return;
-    }
+    if (!user?.id) return;
     try {
       console.log('Fetching completed orders from Supabase...');
-      setLoading(true);
-      setError(null);
       let query = supabase.from('orders').select(`
           *,
           companies (
@@ -134,59 +146,73 @@ export default function CompletedPage({
         ascending: false
       });
       if (!isAdmin) {
-        const {
-          data: profile
-        } = await supabase.from('profiles').select('company_id').eq('id', user.id).single();
-        if (profile?.company_id) {
-          query = query.eq('company_id', profile.company_id);
-        } else {
-          query = query.eq('user_id', user.id);
-        }
+        query = query.eq('user_id', user.id);
       }
       const {
         data,
-        error: fetchError
+        error
       } = await query;
-      if (fetchError) {
-        console.error("Error fetching completed orders:", fetchError);
-        setError(`Failed to fetch orders: ${fetchError.message}`);
+      if (error) {
+        console.error("Error fetching completed orders:", error);
         return;
       }
-      console.log('Fetched completed orders from database:', data?.length || 0);
-      if (data && data.length > 0) {
-        const convertedOrders = data.map((dbOrder: any) => {
-          const orderDate = new Date(dbOrder.created_at);
-          const completedDate = dbOrder.completed_date ? new Date(dbOrder.completed_date) : new Date();
-          return {
-            id: dbOrder.id,
-            orderNumber: dbOrder.order_number,
-            companyName: dbOrder.companies?.name || "Unknown Company",
-            orderDate: orderDate,
-            dueDate: completedDate,
-            completedDate: completedDate,
-            status: dbOrder.status,
-            items: parseOrderItems(dbOrder.description)
-          };
-        });
-        console.log('Converted completed orders:', convertedOrders.length);
-        setOrders(convertedOrders);
-        setFilteredOrders(convertedOrders);
-      } else {
-        setOrders([]);
-        setFilteredOrders([]);
-      }
+      console.log('Fetched completed orders:', data?.length || 0);
+      const transformedOrders = (data || []).map(order => ({
+        id: order.id,
+        orderNumber: order.order_number,
+        companyName: order.companies?.name || "Unknown Company",
+        orderDate: new Date(order.created_at),
+        dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        completedDate: order.completed_date ? new Date(order.completed_date) : new Date(),
+        status: 'completed' as const,
+        items: parseOrderItems(order.description)
+      }));
+      setOrders(transformedOrders);
     } catch (error) {
       console.error("Failed to fetch completed orders:", error);
-      setError(`Failed to fetch orders: ${error}`);
-    } finally {
-      setLoading(false);
+    }
+  };
+
+  // Add delete order functionality
+  const handleDeleteOrder = async (orderId: string, orderNumber: string) => {
+    if (!isAdmin) {
+      toast({
+        title: "Access Denied",
+        description: "Only administrators can delete orders.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('orders')
+        .delete()
+        .eq('id', orderId);
+
+      if (error) throw error;
+
+      // Remove from local state
+      setOrders(prev => prev.filter(order => order.id !== orderId));
+
+      toast({
+        title: "Order Deleted",
+        description: `Order ${orderNumber} has been successfully deleted.`,
+      });
+    } catch (error: any) {
+      console.error("Error deleting order:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete order: " + error.message,
+        variant: "destructive",
+      });
     }
   };
 
   // Set up real-time subscriptions
   useGlobalRealtimeOrders({
     onOrdersChange: () => {
-      console.log('Real-time update detected for completed page, refreshing...');
+      console.log('Real-time update detected, refreshing completed orders...');
       fetchCompletedOrders();
     },
     isAdmin,
@@ -195,180 +221,218 @@ export default function CompletedPage({
 
   // Load orders from database on component mount
   useEffect(() => {
-    console.log('Completed page mounted, fetching orders...');
+    console.log('Loading completed orders...');
     fetchCompletedOrders();
   }, [isAdmin, user?.id]);
 
-  // Filter orders based on search term
+  // Group orders by completion month
   useEffect(() => {
-    if (!searchTerm.trim()) {
-      setFilteredOrders(orders);
-    } else {
-      const filtered = orders.filter(order => order.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) || order.companyName.toLowerCase().includes(searchTerm.toLowerCase()) || order.items.some(item => item.name.toLowerCase().includes(searchTerm.toLowerCase())));
-      setFilteredOrders(filtered);
-    }
-  }, [searchTerm, orders]);
+    const filteredOrders = orders.filter(order => order.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) || order.companyName.toLowerCase().includes(searchTerm.toLowerCase()));
+    const monthMap = new Map<string, Order[]>();
+    filteredOrders.forEach(order => {
+      const completionDate = order.completedDate || order.orderDate;
+      const monthKey = format(completionDate, 'MMMM yyyy');
+      if (!monthMap.has(monthKey)) {
+        monthMap.set(monthKey, []);
+      }
+      monthMap.get(monthKey)!.push(order);
+    });
+    const groups: MonthGroup[] = Array.from(monthMap.entries()).map(([month, orders]) => ({
+      month,
+      orders: orders.sort((a, b) => (b.completedDate || b.orderDate).getTime() - (a.completedDate || a.orderDate).getTime()),
+      isOpen: true
+    })).sort((a, b) => {
+      const dateA = new Date(a.month);
+      const dateB = new Date(b.month);
+      return dateB.getTime() - dateA.getTime();
+    });
+    setMonthGroups(groups);
+  }, [orders, searchTerm]);
 
-  // View order details
-  const viewOrderDetails = (order: Order) => {
-    setSelectedOrder(order);
+  // Toggle month group
+  const toggleMonthGroup = (monthIndex: number) => {
+    setMonthGroups(prev => prev.map((group, index) => index === monthIndex ? {
+      ...group,
+      isOpen: !group.isOpen
+    } : group));
   };
 
-  // Close order details
+  // View order details - now properly parses items like other pages
+  const viewOrderDetails = (order: Order) => {
+    const fetchOrderForDetails = async () => {
+      try {
+        const {
+          data
+        } = await supabase.from('orders').select(`
+            *,
+            companies (
+              name,
+              code
+            )
+          `).eq('id', order.id).single();
+        if (data) {
+          const parsedItems = parseOrderItems(data.description);
+          setSelectedOrder({
+            ...data,
+            companyName: data.companies?.name || "Unknown Company",
+            items: parsedItems
+          });
+          setShowOrderDetails(true);
+        }
+      } catch (error) {
+        console.error('Error fetching order details:', error);
+      }
+    };
+    fetchOrderForDetails();
+  };
   const closeOrderDetails = () => {
+    setShowOrderDetails(false);
     setSelectedOrder(null);
   };
-
-  // Delete order function for admins
-  const deleteOrder = async (orderId: string, orderNumber: string) => {
-    if (!isAdmin) return;
-    const orderToDelete = orders.find(order => order.id === orderId);
-    try {
-      console.log('Deleting completed order:', orderId);
-      const {
-        error
-      } = await supabase.from('orders').delete().eq('id', orderId);
-      if (error) throw error;
-      const remainingOrders = orders.filter(order => order.id !== orderId);
-      setOrders(remainingOrders);
-
-      // Send email notification
-      try {
-        await sendOrderNotification({
-          orderId,
-          orderNumber,
-          companyName: orderToDelete?.companyName || 'Unknown Company',
-          changeType: 'deleted'
-        });
-      } catch (emailError) {
-        console.error('Failed to send email notification:', emailError);
-      }
-      toast({
-        title: "Order Deleted",
-        description: `Completed order ${orderNumber} has been permanently deleted.`
-      });
-      if (selectedOrder && selectedOrder.id === orderId) {
-        setSelectedOrder(null);
-      }
-      console.log('Completed order successfully deleted');
-      fetchCompletedOrders();
-    } catch (error: any) {
-      console.error('Error deleting completed order:', error);
-      toast({
-        title: "Error",
-        description: "Failed to delete order. Please try again.",
-        variant: "destructive"
-      });
-    }
+  const openFilesDialog = (order: Order) => {
+    setFilesDialogOrder(order);
+    setShowFilesDialog(true);
   };
-  if (loading) {
-    return <div className="container mx-auto p-4 bg-background">
-        <div className="flex justify-center items-center h-64">
-          <div className="text-lg text-foreground">Loading completed orders...</div>
-        </div>
-      </div>;
-  }
-  if (error) {
-    return <div className="container mx-auto p-4 bg-background">
-        <div className="flex flex-col items-center justify-center h-64">
-          <div className="text-lg text-red-600 mb-4">Error: {error}</div>
-          <Button onClick={fetchCompletedOrders}>Retry</Button>
-        </div>
-      </div>;
-  }
-  if (!user) {
-    return <div className="container mx-auto p-4 bg-background">
-        <div className="flex flex-col items-center justify-center h-64">
-          <div className="text-lg mb-4 text-foreground">Please log in to view orders</div>
-        </div>
-      </div>;
-  }
-  return <div className="container mx-auto p-4 bg-[#2e2e53]/0">
+  const closeFilesDialog = () => {
+    setShowFilesDialog(false);
+    setFilesDialogOrder(null);
+  };
+  return <div className="container mx-auto p-4">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-foreground">Completed Orders</h1>
-      </div>
-
-      <div className="bg-card border border-border rounded-lg shadow">
-        <div className="p-4 border-b border-border">
-          <div className="flex justify-between items-center">
-            <h2 className="text-lg font-semibold text-card-foreground">Order History</h2>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-              <Input placeholder="Search orders..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="pl-10 w-64 bg-background border-border text-foreground placeholder:text-muted-foreground focus:ring-primary" />
-            </div>
-          </div>
+        <h1 className="text-2xl font-bold">Completed Orders</h1>
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <input type="text" placeholder="Search orders..." className="pl-10 pr-4 py-2 border rounded-md" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
         </div>
-        
-        {filteredOrders.length === 0 ? <div className="p-4 text-center text-muted-foreground">
-            {searchTerm ? `No orders found matching "${searchTerm}".` : "No completed orders found. Orders completed from the Processing page will appear here."}
-          </div> : <Table>
-            <TableHeader>
-              <TableRow className="border-b border-border">
-                <TableHead className="text-foreground">Order #</TableHead>
-                <TableHead className="text-foreground">Company</TableHead>
-                <TableHead className="text-foreground">Date Completed</TableHead>
-                <TableHead className="text-foreground">Status</TableHead>
-                <TableHead className="text-foreground">Items</TableHead>
-                <TableHead className="text-foreground">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredOrders.map(order => <TableRow key={order.id} className="border-b border-border hover:bg-muted/50">
-                  <TableCell className="font-medium text-foreground">
-                    #{order.orderNumber}
-                  </TableCell>
-                  <TableCell className="text-foreground">{order.companyName}</TableCell>
-                  <TableCell className="text-foreground">{formatSafeDate(order.completedDate || order.dueDate)}</TableCell>
-                  <TableCell>
-                    <Badge variant="default" className="bg-green-600 text-white">Completed</Badge>
-                  </TableCell>
-                  <TableCell className="text-foreground">{order.items.length} items</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <OrderExportActions order={{
-                  id: order.id,
-                  order_number: order.orderNumber,
-                  description: order.items.map(item => `${item.name} (Qty: ${item.quantity})`).join('\n'),
-                  status: order.status,
-                  total_amount: null,
-                  created_at: order.orderDate.toISOString(),
-                  company_id: null,
-                  companyName: order.companyName,
-                  items: order.items
-                }} />
-                      
-                      <Button variant="ghost" size="sm" onClick={() => viewOrderDetails(order)}>
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      
-                      {isAdmin && <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-100 dark:hover:bg-red-900/20">
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent className="bg-card border-border">
-                            <AlertDialogHeader>
-                              <AlertDialogTitle className="text-card-foreground">Delete Completed Order</AlertDialogTitle>
-                              <AlertDialogDescription className="text-muted-foreground">
-                                Are you sure you want to delete completed order {order.orderNumber}? This action cannot be undone.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel className="border-border text-foreground hover:bg-muted">Cancel</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => deleteOrder(order.id, order.orderNumber)} className="bg-red-600 hover:bg-red-700">
-                                Delete
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>}
-                    </div>
-                  </TableCell>
-                </TableRow>)}
-            </TableBody>
-          </Table>}
       </div>
 
-      <ProcessingOrderFilesDialog order={selectedOrder} isOpen={!!selectedOrder} onClose={closeOrderDetails} isAdmin={isAdmin} />
+      <div className="space-y-4">
+        {monthGroups.length === 0 && <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
+            No completed orders found.
+          </div>}
+
+        {monthGroups.map((monthGroup, monthIndex) => <div key={monthGroup.month} className="bg-white rounded-lg shadow">
+            <Collapsible open={monthGroup.isOpen} onOpenChange={() => toggleMonthGroup(monthIndex)}>
+              <CollapsibleTrigger asChild>
+                <div className="p-4 border-b cursor-pointer hover:bg-gray-50 flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    {monthGroup.isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                    <h2 className="text-lg font-semibold">{monthGroup.month}</h2>
+                    <Badge variant="outline">{monthGroup.orders.length} orders</Badge>
+                  </div>
+                </div>
+              </CollapsibleTrigger>
+              
+              <CollapsibleContent>
+                <div className="divide-y">
+                  {monthGroup.orders.map(order => {
+                const isExpanded = expandedOrders.has(order.id);
+                return <div key={order.id} className="p-4">
+                        <div className="flex justify-between items-center">
+                          <div className="flex items-center gap-4">
+                            <div>
+                              <h3 className="font-medium">Order #{order.orderNumber}</h3>
+                              <p className="text-sm text-gray-600">{order.companyName}</p>
+                              <p className="text-sm text-gray-600">
+                                Completed: {format(order.completedDate || order.orderDate, 'MMM d, yyyy')}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Button variant="ghost" size="sm" onClick={() => toggleOrderExpansion(order.id)}>
+                              {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                              Items ({order.items.length})
+                            </Button>
+                            
+                            <Badge variant="outline" className="bg-green-100 text-green-800">
+                              Completed
+                            </Badge>
+                            
+                            <OrderExportActions 
+                              order={{
+                                id: order.id,
+                                order_number: order.orderNumber,
+                                description: order.items.map(item => `${item.name} (Qty: ${item.quantity})`).join('\n'),
+                                status: order.status,
+                                total_amount: null,
+                                created_at: order.orderDate.toISOString(),
+                                company_id: null,
+                                companyName: order.companyName,
+                                items: order.items
+                              }}
+                            />
+                            
+                            <Button variant="outline" size="sm" onClick={() => openFilesDialog(order)}>
+                              <FileText className="h-4 w-4 mr-2" />
+                              Files
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={() => viewOrderDetails(order)}>
+                              <Eye className="h-4 w-4 mr-2" />
+                              View Details
+                            </Button>
+                            {isAdmin && (
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700">
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Delete Completed Order</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Are you sure you want to delete completed order #{order.orderNumber}? This action cannot be undone and will permanently remove the order from all systems.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction 
+                                      onClick={() => handleDeleteOrder(order.id, order.orderNumber)}
+                                      className="bg-red-600 hover:bg-red-700"
+                                    >
+                                      Delete
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            )}
+                          </div>
+                        </div>
+
+                        {isExpanded && <div className="mt-4 border-t pt-4">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead>Item</TableHead>
+                                  <TableHead>Quantity Ordered</TableHead>
+                                  <TableHead>Quantity Delivered</TableHead>
+                                  <TableHead>Status</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {order.items.map(item => <TableRow key={item.id}>
+                                    <TableCell className="font-medium">{item.name}</TableCell>
+                                    <TableCell>{item.quantity}</TableCell>
+                                    <TableCell>{item.delivered}</TableCell>
+                                    <TableCell>
+                                      <Badge variant="outline" className="bg-green-100 text-green-800">
+                                        Complete
+                                      </Badge>
+                                    </TableCell>
+                                  </TableRow>)}
+                              </TableBody>
+                            </Table>
+                          </div>}
+                      </div>;
+              })}
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+          </div>)}
+      </div>
+
+      {selectedOrder && <OrderDetailsDialog open={showOrderDetails} onOpenChange={closeOrderDetails} orderNumber={selectedOrder.order_number} companyName={selectedOrder.companyName} status={selectedOrder.status} createdAt={selectedOrder.created_at} items={selectedOrder.items} />}
+
+      <ProcessingOrderFilesDialog order={filesDialogOrder} isOpen={showFilesDialog} onClose={closeFilesDialog} isAdmin={isAdmin} />
     </div>;
 }

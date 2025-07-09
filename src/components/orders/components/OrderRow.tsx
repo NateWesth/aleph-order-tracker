@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -97,11 +96,11 @@ export default function OrderRow({ order, isAdmin, onReceiveOrder, onDeleteOrder
 
   return (
     <>
-      <TableRow className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800">
-        <TableCell className="font-medium text-gray-900 dark:text-gray-100">
+      <TableRow>
+        <TableCell className="font-medium">
           {order.order_number}
         </TableCell>
-        <TableCell className="text-gray-900 dark:text-gray-100">
+        <TableCell>
           {order.companyName || 'No Company'}
         </TableCell>
         <TableCell>
@@ -109,7 +108,7 @@ export default function OrderRow({ order, isAdmin, onReceiveOrder, onDeleteOrder
             {order.status || 'pending'}
           </Badge>
         </TableCell>
-        <TableCell className="text-gray-900 dark:text-gray-100">
+        <TableCell>
           {new Date(order.created_at).toLocaleDateString()}
         </TableCell>
         <TableCell>
@@ -132,7 +131,6 @@ export default function OrderRow({ order, isAdmin, onReceiveOrder, onDeleteOrder
               variant="outline" 
               size="sm"
               onClick={handleViewDetails}
-              className="border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
             >
               <Eye className="h-4 w-4 mr-1" />
               View Details
@@ -142,7 +140,7 @@ export default function OrderRow({ order, isAdmin, onReceiveOrder, onDeleteOrder
                 variant="outline" 
                 size="sm"
                 onClick={() => onReceiveOrder(order)}
-                className="text-green-600 hover:text-green-700 border-green-300 dark:border-green-600 hover:bg-green-50 dark:hover:bg-green-900"
+                className="text-green-600 hover:text-green-700"
               >
                 <CheckCircle className="h-4 w-4 mr-1" />
                 Receive
@@ -151,26 +149,22 @@ export default function OrderRow({ order, isAdmin, onReceiveOrder, onDeleteOrder
             {isAdmin && (
               <AlertDialog>
                 <AlertDialogTrigger asChild>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="text-red-600 hover:text-red-700 border-red-300 dark:border-red-600 hover:bg-red-50 dark:hover:bg-red-900"
-                  >
+                  <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700">
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </AlertDialogTrigger>
-                <AlertDialogContent className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700">
+                <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle className="text-gray-900 dark:text-gray-100">Delete Order</AlertDialogTitle>
-                    <AlertDialogDescription className="text-gray-600 dark:text-gray-400">
+                    <AlertDialogTitle>Delete Order</AlertDialogTitle>
+                    <AlertDialogDescription>
                       Are you sure you want to delete order {order.order_number}? This action cannot be undone and will remove the order from all systems.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
-                    <AlertDialogCancel className="bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600">Cancel</AlertDialogCancel>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
                     <AlertDialogAction 
                       onClick={() => onDeleteOrder(order.id, order.order_number)}
-                      className="bg-red-600 hover:bg-red-700 text-white"
+                      className="bg-red-600 hover:bg-red-700"
                     >
                       Delete
                     </AlertDialogAction>

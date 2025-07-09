@@ -8,7 +8,9 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog";
+import { Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -16,18 +18,21 @@ import OrderForm from "./OrderForm";
 import { getUserRole } from "@/utils/authService";
 
 interface CreateOrderDialogProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onOrderCreated: () => void;
   isAdmin?: boolean;
+  companies: any[];
+  profiles: any[];
+  userProfile: any;
+  onOrderCreated: () => void;
 }
 
 export default function CreateOrderDialog({
-  isOpen,
-  onClose,
-  onOrderCreated,
-  isAdmin = false
+  isAdmin = false,
+  companies,
+  profiles,
+  userProfile,
+  onOrderCreated
 }: CreateOrderDialogProps) {
+  const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
@@ -134,7 +139,7 @@ export default function CreateOrderDialog({
         description: `Order ${orderData.orderNumber} has been created and linked to the company.`,
       });
 
-      onClose();
+      setOpen(false);
       onOrderCreated();
       
     } catch (error: any) {
@@ -150,7 +155,13 @@ export default function CreateOrderDialog({
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button>
+          <Plus className="w-4 h-4 mr-2" />
+          Create Order
+        </Button>
+      </DialogTrigger>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Create New Order</DialogTitle>

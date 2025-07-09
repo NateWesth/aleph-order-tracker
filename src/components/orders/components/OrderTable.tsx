@@ -1,4 +1,3 @@
-
 import {
   Table,
   TableBody,
@@ -19,21 +18,21 @@ interface OrderTableProps {
 
 export default function OrderTable({ orders, isAdmin, onReceiveOrder, onDeleteOrder }: OrderTableProps) {
   return (
-    <div className="bg-card border border-border rounded-lg shadow">
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
       <Table>
         <TableHeader>
-          <TableRow className="border-b border-border">
-            <TableHead className="text-card-foreground">Order Number</TableHead>
-            <TableHead className="text-card-foreground">Company</TableHead>
-            <TableHead className="text-card-foreground">Status</TableHead>
-            <TableHead className="text-card-foreground">Created</TableHead>
-            <TableHead className="text-card-foreground">Actions</TableHead>
+          <TableRow>
+            <TableHead>Order Number</TableHead>
+            <TableHead>Company</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>Created</TableHead>
+            <TableHead>Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {orders.length === 0 ? (
-            <TableRow className="border-b border-border">
-              <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+            <TableRow>
+              <TableCell colSpan={5} className="text-center py-8">
                 No orders found.
               </TableCell>
             </TableRow>

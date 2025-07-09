@@ -320,15 +320,15 @@ export default function ProcessingPage({
   };
 
   if (loading) {
-    return <div className="container mx-auto p-4 bg-white dark:bg-gray-800">
+    return <div className="container mx-auto p-4">
         <div className="flex justify-center items-center h-64">
-          <div className="text-lg text-foreground">Loading processing orders...</div>
+          <div className="text-lg">Loading processing orders...</div>
         </div>
       </div>;
   }
 
   if (error) {
-    return <div className="container mx-auto p-4 bg-white dark:bg-gray-800">
+    return <div className="container mx-auto p-4">
         <div className="flex flex-col items-center justify-center h-64">
           <div className="text-lg text-red-600 mb-4">Error: {error}</div>
           <Button onClick={fetchProcessingOrders}>Retry</Button>
@@ -337,47 +337,47 @@ export default function ProcessingPage({
   }
 
   if (!user) {
-    return <div className="container mx-auto p-4 bg-white dark:bg-gray-800">
+    return <div className="container mx-auto p-4">
         <div className="flex flex-col items-center justify-center h-64">
-          <div className="text-lg mb-4 text-foreground">Please log in to view orders</div>
+          <div className="text-lg mb-4">Please log in to view orders</div>
         </div>
       </div>;
   }
 
-  return <div className="container mx-auto p-4 bg-white dark:bg-gray-800">
+  return <div className="container mx-auto p-4">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-foreground">Processing Orders</h1>
+        <h1 className="text-2xl font-bold">Processing Orders</h1>
       </div>
 
-      <div className="bg-card border rounded-lg shadow">
-        <div className="p-4 border-b border-border">
-          <h2 className="text-lg font-semibold text-card-foreground">Supporting Documents</h2>
+      <div className="bg-white rounded-lg shadow">
+        <div className="p-4 border-b">
+          <h2 className="text-lg font-semibold">Supporting Documents</h2>
         </div>
         
-        {orders.length === 0 ? <div className="p-4 text-center text-muted-foreground">
+        {orders.length === 0 ? <div className="p-4 text-center text-gray-500">
             No orders in processing. Orders completed from the Progress page will appear here.
           </div> : <Table>
             <TableHeader>
-              <TableRow className="border-b border-border">
-                <TableHead className="text-foreground">Order #</TableHead>
-                <TableHead className="text-foreground">Company</TableHead>
-                <TableHead className="text-foreground">Date Created</TableHead>
-                <TableHead className="text-foreground">Status</TableHead>
-                <TableHead className="text-foreground">Items</TableHead>
-                <TableHead className="text-foreground">Actions</TableHead>
+              <TableRow>
+                <TableHead>Order #</TableHead>
+                <TableHead>Company</TableHead>
+                <TableHead>Date Created</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Items</TableHead>
+                <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {orders.map(order => <TableRow key={order.id} className="border-b border-border hover:bg-muted/50">
-                  <TableCell className="font-medium text-foreground">
+              {orders.map(order => <TableRow key={order.id}>
+                  <TableCell className="font-medium">
                     #{order.orderNumber}
                   </TableCell>
-                  <TableCell className="text-foreground">{order.companyName}</TableCell>
-                  <TableCell className="text-foreground">{formatSafeDate(order.orderDate)}</TableCell>
+                  <TableCell>{order.companyName}</TableCell>
+                  <TableCell>{formatSafeDate(order.orderDate)}</TableCell>
                   <TableCell>
                     <Badge variant="default">Processing</Badge>
                   </TableCell>
-                  <TableCell className="text-foreground">{order.items.length} items</TableCell>
+                  <TableCell>{order.items.length} items</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <OrderExportActions 
@@ -406,15 +406,15 @@ export default function ProcessingPage({
                                 Complete
                               </Button>
                             </AlertDialogTrigger>
-                            <AlertDialogContent className="bg-card border-border">
+                            <AlertDialogContent>
                               <AlertDialogHeader>
-                                <AlertDialogTitle className="text-card-foreground">Complete Order</AlertDialogTitle>
-                                <AlertDialogDescription className="text-muted-foreground">
+                                <AlertDialogTitle>Complete Order</AlertDialogTitle>
+                                <AlertDialogDescription>
                                   Are you sure you want to mark order {order.orderNumber} as completed? This will move it to the Completed page.
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
-                                <AlertDialogCancel className="border-border text-foreground hover:bg-muted">Cancel</AlertDialogCancel>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
                                 <AlertDialogAction onClick={() => completeOrder(order.id, order.orderNumber)} className="bg-green-600 hover:bg-green-700">
                                   Complete Order
                                 </AlertDialogAction>
@@ -424,19 +424,19 @@ export default function ProcessingPage({
                           
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-100 dark:hover:bg-red-900/20">
+                              <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700">
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             </AlertDialogTrigger>
-                            <AlertDialogContent className="bg-card border-border">
+                            <AlertDialogContent>
                               <AlertDialogHeader>
-                                <AlertDialogTitle className="text-card-foreground">Delete Order</AlertDialogTitle>
-                                <AlertDialogDescription className="text-muted-foreground">
+                                <AlertDialogTitle>Delete Order</AlertDialogTitle>
+                                <AlertDialogDescription>
                                   Are you sure you want to delete order {order.orderNumber}? This action cannot be undone.
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
-                                <AlertDialogCancel className="border-border text-foreground hover:bg-muted">Cancel</AlertDialogCancel>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
                                 <AlertDialogAction onClick={() => deleteOrder(order.id, order.orderNumber)} className="bg-red-600 hover:bg-red-700">
                                   Delete
                                 </AlertDialogAction>
