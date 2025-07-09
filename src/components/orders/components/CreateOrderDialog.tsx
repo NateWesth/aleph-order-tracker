@@ -65,11 +65,19 @@ export default function CreateOrderDialog({
       const userRole = await getUserRole(user.id);
       console.log("🔐 CreateOrderDialog: User role:", userRole);
       
-      // Create description from items
+      // Create description from items - NOW INCLUDING NOTES
       const itemsDescription = orderData.items
         .filter(item => item.name && item.quantity > 0)
-        .map(item => `${item.name} (Qty: ${item.quantity})`)
+        .map(item => {
+          let itemLine = `${item.name} (Qty: ${item.quantity})`;
+          if (item.notes && item.notes.trim()) {
+            itemLine += ` - ${item.notes.trim()}`;
+          }
+          return itemLine;
+        })
         .join('\n');
+      
+      console.log("📝 CreateOrderDialog: Generated description with notes:", itemsDescription);
       
       // Prepare order data for database insertion - NOW INCLUDING urgency field
       const orderInsertData = {
@@ -129,6 +137,7 @@ export default function CreateOrderDialog({
       console.log("🔍 CreateOrderDialog: Created order company_id:", createdOrder.company_id);
       console.log("🔍 CreateOrderDialog: Created order user_id:", createdOrder.user_id);
       console.log("🎯 CreateOrderDialog: Created order urgency:", createdOrder.urgency);
+      console.log("📝 CreateOrderDialog: Created order description with notes:", createdOrder.description);
 
       // Verify the order was saved with correct data
       const { data: verificationOrder, error: verificationError } = await supabase
@@ -143,6 +152,7 @@ export default function CreateOrderDialog({
         console.log("✅ CreateOrderDialog: Order verification successful:", verificationOrder);
         console.log("🏢 CreateOrderDialog: Verified company_id in database:", verificationOrder.company_id);
         console.log("🎯 CreateOrderDialog: Verified urgency in database:", verificationOrder.urgency);
+        console.log("📝 CreateOrderDialog: Verified description in database:", verificationOrder.description);
       }
 
       const urgencyText = orderData.urgency !== 'normal' ? ` with ${orderData.urgency.toUpperCase()} priority` : '';
