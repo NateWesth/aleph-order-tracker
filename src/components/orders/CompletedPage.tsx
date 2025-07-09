@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -302,19 +303,19 @@ export default function CompletedPage({
         <h1 className="text-2xl font-bold">Completed Orders</h1>
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <input type="text" placeholder="Search orders..." className="pl-10 pr-4 py-2 border rounded-md" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+          <input type="text" placeholder="Search orders..." className="pl-10 pr-4 py-2 border rounded-md bg-background" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
         </div>
       </div>
 
       <div className="space-y-4">
-        {monthGroups.length === 0 && <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
+        {monthGroups.length === 0 && <div className="bg-background border rounded-lg shadow p-8 text-center text-muted-foreground">
             No completed orders found.
           </div>}
 
-        {monthGroups.map((monthGroup, monthIndex) => <div key={monthGroup.month} className="bg-white rounded-lg shadow">
+        {monthGroups.map((monthGroup, monthIndex) => <div key={monthGroup.month} className="bg-background border rounded-lg shadow">
             <Collapsible open={monthGroup.isOpen} onOpenChange={() => toggleMonthGroup(monthIndex)}>
               <CollapsibleTrigger asChild>
-                <div className="p-4 border-b cursor-pointer hover:bg-gray-50 flex items-center justify-between">
+                <div className="p-4 border-b cursor-pointer hover:bg-muted/50 flex items-center justify-between">
                   <div className="flex items-center space-x-2">
                     {monthGroup.isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                     <h2 className="text-lg font-semibold">{monthGroup.month}</h2>
@@ -327,13 +328,13 @@ export default function CompletedPage({
                 <div className="divide-y">
                   {monthGroup.orders.map(order => {
                 const isExpanded = expandedOrders.has(order.id);
-                return <div key={order.id} className="p-4">
+                return <div key={order.id} className="p-4 bg-background">
                         <div className="flex justify-between items-center">
                           <div className="flex items-center gap-4">
                             <div>
                               <h3 className="font-medium">Order #{order.orderNumber}</h3>
-                              <p className="text-sm text-gray-600">{order.companyName}</p>
-                              <p className="text-sm text-gray-600">
+                              <p className="text-sm text-muted-foreground">{order.companyName}</p>
+                              <p className="text-sm text-muted-foreground">
                                 Completed: {format(order.completedDate || order.orderDate, 'MMM d, yyyy')}
                               </p>
                             </div>
@@ -344,7 +345,7 @@ export default function CompletedPage({
                               Items ({order.items.length})
                             </Button>
                             
-                            <Badge variant="outline" className="bg-green-100 text-green-800">
+                            <Badge variant="outline" className="bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400">
                               Completed
                             </Badge>
                             
@@ -399,7 +400,7 @@ export default function CompletedPage({
                           </div>
                         </div>
 
-                        {isExpanded && <div className="mt-4 border-t pt-4">
+                        {isExpanded && <div className="mt-4 border-t pt-4 bg-background">
                             <Table>
                               <TableHeader>
                                 <TableRow>
@@ -415,7 +416,7 @@ export default function CompletedPage({
                                     <TableCell>{item.quantity}</TableCell>
                                     <TableCell>{item.delivered}</TableCell>
                                     <TableCell>
-                                      <Badge variant="outline" className="bg-green-100 text-green-800">
+                                      <Badge variant="outline" className="bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400">
                                         Complete
                                       </Badge>
                                     </TableCell>

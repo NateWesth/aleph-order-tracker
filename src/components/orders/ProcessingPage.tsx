@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -349,12 +350,12 @@ export default function ProcessingPage({
         <h1 className="text-2xl font-bold">Processing Orders</h1>
       </div>
 
-      <div className="bg-white rounded-lg shadow">
+      <div className="bg-background border rounded-lg shadow">
         <div className="p-4 border-b">
           <h2 className="text-lg font-semibold">Supporting Documents</h2>
         </div>
         
-        {orders.length === 0 ? <div className="p-4 text-center text-gray-500">
+        {orders.length === 0 ? <div className="p-4 text-center text-muted-foreground">
             No orders in processing. Orders completed from the Progress page will appear here.
           </div> : <Table>
             <TableHeader>
