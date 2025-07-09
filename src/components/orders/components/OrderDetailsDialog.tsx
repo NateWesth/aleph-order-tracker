@@ -54,14 +54,25 @@ export default function OrderDetailsDialog({
     }
   };
 
-  // Parse items from description if needed (for backward compatibility)
+  // Enhanced parsing function to extract notes from description
   const parseOrderItems = (description: string | null): OrderItem[] => {
     if (!description) return [];
     
+    console.log('Parsing description:', description);
+    
     return description.split('\n').map((line, index) => {
-      // Check for format: "Item Name (Qty: X) - Notes"
-      const matchWithNotes = line.match(/^(.+?)\s*\(Qty:\s*(\d+)\)\s*-\s*(.+)$/);
+      const trimmedLine = line.trim();
+      if (!trimmedLine) return null;
+      
+      // Enhanced regex patterns to capture notes
+      // Pattern 1: "Item Name (Qty: X) - Notes"
+      const matchWithNotes = trimmedLine.match(/^(.+?)\s*\(Qty:\s*(\d+)\)\s*-\s*(.+)$/);
       if (matchWithNotes) {
+        console.log('Found item with notes:', {
+          name: matchWithNotes[1].trim(),
+          quantity: parseInt(matchWithNotes[2]),
+          notes: matchWithNotes[3].trim()
+        });
         return {
           name: matchWithNotes[1].trim(),
           quantity: parseInt(matchWithNotes[2]),
@@ -69,20 +80,44 @@ export default function OrderDetailsDialog({
         };
       }
       
-      // Check for format: "Item Name (Qty: X)"
-      const match = line.match(/^(.+?)\s*\(Qty:\s*(\d+)\)$/);
-      if (match) {
+      // Pattern 2: "Item Name (Qty: X)"
+      const matchWithoutNotes = trimmedLine.match(/^(.+?)\s*\(Qty:\s*(\d+)\)$/);
+      if (matchWithoutNotes) {
+        console.log('Found item without notes:', {
+          name: matchWithoutNotes[1].trim(),
+          quantity: parseInt(matchWithoutNotes[2])
+        });
         return {
-          name: match[1].trim(),
-          quantity: parseInt(match[2])
+          name: matchWithoutNotes[1].trim(),
+          quantity: parseInt(matchWithoutNotes[2])
         };
       }
       
+      // Pattern 3: "Item Name: Notes" (alternative format)
+      const matchAlternateFormat = trimmedLine.match(/^(.+?):\s*(.+)$/);
+      if (matchAlternateFormat) {
+        console.log('Found item with alternate format:', {
+          name: matchAlternateFormat[1].trim(),
+          quantity: 1,
+          notes: matchAlternateFormat[2].trim()
+        });
+        return {
+          name: matchAlternateFormat[1].trim(),
+          quantity: 1,
+          notes: matchAlternateFormat[2].trim()
+        };
+      }
+      
+      // Pattern 4: Just item name
+      console.log('Found simple item:', {
+        name: trimmedLine,
+        quantity: 1
+      });
       return {
-        name: line.trim(),
+        name: trimmedLine,
         quantity: 1
       };
-    }).filter(item => item.name);
+    }).filter((item): item is OrderItem => item !== null);
   };
 
   // Use provided items or parse from description
@@ -90,9 +125,11 @@ export default function OrderDetailsDialog({
     order.items.map(item => ({
       name: item.name,
       quantity: item.quantity,
-      notes: undefined // OrderWithCompany items don't have notes field
+      notes: item.notes // This should now be available from the type definition
     })) : 
     parseOrderItems(order.description || null);
+
+  console.log('Final display items:', displayItems);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -134,31 +171,30 @@ export default function OrderDetailsDialog({
             ) : (
               <div className="border rounded-lg divide-y">
                 <div className="grid grid-cols-12 gap-4 p-4 bg-gray-50 font-medium text-sm text-gray-700">
-                  <div className="col-span-6">Item Name</div>
+                  <div className="col-span-5">Item Name</div>
                   <div className="col-span-2 text-center">Quantity</div>
                   <div className="col-span-2 text-center">Unit</div>
-                  <div className="col-span-2 text-center">Total</div>
+                  <div className="col-span-3">Notes</div>
                 </div>
                 {displayItems.map((item, index) => (
                   <div key={index} className="grid grid-cols-12 gap-4 p-4 items-start hover:bg-gray-50">
-                    <div className="col-span-6">
+                    <div className="col-span-5">
                       <p className="font-medium text-gray-900">{item.name}</p>
-                      {item.notes && (
-                        <p className="text-xs text-gray-500 mt-1 leading-relaxed italic">
-                          {item.notes}
-                        </p>
-                      )}
                     </div>
                     <div className="col-span-2 text-center">
                       <span className="text-gray-600">{item.quantity}</span>
                     </div>
                     <div className="col-span-2 text-center">
-                      <span className="text-gray-600">{item.unit || '-'}</span>
+                      <span className="text-gray-600">{item.unit || 'pcs'}</span>
                     </div>
-                    <div className="col-span-2 text-center">
-                      <span className="font-medium text-gray-900">
-                        {item.quantity} {item.unit || 'pcs'}
-                      </span>
+                    <div className="col-span-3">
+                      {item.notes ? (
+                        <p className="text-sm text-gray-600 bg-yellow-50 p-2 rounded border-l-2 border-yellow-300">
+                          <span className="font-medium text-yellow-800">Note:</span> {item.notes}
+                        </p>
+                      ) : (
+                        <span className="text-gray-400 text-sm italic">No notes</span>
+                      )}
                     </div>
                   </div>
                 ))}
