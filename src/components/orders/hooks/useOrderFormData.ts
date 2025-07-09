@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCompanyData } from "@/components/admin/hooks/useCompanyData";
-import { getUserProfile, getUserRole } from "@/utils/authService";
+import { getUserProfile, getUserRole } from "@/utils/auth";
 
 export const useOrderFormData = () => {
   const { user } = useAuth();
