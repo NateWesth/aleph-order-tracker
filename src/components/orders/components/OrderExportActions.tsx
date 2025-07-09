@@ -763,24 +763,16 @@ export default function OrderExportActions({
   // Single order export
   if (order) {
     return (
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="outline" disabled={loading}>
-            <Printer className="h-4 w-4 mr-2" />
-            Print Order
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem onClick={() => handlePrintSingleOrder(order)}>
-            <Printer className="h-4 w-4 mr-2" />
-            Print Order
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => handleExportSingleOrderPDF(order)}>
-            <FileText className="h-4 w-4 mr-2" />
-            Save as PDF
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <div className="flex gap-2">
+        <Button variant="outline" disabled={loading} onClick={() => handlePrintSingleOrder(order)}>
+          <Printer className="h-4 w-4 mr-2" />
+          Print Order
+        </Button>
+        <Button variant="outline" disabled={loading} onClick={() => handleExportSingleOrderPDF(order)}>
+          <FileText className="h-4 w-4 mr-2" />
+          Save as PDF
+        </Button>
+      </div>
     );
   }
 
