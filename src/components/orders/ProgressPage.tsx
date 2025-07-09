@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -586,27 +587,27 @@ export default function ProgressPage({
       }))} title="Progress Orders" />
       </div>
 
-      <div className="bg-white rounded-lg shadow">
-        <div className="p-4 border-b">
-          <h2 className="text-lg font-semibold">Orders In Progress</h2>
+      <div className="bg-white dark:bg-gray-900 rounded-lg shadow border border-gray-200 dark:border-gray-700">
+        <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Orders In Progress</h2>
         </div>
         
-        {orders.length === 0 ? <div className="p-4 text-center text-gray-500">
+        {orders.length === 0 ? <div className="p-4 text-center text-gray-500 dark:text-gray-400">
             No orders in progress. Orders marked as "received" should appear here automatically.
-          </div> : <div className="divide-y">
+          </div> : <div className="divide-y divide-gray-200 dark:divide-gray-700">
             {orders.map(order => {
           const isExpanded = expandedOrders.has(order.id);
           const orderDeliveries = deliveryQuantities[order.id] || {};
-          return <div key={order.id} className="p-4">
+          return <div key={order.id} className="p-4 bg-white dark:bg-gray-900">
                   <div className="flex justify-between items-center">
                     <div className="flex items-center gap-4">
                       <div className="flex items-center gap-2">
                         {order.company?.logo && <img src={order.company.logo} alt={`${order.companyName} logo`} className="h-6 w-6 rounded object-cover" />}
-                        <span className="font-medium">#{order.orderNumber}</span>
+                        <span className="font-medium text-gray-900 dark:text-gray-100">#{order.orderNumber}</span>
                       </div>
                       <div>
-                        <p className="text-sm text-gray-600">{order.companyName}</p>
-                        <p className="text-sm text-gray-500">Due: {formatSafeDate(order.dueDate)}</p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">{order.companyName}</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-500">Due: {formatSafeDate(order.dueDate)}</p>
                       </div>
                       <div className="flex items-center gap-2">
                         <Badge variant={order.status === 'in-progress' ? 'default' : 'secondary'}>
@@ -614,7 +615,7 @@ export default function ProgressPage({
                         </Badge>
                         <div className="flex items-center gap-2">
                           <Progress value={order.progress || 0} className="w-20 h-2" />
-                          <span className="text-xs text-gray-500">
+                          <span className="text-xs text-gray-500 dark:text-gray-400">
                             {progressStages.find(s => s.id === order.progressStage)?.name || 'Not started'}
                           </span>
                         </div>
@@ -622,36 +623,50 @@ export default function ProgressPage({
                     </div>
                     
                     <div className="flex items-center gap-2">
-                      <Button variant="ghost" size="sm" onClick={() => toggleOrderExpansion(order.id)}>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => toggleOrderExpansion(order.id)}
+                        className="text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+                      >
                         {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                         Items ({order.items.length})
                       </Button>
                       
-                      <Button variant="ghost" size="sm" onClick={() => viewOrderDetails(order)}>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => viewOrderDetails(order)}
+                        className="text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+                      >
                         <Eye className="h-4 w-4" />
                       </Button>
                       
                       {isAdmin && <>
-                          {progressStages.map(stage => <Button key={stage.id} variant={order.progressStage === stage.id ? "default" : "outline"} size="sm" onClick={() => updateProgressStage(order.id, stage.id)} className={stage.id === 'completed' ? "bg-green-600 hover:bg-green-700 text-white" : ""}>
+                          {progressStages.map(stage => <Button key={stage.id} variant={order.progressStage === stage.id ? "default" : "outline"} size="sm" onClick={() => updateProgressStage(order.id, stage.id)} className={stage.id === 'completed' ? "bg-green-600 hover:bg-green-700 text-white" : "border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"}>
                               {stage.name}
                             </Button>)}
                           
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700">
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900"
+                              >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             </AlertDialogTrigger>
-                            <AlertDialogContent>
+                            <AlertDialogContent className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700">
                               <AlertDialogHeader>
-                                <AlertDialogTitle>Delete Order</AlertDialogTitle>
-                                <AlertDialogDescription>
+                                <AlertDialogTitle className="text-gray-900 dark:text-gray-100">Delete Order</AlertDialogTitle>
+                                <AlertDialogDescription className="text-gray-600 dark:text-gray-400">
                                   Are you sure you want to delete order {order.orderNumber}? This action cannot be undone and will remove the order from all systems.
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => deleteOrder(order.id, order.orderNumber)} className="bg-red-600 hover:bg-red-700">
+                                <AlertDialogCancel className="bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600">Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => deleteOrder(order.id, order.orderNumber)} className="bg-red-600 hover:bg-red-700 text-white">
                                   Delete
                                 </AlertDialogAction>
                               </AlertDialogFooter>
@@ -661,15 +676,15 @@ export default function ProgressPage({
                     </div>
                   </div>
 
-                  {isExpanded && <div className="mt-4 border-t pt-4">
+                  {isExpanded && <div className="mt-4 border-t pt-4 border-gray-200 dark:border-gray-700">
                       <Table>
                         <TableHeader>
-                          <TableRow>
-                            <TableHead>Item</TableHead>
-                            <TableHead>Quantity Ordered</TableHead>
+                          <TableRow className="border-b border-gray-200 dark:border-gray-700">
+                            <TableHead className="text-gray-900 dark:text-gray-100">Item</TableHead>
+                            <TableHead className="text-gray-900 dark:text-gray-100">Quantity Ordered</TableHead>
                             {isAdmin && <>
-                                <TableHead>Quantity Delivered</TableHead>
-                                <TableHead>Status</TableHead>
+                                <TableHead className="text-gray-900 dark:text-gray-100">Quantity Delivered</TableHead>
+                                <TableHead className="text-gray-900 dark:text-gray-100">Status</TableHead>
                               </>}
                           </TableRow>
                         </TableHeader>
@@ -685,17 +700,17 @@ export default function ProgressPage({
                   }).map(item => {
                     const delivered = orderDeliveries[item.name] || 0;
                     const isCompleted = delivered >= item.quantity;
-                    return <TableRow key={item.id} className={isCompleted ? "opacity-50" : ""}>
-                                  <TableCell className="font-medium">{item.name}</TableCell>
-                                  <TableCell>{item.quantity}</TableCell>
+                    return <TableRow key={item.id} className={`border-b border-gray-200 dark:border-gray-700 ${isCompleted ? "opacity-50" : ""}`}>
+                                  <TableCell className="font-medium text-gray-900 dark:text-gray-100">{item.name}</TableCell>
+                                  <TableCell className="text-gray-900 dark:text-gray-100">{item.quantity}</TableCell>
                                   {isAdmin && <>
                                       <TableCell>
-                                        <input type="number" min="0" max={item.quantity} value={delivered} onChange={e => updateDeliveryQuantity(order.id, item.name, parseInt(e.target.value) || 0)} className="w-20 px-2 py-1 border rounded text-sm" />
+                                        <input type="number" min="0" max={item.quantity} value={delivered} onChange={e => updateDeliveryQuantity(order.id, item.name, parseInt(e.target.value) || 0)} className="w-20 px-2 py-1 border rounded text-sm bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100" />
                                       </TableCell>
                                       <TableCell>
-                                        {isCompleted ? <Badge variant="outline" className="bg-green-100 text-green-800">
+                                        {isCompleted ? <Badge variant="outline" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">
                                             Complete
-                                          </Badge> : <Badge variant="outline">
+                                          </Badge> : <Badge variant="outline" className="bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">
                                             Pending
                                           </Badge>}
                                       </TableCell>
