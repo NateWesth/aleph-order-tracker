@@ -60,65 +60,78 @@ export default function OrderDetailsDialog({
     
     console.log('Parsing description:', description);
     
-    const items = description.split('\n').map((line, index) => {
-      const trimmedLine = line.trim();
-      if (!trimmedLine) return null;
+    const items: OrderItem[] = [];
+    const lines = description.split('\n');
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line) continue;
       
-      // Enhanced regex patterns to capture notes
+      console.log(`Processing line ${i}: "${line}"`);
+      
       // Pattern 1: "Item Name (Qty: X) - Notes"
-      const matchWithNotes = trimmedLine.match(/^(.+?)\s*\(Qty:\s*(\d+)\)\s*-\s*(.+)$/);
-      if (matchWithNotes) {
-        console.log('Found item with notes:', {
-          name: matchWithNotes[1].trim(),
-          quantity: parseInt(matchWithNotes[2]),
-          notes: matchWithNotes[3].trim()
-        });
-        return {
-          name: matchWithNotes[1].trim(),
-          quantity: parseInt(matchWithNotes[2]),
-          notes: matchWithNotes[3].trim()
+      const matchWithDashNotes = line.match(/^(.+?)\s*\(Qty:\s*(\d+)\)\s*-\s*(.+)$/);
+      if (matchWithDashNotes) {
+        const item = {
+          name: matchWithDashNotes[1].trim(),
+          quantity: parseInt(matchWithDashNotes[2]),
+          notes: matchWithDashNotes[3].trim()
         };
+        console.log('Found item with dash notes:', item);
+        items.push(item);
+        continue;
       }
       
-      // Pattern 2: "Item Name (Qty: X)"
-      const matchWithoutNotes = trimmedLine.match(/^(.+?)\s*\(Qty:\s*(\d+)\)$/);
-      if (matchWithoutNotes) {
-        console.log('Found item without notes:', {
-          name: matchWithoutNotes[1].trim(),
-          quantity: parseInt(matchWithoutNotes[2])
-        });
-        return {
-          name: matchWithoutNotes[1].trim(),
-          quantity: parseInt(matchWithoutNotes[2])
+      // Pattern 2: "Item Name (Qty: X)" followed by a notes line
+      const matchWithQty = line.match(/^(.+?)\s*\(Qty:\s*(\d+)\)$/);
+      if (matchWithQty) {
+        const item = {
+          name: matchWithQty[1].trim(),
+          quantity: parseInt(matchWithQty[2])
         };
+        
+        // Check if next line contains notes (doesn't start with a new item pattern)
+        if (i + 1 < lines.length) {
+          const nextLine = lines[i + 1].trim();
+          if (nextLine && !nextLine.match(/\(Qty:\s*\d+\)/) && !nextLine.match(/^[A-Z].*\s*\(Qty:/)) {
+            item.notes = nextLine;
+            i++; // Skip the notes line in next iteration
+            console.log('Found item with separate notes line:', item);
+          } else {
+            console.log('Found item without notes:', item);
+          }
+        } else {
+          console.log('Found item at end without notes:', item);
+        }
+        items.push(item);
+        continue;
       }
       
       // Pattern 3: "Item Name: Notes" (alternative format)
-      const matchAlternateFormat = trimmedLine.match(/^(.+?):\s*(.+)$/);
-      if (matchAlternateFormat) {
-        console.log('Found item with alternate format:', {
-          name: matchAlternateFormat[1].trim(),
+      const matchColonFormat = line.match(/^(.+?):\s*(.+)$/);
+      if (matchColonFormat && !matchColonFormat[1].includes('(Qty:')) {
+        const item = {
+          name: matchColonFormat[1].trim(),
           quantity: 1,
-          notes: matchAlternateFormat[2].trim()
-        });
-        return {
-          name: matchAlternateFormat[1].trim(),
-          quantity: 1,
-          notes: matchAlternateFormat[2].trim()
+          notes: matchColonFormat[2].trim()
         };
+        console.log('Found item with colon format:', item);
+        items.push(item);
+        continue;
       }
       
-      // Pattern 4: Just item name
-      console.log('Found simple item:', {
-        name: trimmedLine,
-        quantity: 1
-      });
-      return {
-        name: trimmedLine,
-        quantity: 1
-      };
-    }).filter(item => item !== null) as OrderItem[];
+      // Pattern 4: Just item name (fallback)
+      if (!line.includes('(Qty:') && !line.includes(':')) {
+        const item = {
+          name: line,
+          quantity: 1
+        };
+        console.log('Found simple item:', item);
+        items.push(item);
+      }
+    }
 
+    console.log('Final parsed items:', items);
     return items;
   };
 
@@ -202,6 +215,12 @@ export default function OrderDetailsDialog({
                 ))}
               </div>
             )}
+          </div>
+          
+          {/* Debug section - remove in production */}
+          <div className="mt-4 p-4 bg-gray-100 rounded text-xs">
+            <p><strong>Debug - Raw Description:</strong></p>
+            <pre className="whitespace-pre-wrap">{order.description || 'No description'}</pre>
           </div>
         </div>
       </DialogContent>
