@@ -14,6 +14,7 @@ import { useGlobalRealtimeOrders } from "./hooks/useGlobalRealtimeOrders";
 import ProgressOrderDetailsDialog from "./components/ProgressOrderDetailsDialog";
 import OrderExportActions from "./components/OrderExportActions";
 import { sendOrderNotification } from "@/utils/emailNotifications";
+import { getUserRole, getUserProfile } from "@/utils/authService";
 
 // Define the order item interface
 interface OrderItem {
@@ -81,6 +82,7 @@ const mockCompanies: Company[] = [{
   address: "456 Manufacturing Ave, Pretoria, 0001",
   vatNumber: "4987654321"
 }];
+
 export default function ProgressPage({
   isAdmin
 }: ProgressPageProps) {
@@ -100,6 +102,8 @@ export default function ProgressPage({
       [itemName: string]: number;
     };
   }>({});
+  const [userRole, setUserRole] = useState<'admin' | 'user'>('user');
+  const [userCompanyId, setUserCompanyId] = useState<string | null>(null);
 
   // Parse order items from description
   const parseOrderItems = (description: string | null): OrderItem[] => {
@@ -126,6 +130,29 @@ export default function ProgressPage({
       };
     }).filter(item => item.name);
     return items;
+  };
+
+  // Fetch user info to determine filtering
+  const fetchUserInfo = async () => {
+    if (!user?.id) return;
+
+    try {
+      const [role, profile] = await Promise.all([
+        getUserRole(user.id),
+        getUserProfile(user.id)
+      ]);
+
+      console.log('ProgressPage - User role:', role);
+      console.log('ProgressPage - User profile:', profile);
+
+      setUserRole(role);
+      if (role === 'user' && profile?.company_id) {
+        setUserCompanyId(profile.company_id);
+        console.log('ProgressPage - User company ID:', profile.company_id);
+      }
+    } catch (error) {
+      console.error("Error fetching user info:", error);
+    }
   };
 
   // Helper function to get proper progress stage based on status and progress_stage
@@ -227,10 +254,13 @@ export default function ProgressPage({
       setLoading(false);
       return;
     }
+    
     try {
       console.log('Fetching received and in-progress orders from Supabase...');
+      console.log('User role:', userRole, 'Company ID:', userCompanyId);
       setLoading(true);
       setError(null);
+      
       let query = supabase.from('orders').select(`
           *,
           companies (
@@ -240,26 +270,31 @@ export default function ProgressPage({
         `).in('status', ['received', 'in-progress']).order('created_at', {
         ascending: false
       });
-      if (!isAdmin) {
-        const {
-          data: profile
-        } = await supabase.from('profiles').select('company_id').eq('id', user.id).single();
-        if (profile?.company_id) {
-          query = query.eq('company_id', profile.company_id);
-        } else {
-          query = query.eq('user_id', user.id);
-        }
+
+      // Apply filtering based on user role
+      if (userRole === 'user' && userCompanyId) {
+        console.log('Filtering progress orders by company:', userCompanyId);
+        query = query.eq('company_id', userCompanyId);
+      } else if (userRole === 'user' && !userCompanyId) {
+        // If user role but no company ID, filter by user_id as fallback
+        console.log('Filtering progress orders by user_id as fallback');
+        query = query.eq('user_id', user.id);
       }
+      // For admin users, no additional filtering is needed
+
       const {
         data,
         error: fetchError
       } = await query;
+      
       if (fetchError) {
         console.error("Error fetching progress orders:", fetchError);
         setError(`Failed to fetch orders: ${fetchError.message}`);
         return;
       }
-      console.log('Fetched orders from database:', data?.length || 0);
+      
+      console.log('Fetched progress orders:', data?.length || 0);
+      
       if (data && data.length > 0) {
         const convertedOrders = data.map((dbOrder: any) => {
           const progressStage = getProgressStage(dbOrder.status, dbOrder.progress_stage);
@@ -305,12 +340,21 @@ export default function ProgressPage({
     pageType: 'progress'
   });
 
-  // Load orders from database on component mount
+  // Load user info first, then orders
   useEffect(() => {
-    console.log('Progress page mounted, fetching orders...');
-    fetchProgressOrders();
-    loadDeliveryQuantities();
-  }, [isAdmin, user?.id]);
+    if (user?.id) {
+      fetchUserInfo();
+    }
+  }, [user?.id]);
+
+  // Load orders when user info is available
+  useEffect(() => {
+    if (user?.id && (userRole === 'admin' || userCompanyId !== null)) {
+      console.log('Loading progress orders...');
+      fetchProgressOrders();
+      loadDeliveryQuantities();
+    }
+  }, [user?.id, userRole, userCompanyId]);
 
   // Progress stages with corresponding percentage values
   const progressStages = [{
@@ -530,31 +574,32 @@ export default function ProgressPage({
       });
     }
   };
+
   if (loading) {
-    return <div className="container mx-auto p-4">
+    return <div className="container mx-auto p-4 bg-background">
         <div className="flex justify-center items-center h-64">
-          <div className="text-lg">Loading orders...</div>
+          <div className="text-lg text-foreground">Loading orders...</div>
         </div>
       </div>;
   }
   if (error) {
-    return <div className="container mx-auto p-4">
+    return <div className="container mx-auto p-4 bg-background">
         <div className="flex flex-col items-center justify-center h-64">
-          <div className="text-lg text-red-600 mb-4">Error: {error}</div>
+          <div className="text-lg text-destructive mb-4">Error: {error}</div>
           <Button onClick={fetchProgressOrders}>Retry</Button>
         </div>
       </div>;
   }
   if (!user) {
-    return <div className="container mx-auto p-4">
+    return <div className="container mx-auto p-4 bg-background">
         <div className="flex flex-col items-center justify-center h-64">
-          <div className="text-lg mb-4">Please log in to view orders</div>
+          <div className="text-lg text-foreground mb-4">Please log in to view orders</div>
         </div>
       </div>;
   }
-  return <div className="container mx-auto p-4">
+  return <div className="container mx-auto p-4 bg-background">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Order Progress Tracking</h1>
+        <h1 className="text-2xl font-bold text-foreground">Order Progress Tracking</h1>
         <OrderExportActions orders={orders.map(order => ({
         id: order.id,
         order_number: order.orderNumber,
@@ -567,27 +612,27 @@ export default function ProgressPage({
       }))} title="Progress Orders" />
       </div>
 
-      <div className="bg-white rounded-lg shadow">
-        <div className="p-4 border-b">
-          <h2 className="text-lg font-semibold">Orders In Progress</h2>
+      <div className="bg-card rounded-lg shadow">
+        <div className="p-4 border-b border-border">
+          <h2 className="text-lg font-semibold text-card-foreground">Orders In Progress</h2>
         </div>
         
-        {orders.length === 0 ? <div className="p-4 text-center text-gray-500">
+        {orders.length === 0 ? <div className="p-4 text-center text-muted-foreground">
             No orders in progress. Orders marked as "received" should appear here automatically.
-          </div> : <div className="divide-y">
+          </div> : <div className="divide-y divide-border">
             {orders.map(order => {
           const isExpanded = expandedOrders.has(order.id);
           const orderDeliveries = deliveryQuantities[order.id] || {};
-          return <div key={order.id} className="p-4 bg-[#2e2e53]/0">
+          return <div key={order.id} className="p-4">
                   <div className="flex justify-between items-center">
                     <div className="flex items-center gap-4">
                       <div className="flex items-center gap-2">
                         {order.company?.logo && <img src={order.company.logo} alt={`${order.companyName} logo`} className="h-6 w-6 rounded object-cover" />}
-                        <span className="font-medium">#{order.orderNumber}</span>
+                        <span className="font-medium text-card-foreground">#{order.orderNumber}</span>
                       </div>
                       <div>
-                        <p className="text-sm text-gray-600">{order.companyName}</p>
-                        <p className="text-sm text-gray-500">Due: {formatSafeDate(order.dueDate)}</p>
+                        <p className="text-sm text-muted-foreground">{order.companyName}</p>
+                        <p className="text-sm text-muted-foreground">Due: {formatSafeDate(order.dueDate)}</p>
                       </div>
                       <div className="flex items-center gap-2">
                         <Badge variant={order.status === 'in-progress' ? 'default' : 'secondary'}>
@@ -595,7 +640,7 @@ export default function ProgressPage({
                         </Badge>
                         <div className="flex items-center gap-2">
                           <Progress value={order.progress || 0} className="w-20 h-2" />
-                          <span className="text-xs text-gray-500">
+                          <span className="text-xs text-muted-foreground">
                             {progressStages.find(s => s.id === order.progressStage)?.name || 'Not started'}
                           </span>
                         </div>
@@ -619,7 +664,7 @@ export default function ProgressPage({
                           
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700">
+                              <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             </AlertDialogTrigger>
@@ -632,7 +677,7 @@ export default function ProgressPage({
                               </AlertDialogHeader>
                               <AlertDialogFooter>
                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => deleteOrder(order.id, order.orderNumber)} className="bg-red-600 hover:bg-red-700">
+                                <AlertDialogAction onClick={() => deleteOrder(order.id, order.orderNumber)} className="bg-destructive hover:bg-destructive/90">
                                   Delete
                                 </AlertDialogAction>
                               </AlertDialogFooter>
@@ -642,15 +687,15 @@ export default function ProgressPage({
                     </div>
                   </div>
 
-                  {isExpanded && <div className="mt-4 border-t pt-4">
+                  {isExpanded && <div className="mt-4 border-t border-border pt-4">
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead>Item</TableHead>
-                            <TableHead>Quantity Ordered</TableHead>
+                            <TableHead className="text-card-foreground">Item</TableHead>
+                            <TableHead className="text-card-foreground">Quantity Ordered</TableHead>
                             {isAdmin && <>
-                                <TableHead>Quantity Delivered</TableHead>
-                                <TableHead>Status</TableHead>
+                                <TableHead className="text-card-foreground">Quantity Delivered</TableHead>
+                                <TableHead className="text-card-foreground">Status</TableHead>
                               </>}
                           </TableRow>
                         </TableHeader>
@@ -667,11 +712,11 @@ export default function ProgressPage({
                     const delivered = orderDeliveries[item.name] || 0;
                     const isCompleted = delivered >= item.quantity;
                     return <TableRow key={item.id} className={isCompleted ? "opacity-50" : ""}>
-                                  <TableCell className="font-medium">{item.name}</TableCell>
-                                  <TableCell>{item.quantity}</TableCell>
+                                  <TableCell className="font-medium text-card-foreground">{item.name}</TableCell>
+                                  <TableCell className="text-card-foreground">{item.quantity}</TableCell>
                                   {isAdmin && <>
                                       <TableCell>
-                                        <input type="number" min="0" max={item.quantity} value={delivered} onChange={e => updateDeliveryQuantity(order.id, item.name, parseInt(e.target.value) || 0)} className="w-20 px-2 py-1 border rounded text-sm" />
+                                        <input type="number" min="0" max={item.quantity} value={delivered} onChange={e => updateDeliveryQuantity(order.id, item.name, parseInt(e.target.value) || 0)} className="w-20 px-2 py-1 border border-border rounded text-sm bg-background text-foreground" />
                                       </TableCell>
                                       <TableCell>
                                         {isCompleted ? <Badge variant="outline" className="bg-green-100 text-green-800">

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -12,6 +13,7 @@ import { useGlobalRealtimeOrders } from "./hooks/useGlobalRealtimeOrders";
 import ProcessingOrderFilesDialog from "./components/ProcessingOrderFilesDialog";
 import OrderExportActions from "./components/OrderExportActions";
 import { sendOrderNotification } from "@/utils/emailNotifications";
+import { getUserRole, getUserProfile } from "@/utils/authService";
 
 interface OrderItem {
   id: string;
@@ -70,6 +72,8 @@ export default function ProcessingPage({
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState<'admin' | 'user'>('user');
+  const [userCompanyId, setUserCompanyId] = useState<string | null>(null);
 
   // Parse order items from description
   const parseOrderItems = (description: string | null): OrderItem[] => {
@@ -100,6 +104,29 @@ export default function ProcessingPage({
     return items;
   };
 
+  // Fetch user info to determine filtering
+  const fetchUserInfo = async () => {
+    if (!user?.id) return;
+
+    try {
+      const [role, profile] = await Promise.all([
+        getUserRole(user.id),
+        getUserProfile(user.id)
+      ]);
+
+      console.log('ProcessingPage - User role:', role);
+      console.log('ProcessingPage - User profile:', profile);
+
+      setUserRole(role);
+      if (role === 'user' && profile?.company_id) {
+        setUserCompanyId(profile.company_id);
+        console.log('ProcessingPage - User company ID:', profile.company_id);
+      }
+    } catch (error) {
+      console.error("Error fetching user info:", error);
+    }
+  };
+
   // Helper function to safely format dates
   const formatSafeDate = (date: Date | string | number): string => {
     try {
@@ -123,8 +150,10 @@ export default function ProcessingPage({
     }
     try {
       console.log('Fetching processing orders from Supabase...');
+      console.log('User role:', userRole, 'Company ID:', userCompanyId);
       setLoading(true);
       setError(null);
+      
       let query = supabase.from('orders').select(`
           *,
           companies (
@@ -134,26 +163,31 @@ export default function ProcessingPage({
         `).eq('status', 'processing').order('created_at', {
         ascending: false
       });
-      if (!isAdmin) {
-        const {
-          data: profile
-        } = await supabase.from('profiles').select('company_id').eq('id', user.id).single();
-        if (profile?.company_id) {
-          query = query.eq('company_id', profile.company_id);
-        } else {
-          query = query.eq('user_id', user.id);
-        }
+
+      // Apply filtering based on user role
+      if (userRole === 'user' && userCompanyId) {
+        console.log('Filtering processing orders by company:', userCompanyId);
+        query = query.eq('company_id', userCompanyId);
+      } else if (userRole === 'user' && !userCompanyId) {
+        // If user role but no company ID, filter by user_id as fallback
+        console.log('Filtering processing orders by user_id as fallback');
+        query = query.eq('user_id', user.id);
       }
+      // For admin users, no additional filtering is needed
+
       const {
         data,
         error: fetchError
       } = await query;
+      
       if (fetchError) {
         console.error("Error fetching processing orders:", fetchError);
         setError(`Failed to fetch orders: ${fetchError.message}`);
         return;
       }
+      
       console.log('Fetched processing orders from database:', data?.length || 0);
+      
       if (data && data.length > 0) {
         const convertedOrders = data.map((dbOrder: any) => {
           const orderDate = new Date(dbOrder.created_at);
@@ -192,11 +226,20 @@ export default function ProcessingPage({
     pageType: 'processing'
   });
 
-  // Load orders from database on component mount
+  // Load user info first, then orders
   useEffect(() => {
-    console.log('Processing page mounted, fetching orders...');
-    fetchProcessingOrders();
-  }, [isAdmin, user?.id]);
+    if (user?.id) {
+      fetchUserInfo();
+    }
+  }, [user?.id]);
+
+  // Load orders when user info is available
+  useEffect(() => {
+    if (user?.id && (userRole === 'admin' || userCompanyId !== null)) {
+      console.log('Loading processing orders...');
+      fetchProcessingOrders();
+    }
+  }, [user?.id, userRole, userCompanyId]);
 
   // Mark order as completed and move to completed status
   const completeOrder = async (orderId: string, orderNumber: string) => {
@@ -320,64 +363,64 @@ export default function ProcessingPage({
   };
 
   if (loading) {
-    return <div className="container mx-auto p-4">
+    return <div className="container mx-auto p-4 bg-background">
         <div className="flex justify-center items-center h-64">
-          <div className="text-lg">Loading processing orders...</div>
+          <div className="text-lg text-foreground">Loading processing orders...</div>
         </div>
       </div>;
   }
 
   if (error) {
-    return <div className="container mx-auto p-4">
+    return <div className="container mx-auto p-4 bg-background">
         <div className="flex flex-col items-center justify-center h-64">
-          <div className="text-lg text-red-600 mb-4">Error: {error}</div>
+          <div className="text-lg text-destructive mb-4">Error: {error}</div>
           <Button onClick={fetchProcessingOrders}>Retry</Button>
         </div>
       </div>;
   }
 
   if (!user) {
-    return <div className="container mx-auto p-4">
+    return <div className="container mx-auto p-4 bg-background">
         <div className="flex flex-col items-center justify-center h-64">
-          <div className="text-lg mb-4">Please log in to view orders</div>
+          <div className="text-lg text-foreground mb-4">Please log in to view orders</div>
         </div>
       </div>;
   }
 
-  return <div className="container mx-auto p-4">
+  return <div className="container mx-auto p-4 bg-background">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Processing Orders</h1>
+        <h1 className="text-2xl font-bold text-foreground">Processing Orders</h1>
       </div>
 
-      <div className="bg-white rounded-lg shadow">
-        <div className="p-4 border-b">
-          <h2 className="text-lg font-semibold">Supporting Documents</h2>
+      <div className="bg-card rounded-lg shadow">
+        <div className="p-4 border-b border-border">
+          <h2 className="text-lg font-semibold text-card-foreground">Supporting Documents</h2>
         </div>
         
-        {orders.length === 0 ? <div className="p-4 text-center text-gray-500">
+        {orders.length === 0 ? <div className="p-4 text-center text-muted-foreground">
             No orders in processing. Orders completed from the Progress page will appear here.
           </div> : <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Order #</TableHead>
-                <TableHead>Company</TableHead>
-                <TableHead>Date Created</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Items</TableHead>
-                <TableHead>Actions</TableHead>
+                <TableHead className="text-card-foreground">Order #</TableHead>
+                <TableHead className="text-card-foreground">Company</TableHead>
+                <TableHead className="text-card-foreground">Date Created</TableHead>
+                <TableHead className="text-card-foreground">Status</TableHead>
+                <TableHead className="text-card-foreground">Items</TableHead>
+                <TableHead className="text-card-foreground">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {orders.map(order => <TableRow key={order.id}>
-                  <TableCell className="font-medium">
+                  <TableCell className="font-medium text-card-foreground">
                     #{order.orderNumber}
                   </TableCell>
-                  <TableCell>{order.companyName}</TableCell>
-                  <TableCell>{formatSafeDate(order.orderDate)}</TableCell>
+                  <TableCell className="text-card-foreground">{order.companyName}</TableCell>
+                  <TableCell className="text-card-foreground">{formatSafeDate(order.orderDate)}</TableCell>
                   <TableCell>
                     <Badge variant="default">Processing</Badge>
                   </TableCell>
-                  <TableCell>{order.items.length} items</TableCell>
+                  <TableCell className="text-card-foreground">{order.items.length} items</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <OrderExportActions 
@@ -424,7 +467,7 @@ export default function ProcessingPage({
                           
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700">
+                              <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             </AlertDialogTrigger>
@@ -437,7 +480,7 @@ export default function ProcessingPage({
                               </AlertDialogHeader>
                               <AlertDialogFooter>
                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => deleteOrder(order.id, order.orderNumber)} className="bg-red-600 hover:bg-red-700">
+                                <AlertDialogAction onClick={() => deleteOrder(order.id, order.orderNumber)} className="bg-destructive hover:bg-destructive/90">
                                   Delete
                                 </AlertDialogAction>
                               </AlertDialogFooter>
