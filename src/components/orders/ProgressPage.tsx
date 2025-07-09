@@ -56,7 +56,6 @@ interface Order {
     [itemName: string]: number;
   };
 }
-
 interface ProgressPageProps {
   isAdmin: boolean;
 }
@@ -82,7 +81,6 @@ const mockCompanies: Company[] = [{
   address: "456 Manufacturing Ave, Pretoria, 0001",
   vatNumber: "4987654321"
 }];
-
 export default function ProgressPage({
   isAdmin
 }: ProgressPageProps) {
@@ -336,28 +334,21 @@ export default function ProgressPage({
   // Update the progress stage of an order and sync to database
   const updateProgressStage = async (orderId: string, stage: string) => {
     if (!isAdmin) return;
-    
     const stageInfo = progressStages.find(s => s.id === stage);
     if (!stageInfo) return;
-
     const orderToUpdate = orders.find(o => o.id === orderId);
-    
     try {
       console.log(`Updating order ${orderId} progress stage to ${stage}`);
-      
       if (stage === 'completed') {
         // Move to processing instead of completed
-        const { error } = await supabase
-          .from('orders')
-          .update({
-            status: 'processing',
-            progress_stage: 'completed',
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', orderId);
-
+        const {
+          error
+        } = await supabase.from('orders').update({
+          status: 'processing',
+          progress_stage: 'completed',
+          updated_at: new Date().toISOString()
+        }).eq('id', orderId);
         if (error) throw error;
-
         const remainingOrders = orders.filter(order => order.id !== orderId);
         setOrders(remainingOrders);
 
@@ -374,25 +365,20 @@ export default function ProgressPage({
         } catch (emailError) {
           console.error('Failed to send email notification:', emailError);
         }
-
         toast({
           title: "Order Moved to Processing",
           description: "Order has been moved to processing stage and will appear on the Processing page."
         });
-        
         console.log('Order successfully moved to processing status');
         fetchProgressOrders();
       } else {
-        const { error } = await supabase
-          .from('orders')
-          .update({
-            progress_stage: stage,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', orderId);
-
+        const {
+          error
+        } = await supabase.from('orders').update({
+          progress_stage: stage,
+          updated_at: new Date().toISOString()
+        }).eq('id', orderId);
         if (error) throw error;
-
         setOrders(orders.map(order => {
           if (order.id === orderId) {
             const updatedOrder = {
@@ -418,7 +404,6 @@ export default function ProgressPage({
         } catch (emailError) {
           console.error('Failed to send email notification:', emailError);
         }
-
         toast({
           title: "Progress Updated",
           description: `Order progress updated to ${stageInfo.name}.`
@@ -545,7 +530,6 @@ export default function ProgressPage({
       });
     }
   };
-
   if (loading) {
     return <div className="container mx-auto p-4">
         <div className="flex justify-center items-center h-64">
@@ -553,7 +537,6 @@ export default function ProgressPage({
         </div>
       </div>;
   }
-
   if (error) {
     return <div className="container mx-auto p-4">
         <div className="flex flex-col items-center justify-center h-64">
@@ -562,7 +545,6 @@ export default function ProgressPage({
         </div>
       </div>;
   }
-
   if (!user) {
     return <div className="container mx-auto p-4">
         <div className="flex flex-col items-center justify-center h-64">
@@ -570,7 +552,6 @@ export default function ProgressPage({
         </div>
       </div>;
   }
-
   return <div className="container mx-auto p-4">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Order Progress Tracking</h1>
@@ -597,7 +578,7 @@ export default function ProgressPage({
             {orders.map(order => {
           const isExpanded = expandedOrders.has(order.id);
           const orderDeliveries = deliveryQuantities[order.id] || {};
-          return <div key={order.id} className="p-4">
+          return <div key={order.id} className="p-4 bg-[#2e2e53]/0">
                   <div className="flex justify-between items-center">
                     <div className="flex items-center gap-4">
                       <div className="flex items-center gap-2">
