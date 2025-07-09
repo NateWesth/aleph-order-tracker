@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -408,9 +407,14 @@ export default function CompletedPage({
                                 status: order.status,
                                 total_amount: null,
                                 created_at: order.orderDate.toISOString(),
+                                updated_at: order.orderDate.toISOString(),
                                 company_id: null,
                                 companyName: order.companyName,
-                                items: order.items
+                                items: order.items.map(item => ({
+                                  id: item.id,
+                                  name: item.name,
+                                  quantity: item.quantity
+                                }))
                               }}
                             />
                             
@@ -483,7 +487,11 @@ export default function CompletedPage({
           </div>)}
       </div>
 
-      {selectedOrder && <OrderDetailsDialog open={showOrderDetails} onOpenChange={closeOrderDetails} orderNumber={selectedOrder.order_number} companyName={selectedOrder.companyName} status={selectedOrder.status} createdAt={selectedOrder.created_at} items={selectedOrder.items} />}
+      {selectedOrder && <OrderDetailsDialog 
+        open={showOrderDetails} 
+        onOpenChange={closeOrderDetails} 
+        order={selectedOrder} 
+      />}
 
       <ProcessingOrderFilesDialog order={filesDialogOrder} isOpen={showFilesDialog} onClose={closeFilesDialog} isAdmin={isAdmin} />
     </div>;
