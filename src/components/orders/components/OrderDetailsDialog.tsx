@@ -54,7 +54,7 @@ export default function OrderDetailsDialog({
     }
   };
 
-  // Enhanced parsing function to extract notes from description
+  // Enhanced parsing function to properly separate item names and notes
   const parseOrderItems = (description: string | null): OrderItem[] => {
     if (!description) return [];
     
@@ -73,9 +73,9 @@ export default function OrderDetailsDialog({
       const matchWithNotes = trimmedLine.match(/^(.+?)\s*\(Qty:\s*(\d+)\)\s*-\s*(.+)$/);
       if (matchWithNotes) {
         const item: OrderItem = {
-          name: matchWithNotes[1].trim(),
+          name: matchWithNotes[1].trim(), // Only the item name, no notes
           quantity: parseInt(matchWithNotes[2]),
-          notes: matchWithNotes[3].trim()
+          notes: matchWithNotes[3].trim() // Notes go here
         };
         console.log('✅ OrderDetailsDialog: Found item with notes:', item);
         items.push(item);
@@ -86,8 +86,9 @@ export default function OrderDetailsDialog({
       const matchWithoutNotes = trimmedLine.match(/^(.+?)\s*\(Qty:\s*(\d+)\)$/);
       if (matchWithoutNotes) {
         const item: OrderItem = {
-          name: matchWithoutNotes[1].trim(),
+          name: matchWithoutNotes[1].trim(), // Only the item name
           quantity: parseInt(matchWithoutNotes[2])
+          // No notes property when there are no notes
         };
         console.log('✅ OrderDetailsDialog: Found item without notes:', item);
         items.push(item);
@@ -96,8 +97,9 @@ export default function OrderDetailsDialog({
       
       // Fallback: treat as simple item name
       const item: OrderItem = {
-        name: trimmedLine,
+        name: trimmedLine, // Only the line content as item name
         quantity: 1
+        // No notes property for fallback items
       };
       console.log('✅ OrderDetailsDialog: Found simple item:', item);
       items.push(item);
@@ -110,9 +112,9 @@ export default function OrderDetailsDialog({
   // Use provided items or parse from description
   const displayItems: OrderItem[] = order.items && order.items.length > 0 ? 
     order.items.map(item => ({
-      name: item.name,
+      name: item.name, // Only the name
       quantity: item.quantity,
-      notes: item.notes || undefined
+      notes: item.notes || undefined // Notes separated
     })) : 
     parseOrderItems(order.description || null);
 
