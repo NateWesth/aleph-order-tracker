@@ -64,13 +64,16 @@ export default function CreateOrderDialog({
       const userRole = await getUserRole(user.id);
       console.log("🔐 CreateOrderDialog: User role:", userRole);
       
-      // Create description from items for backward compatibility
-      const description = orderData.items
+      // Create description from items for backward compatibility and include urgency info
+      const itemsDescription = orderData.items
         .filter(item => item.name && item.quantity > 0)
         .map(item => `${item.name} (Qty: ${item.quantity})`)
         .join('\n');
       
-      // Prepare order data for database insertion
+      const urgencyPrefix = orderData.urgency !== 'normal' ? `${orderData.urgency.toUpperCase()} ` : '';
+      const description = urgencyPrefix + itemsDescription;
+      
+      // Prepare order data for database insertion - DO NOT include urgency field as it doesn't exist in DB
       const orderInsertData = {
         order_number: orderData.orderNumber,
         description: description,
@@ -78,7 +81,6 @@ export default function CreateOrderDialog({
         total_amount: orderData.totalAmount || 0,
         user_id: user.id,
         status: 'pending',
-        urgency: orderData.urgency,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
