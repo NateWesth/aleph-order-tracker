@@ -58,29 +58,28 @@ export default function CreateOrderDialog({
     console.log("🚀 CreateOrderDialog: Starting order creation process");
     console.log("📋 CreateOrderDialog: Order data received:", orderData);
     console.log("👤 CreateOrderDialog: Current user ID:", user.id);
+    console.log("🎯 CreateOrderDialog: Order urgency:", orderData.urgency);
     
     try {
       // Get user role for additional context
       const userRole = await getUserRole(user.id);
       console.log("🔐 CreateOrderDialog: User role:", userRole);
       
-      // Create description from items for backward compatibility and include urgency info
+      // Create description from items
       const itemsDescription = orderData.items
         .filter(item => item.name && item.quantity > 0)
         .map(item => `${item.name} (Qty: ${item.quantity})`)
         .join('\n');
       
-      const urgencyPrefix = orderData.urgency !== 'normal' ? `${orderData.urgency.toUpperCase()} ` : '';
-      const description = urgencyPrefix + itemsDescription;
-      
-      // Prepare order data for database insertion - DO NOT include urgency field as it doesn't exist in DB
+      // Prepare order data for database insertion - NOW INCLUDING urgency field
       const orderInsertData = {
         order_number: orderData.orderNumber,
-        description: description,
+        description: itemsDescription,
         company_id: orderData.companyId,
         total_amount: orderData.totalAmount || 0,
         user_id: user.id,
         status: 'pending',
+        urgency: orderData.urgency, // Store urgency in database
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
@@ -88,6 +87,7 @@ export default function CreateOrderDialog({
       console.log("💾 CreateOrderDialog: Final order data for database:", orderInsertData);
       console.log("🏢 CreateOrderDialog: Company ID being saved:", orderInsertData.company_id);
       console.log("👤 CreateOrderDialog: User ID being saved:", orderInsertData.user_id);
+      console.log("🎯 CreateOrderDialog: Urgency being saved:", orderInsertData.urgency);
 
       // Verify company exists before creating order
       if (orderInsertData.company_id) {
@@ -128,8 +128,9 @@ export default function CreateOrderDialog({
       console.log("🎉 CreateOrderDialog: Order created successfully in database:", createdOrder);
       console.log("🔍 CreateOrderDialog: Created order company_id:", createdOrder.company_id);
       console.log("🔍 CreateOrderDialog: Created order user_id:", createdOrder.user_id);
+      console.log("🎯 CreateOrderDialog: Created order urgency:", createdOrder.urgency);
 
-      // Verify the order was saved with correct company_id
+      // Verify the order was saved with correct data
       const { data: verificationOrder, error: verificationError } = await supabase
         .from('orders')
         .select('*')
@@ -141,11 +142,13 @@ export default function CreateOrderDialog({
       } else {
         console.log("✅ CreateOrderDialog: Order verification successful:", verificationOrder);
         console.log("🏢 CreateOrderDialog: Verified company_id in database:", verificationOrder.company_id);
+        console.log("🎯 CreateOrderDialog: Verified urgency in database:", verificationOrder.urgency);
       }
 
+      const urgencyText = orderData.urgency !== 'normal' ? ` with ${orderData.urgency.toUpperCase()} priority` : '';
       toast({
         title: "Order Created Successfully",
-        description: `Order ${orderData.orderNumber} has been created and linked to the company.`,
+        description: `Order ${orderData.orderNumber} has been created${urgencyText} and linked to the company.`,
       });
 
       setOpen(false);
