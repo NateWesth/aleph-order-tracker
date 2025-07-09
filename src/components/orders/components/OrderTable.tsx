@@ -1,3 +1,4 @@
+
 import {
   Table,
   TableBody,
@@ -18,21 +19,21 @@ interface OrderTableProps {
 
 export default function OrderTable({ orders, isAdmin, onReceiveOrder, onDeleteOrder }: OrderTableProps) {
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
+    <div className="bg-white dark:bg-gray-900 rounded-lg shadow border border-gray-200 dark:border-gray-700">
       <Table>
         <TableHeader>
-          <TableRow>
-            <TableHead>Order Number</TableHead>
-            <TableHead>Company</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Created</TableHead>
-            <TableHead>Actions</TableHead>
+          <TableRow className="border-b border-gray-200 dark:border-gray-700">
+            <TableHead className="text-gray-900 dark:text-gray-100">Order Number</TableHead>
+            <TableHead className="text-gray-900 dark:text-gray-100">Company</TableHead>
+            <TableHead className="text-gray-900 dark:text-gray-100">Status</TableHead>
+            <TableHead className="text-gray-900 dark:text-gray-100">Created</TableHead>
+            <TableHead className="text-gray-900 dark:text-gray-100">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {orders.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={5} className="text-center py-8">
+            <TableRow className="border-b border-gray-200 dark:border-gray-700">
+              <TableCell colSpan={5} className="text-center py-8 text-gray-600 dark:text-gray-400">
                 No orders found.
               </TableCell>
             </TableRow>
