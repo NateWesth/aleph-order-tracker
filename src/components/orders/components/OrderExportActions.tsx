@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { 
@@ -656,7 +657,7 @@ export default function OrderExportActions({
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      URL.revokeObjectURL(excelBlob);
+      URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Error generating Excel file:', error);
     } finally {
