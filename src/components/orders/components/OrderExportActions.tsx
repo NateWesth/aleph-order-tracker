@@ -43,9 +43,22 @@ interface Company {
   account_manager: string | null;
 }
 
+interface OrderWithCompany {
+  id: string;
+  order_number: string;
+  description: string | null;
+  status: string | null;
+  total_amount: number | null;
+  created_at: string;
+  company_id: string | null;
+  companyName?: string;
+  items?: OrderItem[];
+  company?: Company;
+}
+
 interface OrderExportActionsProps {
   orders?: Order[];
-  order?: Order;
+  order?: OrderWithCompany;
   title?: string;
   clientCompany?: {
     name: string;
@@ -112,7 +125,7 @@ export default function OrderExportActions({
     }
   };
 
-  const handlePrintSingleOrder = async (orderToPrint: Order) => {
+  const handlePrintSingleOrder = async (orderToPrint: OrderWithCompany) => {
     setLoading(true);
     
     // Fetch company details if company_id exists
@@ -340,7 +353,7 @@ export default function OrderExportActions({
     setLoading(false);
   };
 
-  const handleExportSingleOrderPDF = async (orderToExport: Order) => {
+  const handleExportSingleOrderPDF = async (orderToExport: OrderWithCompany) => {
     setLoading(true);
     try {
       const doc = new jsPDF();

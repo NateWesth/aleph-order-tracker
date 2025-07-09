@@ -407,8 +407,8 @@ export default function CompletedPage({
                                 status: order.status,
                                 total_amount: null,
                                 created_at: order.orderDate.toISOString(),
-                                updated_at: order.orderDate.toISOString(),
                                 company_id: null,
+                                user_id: undefined,
                                 companyName: order.companyName,
                                 items: order.items.map(item => ({
                                   id: item.id,
