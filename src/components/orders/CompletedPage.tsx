@@ -125,7 +125,7 @@ export default function CompletedPage({
   // Fetch company details for orders
   const fetchCompanyDetails = async (companyId: string) => {
     try {
-      const { data } = await supabase
+      const { data } } = await supabase
         .from('companies')
         .select('name, address, phone, email, contact_person')
         .eq('id', companyId)
@@ -408,7 +408,6 @@ export default function CompletedPage({
                                 total_amount: null,
                                 created_at: order.orderDate.toISOString(),
                                 company_id: null,
-                                user_id: undefined,
                                 companyName: order.companyName,
                                 items: order.items.map(item => ({
                                   id: item.id,

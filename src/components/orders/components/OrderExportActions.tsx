@@ -11,6 +11,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import { supabase } from "@/integrations/supabase/client";
+import { OrderWithCompany } from "../types/orderTypes";
 
 interface OrderItem {
   id: string;
@@ -41,19 +42,6 @@ interface Company {
   address: string | null;
   vat_number: string | null;
   account_manager: string | null;
-}
-
-interface OrderWithCompany {
-  id: string;
-  order_number: string;
-  description: string | null;
-  status: string | null;
-  total_amount: number | null;
-  created_at: string;
-  company_id: string | null;
-  companyName?: string;
-  items?: OrderItem[];
-  company?: Company;
 }
 
 interface OrderExportActionsProps {
