@@ -1,3 +1,4 @@
+
 import { TableCell, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -6,46 +7,20 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import OrderExportActions from "./OrderExportActions";
 import { useState } from "react";
 import OrderDetailsDialog from "./OrderDetailsDialog";
-
-interface OrderItem {
-  id: string;
-  name: string;
-  quantity: number;
-  delivered?: number;
-  notes?: string;
-}
-
-interface Order {
-  id: string;
-  order_number: string;
-  description: string | null;
-  status: string | null;
-  total_amount: number | null;
-  created_at: string;
-  company_id: string | null;
-  companyName?: string;
-  items?: OrderItem[];
-  urgency?: string;
-}
+import { OrderWithCompany } from "../types/orderTypes";
 
 interface OrderRowProps {
-  order: Order;
-  onEditOrder?: (order: Order) => void;
-  onDeleteOrder?: (id: string) => void;
-  onViewFiles?: (order: Order) => void;
-  onUpdateStatus?: (orderId: string, status: string) => void;
-  onUpdateProgress?: (orderId: string, stage: string) => void;
-  isAdmin?: boolean;
+  order: OrderWithCompany;
+  isAdmin: boolean;
+  onReceiveOrder: (order: OrderWithCompany) => void;
+  onDeleteOrder: (orderId: string, orderNumber: string) => void;
 }
 
 export default function OrderRow({ 
   order, 
-  onEditOrder, 
-  onDeleteOrder, 
-  onViewFiles, 
-  onUpdateStatus, 
-  onUpdateProgress,
-  isAdmin 
+  isAdmin,
+  onReceiveOrder,
+  onDeleteOrder
 }: OrderRowProps) {
   const [showDetails, setShowDetails] = useState(false);
 
@@ -113,23 +88,6 @@ export default function OrderRow({
         <TableCell>{order.companyName || 'No Company'}</TableCell>
         <TableCell>{getStatusBadge(order.status)}</TableCell>
         <TableCell>{new Date(order.created_at).toLocaleDateString()}</TableCell>
-        <TableCell>{order.total_amount ? `$${order.total_amount.toFixed(2)}` : 'N/A'}</TableCell>
-        <TableCell>
-          {order.urgency || 'Normal'}
-        </TableCell>
-        {isAdmin && (
-          <TableCell>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onUpdateStatus && onUpdateStatus(order.id, order.status === 'pending' ? 'processing' : 'completed')}
-              >
-                {order.status === 'pending' ? 'Start Processing' : 'Mark Complete'}
-              </Button>
-            </div>
-          </TableCell>
-        )}
         <TableCell>
           <div className="flex items-center gap-2">
             <Button
@@ -150,19 +108,14 @@ export default function OrderRow({
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem
-                    onClick={() => onEditOrder && onEditOrder(order)}
+                    onClick={() => onReceiveOrder(order)}
                   >
-                    Edit Order
+                    Receive Order
                   </DropdownMenuItem>
                   <DropdownMenuItem
-                    onClick={() => onDeleteOrder && onDeleteOrder(order.id)}
+                    onClick={() => onDeleteOrder(order.id, order.order_number)}
                   >
                     Delete Order
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => onViewFiles && onViewFiles(order)}
-                  >
-                    View Files
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
