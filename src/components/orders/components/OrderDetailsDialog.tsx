@@ -11,6 +11,7 @@ interface OrderItem {
   name: string;
   quantity: number;
   unit?: string;
+  notes?: string;
 }
 
 interface OrderDetailsDialogProps {
@@ -108,9 +109,14 @@ export default function OrderDetailsDialog({
                   <div className="col-span-2 text-center">Total</div>
                 </div>
                 {items.map((item, index) => (
-                  <div key={index} className="grid grid-cols-12 gap-4 p-4 items-center hover:bg-gray-50">
+                  <div key={index} className="grid grid-cols-12 gap-4 p-4 items-start hover:bg-gray-50">
                     <div className="col-span-6">
                       <p className="font-medium text-gray-900">{item.name}</p>
+                      {item.notes && (
+                        <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                          {item.notes}
+                        </p>
+                      )}
                     </div>
                     <div className="col-span-2 text-center">
                       <span className="text-gray-600">{item.quantity}</span>

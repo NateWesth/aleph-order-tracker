@@ -17,6 +17,7 @@ interface OrderItem {
   name: string;
   quantity: number;
   delivered?: number;
+  notes?: string;
 }
 
 interface Order {
@@ -200,9 +201,16 @@ export default function OrderExportActions({
               border: 1px solid #ddd; 
               padding: 10px; 
               text-align: left;
+              vertical-align: top;
             }
             tr:nth-child(even) { 
               background-color: #f9f9f9;
+            }
+            .item-notes {
+              font-size: 9px;
+              color: #666;
+              margin-top: 4px;
+              font-style: italic;
             }
             .signature-section { 
               margin-top: 30px; 
@@ -284,10 +292,13 @@ export default function OrderExportActions({
             <tbody>
               ${items.map(item => `
                 <tr>
-                  <td>${item.name}</td>
+                  <td>
+                    ${item.name}
+                    ${item.notes ? `<div class="item-notes">${item.notes}</div>` : ''}
+                  </td>
                   <td>${item.quantity}</td>
                   <td>Each</td>
-                  <td></td>
+                  <td>${item.notes || ''}</td>
                 </tr>
               `).join('')}
             </tbody>
@@ -414,13 +425,16 @@ export default function OrderExportActions({
       doc.text(`Order Date: ${new Date(orderToExport.created_at).toLocaleDateString()}`, 105, 110, { align: 'center' });
       doc.text(`Status: ${orderToExport.status || 'pending'}`, 105, 118, { align: 'center' });
       
-      // Items table with blue header
-      const tableData = items.map(item => [
-        item.name,
-        item.quantity.toString(),
-        'Each',
-        ''
-      ]);
+      // Items table with blue header and notes support
+      const tableData = items.map(item => {
+        const itemName = item.notes ? `${item.name}\n${item.notes}` : item.name;
+        return [
+          itemName,
+          item.quantity.toString(),
+          'Each',
+          item.notes || ''
+        ];
+      });
 
       autoTable(doc, {
         head: [['Item Description', 'Quantity', 'Unit', 'Notes']],
@@ -443,6 +457,17 @@ export default function OrderExportActions({
           1: { cellWidth: 30, halign: 'center' },
           2: { cellWidth: 30, halign: 'center' },
           3: { cellWidth: 50 }
+        },
+        didParseCell: function(data) {
+          // Make notes text smaller and italic
+          if (data.column.index === 0 && data.cell.text.length > 1) {
+            // If there are multiple lines (item name + notes)
+            const lines = data.cell.text;
+            if (lines.length > 1) {
+              data.cell.styles.fontSize = 8;
+              data.cell.styles.fontStyle = 'italic';
+            }
+          }
         }
       });
 
