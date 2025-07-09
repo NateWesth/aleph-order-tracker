@@ -54,7 +54,7 @@ export default function OrderDetailsDialog({
     }
   };
 
-  // Enhanced parsing function to properly separate item names and notes
+  // Fixed parsing function to completely separate item names from notes
   const parseOrderItems = (description: string | null): OrderItem[] => {
     if (!description) return [];
     
@@ -72,10 +72,14 @@ export default function OrderDetailsDialog({
       // Match pattern: "Item Name (Qty: X) - Notes"
       const matchWithNotes = trimmedLine.match(/^(.+?)\s*\(Qty:\s*(\d+)\)\s*-\s*(.+)$/);
       if (matchWithNotes) {
+        const itemName = matchWithNotes[1].trim();
+        const quantity = parseInt(matchWithNotes[2]);
+        const itemNotes = matchWithNotes[3].trim();
+        
         const item: OrderItem = {
-          name: matchWithNotes[1].trim(), // Only the item name, no notes
-          quantity: parseInt(matchWithNotes[2]),
-          notes: matchWithNotes[3].trim() // Notes go here
+          name: itemName, // Clean item name without any notes
+          quantity: quantity,
+          notes: itemNotes // Notes completely separated
         };
         console.log('✅ OrderDetailsDialog: Found item with notes:', item);
         items.push(item);
@@ -85,10 +89,13 @@ export default function OrderDetailsDialog({
       // Match pattern: "Item Name (Qty: X)" without notes
       const matchWithoutNotes = trimmedLine.match(/^(.+?)\s*\(Qty:\s*(\d+)\)$/);
       if (matchWithoutNotes) {
+        const itemName = matchWithoutNotes[1].trim();
+        const quantity = parseInt(matchWithoutNotes[2]);
+        
         const item: OrderItem = {
-          name: matchWithoutNotes[1].trim(), // Only the item name
-          quantity: parseInt(matchWithoutNotes[2])
-          // No notes property when there are no notes
+          name: itemName, // Clean item name
+          quantity: quantity
+          // No notes for this item
         };
         console.log('✅ OrderDetailsDialog: Found item without notes:', item);
         items.push(item);
@@ -97,9 +104,9 @@ export default function OrderDetailsDialog({
       
       // Fallback: treat as simple item name
       const item: OrderItem = {
-        name: trimmedLine, // Only the line content as item name
+        name: trimmedLine, // Just the item name
         quantity: 1
-        // No notes property for fallback items
+        // No notes for fallback items
       };
       console.log('✅ OrderDetailsDialog: Found simple item:', item);
       items.push(item);
@@ -112,9 +119,9 @@ export default function OrderDetailsDialog({
   // Use provided items or parse from description
   const displayItems: OrderItem[] = order.items && order.items.length > 0 ? 
     order.items.map(item => ({
-      name: item.name, // Only the name
+      name: item.name, // Pure item name only
       quantity: item.quantity,
-      notes: item.notes || undefined // Notes separated
+      notes: item.notes || undefined // Notes go to separate property
     })) : 
     parseOrderItems(order.description || null);
 
