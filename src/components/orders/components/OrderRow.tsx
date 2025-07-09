@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -29,7 +30,7 @@ interface OrderRowProps {
 export default function OrderRow({ order, isAdmin, onReceiveOrder, onDeleteOrder }: OrderRowProps) {
   const [showDetails, setShowDetails] = useState(false);
   const [companyName, setCompanyName] = useState<string>(order.companyName || 'Unknown Company');
-  const [orderItems, setOrderItems] = useState<Array<{id: string, name: string, quantity: number}>>([]);
+  const [orderItems, setOrderItems] = useState<Array<{name: string, quantity: number, unit?: string}>>([]);
 
   const getStatusColor = (status: string | null) => {
     switch (status?.toLowerCase()) {
@@ -61,6 +62,17 @@ export default function OrderRow({ order, isAdmin, onReceiveOrder, onDeleteOrder
   };
 
   const parseOrderItems = () => {
+    // First try to use the items array if it exists
+    if (order.items && order.items.length > 0) {
+      setOrderItems(order.items.map(item => ({
+        name: item.name,
+        quantity: item.quantity,
+        unit: undefined // Will be populated from description if available
+      })));
+      return;
+    }
+
+    // Fall back to parsing description if no items array
     if (!order.description) {
       setOrderItems([]);
       return;
@@ -68,20 +80,21 @@ export default function OrderRow({ order, isAdmin, onReceiveOrder, onDeleteOrder
 
     // Parse the description to extract items and quantities
     // Format: "Item Name (Qty: 2)\nAnother Item (Qty: 1)"
-    const items = order.description.split('\n').map((line, index) => {
+    const lines = order.description.split('\n').filter(line => line.trim());
+    const items = lines.map((line, index) => {
       const match = line.match(/^(.+?)\s*\(Qty:\s*(\d+)\)$/);
       if (match) {
         return {
-          id: `item-${index}`,
           name: match[1].trim(),
-          quantity: parseInt(match[2])
+          quantity: parseInt(match[2]),
+          unit: undefined
         };
       }
       // Fallback for items without quantity format
       return {
-        id: `item-${index}`,
         name: line.trim(),
-        quantity: 1
+        quantity: 1,
+        unit: undefined
       };
     }).filter(item => item.name);
 
@@ -184,6 +197,7 @@ export default function OrderRow({ order, isAdmin, onReceiveOrder, onDeleteOrder
         status={order.status}
         createdAt={order.created_at}
         items={orderItems}
+        urgency={order.urgency}
       />
     </>
   );

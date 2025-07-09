@@ -1,5 +1,4 @@
 
-
 export interface OrderWithCompany {
   id: string;
   order_number: string;
@@ -12,7 +11,7 @@ export interface OrderWithCompany {
   company_id?: string | null;
   user_id?: string;
   progress_stage?: string;
+  urgency?: string;
   items?: Array<{id: string, name: string, quantity: number}>;
   companyName: string;
 }
-

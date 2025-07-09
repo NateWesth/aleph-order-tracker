@@ -3,12 +3,12 @@ import { useState, useEffect } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus } from "lucide-react";
-import { Form, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { generateOrderNumber } from "../utils/orderUtils";
 import { useOrderFormData } from "../hooks/useOrderFormData";
 import OrderFormHeader from "./OrderFormHeader";
-import OrderFormDescription from "./OrderFormDescription";
 import OrderFormCompanySelector from "./OrderFormCompanySelector";
 import OrderFormTotalAmount from "./OrderFormTotalAmount";
 import { OrderItemsForm } from "./OrderItemsForm";
@@ -23,18 +23,18 @@ export interface OrderItem {
 
 interface OrderFormData {
   orderNumber: string;
-  description: string;
   companyId: string;
   totalAmount: number;
+  urgency: string;
   items: OrderItem[];
 }
 
 interface OrderFormProps {
   onSubmit: (orderData: {
     orderNumber: string;
-    description: string;
     companyId: string;
     totalAmount: number;
+    urgency: string;
     items: OrderItem[];
   }) => void;
   loading?: boolean;
@@ -54,9 +54,9 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
   const form = useForm<OrderFormData>({
     defaultValues: {
       orderNumber: "",
-      description: "",
       companyId: "",
       totalAmount: 0,
+      urgency: "normal",
       items: [{
         id: crypto.randomUUID(),
         name: "",
@@ -161,9 +161,9 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
 
     const finalOrderData = {
       orderNumber: data.orderNumber,
-      description: data.description,
       companyId: finalCompanyId,
       totalAmount: data.totalAmount,
+      urgency: data.urgency,
       items: validItems
     };
 
@@ -188,14 +188,36 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
             setValue={form.setValue}
           />
 
-          <OrderFormDescription control={form.control} />
-
           <OrderFormCompanySelector
             control={form.control}
             register={form.register}
             currentUserRole={currentUserRole}
             availableCompanies={availableCompanies}
             userCompany={userCompany}
+          />
+
+          <FormField
+            control={form.control}
+            name="urgency"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Urgency Level</FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select urgency level" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="normal">Normal</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
           />
 
           <Card>
