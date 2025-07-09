@@ -1,86 +1,136 @@
 
 import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Plus } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import CreateOrderDialog from "./components/CreateOrderDialog";
 import OrdersHeader from "./components/OrdersHeader";
 import OrderTable from "./components/OrderTable";
-import CreateOrderDialog from "./components/CreateOrderDialog";
-import OrderExportActions from "./components/OrderExportActions";
-import { useOrderData, Order } from "./hooks/useOrderData";
-import { useGlobalRealtimeOrders } from "./hooks/useGlobalRealtimeOrders";
-import { useCompanyData } from "@/components/admin/hooks/useCompanyData";
-import { useAuth } from "@/contexts/AuthContext";
-import { sendOrderNotification } from "@/utils/emailNotifications";
 import { OrderWithCompany } from "./types/orderTypes";
+import { useGlobalRealtimeOrders } from "./hooks/useGlobalRealtimeOrders";
+import { sendOrderNotification } from "@/utils/emailNotifications";
 
 interface OrdersPageProps {
   isAdmin?: boolean;
 }
 
-export default function OrdersPage({
-  isAdmin = false
-}: OrdersPageProps) {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [ordersWithCompanies, setOrdersWithCompanies] = useState<OrderWithCompany[]>([]);
-  const {
-    user
-  } = useAuth();
-  const {
-    orders,
-    setOrders,
-    loading,
-    fetchOrders,
-    toast,
-    userRole,
-    userCompanyId
-  } = useOrderData();
-  const {
-    companies
-  } = useCompanyData();
+export default function OrdersPage({ isAdmin = false }: OrdersPageProps) {
+  const { toast } = useToast();
+  const { user } = useAuth();
+  const [orders, setOrders] = useState<OrderWithCompany[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
 
-  // Set up real-time subscriptions using the enhanced global hook
+  // Set up real-time subscriptions
   useGlobalRealtimeOrders({
-    onOrdersChange: fetchOrders,
+    onOrdersChange: () => {
+      console.log('Real-time update detected for orders page, refreshing...');
+      fetchOrders();
+    },
     isAdmin,
     pageType: 'orders'
   });
 
-  // Fetch company names for orders
-  useEffect(() => {
-    const fetchOrdersWithCompanies = async () => {
-      if (orders.length === 0) {
-        setOrdersWithCompanies([]);
-        return;
-      }
+  // Fetch orders function
+  const fetchOrders = async () => {
+    if (!user?.id) {
+      setError('User not authenticated');
+      setLoading(false);
+      return;
+    }
 
-      // Get unique company IDs
-      const companyIds = [...new Set(orders.map(order => order.company_id).filter(Boolean))];
-      if (companyIds.length === 0) {
-        setOrdersWithCompanies(orders.map(order => ({
-          ...order,
-          companyName: 'No Company'
-        })));
-        return;
-      }
-
-      // Fetch company names
-      const {
-        data: companiesData
-      } = await supabase.from('companies').select('id, name').in('id', companyIds);
-      const companyMap = new Map(companiesData?.map(c => [c.id, c.name]) || []);
-      const ordersWithNames = orders.map(order => ({
-        ...order,
-        companyName: order.company_id ? companyMap.get(order.company_id) || 'Unknown Company' : 'No Company'
-      })) as OrderWithCompany[];
-      setOrdersWithCompanies(ordersWithNames);
-    };
-    fetchOrdersWithCompanies();
-  }, [orders]);
-
-  const receiveOrder = async (order: OrderWithCompany) => {
     try {
-      console.log('Receiving order and updating status to received:', order.id);
+      console.log('Fetching orders from Supabase...');
+      setLoading(true);
+      setError(null);
 
-      // Update order status in database to 'received' - this will trigger real-time updates
+      let query = supabase
+        .from('orders')
+        .select(`
+          *,
+          companies (
+            name,
+            code
+          )
+        `)
+        .in('status', ['pending', 'received'])
+        .order('created_at', { ascending: false });
+
+      if (!isAdmin) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('company_id')
+          .eq('id', user.id)
+          .single();
+
+        if (profile?.company_id) {
+          query = query.eq('company_id', profile.company_id);
+        } else {
+          query = query.eq('user_id', user.id);
+        }
+      }
+
+      const { data, error: fetchError } = await query;
+
+      if (fetchError) {
+        console.error("Error fetching orders:", fetchError);
+        setError(`Failed to fetch orders: ${fetchError.message}`);
+        return;
+      }
+
+      console.log('Fetched orders from database:', data?.length || 0);
+
+      if (data && data.length > 0) {
+        const convertedOrders: OrderWithCompany[] = data.map((dbOrder: any) => ({
+          id: dbOrder.id,
+          order_number: dbOrder.order_number,
+          description: dbOrder.description,
+          status: dbOrder.status,
+          total_amount: dbOrder.total_amount,
+          created_at: dbOrder.created_at,
+          company_id: dbOrder.company_id,
+          companyName: dbOrder.companies?.name || "Unknown Company",
+          company: dbOrder.companies ? {
+            id: dbOrder.company_id,
+            name: dbOrder.companies.name,
+            code: dbOrder.companies.code,
+            contactPerson: '',
+            email: '',
+            phone: '',
+            address: '',
+            vatNumber: ''
+          } : undefined
+        }));
+
+        console.log('Converted orders:', convertedOrders.length);
+        setOrders(convertedOrders);
+      } else {
+        setOrders([]);
+      }
+    } catch (error) {
+      console.error("Failed to fetch orders:", error);
+      setError(`Failed to fetch orders: ${error}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Load orders on component mount
+  useEffect(() => {
+    console.log('Orders page mounted, fetching orders...');
+    fetchOrders();
+  }, [isAdmin, user?.id]);
+
+  // Handle receiving an order (moving from pending to received)
+  const handleReceiveOrder = async (order: OrderWithCompany) => {
+    if (!isAdmin) return;
+    
+    try {
+      console.log('Receiving order:', order.id);
+      
       const { error } = await supabase
         .from('orders')
         .update({
@@ -91,32 +141,35 @@ export default function OrdersPage({
 
       if (error) throw error;
 
-      // Update local state immediately
-      setOrders(orders.map(o => 
-        o.id === order.id ? { ...o, status: 'received' } : o
-      ));
+      // Update local state
+      const updatedOrders = orders.map(o => 
+        o.id === order.id 
+          ? { ...o, status: 'received' as const }
+          : o
+      );
+      setOrders(updatedOrders);
 
       // Send email notification
       try {
         await sendOrderNotification({
           orderId: order.id,
           orderNumber: order.order_number,
-          companyName: order.companyName || 'Unknown Company',
+          companyName: order.companyName,
           changeType: 'status_change',
           oldStatus: 'pending',
           newStatus: 'received'
         });
       } catch (emailError) {
         console.error('Failed to send email notification:', emailError);
-        // Don't fail the entire operation if email fails
       }
 
       toast({
         title: "Order Received",
-        description: `Order ${order.order_number} has been received and moved to progress tracking. All users will see this update automatically.`
+        description: `Order ${order.order_number} has been marked as received.`
       });
-
-      console.log('Order successfully received and database updated');
+      
+      console.log('Order successfully received');
+      fetchOrders();
     } catch (error: any) {
       console.error('Error receiving order:', error);
       toast({
@@ -127,9 +180,14 @@ export default function OrdersPage({
     }
   };
 
-  const deleteOrder = async (orderId: string, orderNumber: string) => {
+  // Handle deleting an order
+  const handleDeleteOrder = async (orderId: string, orderNumber: string) => {
+    if (!isAdmin) return;
+    
+    const orderToDelete = orders.find(order => order.id === orderId);
+    
     try {
-      const orderToDelete = ordersWithCompanies.find(o => o.id === orderId);
+      console.log('Deleting order:', orderId);
       
       const { error } = await supabase
         .from('orders')
@@ -138,7 +196,8 @@ export default function OrdersPage({
 
       if (error) throw error;
 
-      setOrders(orders.filter(order => order.id !== orderId));
+      const remainingOrders = orders.filter(order => order.id !== orderId);
+      setOrders(remainingOrders);
 
       // Send email notification
       try {
@@ -154,9 +213,13 @@ export default function OrdersPage({
 
       toast({
         title: "Order Deleted",
-        description: `Order ${orderNumber} has been successfully deleted.`
+        description: `Order ${orderNumber} has been permanently deleted.`
       });
+      
+      console.log('Order successfully deleted');
+      fetchOrders();
     } catch (error: any) {
+      console.error('Error deleting order:', error);
       toast({
         title: "Error",
         description: "Failed to delete order. Please try again.",
@@ -165,56 +228,57 @@ export default function OrdersPage({
     }
   };
 
-  const filteredOrders = ordersWithCompanies.filter(order => 
-    order.order_number.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    order.companyName?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    order.status?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
   if (loading) {
-    return <div className="flex items-center justify-center h-64">
-        <div className="text-lg">Loading orders...</div>
-      </div>;
-  }
-
-  // Convert OrderWithCompany[] to Order[] for OrderExportActions
-  const exportOrders = filteredOrders.map(order => ({
-    id: order.id,
-    order_number: order.order_number,
-    description: order.description || '',
-    status: order.status,
-    total_amount: order.total_amount,
-    created_at: order.created_at,
-    updated_at: order.updated_at,
-    completed_date: order.completed_date,
-    company_id: order.company_id,
-    user_id: order.user_id,
-    progress_stage: order.progress_stage,
-    items: order.items,
-    companyName: order.companyName
-  }));
-
-  return <div className="container mx-auto p-6">
-      <div className="flex justify-between items-center mb-6">
-        <OrdersHeader searchTerm={searchTerm} onSearchChange={setSearchTerm} />
-        <div className="flex gap-2">
-          <OrderExportActions orders={exportOrders} title="Orders" />
-          <CreateOrderDialog 
-            isAdmin={isAdmin} 
-            companies={companies} 
-            profiles={[]} // We'll handle this in CreateOrderDialog
-            userProfile={null} // We'll handle this in CreateOrderDialog
-            onOrderCreated={fetchOrders} 
-          />
+    return (
+      <div className="container mx-auto p-4 bg-background">
+        <div className="flex justify-center items-center h-64">
+          <div className="text-lg text-foreground">Loading orders...</div>
         </div>
       </div>
+    );
+  }
 
-      {/* Enhanced Real-time Status Indicator */}
-      
-      
-      <OrderTable orders={filteredOrders} isAdmin={isAdmin} onReceiveOrder={receiveOrder} onDeleteOrder={deleteOrder} />
-      <div className="mt-4 text-sm text-gray-600 dark:text-gray-400">
-        Total orders: {filteredOrders.length}
+  if (error) {
+    return (
+      <div className="container mx-auto p-4 bg-background">
+        <div className="flex flex-col items-center justify-center h-64">
+          <div className="text-lg text-red-600 mb-4">Error: {error}</div>
+          <Button onClick={fetchOrders}>Retry</Button>
+        </div>
       </div>
-    </div>;
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="container mx-auto p-4 bg-background">
+        <div className="flex flex-col items-center justify-center h-64">
+          <div className="text-lg mb-4 text-foreground">Please log in to view orders</div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="container mx-auto p-4 bg-background">
+      <OrdersHeader 
+        isAdmin={isAdmin}
+        onCreateOrder={() => setIsCreateDialogOpen(true)}
+      />
+
+      <OrderTable
+        orders={orders}
+        isAdmin={isAdmin}
+        onReceiveOrder={handleReceiveOrder}
+        onDeleteOrder={handleDeleteOrder}
+      />
+
+      <CreateOrderDialog
+        isOpen={isCreateDialogOpen}
+        onClose={() => setIsCreateDialogOpen(false)}
+        onOrderCreated={fetchOrders}
+        isAdmin={isAdmin}
+      />
+    </div>
+  );
 }

@@ -2,42 +2,32 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
-import { File, Download, Printer, Search, Plus, FileText, Eye } from "lucide-react";
+import { Download, Search, FileText, Image, Archive, Video, Music, Code, File as FileIcon, Trash2, Eye } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { useGlobalRealtimeOrders } from "./hooks/useGlobalRealtimeOrders";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import { ChevronDown, ChevronRight } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
-// Define the order file interface
 interface OrderFile {
   id: string;
-  name: string;
-  url: string;
-  type: 'invoice' | 'quote' | 'purchase-order' | 'delivery-note';
-  uploadedBy: 'admin' | 'client';
-  uploadDate: Date;
-  orderNumber: string;
-  companyName: string;
-}
-
-interface CompletedOrderFiles {
-  orderNumber: string;
-  companyName: string;
-  completedDate: Date;
-  files: OrderFile[];
-}
-
-interface MonthGroup {
-  month: string;
-  orderFiles: CompletedOrderFiles[];
-  isOpen: boolean;
+  file_name: string;
+  file_url: string;
+  file_type: string;
+  file_size: number | null;
+  created_at: string;
+  order_id: string;
+  uploaded_by_role: string;
+  uploaded_by_user_id: string;
+  order?: {
+    order_number: string;
+    status: string;
+    companies?: {
+      name: string;
+    } | null;
+  };
 }
 
 interface FilesPageProps {
@@ -47,320 +37,369 @@ interface FilesPageProps {
 export default function FilesPage({ isAdmin }: FilesPageProps) {
   const { toast } = useToast();
   const { user } = useAuth();
-  const [completedOrderFiles, setCompletedOrderFiles] = useState<CompletedOrderFiles[]>([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterType, setFilterType] = useState<string | null>(null);
-  const [monthGroups, setMonthGroups] = useState<MonthGroup[]>([]);
+  const [files, setFiles] = useState<OrderFile[]>([]);
+  const [filteredFiles, setFilteredFiles] = useState<OrderFile[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
 
-  // Fetch completed orders and their associated files
-  const fetchCompletedOrderFiles = async () => {
-    if (!user?.id) return;
+  // Get file icon based on file type
+  const getFileIcon = (fileName: string, fileType: string) => {
+    const extension = fileName.split('.').pop()?.toLowerCase();
+    const iconClass = "h-4 w-4";
+
+    if (fileType.startsWith('image/')) {
+      return <Image className={iconClass} />;
+    }
+    if (fileType.startsWith('video/')) {
+      return <Video className={iconClass} />;
+    }
+    if (fileType.startsWith('audio/')) {
+      return <Music className={iconClass} />;
+    }
+    if (fileType.includes('pdf') || extension === 'pdf') {
+      return <FileText className={iconClass} />;
+    }
+    if (['zip', 'rar', '7z', 'tar', 'gz'].includes(extension || '')) {
+      return <Archive className={iconClass} />;
+    }
+    if (['js', 'ts', 'jsx', 'tsx', 'html', 'css', 'json', 'xml'].includes(extension || '')) {
+      return <Code className={iconClass} />;
+    }
+    return <FileIcon className={iconClass} />;
+  };
+
+  // Format file size
+  const formatFileSize = (bytes: number | null): string => {
+    if (!bytes) return 'Unknown';
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(1024));
+    return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
+  };
+
+  // Fetch files from database
+  const fetchFiles = async () => {
+    if (!user?.id) {
+      setError('User not authenticated');
+      setLoading(false);
+      return;
+    }
 
     try {
-      console.log('Fetching completed orders with files...');
-      
-      let ordersQuery = supabase
-        .from('orders')
+      console.log('Fetching files from Supabase...');
+      setLoading(true);
+      setError(null);
+
+      let query = supabase
+        .from('order_files')
         .select(`
           *,
-          companies (
-            name,
-            code
+          orders!inner (
+            order_number,
+            status,
+            companies (
+              name
+            )
           )
         `)
-        .eq('status', 'completed')
-        .order('completed_date', { ascending: false });
+        .order('created_at', { ascending: false });
 
-      // If user is not admin, fetch only user's orders
       if (!isAdmin) {
-        ordersQuery = ordersQuery.eq('user_id', user.id);
+        // For non-admin users, only show files from their orders
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('company_id')
+          .eq('id', user.id)
+          .single();
+
+        if (profile?.company_id) {
+          query = query.eq('orders.company_id', profile.company_id);
+        } else {
+          query = query.eq('orders.user_id', user.id);
+        }
       }
 
-      const { data: orders, error: ordersError } = await ordersQuery;
+      const { data, error: fetchError } = await query;
 
-      if (ordersError) {
-        console.error("Error fetching completed orders:", ordersError);
+      if (fetchError) {
+        console.error("Error fetching files:", fetchError);
+        setError(`Failed to fetch files: ${fetchError.message}`);
         return;
       }
 
-      console.log('Fetched completed orders:', orders?.length || 0);
+      console.log('Fetched files from database:', data?.length || 0);
 
-      // For each completed order, fetch its files
-      const orderFilesPromises = (orders || []).map(async (order) => {
-        const { data: files, error: filesError } = await supabase
-          .from('order_files')
-          .select('*')
-          .eq('order_id', order.id)
-          .order('created_at', { ascending: false });
-
-        if (filesError) {
-          console.error(`Error fetching files for order ${order.order_number}:`, filesError);
-          return null;
-        }
-
-        // Transform files to match UI format
-        const transformedFiles: OrderFile[] = (files || []).map(file => ({
+      if (data) {
+        const formattedFiles: OrderFile[] = data.map((file: any) => ({
           id: file.id,
-          name: file.file_name,
-          url: file.file_url,
-          type: file.file_type as 'invoice' | 'quote' | 'purchase-order' | 'delivery-note',
-          uploadedBy: file.uploaded_by_role as 'admin' | 'client',
-          uploadDate: new Date(file.created_at),
-          orderNumber: order.order_number,
-          companyName: order.companies?.name || "Unknown Company"
+          file_name: file.file_name,
+          file_url: file.file_url,
+          file_type: file.file_type,
+          file_size: file.file_size,
+          created_at: file.created_at,
+          order_id: file.order_id,
+          uploaded_by_role: file.uploaded_by_role,
+          uploaded_by_user_id: file.uploaded_by_user_id,
+          order: file.orders
         }));
 
-        return {
-          orderNumber: order.order_number,
-          companyName: order.companies?.name || "Unknown Company",
-          completedDate: order.completed_date ? new Date(order.completed_date) : new Date(order.created_at),
-          files: transformedFiles
-        };
-      });
-
-      const orderFilesResults = await Promise.all(orderFilesPromises);
-      const validOrderFiles = orderFilesResults.filter(Boolean) as CompletedOrderFiles[];
-      
-      setCompletedOrderFiles(validOrderFiles);
+        setFiles(formattedFiles);
+        setFilteredFiles(formattedFiles);
+      } else {
+        setFiles([]);
+        setFilteredFiles([]);
+      }
     } catch (error) {
-      console.error("Failed to fetch completed order files:", error);
+      console.error("Failed to fetch files:", error);
+      setError(`Failed to fetch files: ${error}`);
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Set up real-time subscriptions for order changes
-  useGlobalRealtimeOrders({
-    onOrdersChange: () => {
-      console.log('Real-time update detected, refreshing completed order files...');
-      fetchCompletedOrderFiles();
-    },
-    isAdmin,
-    pageType: 'files'
-  });
-
+  // Load files on component mount
   useEffect(() => {
-    fetchCompletedOrderFiles();
+    console.log('Files page mounted, fetching files...');
+    fetchFiles();
   }, [isAdmin, user?.id]);
 
-  // Group completed order files by completion month
+  // Filter files based on search term
   useEffect(() => {
-    const filteredOrderFiles = completedOrderFiles.filter(orderFile => 
-      orderFile.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      orderFile.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      orderFile.files.some(file => 
-        file.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (!filterType || file.type === filterType)
-      )
-    );
-
-    // Group by completion month
-    const monthMap = new Map<string, CompletedOrderFiles[]>();
-    
-    filteredOrderFiles.forEach(orderFile => {
-      const monthKey = format(orderFile.completedDate, 'MMMM yyyy');
-      
-      if (!monthMap.has(monthKey)) {
-        monthMap.set(monthKey, []);
-      }
-      monthMap.get(monthKey)!.push(orderFile);
-    });
-
-    // Convert to array and sort by month (newest first)
-    const groups: MonthGroup[] = Array.from(monthMap.entries())
-      .map(([month, orderFiles]) => ({
-        month,
-        orderFiles: orderFiles.sort((a, b) => 
-          b.completedDate.getTime() - a.completedDate.getTime()
-        ),
-        isOpen: true // Default to open
-      }))
-      .sort((a, b) => {
-        // Sort by month (newest first)
-        const dateA = new Date(a.month);
-        const dateB = new Date(b.month);
-        return dateB.getTime() - dateA.getTime();
-      });
-
-    setMonthGroups(groups);
-  }, [completedOrderFiles, searchTerm, filterType]);
-
-  // Toggle month group
-  const toggleMonthGroup = (monthIndex: number) => {
-    setMonthGroups(prev => prev.map((group, index) => 
-      index === monthIndex ? { ...group, isOpen: !group.isOpen } : group
-    ));
-  };
-
-  // Handle file action (download or print)
-  const handleFileAction = (file: OrderFile, action: 'download' | 'print') => {
-    toast({
-      title: action === 'download' ? "Downloading File" : "Printing File",
-      description: `${action === 'download' ? 'Downloading' : 'Printing'} ${file.name}...`,
-    });
-    
-    if (action === 'download') {
-      // Download the file
-      const link = document.createElement('a');
-      link.href = file.url;
-      link.download = file.name;
-      link.target = '_blank';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+    if (!searchTerm.trim()) {
+      setFilteredFiles(files);
     } else {
-      // Print the file
-      const printWindow = window.open(file.url, '_blank');
-      if (printWindow) {
-        printWindow.onload = () => {
-          printWindow.print();
-        };
-      }
+      const filtered = files.filter(file => 
+        file.file_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        file.order?.order_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        file.order?.companies?.name?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+      setFilteredFiles(filtered);
+    }
+  }, [searchTerm, files]);
+
+  // Download file
+  const downloadFile = async (file: OrderFile) => {
+    try {
+      const response = await fetch(file.file_url);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = file.file_name;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      toast({
+        title: "Download Started",
+        description: `Downloading ${file.file_name}...`
+      });
+    } catch (error) {
+      console.error('Error downloading file:', error);
+      toast({
+        title: "Download Failed",
+        description: "Failed to download file. Please try again.",
+        variant: "destructive"
+      });
     }
   };
 
-  const handleFileView = (file: OrderFile) => {
-    window.open(file.url, '_blank');
+  // Delete file (admin only)
+  const deleteFile = async (fileId: string, fileName: string) => {
+    if (!isAdmin) return;
+
+    try {
+      console.log('Deleting file:', fileId);
+      
+      const { error } = await supabase
+        .from('order_files')
+        .delete()
+        .eq('id', fileId);
+
+      if (error) throw error;
+
+      const remainingFiles = files.filter(file => file.id !== fileId);
+      setFiles(remainingFiles);
+
+      toast({
+        title: "File Deleted",
+        description: `${fileName} has been deleted successfully.`
+      });
+      
+      console.log('File successfully deleted');
+    } catch (error: any) {
+      console.error('Error deleting file:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete file. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
-  // Get all file types for filter
-  const allFiles = completedOrderFiles.flatMap(orderFile => orderFile.files);
-  const fileTypes = [...new Set(allFiles.map(file => file.type))];
+  // View file in new tab
+  const viewFile = (file: OrderFile) => {
+    window.open(file.file_url, '_blank');
+  };
 
-  return (
-    <div className="container mx-auto p-4">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-        <h1 className="text-2xl font-bold text-aleph-blue">Files Repository</h1>
-        
-        <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
-          <div className="relative flex-grow">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-aleph-blue" />
-            <input
-              type="text"
-              placeholder="Search files..."
-              className="pl-10 pr-4 py-2 border rounded-md w-full focus:ring-2 focus:ring-aleph-blue focus:border-aleph-blue"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-          
-          <select
-            className="border rounded-md px-3 py-2 focus:ring-2 focus:ring-aleph-blue focus:border-aleph-blue"
-            value={filterType || ''}
-            onChange={(e) => setFilterType(e.target.value || null)}
-          >
-            <option value="">All Types</option>
-            {fileTypes.map(type => (
-              <option key={type} value={type}>
-                {type.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
-              </option>
-            ))}
-          </select>
+  if (loading) {
+    return (
+      <div className="container mx-auto p-4 bg-background">
+        <div className="flex justify-center items-center h-64">
+          <div className="text-lg text-foreground">Loading files...</div>
         </div>
       </div>
+    );
+  }
 
-      {/* Real-time Status Indicator */}
-      <div className="mb-4 p-2 bg-green-50 rounded-md border border-green-200">
-        <p className="text-sm text-green-800">
-          ✅ Files automatically collected from completed orders - Real-time updates enabled
-        </p>
+  if (error) {
+    return (
+      <div className="container mx-auto p-4 bg-background">
+        <div className="flex flex-col items-center justify-center h-64">
+          <div className="text-lg text-red-600 mb-4">Error: {error}</div>
+          <Button onClick={fetchFiles}>Retry</Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="container mx-auto p-4 bg-background">
+        <div className="flex flex-col items-center justify-center h-64">
+          <div className="text-lg mb-4 text-foreground">Please log in to view files</div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="container mx-auto p-4 bg-background">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold text-foreground">Order Files</h1>
       </div>
 
-      {/* Files by Month */}
-      <div className="space-y-4">
-        {monthGroups.length === 0 && (
-          <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
-            No completed order files found.
+      <div className="bg-card border border-border rounded-lg shadow">
+        <div className="p-4 border-b border-border">
+          <div className="flex justify-between items-center">
+            <h2 className="text-lg font-semibold text-card-foreground">All Order Documents</h2>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <Input
+                placeholder="Search files..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 w-64 bg-background border-border text-foreground placeholder:text-muted-foreground focus:ring-primary"
+              />
+            </div>
           </div>
-        )}
-
-        {monthGroups.map((monthGroup, monthIndex) => (
-          <div key={monthGroup.month} className="bg-white rounded-lg shadow">
-            <Collapsible open={monthGroup.isOpen} onOpenChange={() => toggleMonthGroup(monthIndex)}>
-              <CollapsibleTrigger asChild>
-                <div className="p-4 border-b cursor-pointer hover:bg-gray-50 flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    {monthGroup.isOpen ? (
-                      <ChevronDown className="h-4 w-4" />
-                    ) : (
-                      <ChevronRight className="h-4 w-4" />
-                    )}
-                    <h2 className="text-lg font-semibold text-aleph-blue">{monthGroup.month}</h2>
-                    <Badge variant="outline">{monthGroup.orderFiles.length} completed orders</Badge>
-                  </div>
-                </div>
-              </CollapsibleTrigger>
-              
-              <CollapsibleContent>
-                <div className="divide-y">
-                  {monthGroup.orderFiles.map(orderFile => (
-                    <div key={orderFile.orderNumber} className="p-4">
-                      <div className="mb-3">
-                        <h3 className="font-medium text-aleph-blue">Order #{orderFile.orderNumber}</h3>
-                        <p className="text-sm text-gray-600">{orderFile.companyName}</p>
-                        <p className="text-sm text-gray-500">
-                          Completed: {format(orderFile.completedDate, 'MMM d, yyyy')}
-                        </p>
-                        <Badge variant="outline" className="mt-1">
-                          {orderFile.files.length} files
-                        </Badge>
-                      </div>
+        </div>
+        
+        {filteredFiles.length === 0 ? (
+          <div className="p-4 text-center text-muted-foreground">
+            {searchTerm ? `No files found matching "${searchTerm}".` : "No files found. Files uploaded to orders will appear here."}
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow className="border-b border-border">
+                <TableHead className="text-foreground">File</TableHead>
+                <TableHead className="text-foreground">Order #</TableHead>
+                <TableHead className="text-foreground">Company</TableHead>
+                <TableHead className="text-foreground">Size</TableHead>
+                <TableHead className="text-foreground">Uploaded By</TableHead>
+                <TableHead className="text-foreground">Date</TableHead>
+                <TableHead className="text-foreground">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredFiles.map(file => (
+                <TableRow key={file.id} className="border-b border-border hover:bg-muted/50">
+                  <TableCell className="text-foreground">
+                    <div className="flex items-center gap-2">
+                      {getFileIcon(file.file_name, file.file_type)}
+                      <span className="truncate max-w-xs" title={file.file_name}>
+                        {file.file_name}
+                      </span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="font-medium text-foreground">
+                    #{file.order?.order_number}
+                  </TableCell>
+                  <TableCell className="text-foreground">
+                    {file.order?.companies?.name || "Unknown Company"}
+                  </TableCell>
+                  <TableCell className="text-foreground">
+                    {formatFileSize(file.file_size)}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={file.uploaded_by_role === 'admin' ? 'default' : 'secondary'}>
+                      {file.uploaded_by_role === 'admin' ? 'Admin' : 'Client'}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-foreground">
+                    {format(new Date(file.created_at), 'MMM d, yyyy')}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => viewFile(file)}
+                        title="View file"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
                       
-                      {orderFile.files.length === 0 ? (
-                        <p className="text-sm text-gray-500 italic">No files uploaded for this order</p>
-                      ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                          {orderFile.files.map((file) => (
-                            <div key={file.id} className="border rounded-lg p-3 hover:shadow-md transition-shadow border-aleph-blue/10">
-                              <div className="flex items-start">
-                                <FileText className="h-8 w-8 text-aleph-blue mr-2 flex-shrink-0" />
-                                <div className="flex-grow min-w-0">
-                                  <h4 className="font-medium truncate text-sm" title={file.name}>{file.name}</h4>
-                                  <div className="flex items-center text-xs text-gray-500 mt-1">
-                                    <span className="capitalize">{file.type.replace('-', ' ')}</span>
-                                    <span className="mx-1">•</span>
-                                    <span>{format(file.uploadDate, 'MMM d')}</span>
-                                    <span className="mx-1">•</span>
-                                    <span>{file.uploadedBy === 'admin' ? 'Admin' : 'Client'}</span>
-                                  </div>
-                                </div>
-                              </div>
-                              
-                              <div className="flex justify-end mt-3 space-x-1">
-                                <Button 
-                                  variant="ghost" 
-                                  size="sm" 
-                                  className="h-8 px-2 text-aleph-blue hover:bg-aleph-blue/10"
-                                  onClick={() => handleFileView(file)}
-                                >
-                                  <Eye className="h-3 w-3" />
-                                </Button>
-                                <Button 
-                                  variant="ghost" 
-                                  size="sm" 
-                                  className="h-8 px-2 text-aleph-blue hover:bg-aleph-blue/10"
-                                  onClick={() => handleFileAction(file, 'download')}
-                                >
-                                  <Download className="h-3 w-3" />
-                                </Button>
-                                <Button 
-                                  variant="ghost" 
-                                  size="sm" 
-                                  className="h-8 px-2 text-aleph-magenta hover:bg-aleph-magenta/10"
-                                  onClick={() => handleFileAction(file, 'print')}
-                                >
-                                  <Printer className="h-3 w-3" />
-                                </Button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => downloadFile(file)}
+                        title="Download file"
+                      >
+                        <Download className="h-4 w-4" />
+                      </Button>
+                      
+                      {isAdmin && (
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="text-red-600 hover:text-red-700 hover:bg-red-100 dark:hover:bg-red-900/20"
+                              title="Delete file"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent className="bg-card border-border">
+                            <AlertDialogHeader>
+                              <AlertDialogTitle className="text-card-foreground">Delete File</AlertDialogTitle>
+                              <AlertDialogDescription className="text-muted-foreground">
+                                Are you sure you want to delete "{file.file_name}"? This action cannot be undone.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel className="border-border text-foreground hover:bg-muted">Cancel</AlertDialogCancel>
+                              <AlertDialogAction 
+                                onClick={() => deleteFile(file.id, file.file_name)} 
+                                className="bg-red-600 hover:bg-red-700"
+                              >
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       )}
                     </div>
-                  ))}
-                </div>
-              </CollapsibleContent>
-            </Collapsible>
-          </div>
-        ))}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
       </div>
     </div>
   );
