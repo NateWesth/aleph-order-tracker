@@ -72,7 +72,7 @@ export default function OrderDetailsDialog({
       // Pattern 1: "Item Name (Qty: X) - Notes"
       const matchWithDashNotes = line.match(/^(.+?)\s*\(Qty:\s*(\d+)\)\s*-\s*(.+)$/);
       if (matchWithDashNotes) {
-        const item = {
+        const item: OrderItem = {
           name: matchWithDashNotes[1].trim(),
           quantity: parseInt(matchWithDashNotes[2]),
           notes: matchWithDashNotes[3].trim()
@@ -85,7 +85,7 @@ export default function OrderDetailsDialog({
       // Pattern 2: "Item Name (Qty: X)" followed by a notes line
       const matchWithQty = line.match(/^(.+?)\s*\(Qty:\s*(\d+)\)$/);
       if (matchWithQty) {
-        const item = {
+        const item: OrderItem = {
           name: matchWithQty[1].trim(),
           quantity: parseInt(matchWithQty[2])
         };
@@ -110,7 +110,7 @@ export default function OrderDetailsDialog({
       // Pattern 3: "Item Name: Notes" (alternative format)
       const matchColonFormat = line.match(/^(.+?):\s*(.+)$/);
       if (matchColonFormat && !matchColonFormat[1].includes('(Qty:')) {
-        const item = {
+        const item: OrderItem = {
           name: matchColonFormat[1].trim(),
           quantity: 1,
           notes: matchColonFormat[2].trim()
@@ -122,7 +122,7 @@ export default function OrderDetailsDialog({
       
       // Pattern 4: Just item name (fallback)
       if (!line.includes('(Qty:') && !line.includes(':')) {
-        const item = {
+        const item: OrderItem = {
           name: line,
           quantity: 1
         };
@@ -136,7 +136,7 @@ export default function OrderDetailsDialog({
   };
 
   // Use provided items or parse from description
-  const displayItems = order.items && order.items.length > 0 ? 
+  const displayItems: OrderItem[] = order.items && order.items.length > 0 ? 
     order.items.map(item => ({
       name: item.name,
       quantity: item.quantity,
