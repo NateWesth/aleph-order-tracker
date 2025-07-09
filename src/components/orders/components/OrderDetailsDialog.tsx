@@ -176,9 +176,7 @@ export default function OrderDetailsDialog({
                     </div>
                     <div className="col-span-3">
                       {item.notes ? (
-                        <p className="text-sm text-gray-600 bg-yellow-50 p-2 rounded border-l-2 border-yellow-300">
-                          <span className="font-medium text-yellow-800">Note:</span> {item.notes}
-                        </p>
+                        <p className="text-sm text-gray-600">{item.notes}</p>
                       ) : (
                         <span className="text-gray-400 text-sm italic">No notes</span>
                       )}
