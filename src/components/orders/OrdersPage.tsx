@@ -91,7 +91,11 @@ export default function OrdersPage({ isAdmin = false }: OrdersPageProps) {
           status: dbOrder.status,
           total_amount: dbOrder.total_amount,
           created_at: dbOrder.created_at,
+          updated_at: dbOrder.updated_at,
+          completed_date: dbOrder.completed_date,
           company_id: dbOrder.company_id,
+          user_id: dbOrder.user_id,
+          progress_stage: dbOrder.progress_stage,
           companyName: dbOrder.companies?.name || "Unknown Company",
           company: dbOrder.companies ? {
             id: dbOrder.company_id,

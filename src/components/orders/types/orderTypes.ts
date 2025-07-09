@@ -1,5 +1,4 @@
 
-
 export interface OrderWithCompany {
   id: string;
   order_number: string;
@@ -14,5 +13,14 @@ export interface OrderWithCompany {
   progress_stage?: string;
   items?: Array<{id: string, name: string, quantity: number}>;
   companyName: string;
+  company?: {
+    id: string;
+    name: string;
+    code: string;
+    contactPerson: string;
+    email: string;
+    phone: string;
+    address: string;
+    vatNumber: string;
+  };
 }
-
