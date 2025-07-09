@@ -12,22 +12,7 @@ import OrderFormHeader from "./OrderFormHeader";
 import OrderFormCompanySelector from "./OrderFormCompanySelector";
 import OrderFormTotalAmount from "./OrderFormTotalAmount";
 import { OrderItemsForm } from "./OrderItemsForm";
-
-export interface OrderItem {
-  id: string;
-  name: string;
-  quantity: number;
-  unit?: string;
-  notes?: string;
-}
-
-interface OrderFormData {
-  orderNumber: string;
-  companyId: string;
-  totalAmount: number;
-  urgency: string;
-  items: OrderItem[];
-}
+import { OrderFormData, OrderItem } from "../types/OrderFormData";
 
 interface OrderFormProps {
   onSubmit: (orderData: {

@@ -4,20 +4,7 @@ import { Button } from "@/components/ui/button";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Trash2 } from "lucide-react";
 import { Control } from "react-hook-form";
-
-interface OrderFormData {
-  orderNumber: string;
-  companyId: string;
-  totalAmount: number;
-  urgency: string;
-  items: Array<{
-    id: string;
-    name: string;
-    quantity: number;
-    unit?: string;
-    notes?: string;
-  }>;
-}
+import { OrderFormData } from "../types/OrderFormData";
 
 interface OrderItemsFormProps {
   control: Control<OrderFormData>;

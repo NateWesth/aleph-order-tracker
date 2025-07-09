@@ -2,20 +2,7 @@
 import { Control, UseFormRegister } from "react-hook-form";
 import { AdminCompanySelector } from "./company/AdminCompanySelector";
 import { ClientCompanyDisplay } from "./company/ClientCompanyDisplay";
-
-interface OrderFormData {
-  orderNumber: string;
-  companyId: string;
-  totalAmount: number;
-  urgency: string;
-  items: Array<{
-    id: string;
-    name: string;
-    quantity: number;
-    unit?: string;
-    notes?: string;
-  }>;
-}
+import { OrderFormData } from "../types/OrderFormData";
 
 interface Company {
   id: string;

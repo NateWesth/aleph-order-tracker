@@ -2,20 +2,7 @@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Control } from "react-hook-form";
-
-interface OrderFormData {
-  orderNumber: string;
-  companyId: string;
-  totalAmount: number;
-  urgency: string;
-  items: Array<{
-    id: string;
-    name: string;
-    quantity: number;
-    unit?: string;
-    notes?: string;
-  }>;
-}
+import { OrderFormData } from "../../types/OrderFormData";
 
 interface Company {
   id: string;
