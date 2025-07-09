@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -24,6 +25,7 @@ import { useGlobalRealtimeOrders } from "./hooks/useGlobalRealtimeOrders";
 import ProcessingOrderFilesDialog from "./components/ProcessingOrderFilesDialog";
 import OrderDetailsDialog from "./components/OrderDetailsDialog";
 import OrderExportActions from "./components/OrderExportActions";
+import { getUserRole, getUserProfile } from "@/utils/authService";
 
 interface OrderItem {
   id: string;
@@ -67,6 +69,8 @@ export default function CompletedPage({
   const [filesDialogOrder, setFilesDialogOrder] = useState<Order | null>(null);
   const [showOrderDetails, setShowOrderDetails] = useState(false);
   const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
+  const [userRole, setUserRole] = useState<'admin' | 'user'>('user');
+  const [userCompanyId, setUserCompanyId] = useState<string | null>(null);
 
   // Parse order items from description - same logic as other components
   const parseOrderItems = (description: string | null): OrderItem[] => {
@@ -94,6 +98,29 @@ export default function CompletedPage({
       };
     }).filter(item => item.name);
     return items;
+  };
+
+  // Fetch user info to determine filtering
+  const fetchUserInfo = async () => {
+    if (!user?.id) return;
+
+    try {
+      const [role, profile] = await Promise.all([
+        getUserRole(user.id),
+        getUserProfile(user.id)
+      ]);
+
+      console.log('CompletedPage - User role:', role);
+      console.log('CompletedPage - User profile:', profile);
+
+      setUserRole(role);
+      if (role === 'user' && profile?.company_id) {
+        setUserCompanyId(profile.company_id);
+        console.log('CompletedPage - User company ID:', profile.company_id);
+      }
+    } catch (error) {
+      console.error("Error fetching user info:", error);
+    }
   };
 
   // Fetch company details for orders
@@ -134,8 +161,11 @@ export default function CompletedPage({
   // Fetch completed orders from database with company information
   const fetchCompletedOrders = async () => {
     if (!user?.id) return;
+    
     try {
       console.log('Fetching completed orders from Supabase...');
+      console.log('User role:', userRole, 'Company ID:', userCompanyId);
+      
       let query = supabase.from('orders').select(`
           *,
           companies (
@@ -145,18 +175,30 @@ export default function CompletedPage({
         `).eq('status', 'completed').order('completed_date', {
         ascending: false
       });
-      if (!isAdmin) {
+
+      // Apply filtering based on user role
+      if (userRole === 'user' && userCompanyId) {
+        console.log('Filtering completed orders by company:', userCompanyId);
+        query = query.eq('company_id', userCompanyId);
+      } else if (userRole === 'user' && !userCompanyId) {
+        // If user role but no company ID, filter by user_id as fallback
+        console.log('Filtering completed orders by user_id as fallback');
         query = query.eq('user_id', user.id);
       }
+      // For admin users, no additional filtering is needed
+
       const {
         data,
         error
       } = await query;
+      
       if (error) {
         console.error("Error fetching completed orders:", error);
         return;
       }
+      
       console.log('Fetched completed orders:', data?.length || 0);
+      
       const transformedOrders = (data || []).map(order => ({
         id: order.id,
         orderNumber: order.order_number,
@@ -167,6 +209,7 @@ export default function CompletedPage({
         status: 'completed' as const,
         items: parseOrderItems(order.description)
       }));
+      
       setOrders(transformedOrders);
     } catch (error) {
       console.error("Failed to fetch completed orders:", error);
@@ -219,11 +262,20 @@ export default function CompletedPage({
     pageType: 'completed'
   });
 
-  // Load orders from database on component mount
+  // Load user info first, then orders
   useEffect(() => {
-    console.log('Loading completed orders...');
-    fetchCompletedOrders();
-  }, [isAdmin, user?.id]);
+    if (user?.id) {
+      fetchUserInfo();
+    }
+  }, [user?.id]);
+
+  // Load orders when user info is available
+  useEffect(() => {
+    if (user?.id && (userRole === 'admin' || userCompanyId !== null)) {
+      console.log('Loading completed orders...');
+      fetchCompletedOrders();
+    }
+  }, [user?.id, userRole, userCompanyId]);
 
   // Group orders by completion month
   useEffect(() => {
@@ -297,43 +349,43 @@ export default function CompletedPage({
     setShowFilesDialog(false);
     setFilesDialogOrder(null);
   };
-  return <div className="container mx-auto p-4">
+  return <div className="container mx-auto p-4 bg-background">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Completed Orders</h1>
+        <h1 className="text-2xl font-bold text-foreground">Completed Orders</h1>
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <input type="text" placeholder="Search orders..." className="pl-10 pr-4 py-2 border rounded-md" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <input type="text" placeholder="Search orders..." className="pl-10 pr-4 py-2 border border-border rounded-md bg-card text-card-foreground" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
         </div>
       </div>
 
       <div className="space-y-4">
-        {monthGroups.length === 0 && <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
+        {monthGroups.length === 0 && <div className="bg-card rounded-lg shadow p-8 text-center text-muted-foreground">
             No completed orders found.
           </div>}
 
-        {monthGroups.map((monthGroup, monthIndex) => <div key={monthGroup.month} className="bg-white rounded-lg shadow">
+        {monthGroups.map((monthGroup, monthIndex) => <div key={monthGroup.month} className="bg-card rounded-lg shadow">
             <Collapsible open={monthGroup.isOpen} onOpenChange={() => toggleMonthGroup(monthIndex)}>
               <CollapsibleTrigger asChild>
-                <div className="p-4 border-b cursor-pointer hover:bg-gray-50 flex items-center justify-between">
+                <div className="p-4 border-b border-border cursor-pointer hover:bg-accent flex items-center justify-between">
                   <div className="flex items-center space-x-2">
-                    {monthGroup.isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                    <h2 className="text-lg font-semibold">{monthGroup.month}</h2>
+                    {monthGroup.isOpen ? <ChevronDown className="h-4 w-4 text-foreground" /> : <ChevronRight className="h-4 w-4 text-foreground" />}
+                    <h2 className="text-lg font-semibold text-card-foreground">{monthGroup.month}</h2>
                     <Badge variant="outline">{monthGroup.orders.length} orders</Badge>
                   </div>
                 </div>
               </CollapsibleTrigger>
               
               <CollapsibleContent>
-                <div className="divide-y">
+                <div className="divide-y divide-border">
                   {monthGroup.orders.map(order => {
                 const isExpanded = expandedOrders.has(order.id);
                 return <div key={order.id} className="p-4">
                         <div className="flex justify-between items-center">
                           <div className="flex items-center gap-4">
                             <div>
-                              <h3 className="font-medium">Order #{order.orderNumber}</h3>
-                              <p className="text-sm text-gray-600">{order.companyName}</p>
-                              <p className="text-sm text-gray-600">
+                              <h3 className="font-medium text-card-foreground">Order #{order.orderNumber}</h3>
+                              <p className="text-sm text-muted-foreground">{order.companyName}</p>
+                              <p className="text-sm text-muted-foreground">
                                 Completed: {format(order.completedDate || order.orderDate, 'MMM d, yyyy')}
                               </p>
                             </div>
@@ -399,21 +451,21 @@ export default function CompletedPage({
                           </div>
                         </div>
 
-                        {isExpanded && <div className="mt-4 border-t pt-4">
+                        {isExpanded && <div className="mt-4 border-t border-border pt-4">
                             <Table>
                               <TableHeader>
                                 <TableRow>
-                                  <TableHead>Item</TableHead>
-                                  <TableHead>Quantity Ordered</TableHead>
-                                  <TableHead>Quantity Delivered</TableHead>
-                                  <TableHead>Status</TableHead>
+                                  <TableHead className="text-card-foreground">Item</TableHead>
+                                  <TableHead className="text-card-foreground">Quantity Ordered</TableHead>
+                                  <TableHead className="text-card-foreground">Quantity Delivered</TableHead>
+                                  <TableHead className="text-card-foreground">Status</TableHead>
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
                                 {order.items.map(item => <TableRow key={item.id}>
-                                    <TableCell className="font-medium">{item.name}</TableCell>
-                                    <TableCell>{item.quantity}</TableCell>
-                                    <TableCell>{item.delivered}</TableCell>
+                                    <TableCell className="font-medium text-card-foreground">{item.name}</TableCell>
+                                    <TableCell className="text-card-foreground">{item.quantity}</TableCell>
+                                    <TableCell className="text-card-foreground">{item.delivered}</TableCell>
                                     <TableCell>
                                       <Badge variant="outline" className="bg-green-100 text-green-800">
                                         Complete
