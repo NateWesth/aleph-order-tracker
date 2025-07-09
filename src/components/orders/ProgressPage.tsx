@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -13,7 +12,6 @@ import { useGlobalRealtimeOrders } from "./hooks/useGlobalRealtimeOrders";
 import ProgressOrderDetailsDialog from "./components/ProgressOrderDetailsDialog";
 import OrderExportActions from "./components/OrderExportActions";
 import { sendOrderNotification } from "@/utils/emailNotifications";
-
 interface OrderItem {
   id: string;
   name: string;
@@ -22,7 +20,6 @@ interface OrderItem {
   unit?: string;
   notes?: string;
 }
-
 interface Company {
   id: string;
   name: string;
@@ -34,7 +31,6 @@ interface Company {
   vatNumber: string;
   logo?: string;
 }
-
 interface Order {
   id: string;
   orderNumber: string;
@@ -53,16 +49,18 @@ interface Order {
     [itemName: string]: number;
   };
 }
-
 interface ProgressPageProps {
   isAdmin: boolean;
 }
-
 export default function ProgressPage({
   isAdmin
 }: ProgressPageProps) {
-  const { toast } = useToast();
-  const { user } = useAuth();
+  const {
+    toast
+  } = useToast();
+  const {
+    user
+  } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
@@ -198,20 +196,15 @@ export default function ProgressPage({
   // Start processing order and move to processing status
   const startProcessing = async (orderId: string, orderNumber: string) => {
     if (!isAdmin) return;
-    
     const orderToProcess = orders.find(order => order.id === orderId);
-    
     try {
       console.log('Starting processing for order:', orderId);
-      
-      const { error } = await supabase
-        .from('orders')
-        .update({
-          status: 'processing',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', orderId);
-
+      const {
+        error
+      } = await supabase.from('orders').update({
+        status: 'processing',
+        updated_at: new Date().toISOString()
+      }).eq('id', orderId);
       if (error) throw error;
 
       // Remove from progress orders
@@ -231,16 +224,13 @@ export default function ProgressPage({
       } catch (emailError) {
         console.error('Failed to send email notification:', emailError);
       }
-
       toast({
         title: "Processing Started",
         description: `Order ${orderNumber} has been moved to processing status and will appear on the Processing page.`
       });
-
       if (selectedOrder && selectedOrder.id === orderId) {
         setSelectedOrder(null);
       }
-      
       console.log('Order successfully moved to processing');
       fetchProgressOrders();
     } catch (error: any) {
@@ -266,19 +256,13 @@ export default function ProgressPage({
   // Delete order function for admins
   const deleteOrder = async (orderId: string, orderNumber: string) => {
     if (!isAdmin) return;
-    
     const orderToDelete = orders.find(order => order.id === orderId);
-    
     try {
       console.log('Deleting order:', orderId);
-      
-      const { error } = await supabase
-        .from('orders')
-        .delete()
-        .eq('id', orderId);
-
+      const {
+        error
+      } = await supabase.from('orders').delete().eq('id', orderId);
       if (error) throw error;
-
       const remainingOrders = orders.filter(order => order.id !== orderId);
       setOrders(remainingOrders);
 
@@ -293,16 +277,13 @@ export default function ProgressPage({
       } catch (emailError) {
         console.error('Failed to send email notification:', emailError);
       }
-
       toast({
         title: "Order Deleted",
         description: `Order ${orderNumber} has been permanently deleted.`
       });
-
       if (selectedOrder && selectedOrder.id === orderId) {
         setSelectedOrder(null);
       }
-      
       console.log('Order successfully deleted');
       fetchProgressOrders();
     } catch (error: any) {
@@ -314,7 +295,6 @@ export default function ProgressPage({
       });
     }
   };
-
   if (loading) {
     return <div className="container mx-auto p-4 bg-background">
         <div className="flex justify-center items-center h-64">
@@ -322,7 +302,6 @@ export default function ProgressPage({
         </div>
       </div>;
   }
-
   if (error) {
     return <div className="container mx-auto p-4 bg-background">
         <div className="flex flex-col items-center justify-center h-64">
@@ -331,7 +310,6 @@ export default function ProgressPage({
         </div>
       </div>;
   }
-
   if (!user) {
     return <div className="container mx-auto p-4 bg-background">
         <div className="flex flex-col items-center justify-center h-64">
@@ -339,8 +317,7 @@ export default function ProgressPage({
         </div>
       </div>;
   }
-
-  return <div className="container mx-auto p-4 bg-background">
+  return <div className="container mx-auto p-4 bg-[#2e2e53]/0">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-foreground">Progress Orders</h1>
       </div>
@@ -376,19 +353,17 @@ export default function ProgressPage({
                   <TableCell className="text-foreground">{order.items.length} items</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
-                      <OrderExportActions 
-                        order={{
-                          id: order.id,
-                          order_number: order.orderNumber,
-                          description: order.items.map(item => `${item.name} (Qty: ${item.quantity})`).join('\n'),
-                          status: order.status,
-                          total_amount: null,
-                          created_at: order.orderDate.toISOString(),
-                          company_id: null,
-                          companyName: order.companyName,
-                          items: order.items
-                        }}
-                      />
+                      <OrderExportActions order={{
+                  id: order.id,
+                  order_number: order.orderNumber,
+                  description: order.items.map(item => `${item.name} (Qty: ${item.quantity})`).join('\n'),
+                  status: order.status,
+                  total_amount: null,
+                  created_at: order.orderDate.toISOString(),
+                  company_id: null,
+                  companyName: order.companyName,
+                  items: order.items
+                }} />
                       
                       <Button variant="ghost" size="sm" onClick={() => viewOrderDetails(order)}>
                         <Eye className="h-4 w-4" />
