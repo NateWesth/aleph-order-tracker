@@ -86,9 +86,9 @@ const AdminDashboard = () => {
   
   return (
     <SidebarProvider>
-      <div className="min-h-screen w-full flex bg-black dark:bg-black">
+      <div className="min-h-screen w-full flex bg-background dark:bg-background">
         {/* Sidebar */}
-        <Sidebar className="dark:bg-black bg-white">
+        <Sidebar className="bg-background dark:bg-background border-border dark:border-border">
           <SidebarContent>
             <SidebarMenu>
               <SidebarMenuItem>
@@ -208,10 +208,10 @@ const AdminDashboard = () => {
             </div>
           </header>
 
-          {/* Dashboard content - White in light mode, slightly lighter grey than toolbar in dark mode */}
-          <main className="flex-1 p-4 md:p-8 bg-white dark:bg-gray-800">
+          {/* Dashboard content - Use background color consistently */}
+          <main className="flex-1 p-4 md:p-8 bg-background dark:bg-background">
             {activeView === "home" ? (
-              <div className="flex items-center justify-center h-full relative bg-white dark:bg-gray-800">
+              <div className="flex items-center justify-center h-full relative bg-background dark:bg-background">
                 {/* Faded background logo */}
                 <div 
                   className="absolute inset-0 opacity-5 bg-no-repeat bg-center"
@@ -229,35 +229,35 @@ const AdminDashboard = () => {
                 </div>
               </div>
             ) : activeView === "orders" ? (
-              <div className="bg-white dark:bg-gray-800 min-h-full">
+              <div className="bg-background dark:bg-background min-h-full">
                 <OrdersPage isAdmin={true} />
               </div>
             ) : activeView === "progress" ? (
-              <div className="bg-white dark:bg-gray-800 min-h-full">
+              <div className="bg-background dark:bg-background min-h-full">
                 <ProgressPage isAdmin={true} />
               </div>
             ) : activeView === "processing" ? (
-              <div className="bg-white dark:bg-gray-800 min-h-full">
+              <div className="bg-background dark:bg-background min-h-full">
                 <ProcessingPage isAdmin={true} />
               </div>
             ) : activeView === "completed" ? (
-              <div className="bg-white dark:bg-gray-800 min-h-full">
+              <div className="bg-background dark:bg-background min-h-full">
                 <CompletedPage isAdmin={true} />
               </div>
             ) : activeView === "files" ? (
-              <div className="bg-white dark:bg-gray-800 min-h-full">
+              <div className="bg-background dark:bg-background min-h-full">
                 <FilesPage isAdmin={true} />
               </div>
             ) : activeView === "companies" ? (
-              <div className="bg-white dark:bg-gray-800 min-h-full">
+              <div className="bg-background dark:bg-background min-h-full">
                 <ClientCompaniesPage />
               </div>
             ) : activeView === "users" ? (
-              <div className="bg-white dark:bg-gray-800 min-h-full">
+              <div className="bg-background dark:bg-background min-h-full">
                 <UsersManagementPage />
               </div>
             ) : (
-              <div className="text-center p-8 bg-white dark:bg-gray-800 min-h-full">
+              <div className="text-center p-8 bg-background dark:bg-background min-h-full">
                 <h2 className="text-2xl font-bold mb-4 text-aleph-green">Page Not Found</h2>
                 <p className="text-gray-600 dark:text-gray-300">The requested page could not be found.</p>
               </div>

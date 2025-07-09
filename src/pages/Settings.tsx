@@ -63,16 +63,16 @@ const Settings = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+      <div className="min-h-screen bg-background dark:bg-background flex items-center justify-center">
         <div className="text-lg">Loading...</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-background dark:bg-background">
       {/* Header */}
-      <header className="bg-white dark:bg-gray-800 shadow">
+      <header className="bg-card dark:bg-card shadow border-b border-border dark:border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-6">
             <div className="flex items-center">
@@ -84,7 +84,7 @@ const Settings = () => {
               >
                 <ArrowLeft className="h-5 w-5" />
               </Button>
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Settings</h1>
+              <h1 className="text-2xl font-bold text-foreground dark:text-foreground">Settings</h1>
             </div>
           </div>
         </div>
@@ -95,7 +95,7 @@ const Settings = () => {
         <div className="px-4 py-6 sm:px-0">
           <div className="grid gap-6 md:grid-cols-2">
             {/* Theme Settings */}
-            <Card>
+            <Card className="bg-card dark:bg-card border-border dark:border-border">
               <CardHeader>
                 <div className="flex items-center space-x-2">
                   {theme === 'dark' ? (
@@ -103,17 +103,17 @@ const Settings = () => {
                   ) : (
                     <Sun className="h-5 w-5 text-aleph-green" />
                   )}
-                  <CardTitle>Appearance</CardTitle>
+                  <CardTitle className="text-card-foreground dark:text-card-foreground">Appearance</CardTitle>
                 </div>
-                <CardDescription>
+                <CardDescription className="text-muted-foreground dark:text-muted-foreground">
                   Customize your viewing experience
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
-                    <Label htmlFor="theme-toggle">Dark Mode</Label>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                    <Label htmlFor="theme-toggle" className="text-card-foreground dark:text-card-foreground">Dark Mode</Label>
+                    <p className="text-sm text-muted-foreground dark:text-muted-foreground">
                       Switch between light and dark themes
                     </p>
                   </div>
@@ -127,73 +127,73 @@ const Settings = () => {
             </Card>
 
             {/* Profile Information */}
-            <Card>
+            <Card className="bg-card dark:bg-card border-border dark:border-border">
               <CardHeader>
                 <div className="flex items-center space-x-2">
                   <User className="h-5 w-5 text-aleph-green" />
-                  <CardTitle>Profile Information</CardTitle>
+                  <CardTitle className="text-card-foreground dark:text-card-foreground">Profile Information</CardTitle>
                 </div>
-                <CardDescription>
+                <CardDescription className="text-muted-foreground dark:text-muted-foreground">
                   Your personal account information
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="fullName">Full Name</Label>
+                  <Label htmlFor="fullName" className="text-card-foreground dark:text-card-foreground">Full Name</Label>
                   <Input
                     id="fullName"
                     value={userProfile?.full_name || ''}
                     readOnly
-                    className="bg-gray-50 dark:bg-gray-700"
+                    className="bg-muted dark:bg-muted text-card-foreground dark:text-card-foreground border-border dark:border-border"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
+                  <Label htmlFor="email" className="text-card-foreground dark:text-card-foreground">Email</Label>
                   <Input
                     id="email"
                     value={userProfile?.email || user?.email || ''}
                     readOnly
-                    className="bg-gray-50 dark:bg-gray-700"
+                    className="bg-muted dark:bg-muted text-card-foreground dark:text-card-foreground border-border dark:border-border"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="phone">Phone</Label>
+                  <Label htmlFor="phone" className="text-card-foreground dark:text-card-foreground">Phone</Label>
                   <Input
                     id="phone"
                     value={userProfile?.phone || 'Not provided'}
                     readOnly
-                    className="bg-gray-50 dark:bg-gray-700"
+                    className="bg-muted dark:bg-muted text-card-foreground dark:text-card-foreground border-border dark:border-border"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="position">Position</Label>
+                  <Label htmlFor="position" className="text-card-foreground dark:text-card-foreground">Position</Label>
                   <Input
                     id="position"
                     value={userProfile?.position || 'Not provided'}
                     readOnly
-                    className="bg-gray-50 dark:bg-gray-700"
+                    className="bg-muted dark:bg-muted text-card-foreground dark:text-card-foreground border-border dark:border-border"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="companyCode">Company Code</Label>
+                  <Label htmlFor="companyCode" className="text-card-foreground dark:text-card-foreground">Company Code</Label>
                   <Input
                     id="companyCode"
                     value={userProfile?.company_code || 'Not provided'}
                     readOnly
-                    className="bg-gray-50 dark:bg-gray-700"
+                    className="bg-muted dark:bg-muted text-card-foreground dark:text-card-foreground border-border dark:border-border"
                   />
                 </div>
               </CardContent>
             </Card>
 
             {/* Company Information */}
-            <Card className="md:col-span-2">
+            <Card className="md:col-span-2 bg-card dark:bg-card border-border dark:border-border">
               <CardHeader>
                 <div className="flex items-center space-x-2">
                   <Building2 className="h-5 w-5 text-aleph-green" />
-                  <CardTitle>Company Information</CardTitle>
+                  <CardTitle className="text-card-foreground dark:text-card-foreground">Company Information</CardTitle>
                 </div>
-                <CardDescription>
+                <CardDescription className="text-muted-foreground dark:text-muted-foreground">
                   Information about your company
                 </CardDescription>
               </CardHeader>
@@ -201,74 +201,74 @@ const Settings = () => {
                 {companyInfo ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="companyName">Company Name</Label>
+                      <Label htmlFor="companyName" className="text-card-foreground dark:text-card-foreground">Company Name</Label>
                       <Input
                         id="companyName"
                         value={companyInfo.name}
                         readOnly
-                        className="bg-gray-50 dark:bg-gray-700"
+                        className="bg-muted dark:bg-muted text-card-foreground dark:text-card-foreground border-border dark:border-border"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="contactPerson">Contact Person</Label>
+                      <Label htmlFor="contactPerson" className="text-card-foreground dark:text-card-foreground">Contact Person</Label>
                       <Input
                         id="contactPerson"
                         value={companyInfo.contact_person || 'Not provided'}
                         readOnly
-                        className="bg-gray-50 dark:bg-gray-700"
+                        className="bg-muted dark:bg-muted text-card-foreground dark:text-card-foreground border-border dark:border-border"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="companyEmail">Company Email</Label>
+                      <Label htmlFor="companyEmail" className="text-card-foreground dark:text-card-foreground">Company Email</Label>
                       <Input
                         id="companyEmail"
                         value={companyInfo.email || 'Not provided'}
                         readOnly
-                        className="bg-gray-50 dark:bg-gray-700"
+                        className="bg-muted dark:bg-muted text-card-foreground dark:text-card-foreground border-border dark:border-border"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="companyPhone">Company Phone</Label>
+                      <Label htmlFor="companyPhone" className="text-card-foreground dark:text-card-foreground">Company Phone</Label>
                       <Input
                         id="companyPhone"
                         value={companyInfo.phone || 'Not provided'}
                         readOnly
-                        className="bg-gray-50 dark:bg-gray-700"
+                        className="bg-muted dark:bg-muted text-card-foreground dark:text-card-foreground border-border dark:border-border"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="companyAddress">Address</Label>
+                      <Label htmlFor="companyAddress" className="text-card-foreground dark:text-card-foreground">Address</Label>
                       <Input
                         id="companyAddress"
                         value={companyInfo.address || 'Not provided'}
                         readOnly
-                        className="bg-gray-50 dark:bg-gray-700"
+                        className="bg-muted dark:bg-muted text-card-foreground dark:text-card-foreground border-border dark:border-border"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="vatNumber">VAT Number</Label>
+                      <Label htmlFor="vatNumber" className="text-card-foreground dark:text-card-foreground">VAT Number</Label>
                       <Input
                         id="vatNumber"
                         value={companyInfo.vat_number || 'Not provided'}
                         readOnly
-                        className="bg-gray-50 dark:bg-gray-700"
+                        className="bg-muted dark:bg-muted text-card-foreground dark:text-card-foreground border-border dark:border-border"
                       />
                     </div>
                     <div className="space-y-2 md:col-span-2">
-                      <Label htmlFor="accountManager">Account Manager</Label>
+                      <Label htmlFor="accountManager" className="text-card-foreground dark:text-card-foreground">Account Manager</Label>
                       <Input
                         id="accountManager"
                         value={companyInfo.account_manager || 'Not provided'}
                         readOnly
-                        className="bg-gray-50 dark:bg-gray-700"
+                        className="bg-muted dark:bg-muted text-card-foreground dark:text-card-foreground border-border dark:border-border"
                       />
                     </div>
                   </div>
                 ) : (
                   <div className="text-center py-8">
-                    <Building2 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                    <p className="text-gray-500">No company information available</p>
-                    <p className="text-sm text-gray-400 mt-2">
+                    <Building2 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <p className="text-muted-foreground">No company information available</p>
+                    <p className="text-sm text-muted-foreground mt-2">
                       Company details will appear here once linked to a company code
                     </p>
                   </div>

@@ -11,6 +11,7 @@ import ProgressPage from "@/components/orders/ProgressPage";
 import ProcessingPage from "@/components/orders/ProcessingPage";
 import CompletedPage from "@/components/orders/CompletedPage";
 import FilesPage from "@/components/orders/FilesPage";
+
 const ClientDashboard = () => {
   const navigate = useNavigate();
   const {
@@ -22,11 +23,13 @@ const ClientDashboard = () => {
   } = useAuth();
   const [activeView, setActiveView] = useState("home");
   const [userProfile, setUserProfile] = useState<any>(null);
+
   useEffect(() => {
     if (user) {
       fetchUserProfile();
     }
   }, [user]);
+
   const fetchUserProfile = async () => {
     if (!user) return;
     const {
@@ -34,6 +37,7 @@ const ClientDashboard = () => {
     } = await supabase.from('profiles').select('*').eq('id', user.id).single();
     setUserProfile(data);
   };
+
   const handleLogout = async () => {
     await signOut();
     toast({
@@ -42,13 +46,15 @@ const ClientDashboard = () => {
     });
     navigate("/auth");
   };
+
   const handleMenuClick = (view: string) => {
     setActiveView(view);
   };
+
   return <SidebarProvider>
-      <div className="min-h-screen w-full flex bg-black dark:bg-black">
+      <div className="min-h-screen w-full flex bg-background dark:bg-background">
         {/* Sidebar */}
-        <Sidebar className="dark:bg-black bg-white">
+        <Sidebar className="bg-background dark:bg-background border-border dark:border-border">
           <SidebarContent>
             <SidebarMenu>
               <SidebarMenuItem>
@@ -120,9 +126,9 @@ const ClientDashboard = () => {
             </div>
           </header>
 
-          {/* Dashboard content - White in light mode, slightly lighter grey than toolbar in dark mode */}
-          <main className="flex-1 p-4 md:p-8 bg-white dark:bg-gray-800">
-            {activeView === "home" ? <div className="flex items-center justify-center h-full relative bg-white dark:bg-gray-800">
+          {/* Dashboard content - Use background color consistently */}
+          <main className="flex-1 p-4 md:p-8 bg-background dark:bg-background">
+            {activeView === "home" ? <div className="flex items-center justify-center h-full relative bg-background dark:bg-background">
                 {/* Faded background logo */}
                 <div className="absolute inset-0 opacity-5 bg-no-repeat bg-center" style={{
               backgroundImage: 'url("/lovable-uploads/e1088147-889e-43f6-bdf0-271189b88913.png")',
@@ -136,17 +142,17 @@ const ClientDashboard = () => {
                   <p className="text-xl text-gray-600 dark:text-gray-300">Client Dashboard - Aleph Engineering and Supplies</p>
                   
                 </div>
-              </div> : activeView === "orders" ? <div className="bg-white dark:bg-gray-800 min-h-full">
+              </div> : activeView === "orders" ? <div className="bg-background dark:bg-background min-h-full">
                 <OrdersPage />
-              </div> : activeView === "progress" ? <div className="bg-white dark:bg-gray-800 min-h-full">
+              </div> : activeView === "progress" ? <div className="bg-background dark:bg-background min-h-full">
                 <ProgressPage isAdmin={false} />
-              </div> : activeView === "processing" ? <div className="bg-white dark:bg-gray-800 min-h-full">  
+              </div> : activeView === "processing" ? <div className="bg-background dark:bg-background min-h-full">  
                 <ProcessingPage isAdmin={false} />
-              </div> : activeView === "completed" ? <div className="bg-white dark:bg-gray-800 min-h-full">
+              </div> : activeView === "completed" ? <div className="bg-background dark:bg-background min-h-full">
                 <CompletedPage isAdmin={false} />
-              </div> : activeView === "files" ? <div className="bg-white dark:bg-gray-800 min-h-full">
+              </div> : activeView === "files" ? <div className="bg-background dark:bg-background min-h-full">
                 <FilesPage isAdmin={false} />
-              </div> : <div className="text-center p-8 bg-white dark:bg-gray-800 min-h-full">
+              </div> : <div className="text-center p-8 bg-background dark:bg-background min-h-full">
                 <h2 className="text-2xl font-bold mb-4 text-aleph-green">Page Not Found</h2>
                 <p className="text-gray-600 dark:text-gray-300">The requested page could not be found.</p>
               </div>}
@@ -155,4 +161,5 @@ const ClientDashboard = () => {
       </div>
     </SidebarProvider>;
 };
+
 export default ClientDashboard;
