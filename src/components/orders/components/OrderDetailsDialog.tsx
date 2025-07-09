@@ -117,7 +117,7 @@ export default function OrderDetailsDialog({
         name: trimmedLine,
         quantity: 1
       };
-    }).filter((item): item is OrderItem => item !== null);
+    }).filter(item => item !== null) as OrderItem[];
 
     return items;
   };
