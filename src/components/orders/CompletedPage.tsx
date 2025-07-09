@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -14,7 +13,6 @@ import { useGlobalRealtimeOrders } from "./hooks/useGlobalRealtimeOrders";
 import ProcessingOrderFilesDialog from "./components/ProcessingOrderFilesDialog";
 import OrderExportActions from "./components/OrderExportActions";
 import { sendOrderNotification } from "@/utils/emailNotifications";
-
 interface OrderItem {
   id: string;
   name: string;
@@ -23,7 +21,6 @@ interface OrderItem {
   unit?: string;
   notes?: string;
 }
-
 interface Company {
   id: string;
   name: string;
@@ -35,7 +32,6 @@ interface Company {
   vatNumber: string;
   logo?: string;
 }
-
 interface Order {
   id: string;
   orderNumber: string;
@@ -55,16 +51,18 @@ interface Order {
     [itemName: string]: number;
   };
 }
-
 interface CompletedPageProps {
   isAdmin: boolean;
 }
-
 export default function CompletedPage({
   isAdmin
 }: CompletedPageProps) {
-  const { toast } = useToast();
-  const { user } = useAuth();
+  const {
+    toast
+  } = useToast();
+  const {
+    user
+  } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -224,19 +222,13 @@ export default function CompletedPage({
   // Delete order function for admins
   const deleteOrder = async (orderId: string, orderNumber: string) => {
     if (!isAdmin) return;
-    
     const orderToDelete = orders.find(order => order.id === orderId);
-    
     try {
       console.log('Deleting completed order:', orderId);
-      
-      const { error } = await supabase
-        .from('orders')
-        .delete()
-        .eq('id', orderId);
-
+      const {
+        error
+      } = await supabase.from('orders').delete().eq('id', orderId);
       if (error) throw error;
-
       const remainingOrders = orders.filter(order => order.id !== orderId);
       setOrders(remainingOrders);
 
@@ -251,16 +243,13 @@ export default function CompletedPage({
       } catch (emailError) {
         console.error('Failed to send email notification:', emailError);
       }
-
       toast({
         title: "Order Deleted",
         description: `Completed order ${orderNumber} has been permanently deleted.`
       });
-
       if (selectedOrder && selectedOrder.id === orderId) {
         setSelectedOrder(null);
       }
-      
       console.log('Completed order successfully deleted');
       fetchCompletedOrders();
     } catch (error: any) {
@@ -272,7 +261,6 @@ export default function CompletedPage({
       });
     }
   };
-
   if (loading) {
     return <div className="container mx-auto p-4 bg-background">
         <div className="flex justify-center items-center h-64">
@@ -280,7 +268,6 @@ export default function CompletedPage({
         </div>
       </div>;
   }
-
   if (error) {
     return <div className="container mx-auto p-4 bg-background">
         <div className="flex flex-col items-center justify-center h-64">
@@ -289,7 +276,6 @@ export default function CompletedPage({
         </div>
       </div>;
   }
-
   if (!user) {
     return <div className="container mx-auto p-4 bg-background">
         <div className="flex flex-col items-center justify-center h-64">
@@ -297,8 +283,7 @@ export default function CompletedPage({
         </div>
       </div>;
   }
-
-  return <div className="container mx-auto p-4 bg-background">
+  return <div className="container mx-auto p-4 bg-[#2e2e53]/0">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-foreground">Completed Orders</h1>
       </div>
@@ -309,12 +294,7 @@ export default function CompletedPage({
             <h2 className="text-lg font-semibold text-card-foreground">Order History</h2>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-              <Input
-                placeholder="Search orders..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 w-64 bg-background border-border text-foreground placeholder:text-muted-foreground focus:ring-primary"
-              />
+              <Input placeholder="Search orders..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="pl-10 w-64 bg-background border-border text-foreground placeholder:text-muted-foreground focus:ring-primary" />
             </div>
           </div>
         </div>
@@ -345,19 +325,17 @@ export default function CompletedPage({
                   <TableCell className="text-foreground">{order.items.length} items</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
-                      <OrderExportActions 
-                        order={{
-                          id: order.id,
-                          order_number: order.orderNumber,
-                          description: order.items.map(item => `${item.name} (Qty: ${item.quantity})`).join('\n'),
-                          status: order.status,
-                          total_amount: null,
-                          created_at: order.orderDate.toISOString(),
-                          company_id: null,
-                          companyName: order.companyName,
-                          items: order.items
-                        }}
-                      />
+                      <OrderExportActions order={{
+                  id: order.id,
+                  order_number: order.orderNumber,
+                  description: order.items.map(item => `${item.name} (Qty: ${item.quantity})`).join('\n'),
+                  status: order.status,
+                  total_amount: null,
+                  created_at: order.orderDate.toISOString(),
+                  company_id: null,
+                  companyName: order.companyName,
+                  items: order.items
+                }} />
                       
                       <Button variant="ghost" size="sm" onClick={() => viewOrderDetails(order)}>
                         <Eye className="h-4 w-4" />
