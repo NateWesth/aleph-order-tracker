@@ -16,7 +16,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import OrderForm from "./OrderForm";
 import { getUserRole } from "@/utils/authService";
-import { generateOrderNumber } from "../utils/orderUtils";
 
 interface CreateOrderDialogProps {
   isAdmin?: boolean;
@@ -37,51 +36,6 @@ export default function CreateOrderDialog({
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
-
-  const createOrderWithRetry = async (orderData: any, maxRetries: number = 3): Promise<any> => {
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        console.log(`🔄 CreateOrderDialog: Attempt ${attempt} to create order`);
-        
-        // Generate a new order number for each attempt
-        const orderNumber = generateOrderNumber();
-        const orderInsertData = {
-          ...orderData,
-          order_number: orderNumber
-        };
-
-        console.log(`📋 CreateOrderDialog: Using order number: ${orderNumber}`);
-
-        const { data: createdOrder, error: insertError } = await supabase
-          .from('orders')
-          .insert([orderInsertData])
-          .select('*')
-          .single();
-
-        if (insertError) {
-          if (insertError.code === '23505' && insertError.message.includes('orders_order_number_key')) {
-            console.log(`⚠️ CreateOrderDialog: Duplicate order number on attempt ${attempt}, retrying...`);
-            if (attempt === maxRetries) {
-              throw new Error(`Failed to generate unique order number after ${maxRetries} attempts`);
-            }
-            continue; // Retry with new order number
-          }
-          throw insertError; // Re-throw non-duplicate errors
-        }
-
-        console.log("🎉 CreateOrderDialog: Order created successfully:", createdOrder);
-        return createdOrder;
-        
-      } catch (error) {
-        if (attempt === maxRetries) {
-          throw error; // Re-throw on final attempt
-        }
-        console.log(`❌ CreateOrderDialog: Attempt ${attempt} failed, retrying...`);
-        // Wait briefly before retry
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
-    }
-  };
 
   const handleSubmit = async (orderData: {
     orderNumber: string;
@@ -117,26 +71,30 @@ export default function CreateOrderDialog({
         .map(item => `${item.name} (Qty: ${item.quantity})`)
         .join('\n');
       
-      // Prepare order data for database insertion - WITHOUT the order_number (will be generated in retry function)
-      const baseOrderData = {
+      // Prepare order data for database insertion - NOW INCLUDING urgency field
+      const orderInsertData = {
+        order_number: orderData.orderNumber,
         description: itemsDescription,
         company_id: orderData.companyId,
         total_amount: orderData.totalAmount || 0,
         user_id: user.id,
         status: 'pending',
-        urgency: orderData.urgency,
+        urgency: orderData.urgency, // Store urgency in database
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
 
-      console.log("💾 CreateOrderDialog: Base order data for database:", baseOrderData);
+      console.log("💾 CreateOrderDialog: Final order data for database:", orderInsertData);
+      console.log("🏢 CreateOrderDialog: Company ID being saved:", orderInsertData.company_id);
+      console.log("👤 CreateOrderDialog: User ID being saved:", orderInsertData.user_id);
+      console.log("🎯 CreateOrderDialog: Urgency being saved:", orderInsertData.urgency);
 
       // Verify company exists before creating order
-      if (baseOrderData.company_id) {
+      if (orderInsertData.company_id) {
         const { data: companyCheck, error: companyError } = await supabase
           .from('companies')
           .select('id, name, code')
-          .eq('id', baseOrderData.company_id)
+          .eq('id', orderInsertData.company_id)
           .single();
 
         if (companyError) {
@@ -149,15 +107,48 @@ export default function CreateOrderDialog({
         console.warn("⚠️ CreateOrderDialog: No company ID provided - order will be created without company link");
       }
 
-      // Create order with retry mechanism
-      const createdOrder = await createOrderWithRetry(baseOrderData);
+      // Insert the order into the database
+      const { data: createdOrder, error: insertError } = await supabase
+        .from('orders')
+        .insert([orderInsertData])
+        .select('*')
+        .single();
 
-      console.log("🎉 CreateOrderDialog: Order created successfully with retry mechanism:", createdOrder);
+      if (insertError) {
+        console.error("❌ CreateOrderDialog: Database insertion failed:", insertError);
+        console.error("❌ CreateOrderDialog: Insert error details:", {
+          code: insertError.code,
+          message: insertError.message,
+          details: insertError.details,
+          hint: insertError.hint
+        });
+        throw insertError;
+      }
+
+      console.log("🎉 CreateOrderDialog: Order created successfully in database:", createdOrder);
+      console.log("🔍 CreateOrderDialog: Created order company_id:", createdOrder.company_id);
+      console.log("🔍 CreateOrderDialog: Created order user_id:", createdOrder.user_id);
+      console.log("🎯 CreateOrderDialog: Created order urgency:", createdOrder.urgency);
+
+      // Verify the order was saved with correct data
+      const { data: verificationOrder, error: verificationError } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('id', createdOrder.id)
+        .single();
+
+      if (verificationError) {
+        console.error("❌ CreateOrderDialog: Order verification failed:", verificationError);
+      } else {
+        console.log("✅ CreateOrderDialog: Order verification successful:", verificationOrder);
+        console.log("🏢 CreateOrderDialog: Verified company_id in database:", verificationOrder.company_id);
+        console.log("🎯 CreateOrderDialog: Verified urgency in database:", verificationOrder.urgency);
+      }
 
       const urgencyText = orderData.urgency !== 'normal' ? ` with ${orderData.urgency.toUpperCase()} priority` : '';
       toast({
         title: "Order Created Successfully",
-        description: `Order ${createdOrder.order_number} has been created${urgencyText} and linked to the company.`,
+        description: `Order ${orderData.orderNumber} has been created${urgencyText} and linked to the company.`,
       });
 
       setOpen(false);
