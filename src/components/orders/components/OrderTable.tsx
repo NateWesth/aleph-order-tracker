@@ -19,21 +19,21 @@ interface OrderTableProps {
 
 export default function OrderTable({ orders, isAdmin, onReceiveOrder, onDeleteOrder }: OrderTableProps) {
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-lg shadow border border-gray-200 dark:border-gray-700">
+    <div className="bg-card border border-border rounded-lg shadow">
       <Table>
         <TableHeader>
-          <TableRow className="border-b border-gray-200 dark:border-gray-700">
-            <TableHead className="text-gray-900 dark:text-gray-100">Order Number</TableHead>
-            <TableHead className="text-gray-900 dark:text-gray-100">Company</TableHead>
-            <TableHead className="text-gray-900 dark:text-gray-100">Status</TableHead>
-            <TableHead className="text-gray-900 dark:text-gray-100">Created</TableHead>
-            <TableHead className="text-gray-900 dark:text-gray-100">Actions</TableHead>
+          <TableRow className="border-b border-border">
+            <TableHead className="text-card-foreground">Order Number</TableHead>
+            <TableHead className="text-card-foreground">Company</TableHead>
+            <TableHead className="text-card-foreground">Status</TableHead>
+            <TableHead className="text-card-foreground">Created</TableHead>
+            <TableHead className="text-card-foreground">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {orders.length === 0 ? (
-            <TableRow className="border-b border-gray-200 dark:border-gray-700">
-              <TableCell colSpan={5} className="text-center py-8 text-gray-600 dark:text-gray-400">
+            <TableRow className="border-b border-border">
+              <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                 No orders found.
               </TableCell>
             </TableRow>
