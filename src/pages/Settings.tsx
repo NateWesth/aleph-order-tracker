@@ -1,4 +1,3 @@
-
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
@@ -64,16 +63,16 @@ const Settings = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-lg text-foreground">Loading...</div>
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <div className="text-lg">Loading...</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Header */}
-      <header className="bg-card shadow border-b border-border">
+      <header className="bg-white dark:bg-gray-800 shadow">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-6">
             <div className="flex items-center">
@@ -85,7 +84,7 @@ const Settings = () => {
               >
                 <ArrowLeft className="h-5 w-5" />
               </Button>
-              <h1 className="text-2xl font-bold text-foreground">Settings</h1>
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Settings</h1>
             </div>
           </div>
         </div>
@@ -100,9 +99,9 @@ const Settings = () => {
               <CardHeader>
                 <div className="flex items-center space-x-2">
                   {theme === 'dark' ? (
-                    <Moon className="h-5 w-5 text-primary" />
+                    <Moon className="h-5 w-5 text-aleph-green" />
                   ) : (
-                    <Sun className="h-5 w-5 text-primary" />
+                    <Sun className="h-5 w-5 text-aleph-green" />
                   )}
                   <CardTitle>Appearance</CardTitle>
                 </div>
@@ -114,7 +113,7 @@ const Settings = () => {
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
                     <Label htmlFor="theme-toggle">Dark Mode</Label>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
                       Switch between light and dark themes
                     </p>
                   </div>
@@ -131,7 +130,7 @@ const Settings = () => {
             <Card>
               <CardHeader>
                 <div className="flex items-center space-x-2">
-                  <User className="h-5 w-5 text-primary" />
+                  <User className="h-5 w-5 text-aleph-green" />
                   <CardTitle>Profile Information</CardTitle>
                 </div>
                 <CardDescription>
@@ -145,7 +144,7 @@ const Settings = () => {
                     id="fullName"
                     value={userProfile?.full_name || ''}
                     readOnly
-                    className="bg-muted"
+                    className="bg-gray-50 dark:bg-gray-700"
                   />
                 </div>
                 <div className="space-y-2">
@@ -154,7 +153,7 @@ const Settings = () => {
                     id="email"
                     value={userProfile?.email || user?.email || ''}
                     readOnly
-                    className="bg-muted"
+                    className="bg-gray-50 dark:bg-gray-700"
                   />
                 </div>
                 <div className="space-y-2">
@@ -163,7 +162,7 @@ const Settings = () => {
                     id="phone"
                     value={userProfile?.phone || 'Not provided'}
                     readOnly
-                    className="bg-muted"
+                    className="bg-gray-50 dark:bg-gray-700"
                   />
                 </div>
                 <div className="space-y-2">
@@ -172,7 +171,7 @@ const Settings = () => {
                     id="position"
                     value={userProfile?.position || 'Not provided'}
                     readOnly
-                    className="bg-muted"
+                    className="bg-gray-50 dark:bg-gray-700"
                   />
                 </div>
                 <div className="space-y-2">
@@ -181,7 +180,7 @@ const Settings = () => {
                     id="companyCode"
                     value={userProfile?.company_code || 'Not provided'}
                     readOnly
-                    className="bg-muted"
+                    className="bg-gray-50 dark:bg-gray-700"
                   />
                 </div>
               </CardContent>
@@ -191,7 +190,7 @@ const Settings = () => {
             <Card className="md:col-span-2">
               <CardHeader>
                 <div className="flex items-center space-x-2">
-                  <Building2 className="h-5 w-5 text-primary" />
+                  <Building2 className="h-5 w-5 text-aleph-green" />
                   <CardTitle>Company Information</CardTitle>
                 </div>
                 <CardDescription>
@@ -207,7 +206,7 @@ const Settings = () => {
                         id="companyName"
                         value={companyInfo.name}
                         readOnly
-                        className="bg-muted"
+                        className="bg-gray-50 dark:bg-gray-700"
                       />
                     </div>
                     <div className="space-y-2">
@@ -216,7 +215,7 @@ const Settings = () => {
                         id="contactPerson"
                         value={companyInfo.contact_person || 'Not provided'}
                         readOnly
-                        className="bg-muted"
+                        className="bg-gray-50 dark:bg-gray-700"
                       />
                     </div>
                     <div className="space-y-2">
@@ -225,7 +224,7 @@ const Settings = () => {
                         id="companyEmail"
                         value={companyInfo.email || 'Not provided'}
                         readOnly
-                        className="bg-muted"
+                        className="bg-gray-50 dark:bg-gray-700"
                       />
                     </div>
                     <div className="space-y-2">
@@ -234,7 +233,7 @@ const Settings = () => {
                         id="companyPhone"
                         value={companyInfo.phone || 'Not provided'}
                         readOnly
-                        className="bg-muted"
+                        className="bg-gray-50 dark:bg-gray-700"
                       />
                     </div>
                     <div className="space-y-2">
@@ -243,7 +242,7 @@ const Settings = () => {
                         id="companyAddress"
                         value={companyInfo.address || 'Not provided'}
                         readOnly
-                        className="bg-muted"
+                        className="bg-gray-50 dark:bg-gray-700"
                       />
                     </div>
                     <div className="space-y-2">
@@ -252,7 +251,7 @@ const Settings = () => {
                         id="vatNumber"
                         value={companyInfo.vat_number || 'Not provided'}
                         readOnly
-                        className="bg-muted"
+                        className="bg-gray-50 dark:bg-gray-700"
                       />
                     </div>
                     <div className="space-y-2 md:col-span-2">
@@ -261,15 +260,15 @@ const Settings = () => {
                         id="accountManager"
                         value={companyInfo.account_manager || 'Not provided'}
                         readOnly
-                        className="bg-muted"
+                        className="bg-gray-50 dark:bg-gray-700"
                       />
                     </div>
                   </div>
                 ) : (
                   <div className="text-center py-8">
-                    <Building2 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                    <p className="text-muted-foreground">No company information available</p>
-                    <p className="text-sm text-muted-foreground mt-2">
+                    <Building2 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <p className="text-gray-500">No company information available</p>
+                    <p className="text-sm text-gray-400 mt-2">
                       Company details will appear here once linked to a company code
                     </p>
                   </div>

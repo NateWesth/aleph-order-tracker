@@ -14,6 +14,7 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
 
+    /* Updated colors to green theme */
     --primary: 142 71% 45%;
     --primary-foreground: 210 40% 98%;
 
@@ -35,7 +36,7 @@
 
     --radius: 0.5rem;
 
-    --sidebar-background: 0 0% 100%;
+    --sidebar-background: 142 71% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
     --sidebar-primary: 142 71% 45%;
     --sidebar-primary-foreground: 0 0% 98%;
@@ -46,42 +47,42 @@
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    --background: 0 0% 8%;
+    --foreground: 0 0% 85%;
 
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
+    --card: 0 0% 25%;
+    --card-foreground: 0 0% 85%;
 
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 0 0% 8%;
+    --popover-foreground: 0 0% 85%;
 
-    --primary: 120 100% 50%;
-    --primary-foreground: 222.2 84% 4.9%;
+    /* Bright green colors in dark mode - slightly less shocking but brighter than light mode */
+    --primary: 120 100% 55%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 120 100% 55%;
+    --secondary-foreground: 0 0% 100%;
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --muted: 0 0% 15%;
+    --muted-foreground: 0 0% 65%;
 
     --accent: 120 100% 45%;
-    --accent-foreground: 210 40% 98%;
+    --accent-foreground: 0 0% 100%;
 
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 120 100% 50%;
-
-    --sidebar-background: 222.2 84% 4.9%;
-    --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 120 100% 50%;
-    --sidebar-primary-foreground: 222.2 84% 4.9%;
-    --sidebar-accent: 217.2 32.6% 17.5%;
-    --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 217.2 32.6% 17.5%;
-    --sidebar-ring: 120 100% 50%;
+    --border: 0 0% 15%;
+    --input: 0 0% 15%;
+    --ring: 120 100% 55%;
+    --sidebar-background: 0 0% 10%;
+    --sidebar-foreground: 0 0% 85%;
+    --sidebar-primary: 120 100% 55%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 0 0% 12%;
+    --sidebar-accent-foreground: 0 0% 85%;
+    --sidebar-border: 0 0% 12%;
+    --sidebar-ring: 120 100% 55%;
   }
 }
 
@@ -96,7 +97,7 @@
   }
 
   h1, h2, h3, h4, h5, h6 {
-    @apply text-primary font-bold;
+    @apply text-aleph-green font-bold;
   }
 
   h1 {
@@ -112,8 +113,9 @@
   }
 }
 
+/* Updated gradient to match green theme */
 .hero-gradient {
-  background: linear-gradient(to right, hsl(var(--primary)), hsl(var(--accent)), hsl(var(--primary)));
+  background: linear-gradient(to right, #00FF00, #FF00C8, #00FF00, #FF8000);
 }
 
 .animate-in {
@@ -130,92 +132,154 @@
 .fade-in-delay-3 { animation-delay: 0.3s; opacity: 0; }
 .fade-in-delay-4 { animation-delay: 0.4s; opacity: 0; }
 
-/* Consistent color classes */
+/* Updated color classes - less shocking green in dark mode but brighter than light mode */
 .text-aleph-green { 
-  @apply text-primary;
+  color: #22C55E; 
+}
+.dark .text-aleph-green { 
+  color: #22FF22; 
 }
 
-.text-aleph-magenta { 
-  color: hsl(320 100% 50%);
+/* Login screen specific green - keep unchanged in dark mode */
+.auth-green {
+  color: #22C55E;
+}
+.dark .auth-green {
+  color: #00FF00;
 }
 
+.text-aleph-magenta { color: #FF00C8; }
 .text-aleph-accent { 
-  @apply text-accent;
+  color: #16A34A; 
+}
+.dark .text-aleph-accent { 
+  color: #22FF22; 
 }
 
-.text-aleph-orange { 
-  color: hsl(30 100% 50%);
-}
+.text-aleph-orange { color: #FF8000; }
 
 .bg-aleph-green { 
-  @apply bg-primary;
+  background-color: #22C55E; 
+}
+.dark .bg-aleph-green { 
+  background-color: #22FF22; 
 }
 
-.bg-aleph-magenta { 
-  background-color: hsl(320 100% 50%);
-}
-
+.bg-aleph-magenta { background-color: #FF00C8; }
 .bg-aleph-accent { 
-  @apply bg-accent;
+  background-color: #16A34A; 
+}
+.dark .bg-aleph-accent { 
+  background-color: #22FF22; 
 }
 
-.bg-aleph-orange { 
-  background-color: hsl(30 100% 50%);
-}
+.bg-aleph-orange { background-color: #FF8000; }
 
-/* Button styles */
+/* Updated button styles for less shocking green in dark mode */
 .btn-aleph-green {
-  @apply bg-primary text-primary-foreground hover:bg-primary/90 transition-colors;
+  @apply bg-aleph-green text-white transition-colors;
+}
+.btn-aleph-green:hover {
+  background-color: #22FF22;
+}
+.dark .btn-aleph-green {
+  background-color: #22FF22;
+  color: #000000;
+}
+.dark .btn-aleph-green:hover {
+  background-color: #11DD11;
 }
 
 .btn-aleph-magenta {
-  @apply text-white transition-colors;
-  background-color: hsl(320 100% 50%);
-}
-.btn-aleph-magenta:hover {
-  background-color: hsl(320 100% 40%);
+  @apply bg-aleph-magenta text-white hover:bg-pink-600 transition-colors;
 }
 
 .btn-aleph-accent {
-  @apply bg-accent text-accent-foreground hover:bg-accent/90 transition-colors;
+  @apply bg-aleph-accent text-white transition-colors;
+}
+.btn-aleph-accent:hover {
+  background-color: #22FF22;
+}
+.dark .btn-aleph-accent {
+  background-color: #22FF22;
+  color: #000000;
+}
+.dark .btn-aleph-accent:hover {
+  background-color: #11DD11;
 }
 
 .btn-aleph-orange {
-  @apply text-white transition-colors;
-  background-color: hsl(30 100% 50%);
-}
-.btn-aleph-orange:hover {
-  background-color: hsl(30 100% 40%);
+  @apply bg-aleph-orange text-white hover:bg-orange-500 transition-colors;
 }
 
-/* Header styles */
+/* Toolbar and header styles updated to light grey in light mode */
 .header-aleph {
-  @apply bg-gradient-to-r from-primary to-accent text-primary-foreground shadow-md;
+  @apply bg-gradient-to-r from-aleph-green to-aleph-magenta text-white shadow-md;
+}
+.dark .header-aleph {
+  background: linear-gradient(to right, #22FF22, #FF00C8);
 }
 
 .toolbar-aleph {
-  @apply bg-muted border-b border-border shadow-sm;
+  @apply bg-gray-100 border-b border-gray-200 shadow-sm;
 }
 
-/* Hover states */
+/* Dark mode specific styles */
+.dark .toolbar-aleph {
+  @apply bg-gray-900 border-aleph-green/20;
+}
+
+/* Hover states with pink colors - no background highlight - WORKS IN BOTH LIGHT AND DARK MODE */
 .sidebar-hover {
-  @apply transition-colors duration-200 hover:text-accent;
+  @apply transition-colors duration-200;
 }
 
+.sidebar-hover:hover {
+  @apply text-pink-600;
+  background-color: transparent !important;
+}
+
+.dark .sidebar-hover:hover {
+  @apply text-pink-400;
+  background-color: transparent !important;
+}
+
+/* Active/selected state - stays pink in both modes */
 .sidebar-active {
-  @apply text-accent;
+  @apply text-pink-600;
+  background-color: transparent !important;
 }
 
+.dark .sidebar-active {
+  @apply text-pink-400;
+  background-color: transparent !important;
+}
+
+/* Button hover states - pink text in both light and dark mode */
 .btn-hover {
-  @apply transition-colors duration-200 hover:text-accent;
+  @apply transition-colors duration-200;
+}
+
+.btn-hover:hover {
+  @apply text-pink-600;
+  background-color: transparent !important;
+}
+
+.dark .btn-hover:hover {
+  @apply text-pink-400;
+  background-color: transparent !important;
 }
 
 /* Focus states */
 .ring-aleph-green {
-  @apply focus:ring-2 focus:ring-primary focus:ring-opacity-50;
+  @apply focus:ring-2 focus:ring-opacity-50;
+  --tw-ring-color: #22C55E;
+}
+.dark .ring-aleph-green {
+  --tw-ring-color: #22FF22;
 }
 
 .ring-aleph-magenta {
   @apply focus:ring-2 focus:ring-opacity-50;
-  --tw-ring-color: hsl(320 100% 50%);
+  --tw-ring-color: #FF00C8;
 }
