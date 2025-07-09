@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FileText, Eye, MoreHorizontal } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { OrderExportActions } from "./OrderExportActions";
+import OrderExportActions from "./OrderExportActions";
 import { useState } from "react";
 import OrderDetailsDialog from "./OrderDetailsDialog";
 
@@ -38,7 +38,7 @@ interface OrderRowProps {
   isAdmin?: boolean;
 }
 
-export function OrderRow({ 
+export default function OrderRow({ 
   order, 
   onEditOrder, 
   onDeleteOrder, 
