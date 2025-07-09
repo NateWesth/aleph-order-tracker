@@ -6,6 +6,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { OrderWithCompany } from "../types/orderTypes";
 
 interface OrderItem {
   name: string;
@@ -17,23 +18,13 @@ interface OrderItem {
 interface OrderDetailsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  orderNumber: string;
-  companyName: string;
-  status: string | null;
-  createdAt: string;
-  items: OrderItem[];
-  urgency?: string;
+  order: OrderWithCompany;
 }
 
 export default function OrderDetailsDialog({
   open,
   onOpenChange,
-  orderNumber,
-  companyName,
-  status,
-  createdAt,
-  items,
-  urgency
+  order
 }: OrderDetailsDialogProps) {
   const getStatusColor = (status: string | null) => {
     switch (status?.toLowerCase()) {
@@ -95,35 +86,41 @@ export default function OrderDetailsDialog({
   };
 
   // Use provided items or parse from description
-  const displayItems = items && items.length > 0 ? items : [];
+  const displayItems = order.items && order.items.length > 0 ? 
+    order.items.map(item => ({
+      name: item.name,
+      quantity: item.quantity,
+      notes: undefined // OrderWithCompany items don't have notes field
+    })) : 
+    parseOrderItems(order.description || null);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl">
         <DialogHeader>
-          <DialogTitle>Order Details - {orderNumber}</DialogTitle>
+          <DialogTitle>Order Details - {order.order_number}</DialogTitle>
         </DialogHeader>
         
         <div className="space-y-6">
           <div className="grid grid-cols-2 gap-4">
             <div>
               <p className="text-sm text-gray-500">Company</p>
-              <p className="font-medium">{companyName}</p>
+              <p className="font-medium">{order.companyName || 'No Company'}</p>
             </div>
             <div>
               <p className="text-sm text-gray-500">Order Date</p>
-              <p>{new Date(createdAt).toLocaleDateString()}</p>
+              <p>{new Date(order.created_at).toLocaleDateString()}</p>
             </div>
             <div>
               <p className="text-sm text-gray-500">Status</p>
-              <Badge className={getStatusColor(status)}>
-                {status || 'pending'}
+              <Badge className={getStatusColor(order.status)}>
+                {order.status || 'pending'}
               </Badge>
             </div>
             <div>
               <p className="text-sm text-gray-500">Urgency</p>
-              <Badge className={getUrgencyColor(urgency)}>
-                {urgency || 'normal'}
+              <Badge className={getUrgencyColor(order.urgency)}>
+                {order.urgency || 'normal'}
               </Badge>
             </div>
           </div>
