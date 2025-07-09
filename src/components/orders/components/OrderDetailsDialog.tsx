@@ -63,6 +63,40 @@ export default function OrderDetailsDialog({
     }
   };
 
+  // Parse items from description if needed (for backward compatibility)
+  const parseOrderItems = (description: string | null): OrderItem[] => {
+    if (!description) return [];
+    
+    return description.split('\n').map((line, index) => {
+      // Check for format: "Item Name (Qty: X) - Notes"
+      const matchWithNotes = line.match(/^(.+?)\s*\(Qty:\s*(\d+)\)\s*-\s*(.+)$/);
+      if (matchWithNotes) {
+        return {
+          name: matchWithNotes[1].trim(),
+          quantity: parseInt(matchWithNotes[2]),
+          notes: matchWithNotes[3].trim()
+        };
+      }
+      
+      // Check for format: "Item Name (Qty: X)"
+      const match = line.match(/^(.+?)\s*\(Qty:\s*(\d+)\)$/);
+      if (match) {
+        return {
+          name: match[1].trim(),
+          quantity: parseInt(match[2])
+        };
+      }
+      
+      return {
+        name: line.trim(),
+        quantity: 1
+      };
+    }).filter(item => item.name);
+  };
+
+  // Use provided items or parse from description
+  const displayItems = items && items.length > 0 ? items : [];
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl">
@@ -96,7 +130,7 @@ export default function OrderDetailsDialog({
           
           <div>
             <h3 className="font-medium mb-4 text-lg">Order Items</h3>
-            {items.length === 0 ? (
+            {displayItems.length === 0 ? (
               <div className="text-center p-8 border rounded-md border-dashed">
                 <p className="text-gray-500">No items found in this order.</p>
               </div>
@@ -108,12 +142,12 @@ export default function OrderDetailsDialog({
                   <div className="col-span-2 text-center">Unit</div>
                   <div className="col-span-2 text-center">Total</div>
                 </div>
-                {items.map((item, index) => (
+                {displayItems.map((item, index) => (
                   <div key={index} className="grid grid-cols-12 gap-4 p-4 items-start hover:bg-gray-50">
                     <div className="col-span-6">
                       <p className="font-medium text-gray-900">{item.name}</p>
                       {item.notes && (
-                        <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                        <p className="text-xs text-gray-500 mt-1 leading-relaxed italic">
                           {item.notes}
                         </p>
                       )}

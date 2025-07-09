@@ -1,43 +1,53 @@
-
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { TableCell, TableRow } from "@/components/ui/table";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import { Trash2, CheckCircle, Eye } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { FileText, Eye, MoreHorizontal } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { OrderExportActions } from "./OrderExportActions";
+import { useState } from "react";
 import OrderDetailsDialog from "./OrderDetailsDialog";
-import OrderExportActions from "./OrderExportActions";
-import { OrderWithCompany } from "../types/orderTypes";
 
 interface OrderItem {
   id: string;
   name: string;
   quantity: number;
-  unit?: string;
+  delivered?: number;
+  notes?: string;
+}
+
+interface Order {
+  id: string;
+  order_number: string;
+  description: string | null;
+  status: string | null;
+  total_amount: number | null;
+  created_at: string;
+  company_id: string | null;
+  companyName?: string;
+  items?: OrderItem[];
+  urgency?: string;
 }
 
 interface OrderRowProps {
-  order: OrderWithCompany;
-  isAdmin: boolean;
-  onReceiveOrder: (order: OrderWithCompany) => void;
-  onDeleteOrder: (orderId: string, orderNumber: string) => void;
+  order: Order;
+  onEditOrder?: (order: Order) => void;
+  onDeleteOrder?: (id: string) => void;
+  onViewFiles?: (order: Order) => void;
+  onUpdateStatus?: (orderId: string, status: string) => void;
+  onUpdateProgress?: (orderId: string, stage: string) => void;
+  isAdmin?: boolean;
 }
 
-export default function OrderRow({ order, isAdmin, onReceiveOrder, onDeleteOrder }: OrderRowProps) {
+export function OrderRow({ 
+  order, 
+  onEditOrder, 
+  onDeleteOrder, 
+  onViewFiles, 
+  onUpdateStatus, 
+  onUpdateProgress,
+  isAdmin 
+}: OrderRowProps) {
   const [showDetails, setShowDetails] = useState(false);
-  const [companyName, setCompanyName] = useState<string>(order.companyName || 'Unknown Company');
-  const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
 
   const getStatusColor = (status: string | null) => {
     switch (status?.toLowerCase()) {
@@ -54,147 +64,108 @@ export default function OrderRow({ order, isAdmin, onReceiveOrder, onDeleteOrder
     }
   };
 
-  const fetchCompanyName = async () => {
-    if (order.company_id && !order.companyName) {
-      const { data } = await supabase
-        .from('companies')
-        .select('name')
-        .eq('id', order.company_id)
-        .single();
-      
-      if (data) {
-        setCompanyName(data.name);
+  const getStatusBadge = (status: string | null) => (
+    <Badge className={getStatusColor(status)}>
+      {status || 'pending'}
+    </Badge>
+  );
+
+  // Parse items from description to include notes
+  const parseOrderItems = (description: string | null) => {
+    if (!description) return [];
+    
+    return description.split('\n').map((line, index) => {
+      // Check for format: "Item Name (Qty: X) - Notes"
+      const matchWithNotes = line.match(/^(.+?)\s*\(Qty:\s*(\d+)\)\s*-\s*(.+)$/);
+      if (matchWithNotes) {
+        return {
+          id: `item-${index}`,
+          name: matchWithNotes[1].trim(),
+          quantity: parseInt(matchWithNotes[2]),
+          notes: matchWithNotes[3].trim()
+        };
       }
-    }
-  };
-
-  const parseOrderItems = () => {
-    // First try to use the items array if it exists
-    if (order.items && order.items.length > 0) {
-      const formattedItems: OrderItem[] = order.items.map(item => ({
-        id: item.id,
-        name: item.name,
-        quantity: item.quantity,
-        unit: undefined // Will be populated from description if available
-      }));
-      setOrderItems(formattedItems);
-      return;
-    }
-
-    // Fall back to parsing description if no items array
-    if (!order.description) {
-      setOrderItems([]);
-      return;
-    }
-
-    // Parse the description to extract items and quantities
-    // Format: "Item Name (Qty: 2)\nAnother Item (Qty: 1)"
-    const lines = order.description.split('\n').filter(line => line.trim());
-    const items: OrderItem[] = lines.map((line, index) => {
+      
+      // Check for format: "Item Name (Qty: X)"
       const match = line.match(/^(.+?)\s*\(Qty:\s*(\d+)\)$/);
       if (match) {
         return {
           id: `item-${index}`,
           name: match[1].trim(),
-          quantity: parseInt(match[2]),
-          unit: undefined
+          quantity: parseInt(match[2])
         };
       }
-      // Fallback for items without quantity format
+      
       return {
         id: `item-${index}`,
         name: line.trim(),
-        quantity: 1,
-        unit: undefined
+        quantity: 1
       };
     }).filter(item => item.name);
-
-    setOrderItems(items);
   };
 
-  const handleViewDetails = async () => {
-    await fetchCompanyName();
-    parseOrderItems();
-    setShowDetails(true);
-  };
+  const orderItems = parseOrderItems(order.description);
 
   return (
     <>
-      <TableRow>
-        <TableCell className="font-medium">
-          {order.order_number}
-        </TableCell>
+      <TableRow className="hover:bg-gray-50">
+        <TableCell>{order.order_number}</TableCell>
+        <TableCell>{order.companyName || 'No Company'}</TableCell>
+        <TableCell>{getStatusBadge(order.status)}</TableCell>
+        <TableCell>{new Date(order.created_at).toLocaleDateString()}</TableCell>
+        <TableCell>{order.total_amount ? `$${order.total_amount.toFixed(2)}` : 'N/A'}</TableCell>
         <TableCell>
-          {order.companyName || 'No Company'}
+          {order.urgency || 'Normal'}
         </TableCell>
-        <TableCell>
-          <Badge className={getStatusColor(order.status)}>
-            {order.status || 'pending'}
-          </Badge>
-        </TableCell>
-        <TableCell>
-          {new Date(order.created_at).toLocaleDateString()}
-        </TableCell>
+        {isAdmin && (
+          <TableCell>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onUpdateStatus && onUpdateStatus(order.id, order.status === 'pending' ? 'processing' : 'completed')}
+              >
+                {order.status === 'pending' ? 'Start Processing' : 'Mark Complete'}
+              </Button>
+            </div>
+          </TableCell>
+        )}
         <TableCell>
           <div className="flex items-center gap-2">
-            <OrderExportActions 
-              order={{
-                id: order.id,
-                order_number: order.order_number,
-                description: order.description,
-                status: order.status,
-                total_amount: order.total_amount,
-                created_at: order.created_at,
-                company_id: order.company_id,
-                companyName: order.companyName,
-                items: orderItems
-              }}
-            />
-            
-            <Button 
-              variant="outline" 
+            <Button
+              variant="ghost"
               size="sm"
-              onClick={handleViewDetails}
+              onClick={() => setShowDetails(true)}
             >
-              <Eye className="h-4 w-4 mr-1" />
-              View Details
+              <Eye className="h-4 w-4" />
             </Button>
-            {isAdmin && order.status === 'pending' && (
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => onReceiveOrder(order)}
-                className="text-green-600 hover:text-green-700"
-              >
-                <CheckCircle className="h-4 w-4 mr-1" />
-                Receive
-              </Button>
-            )}
+            <OrderExportActions order={order} />
             {isAdmin && (
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700">
-                    <Trash2 className="h-4 w-4" />
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="h-8 w-8 p-0">
+                    <span className="sr-only">Open menu</span>
+                    <MoreHorizontal className="h-4 w-4" />
                   </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Delete Order</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      Are you sure you want to delete order {order.order_number}? This action cannot be undone and will remove the order from all systems.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction 
-                      onClick={() => onDeleteOrder(order.id, order.order_number)}
-                      className="bg-red-600 hover:bg-red-700"
-                    >
-                      Delete
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    onClick={() => onEditOrder && onEditOrder(order)}
+                  >
+                    Edit Order
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => onDeleteOrder && onDeleteOrder(order.id)}
+                  >
+                    Delete Order
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => onViewFiles && onViewFiles(order)}
+                  >
+                    View Files
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
           </div>
         </TableCell>
@@ -204,7 +175,7 @@ export default function OrderRow({ order, isAdmin, onReceiveOrder, onDeleteOrder
         open={showDetails}
         onOpenChange={setShowDetails}
         orderNumber={order.order_number}
-        companyName={companyName}
+        companyName={order.companyName || 'No Company'}
         status={order.status}
         createdAt={order.created_at}
         items={orderItems}
