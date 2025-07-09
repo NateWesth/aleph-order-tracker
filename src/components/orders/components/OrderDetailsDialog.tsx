@@ -60,7 +60,7 @@ export default function OrderDetailsDialog({
     
     console.log('Parsing description:', description);
     
-    return description.split('\n').map((line, index) => {
+    const items = description.split('\n').map((line, index) => {
       const trimmedLine = line.trim();
       if (!trimmedLine) return null;
       
@@ -118,6 +118,8 @@ export default function OrderDetailsDialog({
         quantity: 1
       };
     }).filter((item): item is OrderItem => item !== null);
+
+    return items;
   };
 
   // Use provided items or parse from description
@@ -125,7 +127,7 @@ export default function OrderDetailsDialog({
     order.items.map(item => ({
       name: item.name,
       quantity: item.quantity,
-      notes: item.notes // This should now be available from the type definition
+      notes: item.notes || undefined
     })) : 
     parseOrderItems(order.description || null);
 
