@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -125,7 +126,7 @@ export default function CompletedPage({
   // Fetch company details for orders
   const fetchCompanyDetails = async (companyId: string) => {
     try {
-      const { data } } = await supabase
+      const { data } = await supabase
         .from('companies')
         .select('name, address, phone, email, contact_person')
         .eq('id', companyId)
