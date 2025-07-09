@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { 
@@ -466,8 +465,20 @@ export default function OrderExportActions({
       doc.setFontSize(8);
       doc.text(`Generated on: ${new Date().toLocaleDateString()} | ${adminCompany.name}`, 105, 280, { align: 'center' });
 
-      // Save the PDF
-      doc.save(`order-${orderToExport.order_number}-${new Date().getTime()}.pdf`);
+      // Convert PDF to blob and trigger save dialog
+      const pdfBlob = doc.output('blob');
+      const fileName = `order-${orderToExport.order_number}-${new Date().getTime()}.pdf`;
+      
+      // Create a download link and trigger the save dialog
+      const url = URL.createObjectURL(pdfBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Error generating PDF:', error);
     } finally {
@@ -577,8 +588,20 @@ export default function OrderExportActions({
         },
       });
 
-      // Save the PDF
-      doc.save(`${title.toLowerCase().replace(/\s+/g, '-')}-${new Date().getTime()}.pdf`);
+      // Convert PDF to blob and trigger save dialog
+      const pdfBlob = doc.output('blob');
+      const fileName = `${title.toLowerCase().replace(/\s+/g, '-')}-${new Date().getTime()}.pdf`;
+      
+      // Create a download link and trigger the save dialog
+      const url = URL.createObjectURL(pdfBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Error generating PDF:', error);
     } finally {
@@ -619,8 +642,21 @@ export default function OrderExportActions({
       // Add worksheet to workbook
       XLSX.utils.book_append_sheet(wb, ws, title);
 
-      // Save the file
-      XLSX.writeFile(wb, `${title.toLowerCase().replace(/\s+/g, '-')}-${new Date().getTime()}.xlsx`);
+      // Generate blob and trigger save dialog
+      const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+      const excelBlob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const fileName = `${title.toLowerCase().replace(/\s+/g, '-')}-${new Date().getTime()}.xlsx`;
+      
+      // Create a download link and trigger the save dialog
+      const url = URL.createObjectURL(excelBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(excelBlob);
     } catch (error) {
       console.error('Error generating Excel file:', error);
     } finally {
@@ -645,7 +681,7 @@ export default function OrderExportActions({
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => handleExportSingleOrderPDF(order)}>
             <FileText className="h-4 w-4 mr-2" />
-            Export as PDF
+            Save as PDF
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -668,11 +704,11 @@ export default function OrderExportActions({
         </DropdownMenuItem>
         <DropdownMenuItem onClick={handleExportPDF}>
           <FileText className="h-4 w-4 mr-2" />
-          Export as PDF
+          Save as PDF
         </DropdownMenuItem>
         <DropdownMenuItem onClick={handleExportExcel}>
           <Sheet className="h-4 w-4 mr-2" />
-          Export as Excel
+          Save as Excel
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
