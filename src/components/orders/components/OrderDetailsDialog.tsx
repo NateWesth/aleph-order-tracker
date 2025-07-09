@@ -58,80 +58,52 @@ export default function OrderDetailsDialog({
   const parseOrderItems = (description: string | null): OrderItem[] => {
     if (!description) return [];
     
-    console.log('Parsing description:', description);
+    console.log('🔍 OrderDetailsDialog: Parsing description:', description);
     
     const items: OrderItem[] = [];
     const lines = description.split('\n');
     
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
-      if (!line) continue;
+    for (const line of lines) {
+      const trimmedLine = line.trim();
+      if (!trimmedLine) continue;
       
-      console.log(`Processing line ${i}: "${line}"`);
+      console.log(`🔍 OrderDetailsDialog: Processing line: "${trimmedLine}"`);
       
-      // Pattern 1: "Item Name (Qty: X) - Notes"
-      const matchWithDashNotes = line.match(/^(.+?)\s*\(Qty:\s*(\d+)\)\s*-\s*(.+)$/);
-      if (matchWithDashNotes) {
+      // Match pattern: "Item Name (Qty: X) - Notes"
+      const matchWithNotes = trimmedLine.match(/^(.+?)\s*\(Qty:\s*(\d+)\)\s*-\s*(.+)$/);
+      if (matchWithNotes) {
         const item: OrderItem = {
-          name: matchWithDashNotes[1].trim(),
-          quantity: parseInt(matchWithDashNotes[2]),
-          notes: matchWithDashNotes[3].trim()
+          name: matchWithNotes[1].trim(),
+          quantity: parseInt(matchWithNotes[2]),
+          notes: matchWithNotes[3].trim()
         };
-        console.log('Found item with dash notes:', item);
+        console.log('✅ OrderDetailsDialog: Found item with notes:', item);
         items.push(item);
         continue;
       }
       
-      // Pattern 2: "Item Name (Qty: X)" followed by a notes line
-      const matchWithQty = line.match(/^(.+?)\s*\(Qty:\s*(\d+)\)$/);
-      if (matchWithQty) {
+      // Match pattern: "Item Name (Qty: X)" without notes
+      const matchWithoutNotes = trimmedLine.match(/^(.+?)\s*\(Qty:\s*(\d+)\)$/);
+      if (matchWithoutNotes) {
         const item: OrderItem = {
-          name: matchWithQty[1].trim(),
-          quantity: parseInt(matchWithQty[2])
+          name: matchWithoutNotes[1].trim(),
+          quantity: parseInt(matchWithoutNotes[2])
         };
-        
-        // Check if next line contains notes (doesn't start with a new item pattern)
-        if (i + 1 < lines.length) {
-          const nextLine = lines[i + 1].trim();
-          if (nextLine && !nextLine.match(/\(Qty:\s*\d+\)/) && !nextLine.match(/^[A-Z].*\s*\(Qty:/)) {
-            item.notes = nextLine;
-            i++; // Skip the notes line in next iteration
-            console.log('Found item with separate notes line:', item);
-          } else {
-            console.log('Found item without notes:', item);
-          }
-        } else {
-          console.log('Found item at end without notes:', item);
-        }
+        console.log('✅ OrderDetailsDialog: Found item without notes:', item);
         items.push(item);
         continue;
       }
       
-      // Pattern 3: "Item Name: Notes" (alternative format)
-      const matchColonFormat = line.match(/^(.+?):\s*(.+)$/);
-      if (matchColonFormat && !matchColonFormat[1].includes('(Qty:')) {
-        const item: OrderItem = {
-          name: matchColonFormat[1].trim(),
-          quantity: 1,
-          notes: matchColonFormat[2].trim()
-        };
-        console.log('Found item with colon format:', item);
-        items.push(item);
-        continue;
-      }
-      
-      // Pattern 4: Just item name (fallback)
-      if (!line.includes('(Qty:') && !line.includes(':')) {
-        const item: OrderItem = {
-          name: line,
-          quantity: 1
-        };
-        console.log('Found simple item:', item);
-        items.push(item);
-      }
+      // Fallback: treat as simple item name
+      const item: OrderItem = {
+        name: trimmedLine,
+        quantity: 1
+      };
+      console.log('✅ OrderDetailsDialog: Found simple item:', item);
+      items.push(item);
     }
 
-    console.log('Final parsed items:', items);
+    console.log('🎯 OrderDetailsDialog: Final parsed items:', items);
     return items;
   };
 
@@ -144,7 +116,7 @@ export default function OrderDetailsDialog({
     })) : 
     parseOrderItems(order.description || null);
 
-  console.log('Final display items:', displayItems);
+  console.log('📋 OrderDetailsDialog: Final display items:', displayItems);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
