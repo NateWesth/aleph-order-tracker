@@ -27,7 +27,14 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
   const [theme, setTheme] = useState<Theme>(() => {
     // Check if there's a saved theme preference
     const savedTheme = localStorage.getItem('theme') as Theme;
-    return savedTheme || 'light';
+    if (savedTheme) return savedTheme;
+    
+    // Check system preference
+    if (typeof window !== 'undefined' && window.matchMedia) {
+      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+    
+    return 'light';
   });
 
   useEffect(() => {
