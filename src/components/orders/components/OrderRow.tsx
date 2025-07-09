@@ -20,6 +20,13 @@ import OrderDetailsDialog from "./OrderDetailsDialog";
 import OrderExportActions from "./OrderExportActions";
 import { OrderWithCompany } from "../types/orderTypes";
 
+interface OrderItem {
+  id: string;
+  name: string;
+  quantity: number;
+  unit?: string;
+}
+
 interface OrderRowProps {
   order: OrderWithCompany;
   isAdmin: boolean;
@@ -30,7 +37,7 @@ interface OrderRowProps {
 export default function OrderRow({ order, isAdmin, onReceiveOrder, onDeleteOrder }: OrderRowProps) {
   const [showDetails, setShowDetails] = useState(false);
   const [companyName, setCompanyName] = useState<string>(order.companyName || 'Unknown Company');
-  const [orderItems, setOrderItems] = useState<Array<{name: string, quantity: number, unit?: string}>>([]);
+  const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
 
   const getStatusColor = (status: string | null) => {
     switch (status?.toLowerCase()) {
@@ -64,11 +71,13 @@ export default function OrderRow({ order, isAdmin, onReceiveOrder, onDeleteOrder
   const parseOrderItems = () => {
     // First try to use the items array if it exists
     if (order.items && order.items.length > 0) {
-      setOrderItems(order.items.map(item => ({
+      const formattedItems: OrderItem[] = order.items.map(item => ({
+        id: item.id,
         name: item.name,
         quantity: item.quantity,
         unit: undefined // Will be populated from description if available
-      })));
+      }));
+      setOrderItems(formattedItems);
       return;
     }
 
@@ -81,10 +90,11 @@ export default function OrderRow({ order, isAdmin, onReceiveOrder, onDeleteOrder
     // Parse the description to extract items and quantities
     // Format: "Item Name (Qty: 2)\nAnother Item (Qty: 1)"
     const lines = order.description.split('\n').filter(line => line.trim());
-    const items = lines.map((line, index) => {
+    const items: OrderItem[] = lines.map((line, index) => {
       const match = line.match(/^(.+?)\s*\(Qty:\s*(\d+)\)$/);
       if (match) {
         return {
+          id: `item-${index}`,
           name: match[1].trim(),
           quantity: parseInt(match[2]),
           unit: undefined
@@ -92,6 +102,7 @@ export default function OrderRow({ order, isAdmin, onReceiveOrder, onDeleteOrder
       }
       // Fallback for items without quantity format
       return {
+        id: `item-${index}`,
         name: line.trim(),
         quantity: 1,
         unit: undefined

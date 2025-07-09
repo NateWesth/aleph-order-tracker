@@ -8,9 +8,9 @@ import { generateOrderNumber } from "../utils/orderUtils";
 
 interface OrderFormData {
   orderNumber: string;
-  description: string;
   companyId: string;
   totalAmount: number;
+  urgency: string;
   items: Array<{
     id: string;
     name: string;

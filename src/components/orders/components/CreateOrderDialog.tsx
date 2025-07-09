@@ -39,9 +39,9 @@ export default function CreateOrderDialog({
 
   const handleSubmit = async (orderData: {
     orderNumber: string;
-    description: string;
     companyId: string;
     totalAmount: number;
+    urgency: string;
     items: any[];
   }) => {
     if (!user?.id) {
@@ -64,14 +64,21 @@ export default function CreateOrderDialog({
       const userRole = await getUserRole(user.id);
       console.log("🔐 CreateOrderDialog: User role:", userRole);
       
+      // Create description from items for backward compatibility
+      const description = orderData.items
+        .filter(item => item.name && item.quantity > 0)
+        .map(item => `${item.name} (Qty: ${item.quantity})`)
+        .join('\n');
+      
       // Prepare order data for database insertion
       const orderInsertData = {
         order_number: orderData.orderNumber,
-        description: orderData.description,
+        description: description,
         company_id: orderData.companyId,
         total_amount: orderData.totalAmount || 0,
         user_id: user.id,
         status: 'pending',
+        urgency: orderData.urgency,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
