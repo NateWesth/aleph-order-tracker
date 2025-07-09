@@ -36,11 +36,17 @@ export const AdminCompanySelector = ({
     <FormField 
       control={control} 
       name="companyId" 
-      rules={{ required: "Company is required" }} 
+      rules={{ required: "Please select a company" }} 
       render={({ field }) => (
         <FormItem>
-          <FormLabel>Company</FormLabel>
-          <Select value={field.value} onValueChange={field.onChange}>
+          <FormLabel>Company *</FormLabel>
+          <Select 
+            value={field.value || ""} 
+            onValueChange={(value) => {
+              console.log("🏢 AdminCompanySelector: Company selected:", value);
+              field.onChange(value);
+            }}
+          >
             <FormControl>
               <SelectTrigger>
                 <SelectValue placeholder="Select a company" />
@@ -49,7 +55,7 @@ export const AdminCompanySelector = ({
             <SelectContent>
               {availableCompanies.map(company => (
                 <SelectItem key={company.id} value={company.id}>
-                  {company.name}
+                  {company.name} ({company.code})
                 </SelectItem>
               ))}
             </SelectContent>

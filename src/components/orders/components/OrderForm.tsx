@@ -110,6 +110,7 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
     console.log("📝 OrderForm: Starting handleSubmit with data:", data);
     console.log("📝 OrderForm: Current user role:", currentUserRole);
     console.log("📝 OrderForm: User company:", userCompany);
+    console.log("📝 OrderForm: Selected companyId:", data.companyId);
 
     const validItems = data.items.filter(item => item.name.trim() && item.quantity > 0);
     
@@ -133,6 +134,19 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
 
     let finalCompanyId = data.companyId;
 
+    // For admin users, ensure they selected a company
+    if (currentUserRole === 'admin') {
+      if (!finalCompanyId || finalCompanyId.trim() === '') {
+        console.log("❌ OrderForm: Admin user must select a company");
+        form.setError("companyId", {
+          type: "manual",
+          message: "Please select a company"
+        });
+        return;
+      }
+    }
+
+    // For client users, auto-assign their company
     if (currentUserRole === 'user') {
       if (!finalCompanyId && userCompany) {
         finalCompanyId = userCompany.id;
