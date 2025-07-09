@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { getUserRole, getUserProfile } from '@/utils/authService';
+import { getUserRole, getUserProfile } from '@/utils/auth';
 
 export interface Company {
   id: string;

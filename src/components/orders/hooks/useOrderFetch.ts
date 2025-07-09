@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { getUserRole, getUserProfile } from "@/utils/authService";
+import { getUserRole, getUserProfile } from "@/utils/auth";
 import { Order, OrderItem } from "./useOrders";
 
 export function useOrderFetch() {
