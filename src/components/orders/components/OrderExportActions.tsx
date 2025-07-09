@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { 
@@ -466,20 +465,52 @@ export default function OrderExportActions({
       doc.setFontSize(8);
       doc.text(`Generated on: ${new Date().toLocaleDateString()} | ${adminCompany.name}`, 105, 280, { align: 'center' });
 
-      // Convert PDF to blob and trigger save dialog
+      // Convert PDF to blob
       const pdfBlob = doc.output('blob');
       const fileName = `order-${orderToExport.order_number}-${new Date().getTime()}.pdf`;
       
-      // Create a download link and trigger the save dialog
-      const url = URL.createObjectURL(pdfBlob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = fileName;
-      link.style.display = 'none';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+      // Use the File System Access API if available, otherwise fallback to download
+      if ('showSaveFilePicker' in window) {
+        try {
+          const fileHandle = await (window as any).showSaveFilePicker({
+            suggestedName: fileName,
+            types: [{
+              description: 'PDF files',
+              accept: { 'application/pdf': ['.pdf'] }
+            }]
+          });
+          
+          const writable = await fileHandle.createWritable();
+          await writable.write(pdfBlob);
+          await writable.close();
+        } catch (err) {
+          // User cancelled the save dialog
+          if ((err as Error).name !== 'AbortError') {
+            console.error('Error saving file:', err);
+            // Fallback to download
+            const url = URL.createObjectURL(pdfBlob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = fileName;
+            link.style.display = 'none';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+          }
+        }
+      } else {
+        // Fallback for browsers that don't support File System Access API
+        const url = URL.createObjectURL(pdfBlob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = fileName;
+        link.style.display = 'none';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      }
     } catch (error) {
       console.error('Error generating PDF:', error);
     } finally {
@@ -589,20 +620,52 @@ export default function OrderExportActions({
         },
       });
 
-      // Convert PDF to blob and trigger save dialog
+      // Convert PDF to blob
       const pdfBlob = doc.output('blob');
       const fileName = `${title.toLowerCase().replace(/\s+/g, '-')}-${new Date().getTime()}.pdf`;
       
-      // Create a download link and trigger the save dialog
-      const url = URL.createObjectURL(pdfBlob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = fileName;
-      link.style.display = 'none';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+      // Use the File System Access API if available, otherwise fallback to download
+      if ('showSaveFilePicker' in window) {
+        try {
+          const fileHandle = await (window as any).showSaveFilePicker({
+            suggestedName: fileName,
+            types: [{
+              description: 'PDF files',
+              accept: { 'application/pdf': ['.pdf'] }
+            }]
+          });
+          
+          const writable = await fileHandle.createWritable();
+          await writable.write(pdfBlob);
+          await writable.close();
+        } catch (err) {
+          // User cancelled the save dialog
+          if ((err as Error).name !== 'AbortError') {
+            console.error('Error saving file:', err);
+            // Fallback to download
+            const url = URL.createObjectURL(pdfBlob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = fileName;
+            link.style.display = 'none';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+          }
+        }
+      } else {
+        // Fallback for browsers that don't support File System Access API
+        const url = URL.createObjectURL(pdfBlob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = fileName;
+        link.style.display = 'none';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      }
     } catch (error) {
       console.error('Error generating PDF:', error);
     } finally {
@@ -610,7 +673,7 @@ export default function OrderExportActions({
     }
   };
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
     if (!orders) return;
     
     setLoading(true);
@@ -643,21 +706,53 @@ export default function OrderExportActions({
       // Add worksheet to workbook
       XLSX.utils.book_append_sheet(wb, ws, title);
 
-      // Generate blob and trigger save dialog
+      // Generate blob
       const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
       const excelBlob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       const fileName = `${title.toLowerCase().replace(/\s+/g, '-')}-${new Date().getTime()}.xlsx`;
       
-      // Create a download link and trigger the save dialog
-      const url = URL.createObjectURL(excelBlob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = fileName;
-      link.style.display = 'none';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+      // Use the File System Access API if available, otherwise fallback to download
+      if ('showSaveFilePicker' in window) {
+        try {
+          const fileHandle = await (window as any).showSaveFilePicker({
+            suggestedName: fileName,
+            types: [{
+              description: 'Excel files',
+              accept: { 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'] }
+            }]
+          });
+          
+          const writable = await fileHandle.createWritable();
+          await writable.write(excelBlob);
+          await writable.close();
+        } catch (err) {
+          // User cancelled the save dialog
+          if ((err as Error).name !== 'AbortError') {
+            console.error('Error saving file:', err);
+            // Fallback to download
+            const url = URL.createObjectURL(excelBlob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = fileName;
+            link.style.display = 'none';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+          }
+        }
+      } else {
+        // Fallback for browsers that don't support File System Access API
+        const url = URL.createObjectURL(excelBlob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = fileName;
+        link.style.display = 'none';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      }
     } catch (error) {
       console.error('Error generating Excel file:', error);
     } finally {
