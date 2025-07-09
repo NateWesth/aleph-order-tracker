@@ -36,7 +36,6 @@ export const AdminCompanySelector = ({
     <FormField 
       control={control} 
       name="companyId" 
-      rules={{ required: "Please select a company" }} 
       render={({ field }) => (
         <FormItem>
           <FormLabel>Company *</FormLabel>

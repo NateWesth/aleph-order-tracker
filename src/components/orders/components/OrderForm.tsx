@@ -134,18 +134,6 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
 
     let finalCompanyId = data.companyId;
 
-    // For admin users, ensure they selected a company
-    if (currentUserRole === 'admin') {
-      if (!finalCompanyId || finalCompanyId.trim() === '') {
-        console.log("❌ OrderForm: Admin user must select a company");
-        form.setError("companyId", {
-          type: "manual",
-          message: "Please select a company"
-        });
-        return;
-      }
-    }
-
     // For client users, auto-assign their company
     if (currentUserRole === 'user') {
       if (!finalCompanyId && userCompany) {
@@ -161,6 +149,7 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
       }
     }
 
+    // Final validation for company ID
     if (!finalCompanyId) {
       console.log("❌ OrderForm: Final companyId is missing");
       form.setError("companyId", {
