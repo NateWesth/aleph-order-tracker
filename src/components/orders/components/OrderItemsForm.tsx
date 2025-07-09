@@ -1,97 +1,114 @@
 
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Trash2, Plus } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Trash2 } from "lucide-react";
+import { Control } from "react-hook-form";
 
-interface OrderItem {
-  id: string;
-  name: string;
-  quantity: number;
+interface OrderFormData {
+  orderNumber: string;
+  description: string;
+  companyId: string;
+  totalAmount: number;
+  items: Array<{
+    id: string;
+    name: string;
+    quantity: number;
+    unit?: string;
+    notes?: string;
+  }>;
 }
 
 interface OrderItemsFormProps {
-  items: OrderItem[];
-  onItemsChange: (items: OrderItem[]) => void;
+  control: Control<OrderFormData>;
+  index: number;
+  onRemove: () => void;
+  canRemove: boolean;
 }
 
-export default function OrderItemsForm({ items, onItemsChange }: OrderItemsFormProps) {
-  const addItem = () => {
-    const newItem: OrderItem = {
-      id: `item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      name: '',
-      quantity: 1
-    };
-    onItemsChange([...items, newItem]);
-  };
-
-  const removeItem = (itemId: string) => {
-    onItemsChange(items.filter(item => item.id !== itemId));
-  };
-
-  const updateItem = (itemId: string, field: keyof OrderItem, value: string | number) => {
-    onItemsChange(items.map(item => 
-      item.id === itemId ? { ...item, [field]: value } : item
-    ));
-  };
-
+export const OrderItemsForm = ({ control, index, onRemove, canRemove }: OrderItemsFormProps) => {
   return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <Label>Order Items *</Label>
-        <Button type="button" variant="outline" size="sm" onClick={addItem}>
-          <Plus className="h-4 w-4 mr-1" />
-          Add Item
+    <div className="grid grid-cols-12 gap-3 items-end p-4 border rounded-lg">
+      <div className="col-span-4">
+        <FormField 
+          control={control} 
+          name={`items.${index}.name`} 
+          rules={{ required: "Item name is required" }} 
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Item Name</FormLabel>
+              <FormControl>
+                <Input {...field} placeholder="Enter item name" />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )} 
+        />
+      </div>
+      <div className="col-span-2">
+        <FormField 
+          control={control} 
+          name={`items.${index}.quantity`} 
+          rules={{
+            required: "Quantity is required",
+            min: { value: 1, message: "Quantity must be at least 1" }
+          }} 
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Quantity</FormLabel>
+              <FormControl>
+                <Input 
+                  {...field} 
+                  type="number" 
+                  min="1" 
+                  onChange={e => field.onChange(parseInt(e.target.value) || 0)} 
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )} 
+        />
+      </div>
+      <div className="col-span-2">
+        <FormField 
+          control={control} 
+          name={`items.${index}.unit`} 
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Unit</FormLabel>
+              <FormControl>
+                <Input {...field} placeholder="e.g., kg, pcs" />
+              </FormControl>
+            </FormItem>
+          )} 
+        />
+      </div>
+      <div className="col-span-3">
+        <FormField 
+          control={control} 
+          name={`items.${index}.notes`} 
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Notes</FormLabel>
+              <FormControl>
+                <Input {...field} placeholder="Additional notes" />
+              </FormControl>
+            </FormItem>
+          )} 
+        />
+      </div>
+      <div className="col-span-1">
+        <Button 
+          type="button" 
+          onClick={onRemove} 
+          size="sm" 
+          variant="outline" 
+          disabled={!canRemove} 
+          className="w-full"
+        >
+          <Trash2 className="w-4 h-4" />
         </Button>
       </div>
-      
-      {items.length === 0 && (
-        <div className="text-center p-4 border border-dashed rounded-md">
-          <p className="text-gray-500">No items added yet. Click "Add Item" to get started.</p>
-        </div>
-      )}
-      
-      {items.map((item, index) => (
-        <div key={item.id} className="border rounded-md p-4 space-y-3">
-          <div className="flex justify-between items-center">
-            <span className="text-sm font-medium">Item {index + 1}</span>
-            {items.length > 1 && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => removeItem(item.id)}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
-          
-          <div>
-            <Label htmlFor={`item-name-${item.id}`}>Description</Label>
-            <Input
-              id={`item-name-${item.id}`}
-              value={item.name}
-              onChange={(e) => updateItem(item.id, 'name', e.target.value)}
-              placeholder="Enter item description"
-              required
-            />
-          </div>
-          
-          <div>
-            <Label htmlFor={`item-quantity-${item.id}`}>Quantity</Label>
-            <Input
-              id={`item-quantity-${item.id}`}
-              type="number"
-              min="1"
-              value={item.quantity}
-              onChange={(e) => updateItem(item.id, 'quantity', parseInt(e.target.value) || 1)}
-              placeholder="Enter quantity"
-              required
-            />
-          </div>
-        </div>
-      ))}
     </div>
   );
-}
+};
