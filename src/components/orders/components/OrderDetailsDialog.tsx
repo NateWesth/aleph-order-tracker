@@ -1,4 +1,3 @@
-
 import {
   Dialog,
   DialogContent,
@@ -55,7 +54,7 @@ export default function OrderDetailsDialog({
     
     console.log('Parsing item:', { fullName, itemQuantity, itemNotes });
     
-    // Extract quantity from name if present
+    // Extract quantity from name if present and update the quantity
     const qtyMatch = fullName.match(/\(Qty:\s*(\d+)\)/i);
     if (qtyMatch) {
       itemQuantity = parseInt(qtyMatch[1]);
@@ -63,17 +62,9 @@ export default function OrderDetailsDialog({
       fullName = fullName.replace(/\s*\(Qty:\s*\d+\)\s*/, '');
     }
     
-    // Split the name to extract the actual product name and move the rest to notes
-    // The pattern seems to be: PRODUCT NAME - DETAILS - MORE DETAILS
-    // Let's take the first part as the name and the rest as notes
-    const nameParts = fullName.split(' - ');
-    let itemName = nameParts[0] || fullName;
-    
-    // If there are additional parts, they become the notes
-    if (nameParts.length > 1) {
-      const additionalDetails = nameParts.slice(1).join(' - ');
-      itemNotes = itemNotes ? `${itemNotes}; ${additionalDetails}` : additionalDetails;
-    }
+    // Keep the full name as the item name - don't split it
+    // Only add existing notes to the notes field
+    let itemName = fullName;
     
     console.log('Parsed result:', { 
       name: itemName, 
@@ -137,17 +128,17 @@ export default function OrderDetailsDialog({
             ) : (
               <div className="border rounded-lg divide-y">
                 <div className="grid grid-cols-12 gap-4 p-4 bg-gray-50 font-medium text-sm text-gray-700">
-                  <div className="col-span-4">Item Name</div>
+                  <div className="col-span-6">Item Name</div>
                   <div className="col-span-2 text-center">Quantity</div>
-                  <div className="col-span-1 text-center">Unit</div>
-                  <div className="col-span-5">Notes</div>
+                  <div className="col-span-2 text-center">Unit</div>
+                  <div className="col-span-2">Notes</div>
                 </div>
                 {displayItems.map((item, index) => {
                   const parsedItem = parseItemData(item);
                   
                   return (
                     <div key={`item-${index}`} className="grid grid-cols-12 gap-4 p-4 items-start hover:bg-gray-50">
-                      <div className="col-span-4">
+                      <div className="col-span-6">
                         <p className="font-medium text-gray-900 break-words">
                           {parsedItem.name}
                         </p>
@@ -157,12 +148,12 @@ export default function OrderDetailsDialog({
                           {parsedItem.quantity}
                         </span>
                       </div>
-                      <div className="col-span-1 text-center">
+                      <div className="col-span-2 text-center">
                         <span className="text-gray-600">
                           {parsedItem.unit}
                         </span>
                       </div>
-                      <div className="col-span-5">
+                      <div className="col-span-2">
                         <p className="text-sm text-gray-600 break-words">
                           {parsedItem.notes || '-'}
                         </p>
