@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { CheckCircle, Clock, AlertCircle, Package } from "lucide-react";
+import { CheckCircle, Clock, AlertCircle, Package, BarChart2, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface TodoItem {
@@ -41,7 +41,7 @@ export default function TodoList() {
           company_id,
           companies (name)
         `)
-        .in('status', ['pending', 'received', 'processing'])
+        .in('status', ['pending', 'received', 'processing', 'in-progress'])
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -57,11 +57,12 @@ export default function TodoList() {
             priority = order.urgency === 'urgent' ? 'high' : 'medium';
             break;
           case 'received':
-            actionNeeded = 'Start processing order';
+          case 'in-progress':
+            actionNeeded = 'Track progress and update status';
             priority = 'medium';
             break;
           case 'processing':
-            actionNeeded = 'Continue processing';
+            actionNeeded = 'Complete and deliver order';
             priority = 'low';
             break;
         }
@@ -118,6 +119,7 @@ export default function TodoList() {
       case 'pending':
         return 'bg-orange-100 text-orange-800';
       case 'received':
+      case 'in-progress':
         return 'bg-blue-100 text-blue-800';
       case 'processing':
         return 'bg-purple-100 text-purple-800';
@@ -135,42 +137,47 @@ export default function TodoList() {
     });
   };
 
+  // Separate items by category
+  const pendingItems = todoItems.filter(item => item.status === 'pending');
+  const progressItems = todoItems.filter(item => item.status === 'received' || item.status === 'in-progress');
+  const processingItems = todoItems.filter(item => item.status === 'processing');
+
   if (loading) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <CheckCircle className="h-5 w-5 text-aleph-green" />
-            Order To-Do List
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-center py-8">
-            <div className="text-lg">Loading todos...</div>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="space-y-4">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CheckCircle className="h-5 w-5 text-aleph-green" />
+              Order To-Do List
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-center py-8">
+              <div className="text-lg">Loading todos...</div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
-  return (
+  const renderTodoSection = (items: TodoItem[], title: string, icon: React.ReactNode, emptyMessage: string) => (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <CheckCircle className="h-5 w-5 text-aleph-green" />
-          Order To-Do List ({todoItems.length} items)
+          {icon}
+          {title} ({items.length} items)
         </CardTitle>
       </CardHeader>
       <CardContent>
-        {todoItems.length === 0 ? (
-          <div className="text-center py-8">
-            <CheckCircle className="h-12 w-12 text-aleph-green mx-auto mb-4" />
-            <div className="text-lg font-medium text-gray-600">All caught up!</div>
-            <div className="text-sm text-gray-500">No pending orders to review</div>
+        {items.length === 0 ? (
+          <div className="text-center py-4">
+            <div className="text-sm text-gray-500">{emptyMessage}</div>
           </div>
         ) : (
-          <div className="space-y-3 max-h-96 overflow-y-auto">
-            {todoItems.map((item) => (
+          <div className="space-y-3 max-h-64 overflow-y-auto">
+            {items.map((item) => (
               <div key={item.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 transition-colors">
                 <div className="flex items-center gap-3 flex-1">
                   {getPriorityIcon(item.priority)}
@@ -205,5 +212,47 @@ export default function TodoList() {
         )}
       </CardContent>
     </Card>
+  );
+
+  return (
+    <div className="space-y-6">
+      <div className="text-center">
+        <h2 className="text-lg font-semibold text-gray-800 mb-2">Order Management Dashboard</h2>
+        <p className="text-sm text-gray-600">Track and manage orders across different stages</p>
+      </div>
+      
+      <div className="grid gap-4 md:grid-cols-3">
+        {renderTodoSection(
+          pendingItems, 
+          "Pending Orders", 
+          <AlertCircle className="h-5 w-5 text-orange-500" />, 
+          "No pending orders to review"
+        )}
+        
+        {renderTodoSection(
+          progressItems, 
+          "In Progress", 
+          <BarChart2 className="h-5 w-5 text-blue-500" />, 
+          "No orders in progress"
+        )}
+        
+        {renderTodoSection(
+          processingItems, 
+          "Processing", 
+          <FileText className="h-5 w-5 text-purple-500" />, 
+          "No orders being processed"
+        )}
+      </div>
+
+      {todoItems.length === 0 && (
+        <Card>
+          <CardContent className="text-center py-8">
+            <CheckCircle className="h-12 w-12 text-aleph-green mx-auto mb-4" />
+            <div className="text-lg font-medium text-gray-600">All caught up!</div>
+            <div className="text-sm text-gray-500">No orders need immediate attention</div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
   );
 }
