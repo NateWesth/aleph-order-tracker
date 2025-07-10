@@ -43,12 +43,12 @@ export default function OrderDetailsDialog({
       case 'low':
         return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
       default:
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dot-gray-300';
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-700 text-gray-300';
     }
   };
 
-  // Parse description as fallback only if no structured items exist
-  const parseOrderItems = (description: string | null) => {
+  // Simple fallback parsing only when no structured items exist
+  const parseDescriptionAsLastResort = (description: string | null) => {
     if (!description) return [];
     
     const items: Array<{name: string, quantity: number, notes?: string}> = [];
@@ -90,14 +90,15 @@ export default function OrderDetailsDialog({
     return items;
   };
 
-  // Use structured items if available, otherwise parse description
+  // Use structured items directly if available, otherwise parse description
   const displayItems = order.items && order.items.length > 0 ? 
-    order.items.map(item => ({
-      name: item.name,
-      quantity: item.quantity,
-      notes: item.notes
-    })) : 
-    parseOrderItems(order.description);
+    // Use structured items exactly as they are - no modification
+    order.items : 
+    // Only parse description if no structured items exist
+    parseDescriptionAsLastResort(order.description);
+
+  console.log("🔍 OrderDetailsDialog: Order items:", order.items);
+  console.log("🔍 OrderDetailsDialog: Display items:", displayItems);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -147,10 +148,10 @@ export default function OrderDetailsDialog({
                 {displayItems.map((item, index) => (
                   <div key={index} className="grid grid-cols-12 gap-4 p-4 items-start hover:bg-gray-50">
                     <div className="col-span-5">
-                      <p className="font-medium text-gray-900">{item.name}</p>
+                      <p className="font-medium text-gray-900">{item.name || ''}</p>
                     </div>
                     <div className="col-span-2 text-center">
-                      <span className="text-gray-600">{item.quantity}</span>
+                      <span className="text-gray-600">{item.quantity || 0}</span>
                     </div>
                     <div className="col-span-2 text-center">
                       <span className="text-gray-600">pcs</span>
