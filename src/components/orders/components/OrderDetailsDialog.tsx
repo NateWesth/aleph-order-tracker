@@ -47,58 +47,11 @@ export default function OrderDetailsDialog({
     }
   };
 
-  // Simple fallback parsing only when no structured items exist
-  const parseDescriptionAsLastResort = (description: string | null) => {
-    if (!description) return [];
-    
-    const items: Array<{name: string, quantity: number, notes?: string}> = [];
-    const lines = description.split('\n').filter(line => line.trim());
-    
-    for (const line of lines) {
-      const trimmedLine = line.trim();
-      
-      // Match: "ItemName (Qty: X) - Notes"
-      const withNotesMatch = trimmedLine.match(/^(.+?)\s*\(Qty:\s*(\d+)\)\s*-\s*(.+)$/);
-      if (withNotesMatch) {
-        items.push({
-          name: withNotesMatch[1].trim(),
-          quantity: parseInt(withNotesMatch[2]),
-          notes: withNotesMatch[3].trim()
-        });
-        continue;
-      }
-      
-      // Match: "ItemName (Qty: X)" without notes
-      const withoutNotesMatch = trimmedLine.match(/^(.+?)\s*\(Qty:\s*(\d+)\)\s*$/);
-      if (withoutNotesMatch) {
-        items.push({
-          name: withoutNotesMatch[1].trim(),
-          quantity: parseInt(withoutNotesMatch[2]),
-          notes: undefined
-        });
-        continue;
-      }
-      
-      // Fallback - treat as item name only
-      items.push({
-        name: trimmedLine,
-        quantity: 1,
-        notes: undefined
-      });
-    }
-    
-    return items;
-  };
+  // Determine which items to display - prioritize structured items
+  const displayItems = order.items && order.items.length > 0 ? order.items : [];
 
-  // Use structured items directly if available, otherwise parse description
-  const displayItems = order.items && order.items.length > 0 ? 
-    // Use structured items exactly as they are - no modification
-    order.items : 
-    // Only parse description if no structured items exist
-    parseDescriptionAsLastResort(order.description);
-
-  console.log("🔍 OrderDetailsDialog: Order items:", order.items);
-  console.log("🔍 OrderDetailsDialog: Display items:", displayItems);
+  console.log("🔍 OrderDetailsDialog: Raw order items:", order.items);
+  console.log("🔍 OrderDetailsDialog: Items to display:", displayItems);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -146,19 +99,25 @@ export default function OrderDetailsDialog({
                   <div className="col-span-3">Notes</div>
                 </div>
                 {displayItems.map((item, index) => (
-                  <div key={index} className="grid grid-cols-12 gap-4 p-4 items-start hover:bg-gray-50">
+                  <div key={`item-${index}`} className="grid grid-cols-12 gap-4 p-4 items-start hover:bg-gray-50">
                     <div className="col-span-5">
-                      <p className="font-medium text-gray-900">{item.name || ''}</p>
+                      <p className="font-medium text-gray-900">
+                        {String(item.name || '').trim()}
+                      </p>
                     </div>
                     <div className="col-span-2 text-center">
-                      <span className="text-gray-600">{item.quantity || 0}</span>
+                      <span className="text-gray-600">
+                        {Number(item.quantity) || 0}
+                      </span>
                     </div>
                     <div className="col-span-2 text-center">
                       <span className="text-gray-600">pcs</span>
                     </div>
                     <div className="col-span-3">
-                      {item.notes && item.notes.trim() ? (
-                        <p className="text-sm text-gray-600">{item.notes}</p>
+                      {item.notes && String(item.notes).trim() ? (
+                        <p className="text-sm text-gray-600">
+                          {String(item.notes).trim()}
+                        </p>
                       ) : (
                         <span className="text-gray-400 text-sm italic">No notes</span>
                       )}
