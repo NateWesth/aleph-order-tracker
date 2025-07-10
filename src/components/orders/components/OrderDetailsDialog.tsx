@@ -47,11 +47,25 @@ export default function OrderDetailsDialog({
     }
   };
 
-  // Determine which items to display - prioritize structured items
-  const displayItems = order.items && order.items.length > 0 ? order.items : [];
+  // Debug logging to see exactly what we're working with
+  console.log("🔍 OrderDetailsDialog: Full order object:", order);
+  console.log("🔍 OrderDetailsDialog: Order items array:", order.items);
+  console.log("🔍 OrderDetailsDialog: Order description:", order.description);
+  
+  // Log each item individually
+  if (order.items && order.items.length > 0) {
+    order.items.forEach((item, index) => {
+      console.log(`🔍 Item ${index}:`, {
+        name: item.name,
+        quantity: item.quantity,
+        notes: item.notes,
+        fullItem: item
+      });
+    });
+  }
 
-  console.log("🔍 OrderDetailsDialog: Raw order items:", order.items);
-  console.log("🔍 OrderDetailsDialog: Items to display:", displayItems);
+  // Use structured items directly - no parsing or transformation
+  const displayItems = order.items || [];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -86,9 +100,16 @@ export default function OrderDetailsDialog({
           
           <div>
             <h3 className="font-medium mb-4 text-lg">Order Items</h3>
+            <div className="mb-4 p-3 bg-gray-50 rounded text-sm">
+              <strong>Debug Info:</strong><br/>
+              Items count: {displayItems.length}<br/>
+              Raw items: {JSON.stringify(displayItems, null, 2)}
+            </div>
+            
             {displayItems.length === 0 ? (
               <div className="text-center p-8 border rounded-md border-dashed">
                 <p className="text-gray-500">No items found in this order.</p>
+                <p className="text-xs text-gray-400 mt-2">Debug: Order description = {order.description}</p>
               </div>
             ) : (
               <div className="border rounded-lg divide-y">
@@ -98,32 +119,34 @@ export default function OrderDetailsDialog({
                   <div className="col-span-2 text-center">Unit</div>
                   <div className="col-span-3">Notes</div>
                 </div>
-                {displayItems.map((item, index) => (
-                  <div key={`item-${index}`} className="grid grid-cols-12 gap-4 p-4 items-start hover:bg-gray-50">
-                    <div className="col-span-5">
-                      <p className="font-medium text-gray-900">
-                        {String(item.name || '').trim()}
-                      </p>
-                    </div>
-                    <div className="col-span-2 text-center">
-                      <span className="text-gray-600">
-                        {Number(item.quantity) || 0}
-                      </span>
-                    </div>
-                    <div className="col-span-2 text-center">
-                      <span className="text-gray-600">pcs</span>
-                    </div>
-                    <div className="col-span-3">
-                      {item.notes && String(item.notes).trim() ? (
-                        <p className="text-sm text-gray-600">
-                          {String(item.notes).trim()}
+                {displayItems.map((item, index) => {
+                  console.log(`🔍 Rendering item ${index}:`, item);
+                  return (
+                    <div key={`item-${index}`} className="grid grid-cols-12 gap-4 p-4 items-start hover:bg-gray-50">
+                      <div className="col-span-5">
+                        <p className="font-medium text-gray-900">
+                          {item.name || 'No name'}
                         </p>
-                      ) : (
-                        <span className="text-gray-400 text-sm italic">No notes</span>
-                      )}
+                        <p className="text-xs text-gray-400">Raw: {JSON.stringify(item.name)}</p>
+                      </div>
+                      <div className="col-span-2 text-center">
+                        <span className="text-gray-600">
+                          {item.quantity || 0}
+                        </span>
+                        <p className="text-xs text-gray-400">Raw: {JSON.stringify(item.quantity)}</p>
+                      </div>
+                      <div className="col-span-2 text-center">
+                        <span className="text-gray-600">pcs</span>
+                      </div>
+                      <div className="col-span-3">
+                        <p className="text-sm text-gray-600">
+                          {item.notes || 'No notes'}
+                        </p>
+                        <p className="text-xs text-gray-400">Raw: {JSON.stringify(item.notes)}</p>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
