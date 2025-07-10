@@ -47,24 +47,28 @@ export default function OrderDetailsDialog({
     }
   };
 
-  // Debug logging to see exactly what we're working with
-  console.log("🔍 OrderDetailsDialog: Full order object:", order);
-  console.log("🔍 OrderDetailsDialog: Order items array:", order.items);
-  console.log("🔍 OrderDetailsDialog: Order description:", order.description);
-  
-  // Log each item individually
-  if (order.items && order.items.length > 0) {
-    order.items.forEach((item, index) => {
-      console.log(`🔍 Item ${index}:`, {
-        name: item.name,
-        quantity: item.quantity,
-        notes: item.notes,
-        fullItem: item
-      });
-    });
-  }
+  // Parse item name to extract actual name and quantity if needed
+  const parseItemData = (item: any) => {
+    let itemName = item.name || '';
+    let itemQuantity = item.quantity || 0;
+    
+    // If the name contains "(Qty: X)" pattern, extract the quantity and clean the name
+    const qtyMatch = itemName.match(/\(Qty:\s*(\d+)\)/i);
+    if (qtyMatch) {
+      itemQuantity = parseInt(qtyMatch[1]);
+      // Remove the quantity part from the name
+      itemName = itemName.replace(/\s*\(Qty:\s*\d+\)\s*-?\s*/i, '').trim();
+    }
+    
+    return {
+      name: itemName,
+      quantity: itemQuantity,
+      notes: item.notes || '',
+      unit: item.unit || 'pcs'
+    };
+  };
 
-  // Use structured items directly - no parsing or transformation
+  // Use structured items directly
   const displayItems = order.items || [];
 
   return (
@@ -100,49 +104,43 @@ export default function OrderDetailsDialog({
           
           <div>
             <h3 className="font-medium mb-4 text-lg">Order Items</h3>
-            <div className="mb-4 p-3 bg-gray-50 rounded text-sm">
-              <strong>Debug Info:</strong><br/>
-              Items count: {displayItems.length}<br/>
-              Raw items: {JSON.stringify(displayItems, null, 2)}
-            </div>
             
             {displayItems.length === 0 ? (
               <div className="text-center p-8 border rounded-md border-dashed">
                 <p className="text-gray-500">No items found in this order.</p>
-                <p className="text-xs text-gray-400 mt-2">Debug: Order description = {order.description}</p>
               </div>
             ) : (
               <div className="border rounded-lg divide-y">
                 <div className="grid grid-cols-12 gap-4 p-4 bg-gray-50 font-medium text-sm text-gray-700">
-                  <div className="col-span-5">Item Name</div>
+                  <div className="col-span-6">Item Name</div>
                   <div className="col-span-2 text-center">Quantity</div>
                   <div className="col-span-2 text-center">Unit</div>
-                  <div className="col-span-3">Notes</div>
+                  <div className="col-span-2">Notes</div>
                 </div>
                 {displayItems.map((item, index) => {
-                  console.log(`🔍 Rendering item ${index}:`, item);
+                  const parsedItem = parseItemData(item);
+                  
                   return (
                     <div key={`item-${index}`} className="grid grid-cols-12 gap-4 p-4 items-start hover:bg-gray-50">
-                      <div className="col-span-5">
-                        <p className="font-medium text-gray-900">
-                          {item.name || 'No name'}
+                      <div className="col-span-6">
+                        <p className="font-medium text-gray-900 break-words">
+                          {parsedItem.name}
                         </p>
-                        <p className="text-xs text-gray-400">Raw: {JSON.stringify(item.name)}</p>
+                      </div>
+                      <div className="col-span-2 text-center">
+                        <span className="text-gray-600 font-semibold">
+                          {parsedItem.quantity}
+                        </span>
                       </div>
                       <div className="col-span-2 text-center">
                         <span className="text-gray-600">
-                          {item.quantity || 0}
+                          {parsedItem.unit}
                         </span>
-                        <p className="text-xs text-gray-400">Raw: {JSON.stringify(item.quantity)}</p>
                       </div>
-                      <div className="col-span-2 text-center">
-                        <span className="text-gray-600">pcs</span>
-                      </div>
-                      <div className="col-span-3">
-                        <p className="text-sm text-gray-600">
-                          {item.notes || 'No notes'}
+                      <div className="col-span-2">
+                        <p className="text-sm text-gray-600 break-words">
+                          {parsedItem.notes || '-'}
                         </p>
-                        <p className="text-xs text-gray-400">Raw: {JSON.stringify(item.notes)}</p>
                       </div>
                     </div>
                   );
