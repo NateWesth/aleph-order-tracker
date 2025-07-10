@@ -54,7 +54,7 @@ export default function OrderDetailsDialog({
     }
   };
 
-  // FIXED parsing function to properly separate item names and notes
+  // COMPLETELY REWRITTEN parsing function to properly separate notes from item names
   const parseOrderItems = (description: string | null): OrderItem[] => {
     if (!description) return [];
     
@@ -64,40 +64,40 @@ export default function OrderDetailsDialog({
     for (const line of lines) {
       const trimmedLine = line.trim();
       
-      // Pattern: "Item Name (Qty: X) - Notes"
-      const matchWithNotes = trimmedLine.match(/^(.+?)\s*\(Qty:\s*(\d+)\)\s*-\s*(.+)$/);
-      if (matchWithNotes) {
-        const [, itemName, quantity, notes] = matchWithNotes;
+      // Look for pattern: "ItemName (Qty: X) - Notes"
+      const withNotesMatch = trimmedLine.match(/^(.+?)\s*\(Qty:\s*(\d+)\)\s*-\s*(.+)$/);
+      if (withNotesMatch) {
         items.push({
-          name: itemName.trim(),
-          quantity: parseInt(quantity),
-          notes: notes.trim()
+          name: withNotesMatch[1].trim(), // Only the item name, NO notes
+          quantity: parseInt(withNotesMatch[2]),
+          notes: withNotesMatch[3].trim() // Notes go here ONLY
         });
         continue;
       }
       
-      // Pattern: "Item Name (Qty: X)" without notes
-      const matchWithoutNotes = trimmedLine.match(/^(.+?)\s*\(Qty:\s*(\d+)\)\s*$/);
-      if (matchWithoutNotes) {
-        const [, itemName, quantity] = matchWithoutNotes;
+      // Look for pattern: "ItemName (Qty: X)" without notes
+      const withoutNotesMatch = trimmedLine.match(/^(.+?)\s*\(Qty:\s*(\d+)\)\s*$/);
+      if (withoutNotesMatch) {
         items.push({
-          name: itemName.trim(),
-          quantity: parseInt(quantity)
+          name: withoutNotesMatch[1].trim(), // Only the item name
+          quantity: parseInt(withoutNotesMatch[2]),
+          notes: undefined // No notes
         });
         continue;
       }
       
-      // Fallback: treat as simple item name
+      // Fallback for simple lines
       items.push({
         name: trimmedLine,
-        quantity: 1
+        quantity: 1,
+        notes: undefined
       });
     }
 
     return items;
   };
 
-  // Get display items with proper structure
+  // Get display items - prioritize structured items, fallback to parsing
   const displayItems: OrderItem[] = order.items && order.items.length > 0 ? 
     order.items.map(item => ({
       name: item.name,
