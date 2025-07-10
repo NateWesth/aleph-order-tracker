@@ -8,13 +8,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { OrderWithCompany } from "../types/orderTypes";
 
-interface OrderItem {
-  name: string;
-  quantity: number;
-  unit?: string;
-  notes?: string;
-}
-
 interface OrderDetailsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -54,11 +47,11 @@ export default function OrderDetailsDialog({
     }
   };
 
-  // Parse description and actively strip notes from item names
-  const parseOrderItems = (description: string | null): OrderItem[] => {
+  // Parse description as fallback only if no structured items exist
+  const parseOrderItems = (description: string | null) => {
     if (!description) return [];
     
-    const items: OrderItem[] = [];
+    const items: Array<{name: string, quantity: number, notes?: string}> = [];
     const lines = description.split('\n').filter(line => line.trim());
     
     for (const line of lines) {
@@ -67,14 +60,10 @@ export default function OrderDetailsDialog({
       // Match: "ItemName (Qty: X) - Notes"
       const withNotesMatch = trimmedLine.match(/^(.+?)\s*\(Qty:\s*(\d+)\)\s*-\s*(.+)$/);
       if (withNotesMatch) {
-        const itemName = withNotesMatch[1].trim();
-        const quantity = parseInt(withNotesMatch[2]);
-        const notes = withNotesMatch[3].trim();
-        
         items.push({
-          name: itemName,
-          quantity: quantity,
-          notes: notes
+          name: withNotesMatch[1].trim(),
+          quantity: parseInt(withNotesMatch[2]),
+          notes: withNotesMatch[3].trim()
         });
         continue;
       }
@@ -82,38 +71,12 @@ export default function OrderDetailsDialog({
       // Match: "ItemName (Qty: X)" without notes
       const withoutNotesMatch = trimmedLine.match(/^(.+?)\s*\(Qty:\s*(\d+)\)\s*$/);
       if (withoutNotesMatch) {
-        const itemName = withoutNotesMatch[1].trim();
-        const quantity = parseInt(withoutNotesMatch[2]);
-        
         items.push({
-          name: itemName,
-          quantity: quantity,
+          name: withoutNotesMatch[1].trim(),
+          quantity: parseInt(withoutNotesMatch[2]),
           notes: undefined
         });
         continue;
-      }
-      
-      // For any other format, try to extract notes that might be embedded
-      // Look for common note patterns like " - Note" at the end
-      const notePattern = /^(.+?)\s*-\s*(.+)$/;
-      const noteMatch = trimmedLine.match(notePattern);
-      
-      if (noteMatch) {
-        // Check if the first part looks like an item name
-        const potentialName = noteMatch[1].trim();
-        const potentialNote = noteMatch[2].trim();
-        
-        // If the note part looks like actual notes (contains words like "for", "with", etc.)
-        // or if it's short descriptive text, treat it as a note
-        if (potentialNote.length < potentialName.length || 
-            /\b(for|with|in|on|by|to|from|about|use|used|size|color|spec|special|note|remark)\b/i.test(potentialNote)) {
-          items.push({
-            name: potentialName,
-            quantity: 1,
-            notes: potentialNote
-          });
-          continue;
-        }
       }
       
       // Fallback - treat as item name only
@@ -127,37 +90,13 @@ export default function OrderDetailsDialog({
     return items;
   };
 
-  // Clean up structured items to ensure notes are not in names
-  const cleanStructuredItems = (items: Array<{id: string, name: string, quantity: number, notes?: string}>): OrderItem[] => {
-    return items.map(item => {
-      let cleanName = item.name;
-      let notes = item.notes || '';
-      
-      // If there are notes in the name (indicated by " - "), extract them
-      const noteInNameMatch = cleanName.match(/^(.+?)\s*-\s*(.+)$/);
-      if (noteInNameMatch && !notes) {
-        const potentialName = noteInNameMatch[1].trim();
-        const potentialNote = noteInNameMatch[2].trim();
-        
-        // If the second part looks like a note, extract it
-        if (potentialNote.length < potentialName.length || 
-            /\b(for|with|in|on|by|to|from|about|use|used|size|color|spec|special|note|remark)\b/i.test(potentialNote)) {
-          cleanName = potentialName;
-          notes = potentialNote;
-        }
-      }
-      
-      return {
-        name: cleanName,
-        quantity: item.quantity,
-        notes: notes || undefined
-      };
-    });
-  };
-
-  // Get display items - prioritize structured items, fallback to parsing
-  const displayItems: OrderItem[] = order.items && order.items.length > 0 ? 
-    cleanStructuredItems(order.items) : 
+  // Use structured items if available, otherwise parse description
+  const displayItems = order.items && order.items.length > 0 ? 
+    order.items.map(item => ({
+      name: item.name,
+      quantity: item.quantity,
+      notes: item.notes
+    })) : 
     parseOrderItems(order.description);
 
   return (
@@ -214,7 +153,7 @@ export default function OrderDetailsDialog({
                       <span className="text-gray-600">{item.quantity}</span>
                     </div>
                     <div className="col-span-2 text-center">
-                      <span className="text-gray-600">{item.unit || 'pcs'}</span>
+                      <span className="text-gray-600">pcs</span>
                     </div>
                     <div className="col-span-3">
                       {item.notes && item.notes.trim() ? (
