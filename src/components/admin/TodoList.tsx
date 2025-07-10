@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -93,6 +92,33 @@ export default function TodoList() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleOrderClick = (order: TodoItem) => {
+    // Dispatch custom event to change active view in AdminDashboard
+    const status = order.status?.toLowerCase();
+    let targetView = 'orders';
+    
+    switch (status) {
+      case 'pending':
+        targetView = 'orders';
+        break;
+      case 'received':
+      case 'in-progress':
+        targetView = 'progress';
+        break;
+      case 'processing':
+        targetView = 'processing';
+        break;
+      case 'completed':
+        targetView = 'completed';
+        break;
+      default:
+        targetView = 'orders';
+    }
+    
+    const event = new CustomEvent('setActiveView', { detail: targetView });
+    window.dispatchEvent(event);
   };
 
   const getPriorityIcon = (priority: string) => {
@@ -197,7 +223,11 @@ export default function TodoList() {
         ) : (
           <div className="space-y-3 max-h-64 overflow-y-auto">
             {items.map((item) => (
-              <div key={item.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 transition-colors">
+              <div 
+                key={item.id} 
+                className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
+                onClick={() => handleOrderClick(item)}
+              >
                 <div className="flex items-center gap-3 flex-1">
                   {getPriorityIcon(item.priority)}
                   <div className="flex-1">

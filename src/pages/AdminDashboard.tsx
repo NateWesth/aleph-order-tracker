@@ -37,6 +37,19 @@ const AdminDashboard = () => {
     }
   }, [user]);
 
+  useEffect(() => {
+    // Listen for custom events to change active view
+    const handleSetActiveView = (event: CustomEvent) => {
+      setActiveView(event.detail);
+    };
+
+    window.addEventListener('setActiveView', handleSetActiveView as EventListener);
+
+    return () => {
+      window.removeEventListener('setActiveView', handleSetActiveView as EventListener);
+    };
+  }, []);
+
   const fetchUserProfile = async () => {
     if (!user) return;
     

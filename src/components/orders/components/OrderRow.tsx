@@ -8,21 +8,25 @@ import OrderExportActions from "./OrderExportActions";
 import { useState } from "react";
 import OrderDetailsDialog from "./OrderDetailsDialog";
 import { OrderWithCompany } from "../types/orderTypes";
+import { useNavigate } from "react-router-dom";
 
 interface OrderRowProps {
   order: OrderWithCompany;
   isAdmin: boolean;
   onReceiveOrder: (order: OrderWithCompany) => void;
   onDeleteOrder: (orderId: string, orderNumber: string) => void;
+  onOrderClick?: (order: OrderWithCompany) => void;
 }
 
 export default function OrderRow({ 
   order, 
   isAdmin,
   onReceiveOrder,
-  onDeleteOrder
+  onDeleteOrder,
+  onOrderClick
 }: OrderRowProps) {
   const [showDetails, setShowDetails] = useState(false);
+  const navigate = useNavigate();
 
   const getStatusColor = (status: string | null) => {
     switch (status?.toLowerCase()) {
@@ -45,9 +49,67 @@ export default function OrderRow({
     </Badge>
   );
 
+  const handleRowClick = (e: React.MouseEvent) => {
+    // Don't navigate if clicking on buttons or dropdowns
+    if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('[role="menuitem"]')) {
+      return;
+    }
+
+    if (onOrderClick) {
+      onOrderClick(order);
+      return;
+    }
+
+    // Navigate based on order status if admin
+    if (isAdmin) {
+      const status = order.status?.toLowerCase();
+      switch (status) {
+        case 'pending':
+          navigate('/admin-dashboard');
+          // Set active view to orders after navigation
+          setTimeout(() => {
+            const event = new CustomEvent('setActiveView', { detail: 'orders' });
+            window.dispatchEvent(event);
+          }, 100);
+          break;
+        case 'received':
+        case 'in-progress':
+          navigate('/admin-dashboard');
+          setTimeout(() => {
+            const event = new CustomEvent('setActiveView', { detail: 'progress' });
+            window.dispatchEvent(event);
+          }, 100);
+          break;
+        case 'processing':
+          navigate('/admin-dashboard');
+          setTimeout(() => {
+            const event = new CustomEvent('setActiveView', { detail: 'processing' });
+            window.dispatchEvent(event);
+          }, 100);
+          break;
+        case 'completed':
+          navigate('/admin-dashboard');
+          setTimeout(() => {
+            const event = new CustomEvent('setActiveView', { detail: 'completed' });
+            window.dispatchEvent(event);
+          }, 100);
+          break;
+        default:
+          navigate('/admin-dashboard');
+          setTimeout(() => {
+            const event = new CustomEvent('setActiveView', { detail: 'orders' });
+            window.dispatchEvent(event);
+          }, 100);
+      }
+    }
+  };
+
   return (
     <>
-      <TableRow className="hover:bg-gray-50">
+      <TableRow 
+        className="hover:bg-gray-50 cursor-pointer transition-colors" 
+        onClick={handleRowClick}
+      >
         <TableCell>{order.order_number}</TableCell>
         <TableCell>{order.companyName || 'No Company'}</TableCell>
         <TableCell>{getStatusBadge(order.status)}</TableCell>
@@ -57,7 +119,10 @@ export default function OrderRow({
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setShowDetails(true)}
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowDetails(true);
+              }}
             >
               <Eye className="h-4 w-4" />
             </Button>
@@ -65,19 +130,29 @@ export default function OrderRow({
             {isAdmin && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="h-8 w-8 p-0">
+                  <Button 
+                    variant="ghost" 
+                    className="h-8 w-8 p-0"
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     <span className="sr-only">Open menu</span>
                     <MoreHorizontal className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem
-                    onClick={() => onReceiveOrder(order)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onReceiveOrder(order);
+                    }}
                   >
                     Receive Order
                   </DropdownMenuItem>
                   <DropdownMenuItem
-                    onClick={() => onDeleteOrder(order.id, order.order_number)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDeleteOrder(order.id, order.order_number);
+                    }}
                   >
                     Delete Order
                   </DropdownMenuItem>

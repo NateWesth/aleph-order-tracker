@@ -15,9 +15,16 @@ interface OrderTableProps {
   isAdmin: boolean;
   onReceiveOrder: (order: OrderWithCompany) => void;
   onDeleteOrder: (orderId: string, orderNumber: string) => void;
+  onOrderClick?: (order: OrderWithCompany) => void;
 }
 
-export default function OrderTable({ orders, isAdmin, onReceiveOrder, onDeleteOrder }: OrderTableProps) {
+export default function OrderTable({ 
+  orders, 
+  isAdmin, 
+  onReceiveOrder, 
+  onDeleteOrder,
+  onOrderClick 
+}: OrderTableProps) {
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
       <Table>
@@ -45,6 +52,7 @@ export default function OrderTable({ orders, isAdmin, onReceiveOrder, onDeleteOr
                 isAdmin={isAdmin}
                 onReceiveOrder={onReceiveOrder}
                 onDeleteOrder={onDeleteOrder}
+                onOrderClick={onOrderClick}
               />
             ))
           )}
