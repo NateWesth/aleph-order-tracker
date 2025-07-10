@@ -50,60 +50,62 @@ export default function OrderDetailsDialog({
       case 'low':
         return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
       default:
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dot-gray-300';
     }
   };
 
-  // Fixed parsing function - ensures notes NEVER appear in item names
+  // COMPLETELY REWRITTEN parsing function to properly separate item names and notes
   const parseOrderItems = (description: string | null): OrderItem[] => {
     if (!description) return [];
     
-    console.log('🔍 OrderDetailsDialog: Parsing description:', description);
+    console.log('🔍 OrderDetailsDialog: Raw description to parse:', description);
     
     const items: OrderItem[] = [];
     const lines = description.split('\n').filter(line => line.trim());
     
     for (const line of lines) {
       const trimmedLine = line.trim();
-      console.log(`🔍 OrderDetailsDialog: Processing line: "${trimmedLine}"`);
+      console.log(`🔍 Processing line: "${trimmedLine}"`);
       
-      // First check for pattern with notes: "ItemName (Qty: X) - Notes"
-      const withNotesPattern = /^(.+?)\s*\(Qty:\s*(\d+)\)\s*-\s*(.+)$/;
-      const withNotesMatch = trimmedLine.match(withNotesPattern);
-      
-      if (withNotesMatch) {
-        // Extract clean item name (everything before " (Qty:")
-        const itemName = withNotesMatch[1].trim();
-        const quantity = parseInt(withNotesMatch[2]);
-        const notes = withNotesMatch[3].trim();
+      // Check if line has notes pattern: "Something (Qty: X) - Notes"
+      if (trimmedLine.includes(' - ') && trimmedLine.includes('(Qty:')) {
+        const dashIndex = trimmedLine.lastIndexOf(' - ');
+        const beforeDash = trimmedLine.substring(0, dashIndex);
+        const afterDash = trimmedLine.substring(dashIndex + 3);
         
-        items.push({
-          name: itemName,  // Only the item name, no notes here
-          quantity: quantity,
-          notes: notes     // Notes go here only
-        });
-        console.log('✅ Item with notes:', { name: itemName, quantity, notes });
-        continue;
+        // Extract quantity from before dash
+        const qtyMatch = beforeDash.match(/\(Qty:\s*(\d+)\)/);
+        if (qtyMatch) {
+          const itemName = beforeDash.replace(/\s*\(Qty:\s*\d+\)/, '').trim();
+          const quantity = parseInt(qtyMatch[1]);
+          const notes = afterDash.trim();
+          
+          items.push({
+            name: itemName,  // ONLY item name here
+            quantity: quantity,
+            notes: notes     // ONLY notes here
+          });
+          console.log('✅ Parsed item with notes:', { name: itemName, quantity, notes });
+          continue;
+        }
       }
       
-      // Check for pattern without notes: "ItemName (Qty: X)"
-      const withoutNotesPattern = /^(.+?)\s*\(Qty:\s*(\d+)\)$/;
-      const withoutNotesMatch = trimmedLine.match(withoutNotesPattern);
-      
-      if (withoutNotesMatch) {
-        const itemName = withoutNotesMatch[1].trim();
-        const quantity = parseInt(withoutNotesMatch[2]);
+      // Check if line has quantity but no notes: "Something (Qty: X)"
+      const qtyOnlyMatch = trimmedLine.match(/^(.+?)\s*\(Qty:\s*(\d+)\)$/);
+      if (qtyOnlyMatch) {
+        const itemName = qtyOnlyMatch[1].trim();
+        const quantity = parseInt(qtyOnlyMatch[2]);
         
         items.push({
-          name: itemName,  // Only the item name
+          name: itemName,  // ONLY item name here
           quantity: quantity
-          // No notes property = no notes displayed
+          // NO notes property at all
         });
-        console.log('✅ Item without notes:', { name: itemName, quantity });
+        console.log('✅ Parsed item without notes:', { name: itemName, quantity });
         continue;
       }
       
-      // Fallback: treat entire line as item name
+      // Fallback: treat as simple item
       items.push({
         name: trimmedLine,
         quantity: 1
@@ -111,20 +113,23 @@ export default function OrderDetailsDialog({
       console.log('✅ Simple item:', { name: trimmedLine, quantity: 1 });
     }
 
-    console.log('🎯 OrderDetailsDialog: Final items with proper separation:', items);
+    console.log('🎯 Final parsed items array:', items);
     return items;
   };
 
-  // Get display items - ensure proper structure
+  // Get display items with proper structure
   const displayItems: OrderItem[] = order.items && order.items.length > 0 ? 
-    order.items.map(item => ({
-      name: item.name,      // Item name only
-      quantity: item.quantity,
-      notes: item.notes     // Notes only in notes field
-    })) : 
+    order.items.map(item => {
+      console.log('🔍 Processing structured item:', item);
+      return {
+        name: item.name,      // ONLY item name
+        quantity: item.quantity,
+        notes: item.notes     // ONLY notes
+      };
+    }) : 
     parseOrderItems(order.description);
 
-  console.log('📋 OrderDetailsDialog: Final display items:', displayItems);
+  console.log('📋 Final display items for rendering:', displayItems);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -171,26 +176,29 @@ export default function OrderDetailsDialog({
                   <div className="col-span-2 text-center">Unit</div>
                   <div className="col-span-3">Notes</div>
                 </div>
-                {displayItems.map((item, index) => (
-                  <div key={index} className="grid grid-cols-12 gap-4 p-4 items-start hover:bg-gray-50">
-                    <div className="col-span-5">
-                      <p className="font-medium text-gray-900">{item.name}</p>
+                {displayItems.map((item, index) => {
+                  console.log(`🔍 Rendering item ${index}:`, item);
+                  return (
+                    <div key={index} className="grid grid-cols-12 gap-4 p-4 items-start hover:bg-gray-50">
+                      <div className="col-span-5">
+                        <p className="font-medium text-gray-900">{item.name}</p>
+                      </div>
+                      <div className="col-span-2 text-center">
+                        <span className="text-gray-600">{item.quantity}</span>
+                      </div>
+                      <div className="col-span-2 text-center">
+                        <span className="text-gray-600">{item.unit || 'pcs'}</span>
+                      </div>
+                      <div className="col-span-3">
+                        {item.notes && item.notes.trim() ? (
+                          <p className="text-sm text-gray-600">{item.notes}</p>
+                        ) : (
+                          <span className="text-gray-400 text-sm italic">No notes</span>
+                        )}
+                      </div>
                     </div>
-                    <div className="col-span-2 text-center">
-                      <span className="text-gray-600">{item.quantity}</span>
-                    </div>
-                    <div className="col-span-2 text-center">
-                      <span className="text-gray-600">{item.unit || 'pcs'}</span>
-                    </div>
-                    <div className="col-span-3">
-                      {item.notes ? (
-                        <p className="text-sm text-gray-600">{item.notes}</p>
-                      ) : (
-                        <span className="text-gray-400 text-sm italic">No notes</span>
-                      )}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -199,6 +207,8 @@ export default function OrderDetailsDialog({
           <div className="mt-4 p-4 bg-gray-100 rounded text-xs">
             <p><strong>Debug - Raw Description:</strong></p>
             <pre className="whitespace-pre-wrap">{order.description || 'No description'}</pre>
+            <p className="mt-2"><strong>Debug - Parsed Items:</strong></p>
+            <pre className="whitespace-pre-wrap">{JSON.stringify(displayItems, null, 2)}</pre>
           </div>
         </div>
       </DialogContent>
