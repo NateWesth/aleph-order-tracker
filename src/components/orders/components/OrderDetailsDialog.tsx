@@ -54,8 +54,8 @@ export default function OrderDetailsDialog({
     }
   };
 
-  // Parse description for fallback when no structured items exist
-  const parseOrderItems = (description: string | null): OrderItem[] => {
+  // For legacy orders that only have description, parse it simply
+  const parseDescriptionItems = (description: string | null): OrderItem[] => {
     if (!description) return [];
     
     const items: OrderItem[] = [];
@@ -63,51 +63,25 @@ export default function OrderDetailsDialog({
     
     for (const line of lines) {
       const trimmedLine = line.trim();
-      
-      // Match: "ItemName (Qty: X) - Notes"
-      const withNotesMatch = trimmedLine.match(/^(.+?)\s*\(Qty:\s*(\d+)\)\s*-\s*(.+)$/);
-      if (withNotesMatch) {
-        items.push({
-          name: withNotesMatch[1].trim(),
-          quantity: parseInt(withNotesMatch[2]),
-          notes: withNotesMatch[3].trim()
-        });
-        continue;
-      }
-      
-      // Match: "ItemName (Qty: X)" without notes
-      const withoutNotesMatch = trimmedLine.match(/^(.+?)\s*\(Qty:\s*(\d+)\)\s*$/);
-      if (withoutNotesMatch) {
-        items.push({
-          name: withoutNotesMatch[1].trim(),
-          quantity: parseInt(withoutNotesMatch[2])
-        });
-        continue;
-      }
-      
-      // Fallback - treat as item name only
       items.push({
         name: trimmedLine,
-        quantity: 1
+        quantity: 1,
+        notes: undefined
       });
     }
     
     return items;
   };
 
-  // Convert structured items to display format - ensuring data stays in correct columns
-  const convertStructuredItems = (items: Array<{id: string, name: string, quantity: number, notes?: string}>): OrderItem[] => {
-    return items.map(item => ({
-      name: item.name, // Keep name as is
-      quantity: item.quantity, // Keep quantity as is
-      notes: item.notes // Keep notes as is
-    }));
-  };
-
-  // Get display items - prioritize structured items, fallback to parsing
+  // Get display items - use structured items as-is, or parse description for legacy orders
   const displayItems: OrderItem[] = order.items && order.items.length > 0 ? 
-    convertStructuredItems(order.items) : 
-    parseOrderItems(order.description);
+    order.items.map(item => ({
+      name: item.name,
+      quantity: item.quantity,
+      unit: undefined, // Not stored in current schema
+      notes: item.notes
+    })) : 
+    parseDescriptionItems(order.description);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
