@@ -54,46 +54,68 @@ export default function OrderDetailsDialog({
     }
   };
 
-  // COMPLETELY REWRITTEN parsing function to properly separate notes from item names
+  // Parse description to extract items and notes properly
   const parseOrderItems = (description: string | null): OrderItem[] => {
     if (!description) return [];
+    
+    console.log('🔍 Raw description from database:', description);
     
     const items: OrderItem[] = [];
     const lines = description.split('\n').filter(line => line.trim());
     
+    console.log('📝 Split lines:', lines);
+    
     for (const line of lines) {
       const trimmedLine = line.trim();
+      console.log('🔄 Processing line:', trimmedLine);
       
-      // Look for pattern: "ItemName (Qty: X) - Notes"
-      const withNotesMatch = trimmedLine.match(/^(.+?)\s*\(Qty:\s*(\d+)\)\s*-\s*(.+)$/);
+      // Match: "ItemName (Qty: X) - Notes"
+      const withNotesRegex = /^(.+?)\s*\(Qty:\s*(\d+)\)\s*-\s*(.+)$/;
+      const withNotesMatch = trimmedLine.match(withNotesRegex);
+      
       if (withNotesMatch) {
+        const itemName = withNotesMatch[1].trim();
+        const quantity = parseInt(withNotesMatch[2]);
+        const notes = withNotesMatch[3].trim();
+        
+        console.log('✅ Found item with notes:', { itemName, quantity, notes });
+        
         items.push({
-          name: withNotesMatch[1].trim(), // Only the item name, NO notes
-          quantity: parseInt(withNotesMatch[2]),
-          notes: withNotesMatch[3].trim() // Notes go here ONLY
+          name: itemName,
+          quantity: quantity,
+          notes: notes
         });
         continue;
       }
       
-      // Look for pattern: "ItemName (Qty: X)" without notes
-      const withoutNotesMatch = trimmedLine.match(/^(.+?)\s*\(Qty:\s*(\d+)\)\s*$/);
+      // Match: "ItemName (Qty: X)" without notes
+      const withoutNotesRegex = /^(.+?)\s*\(Qty:\s*(\d+)\)\s*$/;
+      const withoutNotesMatch = trimmedLine.match(withoutNotesRegex);
+      
       if (withoutNotesMatch) {
+        const itemName = withoutNotesMatch[1].trim();
+        const quantity = parseInt(withoutNotesMatch[2]);
+        
+        console.log('✅ Found item without notes:', { itemName, quantity });
+        
         items.push({
-          name: withoutNotesMatch[1].trim(), // Only the item name
-          quantity: parseInt(withoutNotesMatch[2]),
-          notes: undefined // No notes
+          name: itemName,
+          quantity: quantity,
+          notes: undefined
         });
         continue;
       }
       
       // Fallback for simple lines
+      console.log('⚠️ Using fallback for line:', trimmedLine);
       items.push({
         name: trimmedLine,
         quantity: 1,
         notes: undefined
       });
     }
-
+    
+    console.log('🎯 Final parsed items:', items);
     return items;
   };
 
@@ -105,6 +127,8 @@ export default function OrderDetailsDialog({
       notes: item.notes
     })) : 
     parseOrderItems(order.description);
+
+  console.log('📊 Display items being rendered:', displayItems);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
