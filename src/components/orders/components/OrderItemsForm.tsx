@@ -1,4 +1,3 @@
-
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -14,6 +13,12 @@ interface OrderItemsFormProps {
 }
 
 export const OrderItemsForm = ({ control, index, onRemove, canRemove }: OrderItemsFormProps) => {
+  const handleItemNameChange = (e: React.ChangeEvent<HTMLInputElement>, onChange: (value: string) => void) => {
+    // Remove special characters, keeping only letters, numbers, and spaces
+    const cleanValue = e.target.value.replace(/[^a-zA-Z0-9\s]/g, '');
+    onChange(cleanValue);
+  };
+
   return (
     <div className="grid grid-cols-12 gap-3 items-end p-4 border rounded-lg">
       <div className="col-span-4">
@@ -25,7 +30,11 @@ export const OrderItemsForm = ({ control, index, onRemove, canRemove }: OrderIte
             <FormItem>
               <FormLabel>Item Name</FormLabel>
               <FormControl>
-                <Input {...field} placeholder="Enter item name" />
+                <Input 
+                  {...field} 
+                  placeholder="Enter item name (letters, numbers, spaces only)" 
+                  onChange={(e) => handleItemNameChange(e, field.onChange)}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
