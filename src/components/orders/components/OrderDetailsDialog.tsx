@@ -47,23 +47,45 @@ export default function OrderDetailsDialog({
     }
   };
 
-  // Parse item name to extract actual name and quantity if needed
+  // Parse item data to extract name, quantity, and notes
   const parseItemData = (item: any) => {
-    let itemName = item.name || '';
+    let fullName = item.name || '';
     let itemQuantity = item.quantity || 0;
+    let itemNotes = item.notes || '';
     
-    // If the name contains "(Qty: X)" pattern, extract the quantity and clean the name
-    const qtyMatch = itemName.match(/\(Qty:\s*(\d+)\)/i);
+    console.log('Parsing item:', { fullName, itemQuantity, itemNotes });
+    
+    // Extract quantity from name if present
+    const qtyMatch = fullName.match(/\(Qty:\s*(\d+)\)/i);
     if (qtyMatch) {
       itemQuantity = parseInt(qtyMatch[1]);
       // Remove the quantity part from the name
-      itemName = itemName.replace(/\s*\(Qty:\s*\d+\)\s*-?\s*/i, '').trim();
+      fullName = fullName.replace(/\s*\(Qty:\s*\d+\)\s*/, '');
     }
+    
+    // Split the name to extract the actual product name and move the rest to notes
+    // The pattern seems to be: PRODUCT NAME - DETAILS - MORE DETAILS
+    // Let's take the first part as the name and the rest as notes
+    const nameParts = fullName.split(' - ');
+    let itemName = nameParts[0] || fullName;
+    
+    // If there are additional parts, they become the notes
+    if (nameParts.length > 1) {
+      const additionalDetails = nameParts.slice(1).join(' - ');
+      itemNotes = itemNotes ? `${itemNotes}; ${additionalDetails}` : additionalDetails;
+    }
+    
+    console.log('Parsed result:', { 
+      name: itemName, 
+      quantity: itemQuantity, 
+      notes: itemNotes,
+      unit: item.unit || 'pcs'
+    });
     
     return {
       name: itemName,
       quantity: itemQuantity,
-      notes: item.notes || '',
+      notes: itemNotes,
       unit: item.unit || 'pcs'
     };
   };
@@ -71,9 +93,12 @@ export default function OrderDetailsDialog({
   // Use structured items directly
   const displayItems = order.items || [];
 
+  console.log('Items count:', displayItems.length);
+  console.log('Raw items:', JSON.stringify(displayItems, null, 2));
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Order Details - {order.order_number}</DialogTitle>
         </DialogHeader>
@@ -112,17 +137,17 @@ export default function OrderDetailsDialog({
             ) : (
               <div className="border rounded-lg divide-y">
                 <div className="grid grid-cols-12 gap-4 p-4 bg-gray-50 font-medium text-sm text-gray-700">
-                  <div className="col-span-6">Item Name</div>
+                  <div className="col-span-4">Item Name</div>
                   <div className="col-span-2 text-center">Quantity</div>
-                  <div className="col-span-2 text-center">Unit</div>
-                  <div className="col-span-2">Notes</div>
+                  <div className="col-span-1 text-center">Unit</div>
+                  <div className="col-span-5">Notes</div>
                 </div>
                 {displayItems.map((item, index) => {
                   const parsedItem = parseItemData(item);
                   
                   return (
                     <div key={`item-${index}`} className="grid grid-cols-12 gap-4 p-4 items-start hover:bg-gray-50">
-                      <div className="col-span-6">
+                      <div className="col-span-4">
                         <p className="font-medium text-gray-900 break-words">
                           {parsedItem.name}
                         </p>
@@ -132,12 +157,12 @@ export default function OrderDetailsDialog({
                           {parsedItem.quantity}
                         </span>
                       </div>
-                      <div className="col-span-2 text-center">
+                      <div className="col-span-1 text-center">
                         <span className="text-gray-600">
                           {parsedItem.unit}
                         </span>
                       </div>
-                      <div className="col-span-2">
+                      <div className="col-span-5">
                         <p className="text-sm text-gray-600 break-words">
                           {parsedItem.notes || '-'}
                         </p>
