@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { CheckCircle, Clock, AlertCircle, Package, BarChart2, FileText } from "lucide-react";
+import { CheckCircle, Clock, AlertCircle, Package, BarChart2, FileText, Flame } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface TodoItem {
@@ -140,6 +140,19 @@ export default function TodoList() {
     });
   };
 
+  const isOrderOld = (createdAt: string) => {
+    const orderDate = new Date(createdAt);
+    const fourDaysAgo = new Date();
+    fourDaysAgo.setDate(fourDaysAgo.getDate() - 4);
+    return orderDate < fourDaysAgo;
+  };
+
+  // Get priority items (urgent orders or orders older than 4 days that haven't moved to processing)
+  const priorityItems = todoItems.filter(item => 
+    item.urgency === 'urgent' || 
+    (isOrderOld(item.created_at) && item.status !== 'processing')
+  );
+
   // Categorize items based on the new requirements
   const pendingItems = todoItems.filter(item => item.status === 'pending');
   const progressItems = todoItems.filter(item => 
@@ -231,6 +244,18 @@ export default function TodoList() {
         <h2 className="text-lg font-semibold text-gray-800 mb-2">Order Management Dashboard</h2>
         <p className="text-sm text-gray-600">Track and manage orders across different stages</p>
       </div>
+      
+      {/* Priority Section */}
+      {priorityItems.length > 0 && (
+        <div className="mb-6">
+          {renderTodoSection(
+            priorityItems, 
+            "🔥 Priority Orders", 
+            <Flame className="h-5 w-5 text-red-500" />, 
+            "No priority orders requiring immediate attention"
+          )}
+        </div>
+      )}
       
       <div className="grid gap-4 md:grid-cols-3">
         {renderTodoSection(
