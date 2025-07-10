@@ -54,8 +54,8 @@ export default function OrderDetailsDialog({
     }
   };
 
-  // For legacy orders that only have description, parse it simply
-  const parseDescriptionItems = (description: string | null): OrderItem[] => {
+  // Simple parsing that preserves item names exactly as entered
+  const parseOrderItems = (description: string | null): OrderItem[] => {
     if (!description) return [];
     
     const items: OrderItem[] = [];
@@ -63,6 +63,9 @@ export default function OrderDetailsDialog({
     
     for (const line of lines) {
       const trimmedLine = line.trim();
+      
+      // For description-based orders, treat each line as a simple item
+      // Don't try to parse notes from the item name
       items.push({
         name: trimmedLine,
         quantity: 1,
@@ -73,15 +76,14 @@ export default function OrderDetailsDialog({
     return items;
   };
 
-  // Get display items - use structured items as-is, or parse description for legacy orders
+  // Get display items - prioritize structured items (which have separate fields)
   const displayItems: OrderItem[] = order.items && order.items.length > 0 ? 
     order.items.map(item => ({
-      name: item.name,
+      name: item.name, // Keep item name exactly as it was entered
       quantity: item.quantity,
-      unit: undefined, // Not stored in current schema
-      notes: item.notes
+      notes: item.notes // Only show actual notes from the notes field
     })) : 
-    parseDescriptionItems(order.description);
+    parseOrderItems(order.description);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
