@@ -16,6 +16,7 @@ interface TodoItem {
   company_name?: string;
   action_needed: string;
   priority: 'high' | 'medium' | 'low';
+  progress_stage?: string;
 }
 
 export default function TodoList() {
@@ -39,6 +40,7 @@ export default function TodoList() {
           urgency,
           created_at,
           company_id,
+          progress_stage,
           companies (name)
         `)
         .in('status', ['pending', 'received', 'processing', 'in-progress'])
@@ -62,8 +64,8 @@ export default function TodoList() {
             priority = 'medium';
             break;
           case 'processing':
-            actionNeeded = 'Complete and deliver order';
-            priority = 'low';
+            actionNeeded = 'Upload required files';
+            priority = 'high';
             break;
         }
 
@@ -75,7 +77,8 @@ export default function TodoList() {
           created_at: order.created_at,
           company_name: order.companies?.name || 'Unknown Company',
           action_needed: actionNeeded,
-          priority
+          priority,
+          progress_stage: order.progress_stage
         };
       }) || [];
 
@@ -137,9 +140,12 @@ export default function TodoList() {
     });
   };
 
-  // Separate items by category
+  // Categorize items based on the new requirements
   const pendingItems = todoItems.filter(item => item.status === 'pending');
-  const progressItems = todoItems.filter(item => item.status === 'received' || item.status === 'in-progress');
+  const progressItems = todoItems.filter(item => 
+    (item.status === 'received' || item.status === 'in-progress') && 
+    (!item.progress_stage || item.progress_stage === 'packaging' || item.progress_stage === 'packing')
+  );
   const processingItems = todoItems.filter(item => item.status === 'processing');
 
   if (loading) {
@@ -192,6 +198,11 @@ export default function TodoList() {
                           Urgent
                         </Badge>
                       )}
+                      {item.progress_stage && (
+                        <Badge variant="outline" className="bg-gray-100 text-gray-800">
+                          {item.progress_stage}
+                        </Badge>
+                      )}
                     </div>
                     <div className="text-sm text-gray-600">
                       {item.action_needed} • {item.company_name}
@@ -233,14 +244,14 @@ export default function TodoList() {
           progressItems, 
           "In Progress", 
           <BarChart2 className="h-5 w-5 text-blue-500" />, 
-          "No orders in progress"
+          "No orders awaiting packaging/packing"
         )}
         
         {renderTodoSection(
           processingItems, 
           "Processing", 
           <FileText className="h-5 w-5 text-purple-500" />, 
-          "No orders being processed"
+          "No orders awaiting file uploads"
         )}
       </div>
 
