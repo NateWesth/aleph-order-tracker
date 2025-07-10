@@ -54,78 +54,71 @@ export default function OrderDetailsDialog({
     }
   };
 
-  // Fixed parsing function to completely separate item names from notes
+  // Completely rewritten parsing function to ensure clean separation
   const parseOrderItems = (description: string | null): OrderItem[] => {
     if (!description) return [];
     
     console.log('🔍 OrderDetailsDialog: Parsing description:', description);
     
     const items: OrderItem[] = [];
-    const lines = description.split('\n');
+    const lines = description.split('\n').filter(line => line.trim());
     
     for (const line of lines) {
       const trimmedLine = line.trim();
-      if (!trimmedLine) continue;
-      
       console.log(`🔍 OrderDetailsDialog: Processing line: "${trimmedLine}"`);
       
-      // Match pattern: "Item Name (Qty: X) - Notes"
-      const matchWithNotes = trimmedLine.match(/^(.+?)\s*\(Qty:\s*(\d+)\)\s*-\s*(.+)$/);
-      if (matchWithNotes) {
-        const itemName = matchWithNotes[1].trim();
-        const quantity = parseInt(matchWithNotes[2]);
-        const itemNotes = matchWithNotes[3].trim();
+      // Pattern 1: "ItemName (Qty: X) - Notes"
+      const withNotesMatch = trimmedLine.match(/^(.+?)\s*\(Qty:\s*(\d+)\)\s*-\s*(.+)$/);
+      if (withNotesMatch) {
+        const cleanItemName = withNotesMatch[1].trim();
+        const qty = parseInt(withNotesMatch[2]);
+        const cleanNotes = withNotesMatch[3].trim();
         
-        const item: OrderItem = {
-          name: itemName, // Clean item name without any notes
-          quantity: quantity,
-          notes: itemNotes // Notes completely separated
-        };
-        console.log('✅ OrderDetailsDialog: Found item with notes:', item);
-        items.push(item);
+        items.push({
+          name: cleanItemName,
+          quantity: qty,
+          notes: cleanNotes
+        });
+        console.log('✅ Item with notes extracted:', { name: cleanItemName, quantity: qty, notes: cleanNotes });
         continue;
       }
       
-      // Match pattern: "Item Name (Qty: X)" without notes
-      const matchWithoutNotes = trimmedLine.match(/^(.+?)\s*\(Qty:\s*(\d+)\)$/);
-      if (matchWithoutNotes) {
-        const itemName = matchWithoutNotes[1].trim();
-        const quantity = parseInt(matchWithoutNotes[2]);
+      // Pattern 2: "ItemName (Qty: X)" without notes
+      const withoutNotesMatch = trimmedLine.match(/^(.+?)\s*\(Qty:\s*(\d+)\)$/);
+      if (withoutNotesMatch) {
+        const cleanItemName = withoutNotesMatch[1].trim();
+        const qty = parseInt(withoutNotesMatch[2]);
         
-        const item: OrderItem = {
-          name: itemName, // Clean item name
-          quantity: quantity
-          // No notes for this item
-        };
-        console.log('✅ OrderDetailsDialog: Found item without notes:', item);
-        items.push(item);
+        items.push({
+          name: cleanItemName,
+          quantity: qty
+        });
+        console.log('✅ Item without notes extracted:', { name: cleanItemName, quantity: qty });
         continue;
       }
       
-      // Fallback: treat as simple item name
-      const item: OrderItem = {
-        name: trimmedLine, // Just the item name
+      // Pattern 3: Fallback - treat as simple item
+      items.push({
+        name: trimmedLine,
         quantity: 1
-        // No notes for fallback items
-      };
-      console.log('✅ OrderDetailsDialog: Found simple item:', item);
-      items.push(item);
+      });
+      console.log('✅ Simple item extracted:', { name: trimmedLine, quantity: 1 });
     }
 
-    console.log('🎯 OrderDetailsDialog: Final parsed items:', items);
+    console.log('🎯 OrderDetailsDialog: Final extracted items:', items);
     return items;
   };
 
-  // Use provided items or parse from description
+  // Get display items - either from structured data or parsed description
   const displayItems: OrderItem[] = order.items && order.items.length > 0 ? 
     order.items.map(item => ({
-      name: item.name, // Pure item name only
+      name: item.name,
       quantity: item.quantity,
-      notes: item.notes || undefined // Notes go to separate property
+      notes: item.notes
     })) : 
-    parseOrderItems(order.description || null);
+    parseOrderItems(order.description);
 
-  console.log('📋 OrderDetailsDialog: Final display items:', displayItems);
+  console.log('📋 OrderDetailsDialog: Items to display:', displayItems);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
