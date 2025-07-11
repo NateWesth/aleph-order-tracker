@@ -68,10 +68,9 @@ export default function ProcessingOrderFilesDialog({
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isScanning, setIsScanning] = useState(false);
-  const [currentScanType, setCurrentScanType: any] = useState<'quote' | 'purchase-order' | 'invoice' | 'delivery-note' | null>(null);
+  const [currentScanType, setCurrentScanType] = useState<'quote' | 'purchase-order' | 'invoice' | 'delivery-note' | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
 
-  // Fetch files for the order
   const fetchOrderFiles = async () => {
     if (!order?.id || !user?.id) return;
 
@@ -91,7 +90,6 @@ export default function ProcessingOrderFilesDialog({
       
       console.log('Files fetched successfully:', data?.length || 0);
       
-      // Transform the data to match our OrderFile interface
       const transformedFiles: OrderFile[] = (data || []).map(file => ({
         id: file.id,
         file_name: file.file_name,
@@ -117,7 +115,6 @@ export default function ProcessingOrderFilesDialog({
     }
   };
 
-  // Upload file function - now more permissive
   const handleFileUpload = async (file: File, fileType: 'quote' | 'purchase-order' | 'invoice' | 'delivery-note') => {
     if (!order?.id || !user?.id) {
       console.error('Missing order ID or user ID');
@@ -135,7 +132,6 @@ export default function ProcessingOrderFilesDialog({
     setUploadingFiles(prev => ({ ...prev, [fileType]: true }));
 
     try {
-      // Upload file to Supabase Storage
       const fileExt = file.name.split('.').pop();
       const fileName = `${order.id}/${fileType}/${Date.now()}.${fileExt}`;
       
@@ -151,14 +147,12 @@ export default function ProcessingOrderFilesDialog({
 
       console.log('File uploaded to storage successfully:', uploadData);
 
-      // Get public URL
       const { data: urlData } = supabase.storage
         .from('order-files')
         .getPublicUrl(fileName);
 
       console.log('Public URL generated:', urlData.publicUrl);
 
-      // Save file record to database
       const fileRecord = {
         order_id: order.id,
         file_name: file.name,
@@ -188,7 +182,6 @@ export default function ProcessingOrderFilesDialog({
         description: `${file.name} has been uploaded successfully.`,
       });
 
-      // Refresh files list
       fetchOrderFiles();
     } catch (error: any) {
       console.error('Error uploading file:', error);
@@ -208,14 +201,12 @@ export default function ProcessingOrderFilesDialog({
     }
   };
 
-  // Delete file function
   const handleFileDelete = async (file: OrderFile) => {
     if (!user?.id) {
       console.error('Missing user ID');
       return;
     }
 
-    // Check if user can delete this file (either admin or file owner)
     const canDelete = isAdmin || file.uploaded_by_user_id === user.id;
     if (!canDelete) {
       toast({
@@ -236,7 +227,6 @@ export default function ProcessingOrderFilesDialog({
     setDeletingFiles(prev => ({ ...prev, [file.id]: true }));
 
     try {
-      // Extract the file path from the URL for storage deletion
       const urlParts = file.file_url.split('/');
       const fileName = urlParts[urlParts.length - 1];
       const fileType = file.file_type;
@@ -245,19 +235,16 @@ export default function ProcessingOrderFilesDialog({
       
       console.log('Deleting from storage:', filePath);
       
-      // Delete from Supabase Storage
       const { error: storageError } = await supabase.storage
         .from('order-files')
         .remove([filePath]);
 
       if (storageError) {
         console.error('Storage deletion error:', storageError);
-        // Continue with database deletion even if storage deletion fails
       }
 
       console.log('File deleted from storage, now deleting database record');
 
-      // Delete from database
       const { error: dbError } = await supabase
         .from('order_files')
         .delete()
@@ -275,7 +262,6 @@ export default function ProcessingOrderFilesDialog({
         description: `${file.file_name} has been deleted successfully.`,
       });
 
-      // Refresh files list
       fetchOrderFiles();
     } catch (error: any) {
       console.error('Error deleting file:', error);
@@ -295,7 +281,6 @@ export default function ProcessingOrderFilesDialog({
     }
   };
 
-  // Download file
   const handleFileDownload = (file: OrderFile) => {
     const link = document.createElement('a');
     link.href = file.file_url;
@@ -319,25 +304,19 @@ export default function ProcessingOrderFilesDialog({
     }
   };
 
-  // Get files by type
   const getFilesByType = (type: string) => {
     return files.filter(file => file.file_type === type);
   };
 
-  // Updated check for upload permissions - now more permissive but still shows user guidance
   const canUploadFileType = (fileType: 'quote' | 'purchase-order' | 'invoice' | 'delivery-note') => {
     console.log('Checking upload permissions:', { fileType, isAdmin });
-    // Now all authenticated users can upload any file type
-    // But we still show guidance about what they typically should upload
     return true;
   };
 
-  // Check if user can delete a file
   const canDeleteFile = (file: OrderFile) => {
     return isAdmin || file.uploaded_by_user_id === user?.id;
   };
 
-  // Get upload guidance text
   const getUploadGuidanceText = (fileType: 'quote' | 'purchase-order' | 'invoice' | 'delivery-note') => {
     if (isAdmin) {
       return fileType === 'purchase-order' ? 'Typically uploaded by clients' : 'Admin can upload';
@@ -346,7 +325,6 @@ export default function ProcessingOrderFilesDialog({
     }
   };
 
-  // New scanning functionality
   const startScanning = async (fileType: 'quote' | 'purchase-order' | 'invoice' | 'delivery-note') => {
     try {
       setScanningFiles(prev => ({ ...prev, [fileType]: true }));
@@ -354,7 +332,7 @@ export default function ProcessingOrderFilesDialog({
       
       const mediaStream = await navigator.mediaDevices.getUserMedia({ 
         video: { 
-          facingMode: 'environment', // Use back camera if available
+          facingMode: 'environment', 
           width: { ideal: 1920 },
           height: { ideal: 1080 }
         } 
@@ -392,26 +370,20 @@ export default function ProcessingOrderFilesDialog({
       
       if (!context) return;
 
-      // Set canvas dimensions to match video
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       
-      // Draw the current video frame to canvas
       context.drawImage(video, 0, 0, canvas.width, canvas.height);
       
-      // Convert canvas to blob
       canvas.toBlob(async (blob) => {
         if (!blob) return;
         
-        // Create a file from the blob
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
         const fileName = `scanned-${currentScanType}-${timestamp}.jpg`;
         const file = new File([blob], fileName, { type: 'image/jpeg' });
         
-        // Stop scanning
         stopScanning();
         
-        // Upload the scanned file
         await handleFileUpload(file, currentScanType);
         
         toast({
@@ -444,7 +416,6 @@ export default function ProcessingOrderFilesDialog({
     }
   };
 
-  // File upload component
   const FileUploadSection = ({ fileType }: { fileType: 'quote' | 'purchase-order' | 'invoice' | 'delivery-note' }) => {
     const inputId = `file-upload-${fileType}`;
     
@@ -515,7 +486,6 @@ export default function ProcessingOrderFilesDialog({
     );
   };
 
-  // File row component with delete functionality
   const FileRow = ({ file }: { file: OrderFile }) => (
     <div key={file.id} className="flex items-center justify-between p-3 border rounded-lg">
       <div className="flex items-center space-x-3">
@@ -588,7 +558,6 @@ export default function ProcessingOrderFilesDialog({
     }
   }, [isOpen, order?.id]);
 
-  // Real-time subscription for file changes
   useEffect(() => {
     if (!order?.id) return;
 
@@ -616,7 +585,6 @@ export default function ProcessingOrderFilesDialog({
     };
   }, [order?.id]);
 
-  // Cleanup camera when dialog closes
   useEffect(() => {
     if (!isOpen && stream) {
       stopScanning();
@@ -632,7 +600,6 @@ export default function ProcessingOrderFilesDialog({
           <DialogTitle>Files for Order #{order.orderNumber}</DialogTitle>
         </DialogHeader>
 
-        {/* Camera scanning overlay */}
         {isScanning && (
           <div className="fixed inset-0 z-50 bg-black bg-opacity-75 flex items-center justify-center">
             <div className="bg-white p-4 rounded-lg max-w-2xl w-full mx-4">
@@ -677,7 +644,6 @@ export default function ProcessingOrderFilesDialog({
             <TabsTrigger value="delivery-note">Delivery Notes</TabsTrigger>
           </TabsList>
 
-          {/* Quote Tab */}
           <TabsContent value="quote" className="space-y-4">
             <div className="flex justify-between items-center">
               <h3 className="text-lg font-medium">Quote Files</h3>
@@ -696,7 +662,6 @@ export default function ProcessingOrderFilesDialog({
             <FileUploadSection fileType="quote" />
           </TabsContent>
 
-          {/* Purchase Order Tab */}
           <TabsContent value="purchase-order" className="space-y-4">
             <div className="flex justify-between items-center">
               <h3 className="text-lg font-medium">Purchase Order Files</h3>
@@ -715,7 +680,6 @@ export default function ProcessingOrderFilesDialog({
             <FileUploadSection fileType="purchase-order" />
           </TabsContent>
 
-          {/* Invoice Tab */}
           <TabsContent value="invoice" className="space-y-4">
             <div className="flex justify-between items-center">
               <h3 className="text-lg font-medium">Invoice Files</h3>
@@ -734,7 +698,6 @@ export default function ProcessingOrderFilesDialog({
             <FileUploadSection fileType="invoice" />
           </TabsContent>
 
-          {/* Delivery Notes Tab */}
           <TabsContent value="delivery-note" className="space-y-4">
             <div className="flex justify-between items-center">
               <h3 className="text-lg font-medium">Delivery Note Files</h3>
