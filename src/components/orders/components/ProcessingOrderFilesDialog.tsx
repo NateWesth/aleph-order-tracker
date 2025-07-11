@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -8,7 +8,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Download, Eye, FileText, Upload, Plus, Trash2 } from "lucide-react";
+import { Download, Eye, FileText, Upload, Plus, Trash2, Scan } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -64,6 +64,12 @@ export default function ProcessingOrderFilesDialog({
   const [loading, setLoading] = useState(false);
   const [uploadingFiles, setUploadingFiles] = useState<{ [key: string]: boolean }>({});
   const [deletingFiles, setDeletingFiles] = useState<{ [key: string]: boolean }>({});
+  const [scanningFiles, setScanningFiles] = useState<{ [key: string]: boolean }>({});
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [isScanning, setIsScanning] = useState(false);
+  const [currentScanType, setCurrentScanType: any] = useState<'quote' | 'purchase-order' | 'invoice' | 'delivery-note' | null>(null);
+  const [stream, setStream] = useState<MediaStream | null>(null);
 
   // Fetch files for the order
   const fetchOrderFiles = async () => {
@@ -340,6 +346,104 @@ export default function ProcessingOrderFilesDialog({
     }
   };
 
+  // New scanning functionality
+  const startScanning = async (fileType: 'quote' | 'purchase-order' | 'invoice' | 'delivery-note') => {
+    try {
+      setScanningFiles(prev => ({ ...prev, [fileType]: true }));
+      setCurrentScanType(fileType);
+      
+      const mediaStream = await navigator.mediaDevices.getUserMedia({ 
+        video: { 
+          facingMode: 'environment', // Use back camera if available
+          width: { ideal: 1920 },
+          height: { ideal: 1080 }
+        } 
+      });
+      
+      setStream(mediaStream);
+      setIsScanning(true);
+      
+      if (videoRef.current) {
+        videoRef.current.srcObject = mediaStream;
+      }
+      
+      toast({
+        title: "Camera Started",
+        description: "Position your document and click capture when ready.",
+      });
+    } catch (error) {
+      console.error('Error starting camera:', error);
+      toast({
+        title: "Camera Error",
+        description: "Unable to access camera. Please check permissions.",
+        variant: "destructive",
+      });
+      setScanningFiles(prev => ({ ...prev, [fileType]: false }));
+    }
+  };
+
+  const captureDocument = async () => {
+    if (!videoRef.current || !canvasRef.current || !currentScanType) return;
+
+    try {
+      const canvas = canvasRef.current;
+      const video = videoRef.current;
+      const context = canvas.getContext('2d');
+      
+      if (!context) return;
+
+      // Set canvas dimensions to match video
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      
+      // Draw the current video frame to canvas
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      
+      // Convert canvas to blob
+      canvas.toBlob(async (blob) => {
+        if (!blob) return;
+        
+        // Create a file from the blob
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const fileName = `scanned-${currentScanType}-${timestamp}.jpg`;
+        const file = new File([blob], fileName, { type: 'image/jpeg' });
+        
+        // Stop scanning
+        stopScanning();
+        
+        // Upload the scanned file
+        await handleFileUpload(file, currentScanType);
+        
+        toast({
+          title: "Document Captured",
+          description: `Scanned document saved as ${fileName}`,
+        });
+      }, 'image/jpeg', 0.8);
+      
+    } catch (error) {
+      console.error('Error capturing document:', error);
+      toast({
+        title: "Capture Error",
+        description: "Failed to capture document. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const stopScanning = () => {
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+      setStream(null);
+    }
+    
+    setIsScanning(false);
+    setCurrentScanType(null);
+    
+    if (currentScanType) {
+      setScanningFiles(prev => ({ ...prev, [currentScanType]: false }));
+    }
+  };
+
   // File upload component
   const FileUploadSection = ({ fileType }: { fileType: 'quote' | 'purchase-order' | 'invoice' | 'delivery-note' }) => {
     const inputId = `file-upload-${fileType}`;
@@ -367,13 +471,13 @@ export default function ProcessingOrderFilesDialog({
                 e.target.value = ''; // Reset input
               }
             }}
-            disabled={uploadingFiles[fileType]}
+            disabled={uploadingFiles[fileType] || scanningFiles[fileType]}
             className="flex-1"
           />
           <Button
             variant="outline"
             size="sm"
-            disabled={uploadingFiles[fileType]}
+            disabled={uploadingFiles[fileType] || scanningFiles[fileType]}
             onClick={() => document.getElementById(inputId)?.click()}
           >
             {uploadingFiles[fileType] ? (
@@ -385,6 +489,24 @@ export default function ProcessingOrderFilesDialog({
               <>
                 <Plus className="h-4 w-4 mr-1" />
                 Upload
+              </>
+            )}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={uploadingFiles[fileType] || scanningFiles[fileType]}
+            onClick={() => startScanning(fileType)}
+          >
+            {scanningFiles[fileType] ? (
+              <>
+                <Scan className="h-4 w-4 mr-1 animate-spin" />
+                Starting...
+              </>
+            ) : (
+              <>
+                <Scan className="h-4 w-4 mr-1" />
+                Scan
               </>
             )}
           </Button>
@@ -494,6 +616,13 @@ export default function ProcessingOrderFilesDialog({
     };
   }, [order?.id]);
 
+  // Cleanup camera when dialog closes
+  useEffect(() => {
+    if (!isOpen && stream) {
+      stopScanning();
+    }
+  }, [isOpen, stream]);
+
   if (!order) return null;
 
   return (
@@ -502,6 +631,43 @@ export default function ProcessingOrderFilesDialog({
         <DialogHeader>
           <DialogTitle>Files for Order #{order.orderNumber}</DialogTitle>
         </DialogHeader>
+
+        {/* Camera scanning overlay */}
+        {isScanning && (
+          <div className="fixed inset-0 z-50 bg-black bg-opacity-75 flex items-center justify-center">
+            <div className="bg-white p-4 rounded-lg max-w-2xl w-full mx-4">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold">Scan Document</h3>
+                <Button variant="outline" onClick={stopScanning}>
+                  Cancel
+                </Button>
+              </div>
+              
+              <div className="relative">
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  className="w-full h-64 object-cover rounded border"
+                />
+                <canvas
+                  ref={canvasRef}
+                  className="hidden"
+                />
+              </div>
+              
+              <div className="flex justify-center mt-4 gap-2">
+                <Button onClick={captureDocument} className="bg-green-600 hover:bg-green-700">
+                  <Scan className="h-4 w-4 mr-2" />
+                  Capture Document
+                </Button>
+                <Button variant="outline" onClick={stopScanning}>
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <Tabs defaultValue="quote" className="w-full">
           <TabsList className="grid w-full grid-cols-4">
