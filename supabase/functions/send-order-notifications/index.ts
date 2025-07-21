@@ -74,30 +74,40 @@ serve(async (req: Request): Promise<Response> => {
     // Collect all recipients
     const allRecipients: Array<{email: string, name: string, role: string}> = [];
 
-    // 1. Get ALL admin users
+    // 1. Get admin users
     console.log('🔍 Fetching admin users...');
     const { data: adminRoles, error: adminRolesError } = await supabase
       .from('user_roles')
-      .select(`
-        user_id,
-        profiles!inner(email, full_name)
-      `)
+      .select('user_id')
       .eq('role', 'admin');
 
     if (adminRolesError) {
-      console.error('❌ Error fetching admin users:', adminRolesError);
+      console.error('❌ Error fetching admin roles:', adminRolesError);
     } else if (adminRoles && adminRoles.length > 0) {
-      console.log('👥 Admin users found:', adminRoles.length);
-      adminRoles.forEach(adminRole => {
-        if (adminRole.profiles && adminRole.profiles.email) {
-          allRecipients.push({
-            email: adminRole.profiles.email,
-            name: adminRole.profiles.full_name || 'Admin User',
-            role: 'admin'
-          });
-          console.log('✅ Added admin:', adminRole.profiles.email);
-        }
-      });
+      console.log('👥 Admin role entries found:', adminRoles.length);
+      
+      // Get profile details for admin users
+      const adminUserIds = adminRoles.map(role => role.user_id);
+      const { data: adminProfiles, error: adminProfilesError } = await supabase
+        .from('profiles')
+        .select('id, email, full_name')
+        .in('id', adminUserIds);
+
+      if (adminProfilesError) {
+        console.error('❌ Error fetching admin profiles:', adminProfilesError);
+      } else if (adminProfiles && adminProfiles.length > 0) {
+        console.log('👥 Admin profiles found:', adminProfiles.length);
+        adminProfiles.forEach(profile => {
+          if (profile.email) {
+            allRecipients.push({
+              email: profile.email,
+              name: profile.full_name || 'Admin User',
+              role: 'admin'
+            });
+            console.log('✅ Added admin:', profile.email);
+          }
+        });
+      }
     }
 
     // 2. Get ALL users from the same company as the order
