@@ -16,6 +16,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import OrderForm from "./OrderForm";
 import { getUserRole } from "@/utils/authService";
+import { sendOrderNotification } from "@/utils/emailNotifications";
 
 interface CreateOrderDialogProps {
   isAdmin?: boolean;
@@ -153,6 +154,26 @@ export default function CreateOrderDialog({
         console.log("🏢 CreateOrderDialog: Verified company_id in database:", verificationOrder.company_id);
         console.log("🎯 CreateOrderDialog: Verified urgency in database:", verificationOrder.urgency);
         console.log("📝 CreateOrderDialog: Verified description in database:", verificationOrder.description);
+      }
+
+      // Send email notification for new order
+      try {
+        // Get company name from the companies array
+        const company = companies.find(c => c.id === orderData.companyId);
+        const companyName = company?.name || 'Unknown Company';
+        
+        await sendOrderNotification({
+          orderId: createdOrder.id,
+          orderNumber: orderData.orderNumber,
+          companyName: companyName,
+          changeType: 'created',
+          newStatus: 'pending',
+          description: itemsDescription
+        });
+        console.log("✅ CreateOrderDialog: Email notification sent successfully");
+      } catch (emailError) {
+        console.error("❌ CreateOrderDialog: Email notification failed:", emailError);
+        // Don't fail the order creation if email fails
       }
 
       const urgencyText = orderData.urgency !== 'normal' ? ` with ${orderData.urgency.toUpperCase()} priority` : '';
