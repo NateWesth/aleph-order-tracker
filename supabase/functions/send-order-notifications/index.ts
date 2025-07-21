@@ -302,7 +302,7 @@ serve(async (req: Request): Promise<Response> => {
           },
           body: JSON.stringify({
             from: {
-              email: 'onboarding@resend.dev',
+              email: 'noreply@alepheng.co.za',
               name: 'Order Management System'
             },
             personalizations: [{
