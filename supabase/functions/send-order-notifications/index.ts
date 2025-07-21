@@ -1,7 +1,6 @@
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.8';
-import { Resend } from "npm:resend@2.0.0";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -26,13 +25,13 @@ serve(async (req: Request): Promise<Response> => {
   try {
     console.log('=== Order Notification Function Started ===');
     
-    const resendApiKey = Deno.env.get('RESEND_API_KEY');
-    console.log('RESEND_API_KEY configured:', !!resendApiKey);
+    const sendgridApiKey = Deno.env.get('SENDGRID_API_KEY');
+    console.log('SENDGRID_API_KEY configured:', !!sendgridApiKey);
     
-    if (!resendApiKey) {
-      console.error('❌ RESEND_API_KEY is not configured in Supabase secrets');
+    if (!sendgridApiKey) {
+      console.error('❌ SENDGRID_API_KEY is not configured in Supabase secrets');
       return new Response(
-        JSON.stringify({ error: 'Email service not configured - RESEND_API_KEY missing' }),
+        JSON.stringify({ error: 'Email service not configured - SENDGRID_API_KEY missing' }),
         {
           status: 500,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -274,9 +273,7 @@ serve(async (req: Request): Promise<Response> => {
 
     console.log('📝 Email subject:', subject);
 
-    const resend = new Resend(resendApiKey);
-
-    // Send emails to all recipients
+    // Send emails to all recipients using SendGrid
     const emailPromises = allRecipients.map(async (recipient, index) => {
       try {
         console.log(`📤 Sending email ${index + 1}/${allRecipients.length} to: ${recipient.email} (${recipient.role})`);
@@ -296,14 +293,36 @@ serve(async (req: Request): Promise<Response> => {
           </div>
         `;
 
-        const result = await resend.emails.send({
-          from: 'Order Management <orders@resend.dev>',
-          to: [recipient.email],
-          subject: subject,
-          html: personalizedContent,
+        // SendGrid API call
+        const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${sendgridApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            from: {
+              email: 'orders@yourdomain.com',
+              name: 'Order Management System'
+            },
+            personalizations: [{
+              to: [{ email: recipient.email, name: recipient.name }],
+              subject: subject
+            }],
+            content: [{
+              type: 'text/html',
+              value: personalizedContent
+            }]
+          })
         });
 
-        console.log(`✅ Email sent successfully to ${recipient.email}:`, result);
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`SendGrid API error: ${response.status} - ${errorText}`);
+        }
+
+        const result = await response.text();
+        console.log(`✅ Email sent successfully to ${recipient.email} via SendGrid`);
         return { success: true, email: recipient.email, result, role: recipient.role };
       } catch (error) {
         console.error(`❌ Failed to send email to ${recipient.email}:`, error);
