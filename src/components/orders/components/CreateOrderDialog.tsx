@@ -158,9 +158,17 @@ export default function CreateOrderDialog({
 
       // Send email notification for new order
       try {
+        console.log("🚀 CreateOrderDialog: Starting email notification process");
         // Get company name from the companies array
         const company = companies.find(c => c.id === orderData.companyId);
         const companyName = company?.name || 'Unknown Company';
+        
+        console.log("📧 CreateOrderDialog: Calling sendOrderNotification with:", {
+          orderId: createdOrder.id,
+          orderNumber: orderData.orderNumber,
+          companyName: companyName,
+          changeType: 'created'
+        });
         
         await sendOrderNotification({
           orderId: createdOrder.id,

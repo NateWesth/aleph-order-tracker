@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Email Notification</title>
+</head>
+<body>
+    <button onclick="testEmail()">Test Email Notification</button>
+    <div id="result"></div>
+    
+    <script>
+        async function testEmail() {
+            const supabase = window.supabaseClient;
+            
+            try {
+                console.log('Testing email notification...');
+                document.getElementById('result').innerHTML = 'Sending test email...';
+                
+                const { data, error } = await supabase.functions.invoke('send-order-notifications', {
+                    body: {
+                        orderId: '312cb6d9-9122-4f98-99b6-14f01e486567',
+                        orderNumber: 'Test',
+                        companyName: 'Test Company',
+                        changeType: 'created',
+                        newStatus: 'pending',
+                        description: 'Test order description'
+                    }
+                });
+                
+                if (error) {
+                    console.error('Error:', error);
+                    document.getElementById('result').innerHTML = 'Error: ' + JSON.stringify(error);
+                } else {
+                    console.log('Success:', data);
+                    document.getElementById('result').innerHTML = 'Success: ' + JSON.stringify(data, null, 2);
+                }
+            } catch (err) {
+                console.error('Exception:', err);
+                document.getElementById('result').innerHTML = 'Exception: ' + err.message;
+            }
+        }
+    </script>
+</body>
+</html>
