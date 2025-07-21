@@ -20,7 +20,7 @@ function App() {
           <Router>
             <div className="min-h-screen bg-background text-foreground">
               <Routes>
-                <Route path="/auth" element={<Auth />} />
+                <Route path="/" element={<Auth />} />
                 <Route path="/admin-dashboard" element={<AdminDashboard />} />
                 <Route path="/client-dashboard" element={<ClientDashboard />} />
                 <Route path="/settings" element={<Settings />} />
