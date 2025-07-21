@@ -51,25 +51,35 @@ serve(async (req: Request): Promise<Response> => {
 
     console.log('🔍 Processing notification for:', { orderId, orderNumber, changeType });
 
-    // Get the order details
-    const { data: orderData, error: orderError } = await supabase
-      .from('orders')
-      .select('company_id, user_id')
-      .eq('id', orderId)
-      .single();
+    let orderData: { company_id: string | null; user_id: string | null } | null = null;
 
-    if (orderError) {
-      console.error('❌ Error fetching order:', orderError);
-      return new Response(
-        JSON.stringify({ error: `Failed to fetch order: ${orderError.message}` }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
+    // For delete operations, we can't fetch the order (it's already deleted)
+    // So we'll try to get company info from the companyName and skip user_id
+    if (changeType === 'deleted') {
+      console.log('🗑️ Delete operation detected - skipping order lookup');
+      orderData = { company_id: null, user_id: null };
+    } else {
+      // Get the order details for non-delete operations
+      const { data: fetchedOrderData, error: orderError } = await supabase
+        .from('orders')
+        .select('company_id, user_id')
+        .eq('id', orderId)
+        .single();
+
+      if (orderError) {
+        console.error('❌ Error fetching order:', orderError);
+        return new Response(
+          JSON.stringify({ error: `Failed to fetch order: ${orderError.message}` }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+
+      orderData = fetchedOrderData;
+      console.log('📋 Order data retrieved:', orderData);
     }
-
-    console.log('📋 Order data retrieved:', orderData);
 
     // Collect all recipients
     const allRecipients: Array<{email: string, name: string, role: string}> = [];
@@ -110,7 +120,7 @@ serve(async (req: Request): Promise<Response> => {
       }
     }
 
-    // 2. Get ALL users from the same company as the order
+    // 2. Get company users - different logic for delete operations
     if (orderData.company_id) {
       console.log('🔍 Fetching company users for company_id:', orderData.company_id);
       
@@ -134,10 +144,68 @@ serve(async (req: Request): Promise<Response> => {
           }
         });
       }
+    } else if (changeType === 'deleted' && companyName) {
+      // For delete operations, try to find company users by company name
+      console.log('🔍 Delete operation - finding users by company name:', companyName);
+      
+      // First get the company by name
+      const { data: company, error: companyError } = await supabase
+        .from('companies')
+        .select('id, code')
+        .eq('name', companyName)
+        .single();
+
+      if (!companyError && company) {
+        console.log('🏢 Found company for delete operation:', company.id);
+        
+        // Get users by company_id
+        const { data: companyUsers, error: companyUsersError } = await supabase
+          .from('profiles')
+          .select('email, full_name')
+          .eq('company_id', company.id);
+
+        if (!companyUsersError && companyUsers && companyUsers.length > 0) {
+          console.log('🏢 Company users found for delete operation:', companyUsers.length);
+          companyUsers.forEach(user => {
+            if (user.email && !allRecipients.find(r => r.email === user.email)) {
+              allRecipients.push({
+                email: user.email,
+                name: user.full_name || 'Company User',
+                role: 'client'
+              });
+              console.log('✅ Added company user for delete:', user.email);
+            }
+          });
+        }
+
+        // Also try by company_code if no users found by company_id
+        if (company.code && (!companyUsers || companyUsers.length === 0)) {
+          console.log('🔍 Also trying by company_code:', company.code);
+          
+          const { data: codeUsers, error: codeUsersError } = await supabase
+            .from('profiles')
+            .select('email, full_name')
+            .eq('company_code', company.code);
+
+          if (!codeUsersError && codeUsers && codeUsers.length > 0) {
+            console.log('🏢 Users found by company_code for delete:', codeUsers.length);
+            codeUsers.forEach(user => {
+              if (user.email && !allRecipients.find(r => r.email === user.email)) {
+                allRecipients.push({
+                  email: user.email,
+                  name: user.full_name || 'Company User',
+                  role: 'client'
+                });
+                console.log('✅ Added user by company_code for delete:', user.email);
+              }
+            });
+          }
+        }
+      }
     }
 
-    // 3. If no company users found by company_id, try by company_code
-    if (orderData.company_id && allRecipients.filter(r => r.role === 'client').length === 0 && companyName) {
+    // 3. If no company users found by company_id, try by company_code (for non-delete operations)
+    if (orderData.company_id && allRecipients.filter(r => r.role === 'client').length === 0 && companyName && changeType !== 'deleted') {
       console.log('🔍 Trying to find users by company name/code...');
       
       // First get the company code
