@@ -51,6 +51,23 @@ serve(async (req: Request): Promise<Response> => {
 
     console.log('🔍 Processing notification for:', { orderId, orderNumber, changeType });
 
+    // Only send notifications for created orders and when orders are completed
+    if (changeType !== 'created' && !(changeType === 'status_change' && newStatus === 'completed')) {
+      console.log('📧 Skipping notification - not a creation or completion event');
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          message: 'Notification skipped - only sending for order creation and completion',
+          sent: 0, 
+          failed: 0,
+          recipients: 0
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
     let orderData: { company_id: string | null; user_id: string | null } | null = null;
 
     // For delete operations, we can't fetch the order (it's already deleted)
