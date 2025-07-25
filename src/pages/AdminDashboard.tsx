@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
+import { ProcessedLogo } from "@/components/ui/ProcessedLogo";
 import { supabase } from "@/integrations/supabase/client";
 import { 
   SidebarProvider, 
@@ -198,17 +199,17 @@ const AdminDashboard = () => {
         {/* Main content */}
         <div className="flex-1 flex flex-col">
           {/* Header - light grey in light mode */}
-          <header className="toolbar-aleph p-4">
+          <header className="toolbar-aleph py-2">{/* Reduced padding for smaller header */}
             <div className="max-w-7xl mx-auto flex justify-between items-center">
               <div className="flex items-center">
                 {theme === 'light' ? (
-                  <img 
-                    src="/lovable-uploads/e5573278-d431-4b7e-a327-ed9adfa99fcb.png" 
-                    alt="Aleph Engineering and Supplies" 
-                    className="h-20 w-auto brightness-110 contrast-105"
+                  <ProcessedLogo
+                    originalSrc="/lovable-uploads/e5573278-d431-4b7e-a327-ed9adfa99fcb.png"
+                    alt="Aleph Engineering and Supplies"
+                    className="h-16 w-auto"
                   />
                 ) : (
-                  <h1 className="text-2xl font-bold text-aleph-green">Aleph Engineering and Supplies - Admin</h1>
+                  <h1 className="text-xl font-bold text-aleph-green">Aleph Engineering and Supplies - Admin</h1>
                 )}
               </div>
               <div className="flex items-center gap-4">
