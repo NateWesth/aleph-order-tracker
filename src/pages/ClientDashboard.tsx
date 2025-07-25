@@ -144,12 +144,6 @@ const ClientDashboard = () => {
           {/* Dashboard content - White in light mode, slightly lighter grey than toolbar in dark mode */}
           <main className="flex-1 p-4 md:p-8 bg-white dark:bg-gray-800">
             {activeView === "home" ? <div className="flex items-center justify-center h-full relative bg-white dark:bg-gray-800">
-                {/* Faded background logo */}
-                <div className="absolute inset-0 opacity-5 bg-no-repeat bg-center" style={{
-              backgroundImage: 'url("/lovable-uploads/e1088147-889e-43f6-bdf0-271189b88913.png")',
-              backgroundSize: '50%',
-              zIndex: 0
-            }}></div>
                 <div className="text-center relative z-10">
                   <h1 className="text-4xl font-bold mb-4 text-emerald-950 md:text-6xl">
                     Welcome{userProfile?.full_name ? `, ${userProfile.full_name}` : ''}
