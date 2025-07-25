@@ -339,8 +339,8 @@ export default function ProgressPage({
   useEffect(() => {
     if (user?.id && (userRole === 'admin' || userCompanyId !== null)) {
       console.log('Loading progress orders...');
+      loadDeliveryQuantities(); // Load saved quantities first
       fetchProgressOrders();
-      loadDeliveryQuantities();
     }
   }, [user?.id, userRole, userCompanyId]);
 
