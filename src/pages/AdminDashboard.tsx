@@ -89,9 +89,11 @@ const AdminDashboard = () => {
         <Sidebar className="dark:bg-black bg-white">
           <SidebarContent className="relative">
             {/* Watermark background */}
-            <div className="absolute inset-0 opacity-10 bg-no-repeat bg-center bg-contain pointer-events-none" 
+            <div className="absolute inset-0 opacity-15 bg-no-repeat bg-center pointer-events-none" 
                  style={{
-                   backgroundImage: 'url("/lovable-uploads/e1088147-889e-43f6-bdf0-271189b88913.png")'
+                   backgroundImage: 'url("/lovable-uploads/60acfbdb-e784-45e3-ad7d-af256b7060cb.png")',
+                   backgroundSize: '180%',
+                   transform: 'rotate(-15deg)'
                  }}>
             </div>
             <SidebarMenu>
