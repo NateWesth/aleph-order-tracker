@@ -8,14 +8,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Download, Eye, FileText, Upload, Plus, Trash2, Scan, QrCode, Printer } from "lucide-react";
+import { Download, Eye, FileText, Upload, Plus, Trash2, Scan, Printer } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import QRCode from 'qrcode';
+// QRCode import removed - no longer using QR scanning
 import { NativeScanningService } from "@/services/nativeScanningService";
 import { Capacitor } from '@capacitor/core';
 
@@ -68,8 +68,7 @@ export default function ProcessingOrderFilesDialog({
   const [uploadingFiles, setUploadingFiles] = useState<{ [key: string]: boolean }>({});
   const [deletingFiles, setDeletingFiles] = useState<{ [key: string]: boolean }>({});
   const [scanningFiles, setScanningFiles] = useState<{ [key: string]: boolean }>({});
-  const [qrCodeFiles, setQrCodeFiles] = useState<{ [key: string]: boolean }>({});
-  const [qrCodeDataUrls, setQrCodeDataUrls] = useState<{ [key: string]: string }>({});
+  // QR code state removed - no longer using QR scanning
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isScanning, setIsScanning] = useState(false);
@@ -332,48 +331,7 @@ export default function ProcessingOrderFilesDialog({
     }
   };
 
-  const generateQRCodeForScanning = async (fileType: 'quote' | 'purchase-order' | 'invoice' | 'delivery-note') => {
-    if (!order?.id) return;
-
-    try {
-      setQrCodeFiles(prev => ({ ...prev, [fileType]: true }));
-      
-      // Generate a unique session ID for this scanning session
-      const sessionId = Date.now().toString();
-      const scanUrl = `${window.location.origin}/mobile-scan/${sessionId}/${order.id}/${fileType}`;
-      
-      // Generate QR code
-      const qrCodeDataUrl = await QRCode.toDataURL(scanUrl, {
-        width: 256,
-        margin: 2,
-        color: {
-          dark: '#000000',
-          light: '#FFFFFF'
-        }
-      });
-      
-      setQrCodeDataUrls(prev => ({ ...prev, [fileType]: qrCodeDataUrl }));
-      
-      toast({
-        title: "QR Code Generated",
-        description: "Scan this QR code with your phone to upload the document.",
-      });
-      
-    } catch (error) {
-      console.error('Error generating QR code:', error);
-      toast({
-        title: "QR Code Error",
-        description: "Failed to generate QR code. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setQrCodeFiles(prev => ({ ...prev, [fileType]: false }));
-    }
-  };
-
-  const closeQRCode = (fileType: 'quote' | 'purchase-order' | 'invoice' | 'delivery-note') => {
-    setQrCodeDataUrls(prev => ({ ...prev, [fileType]: '' }));
-  };
+  // QR code generation functions removed - no longer using QR scanning
 
   const startScanning = async (fileType: 'quote' | 'purchase-order' | 'invoice' | 'delivery-note') => {
     try {
@@ -513,19 +471,7 @@ export default function ProcessingOrderFilesDialog({
               </>
             )}
           </Button>
-          {/* HP Smart Scanner Button - Priority button for native devices */}
-          {isNativeDevice && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
-              disabled={uploadingFiles[fileType] || scanningFiles[fileType]}
-              onClick={() => handleHPScan(fileType)}
-            >
-              <Printer className="h-4 w-4 mr-1" />
-              HP Scan
-            </Button>
-          )}
+          {/* Remove duplicate HP Smart Scanner Button - only one needed */}
           <Button
             variant="outline"
             size="sm"
@@ -547,48 +493,26 @@ export default function ProcessingOrderFilesDialog({
           <Button
             variant="outline"
             size="sm"
-            disabled={qrCodeFiles[fileType]}
-            onClick={() => generateQRCodeForScanning(fileType)}
+            disabled={scanningFiles[fileType] || uploadingFiles[fileType]}
+            onClick={() => handleHPScan(fileType)}
           >
-            {qrCodeFiles[fileType] ? (
+            {scanningFiles[fileType] ? (
               <>
-                <QrCode className="h-4 w-4 mr-1 animate-spin" />
-                Generating...
+                <Scan className="h-4 w-4 mr-1 animate-spin" />
+                Opening...
               </>
             ) : (
               <>
-                <QrCode className="h-4 w-4 mr-1" />
-                QR Scan
+                <Scan className="h-4 w-4 mr-1" />
+                HP Scan
               </>
             )}
           </Button>
         </div>
         
-        {/* QR Code Display */}
-        {qrCodeDataUrls[fileType] && (
-          <div className="mt-4 p-4 border rounded-lg bg-gray-50">
-            <div className="flex justify-between items-center mb-3">
-              <h4 className="font-medium">Scan with your phone</h4>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => closeQRCode(fileType)}
-              >
-                ✕
-              </Button>
-            </div>
-            <div className="flex flex-col items-center">
-              <img 
-                src={qrCodeDataUrls[fileType]} 
-                alt="QR Code for mobile scanning"
-                className="mb-3"
-              />
-              <p className="text-sm text-center text-muted-foreground">
-                Open your phone's camera and scan this QR code to upload {fileTypeLabels[fileType]} documents from your mobile device.
-              </p>
-            </div>
-          </div>
-        )}
+        <p className="text-xs text-muted-foreground mt-2">
+          Use Upload for files, Camera for quick photos, or HP Scan for high-quality document scanning through your HP app.
+        </p>
       </div>
     );
   };
