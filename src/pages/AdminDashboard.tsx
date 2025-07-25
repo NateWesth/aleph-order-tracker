@@ -205,7 +205,7 @@ const AdminDashboard = () => {
                   <img 
                     src="/lovable-uploads/e5573278-d431-4b7e-a327-ed9adfa99fcb.png" 
                     alt="Aleph Engineering and Supplies" 
-                    className="h-16 w-auto brightness-110 contrast-105"
+                    className="h-20 w-auto brightness-110 contrast-105"
                   />
                 ) : (
                   <h1 className="text-2xl font-bold text-aleph-green">Aleph Engineering and Supplies - Admin</h1>
