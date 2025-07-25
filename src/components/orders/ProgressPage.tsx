@@ -642,10 +642,19 @@ export default function ProgressPage({
                       
                       
                       
-                      {isAdmin && <>
-                          {progressStages.map(stage => <Button key={stage.id} variant={order.progressStage === stage.id ? "default" : "outline"} size="sm" onClick={() => updateProgressStage(order.id, stage.id)} className={stage.id === 'completed' ? "bg-green-600 hover:bg-green-700 text-white" : ""}>
+                      {isAdmin ? (
+                        <>
+                          {progressStages.map(stage => 
+                            <Button 
+                              key={stage.id} 
+                              variant={order.progressStage === stage.id ? "default" : "outline"} 
+                              size="sm" 
+                              onClick={() => updateProgressStage(order.id, stage.id)} 
+                              className={stage.id === 'completed' ? "bg-green-600 hover:bg-green-700 text-white" : ""}
+                            >
                               {stage.name}
-                            </Button>)}
+                            </Button>
+                          )}
                           
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
@@ -662,13 +671,30 @@ export default function ProgressPage({
                               </AlertDialogHeader>
                               <AlertDialogFooter>
                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => deleteOrder(order.id, order.orderNumber)} className="bg-destructive hover:bg-destructive/90">
+                                <AlertDialogAction 
+                                  onClick={() => deleteOrder(order.id, order.orderNumber)} 
+                                  className="bg-destructive hover:bg-destructive/90"
+                                >
                                   Delete
                                 </AlertDialogAction>
                               </AlertDialogFooter>
                             </AlertDialogContent>
                           </AlertDialog>
-                        </>}
+                        </>
+                      ) : (
+                        // For client users, show current progress stage as read-only badges
+                        <>
+                          {progressStages.map(stage => 
+                            <Badge 
+                              key={stage.id} 
+                              variant={order.progressStage === stage.id ? "default" : "outline"}
+                              className={order.progressStage === stage.id && stage.id === 'completed' ? "bg-green-600 text-white" : ""}
+                            >
+                              {stage.name}
+                            </Badge>
+                          )}
+                        </>
+                      )}
                     </div>
                   </div>
 
@@ -678,10 +704,8 @@ export default function ProgressPage({
                           <TableRow>
                             <TableHead className="text-card-foreground">Item</TableHead>
                             <TableHead className="text-card-foreground">Quantity Ordered</TableHead>
-                            {isAdmin && <>
-                                <TableHead className="text-card-foreground">Quantity Delivered</TableHead>
-                                <TableHead className="text-card-foreground">Status</TableHead>
-                              </>}
+                            <TableHead className="text-card-foreground">Quantity Delivered</TableHead>
+                            <TableHead className="text-card-foreground">Status</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -699,18 +723,30 @@ export default function ProgressPage({
                     return <TableRow key={item.id} className={isCompleted ? "opacity-50" : ""}>
                                   <TableCell className="font-medium text-card-foreground">{item.name}</TableCell>
                                   <TableCell className="text-card-foreground">{item.quantity}</TableCell>
-                                  {isAdmin && <>
-                                      <TableCell>
-                                        <input type="number" min="0" max={item.quantity} value={delivered} onChange={e => updateDeliveryQuantity(order.id, item.name, parseInt(e.target.value) || 0)} className="w-20 px-2 py-1 border border-border rounded text-sm bg-background text-foreground" />
-                                      </TableCell>
-                                      <TableCell>
-                                        {isCompleted ? <Badge variant="outline" className="bg-green-100 text-green-800">
-                                            Complete
-                                          </Badge> : <Badge variant="outline">
-                                            Pending
-                                          </Badge>}
-                                      </TableCell>
-                                    </>}
+                                  <TableCell>
+                                    {isAdmin ? (
+                                      <input 
+                                        type="number" 
+                                        min="0" 
+                                        max={item.quantity} 
+                                        value={delivered} 
+                                        onChange={e => updateDeliveryQuantity(order.id, item.name, parseInt(e.target.value) || 0)} 
+                                        className="w-20 px-2 py-1 border border-border rounded text-sm bg-background text-foreground" 
+                                      />
+                                    ) : (
+                                      <span className="text-card-foreground font-medium">{delivered}</span>
+                                    )}
+                                  </TableCell>
+                                  <TableCell>
+                                    {isCompleted ? 
+                                      <Badge variant="outline" className="bg-green-100 text-green-800">
+                                        Complete
+                                      </Badge> : 
+                                      <Badge variant="outline">
+                                        Pending
+                                      </Badge>
+                                    }
+                                  </TableCell>
                                 </TableRow>;
                   })}
                         </TableBody>
