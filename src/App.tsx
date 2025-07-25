@@ -7,6 +7,7 @@ import NotFound from './pages/NotFound';
 import MobileScanPage from './components/orders/components/MobileScanPage';
 import { AuthProvider } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
+import { ProtectedRoute } from './components/ProtectedRoute';
 import { Toaster } from "@/components/ui/toaster";
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
@@ -21,9 +22,21 @@ function App() {
             <div className="min-h-screen bg-background text-foreground">
               <Routes>
                 <Route path="/" element={<Auth />} />
-                <Route path="/admin-dashboard" element={<AdminDashboard />} />
-                <Route path="/client-dashboard" element={<ClientDashboard />} />
-                <Route path="/settings" element={<Settings />} />
+                <Route path="/admin-dashboard" element={
+                  <ProtectedRoute>
+                    <AdminDashboard />
+                  </ProtectedRoute>
+                } />
+                <Route path="/client-dashboard" element={
+                  <ProtectedRoute>
+                    <ClientDashboard />
+                  </ProtectedRoute>
+                } />
+                <Route path="/settings" element={
+                  <ProtectedRoute>
+                    <Settings />
+                  </ProtectedRoute>
+                } />
                 <Route path="/mobile-scan/:sessionId/:orderId/:fileType" element={<MobileScanPage />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
