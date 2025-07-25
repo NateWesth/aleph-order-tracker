@@ -235,7 +235,7 @@
 }
 
 .sidebar-hover:hover {
-  @apply text-pink-600;
+  @apply text-white;
   background-color: transparent !important;
 }
 
