@@ -243,26 +243,38 @@ export default function ProgressOrderDetailsDialog({
                         {item.quantity}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        <input
-                          type="number"
-                          value={deliveredQuantities[item.name] || 0}
-                          onChange={(e) =>
-                            updateDeliveredQuantity(item.name, parseInt(e.target.value) || 0)
-                          }
-                          className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-24 sm:text-sm border-gray-300 rounded-md"
-                          min="0"
-                          max={item.quantity}
-                        />
+                        {isAdmin ? (
+                          <input
+                            type="number"
+                            value={deliveredQuantities[item.name] || 0}
+                            onChange={(e) =>
+                              updateDeliveredQuantity(item.name, parseInt(e.target.value) || 0)
+                            }
+                            className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-24 sm:text-sm border-gray-300 rounded-md"
+                            min="0"
+                            max={item.quantity}
+                          />
+                        ) : (
+                          <span className="text-gray-900 font-medium">
+                            {deliveredQuantities[item.name] || 0}
+                          </span>
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        <input
-                          type="checkbox"
-                          checked={item.completed}
-                          onChange={(e) =>
-                            toggleItemCompletion(item.name, e.target.checked)
-                          }
-                          className="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300 rounded"
-                        />
+                        {isAdmin ? (
+                          <input
+                            type="checkbox"
+                            checked={item.completed}
+                            onChange={(e) =>
+                              toggleItemCompletion(item.name, e.target.checked)
+                            }
+                            className="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300 rounded"
+                          />
+                        ) : (
+                          <Badge variant={item.completed ? "default" : "secondary"}>
+                            {item.completed ? "Completed" : "Pending"}
+                          </Badge>
+                        )}
                       </td>
                     </tr>
                   ))
@@ -273,8 +285,12 @@ export default function ProgressOrderDetailsDialog({
         </div>
 
         <AlertDialogFooter>
-          <AlertDialogCancel onClick={onClose}>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={saveChanges}>Save Changes</AlertDialogAction>
+          <AlertDialogCancel onClick={onClose}>
+            {isAdmin ? "Cancel" : "Close"}
+          </AlertDialogCancel>
+          {isAdmin && (
+            <AlertDialogAction onClick={saveChanges}>Save Changes</AlertDialogAction>
+          )}
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
