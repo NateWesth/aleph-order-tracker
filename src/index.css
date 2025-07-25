@@ -298,7 +298,7 @@
 }
 
 .order-row-hover:hover {
-  @apply transform scale-102;
+  transform: scale(1.02);
   animation: pulse 1.5s ease-in-out infinite;
   z-index: 10;
   position: relative;
