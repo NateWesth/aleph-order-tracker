@@ -229,9 +229,9 @@
   @apply bg-background border-gray-800;
 }
 
-/* Hover states for sidebar - white text on hover */
+/* Hover states for sidebar - breathing motion in dark mode */
 .sidebar-hover {
-  @apply transition-colors duration-200;
+  @apply transition-all duration-300;
 }
 
 .sidebar-hover:hover {
@@ -241,9 +241,10 @@
 }
 
 .dark .sidebar-hover:hover {
-  @apply text-white;
-  color: white !important;
+  @apply transform scale-105;
+  color: inherit !important;
   background-color: transparent !important;
+  animation: pulse 1.5s ease-in-out infinite;
 }
 
 /* Active/selected state - stays pink in both modes */
@@ -257,9 +258,9 @@
   background-color: transparent !important;
 }
 
-/* Button hover states - white text on hover for toolbar buttons */
+/* Button hover states - breathing motion in dark mode */
 .btn-hover {
-  @apply transition-colors duration-200;
+  @apply transition-all duration-300;
 }
 
 .btn-hover:hover {
@@ -269,9 +270,10 @@
 }
 
 .dark .btn-hover:hover {
-  @apply text-white bg-transparent;
-  color: white !important;
+  @apply transform scale-105;
+  color: inherit !important;
   background-color: transparent !important;
+  animation: pulse 1.5s ease-in-out infinite;
 }
 
 /* Focus states */
