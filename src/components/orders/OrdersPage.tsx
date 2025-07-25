@@ -194,7 +194,7 @@ export default function OrdersPage({
     companyName: order.companyName
   }));
 
-  return <div className="container mx-auto p-6">
+  return <div className="container mx-auto p-6 bg-background">
       <div className="flex justify-between items-center mb-6">
         <OrdersHeader searchTerm={searchTerm} onSearchChange={setSearchTerm} />
         <div className="flex gap-2">
