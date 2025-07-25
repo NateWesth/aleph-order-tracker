@@ -49,7 +49,15 @@ const ClientDashboard = () => {
       <div className="min-h-screen w-full flex bg-black dark:bg-black">
         {/* Sidebar */}
         <Sidebar className="dark:bg-black bg-white">
-          <SidebarContent>
+          <SidebarContent className="relative">
+            {/* Watermark background */}
+            <div className="absolute inset-0 opacity-15 bg-no-repeat bg-center pointer-events-none" 
+                 style={{
+                   backgroundImage: 'url("/lovable-uploads/60acfbdb-e784-45e3-ad7d-af256b7060cb.png")',
+                   backgroundSize: '250%',
+                   transform: 'rotate(-15deg)'
+                 }}>
+            </div>
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton tooltip="Home" onClick={() => handleMenuClick("home")} className={`sidebar-hover ${activeView === "home" ? "sidebar-active" : ""}`}>
