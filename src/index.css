@@ -295,9 +295,13 @@
 /* Order row breathing hover effect */
 .order-row-hover {
   @apply cursor-pointer transition-all duration-300;
+  transform-origin: center;
+  overflow: visible;
 }
 
 .order-row-hover:hover {
   @apply transform scale-105;
   animation: pulse 1.5s ease-in-out infinite;
+  z-index: 10;
+  position: relative;
 }
