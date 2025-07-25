@@ -5,7 +5,9 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { Upload, Camera, Check } from "lucide-react";
+import { Upload, Camera, Check, Printer } from "lucide-react";
+import { NativeScanningService } from "@/services/nativeScanningService";
+import { Capacitor } from '@capacitor/core';
 
 interface MobileScanPageProps {}
 
@@ -29,10 +31,12 @@ export default function MobileScanPage({}: MobileScanPageProps) {
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploaded, setUploaded] = useState(false);
+  const [isNativeDevice, setIsNativeDevice] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const scanningService = NativeScanningService.getInstance();
 
-  // Verify session is valid (you might want to implement session validation)
+  // Verify session is valid and check device type
   useEffect(() => {
     if (!sessionId || !orderId || !fileType) {
       toast({
@@ -42,7 +46,45 @@ export default function MobileScanPage({}: MobileScanPageProps) {
       });
       return;
     }
+    
+    // Check if running on native mobile device
+    setIsNativeDevice(Capacitor.isNativePlatform());
   }, [sessionId, orderId, fileType]);
+
+  const handleHPScan = async () => {
+    try {
+      const result = await scanningService.openHPScanApp();
+      
+      if (result.success) {
+        toast({
+          title: "Opening HP Smart App",
+          description: "Please scan your document and return to this app when finished.",
+        });
+      } else {
+        toast({
+          title: "HP Smart Not Available",
+          description: result.error || "HP Smart app is not installed.",
+          variant: "destructive",
+        });
+        
+        // Try alternative scanning apps
+        const altResult = await scanningService.openAlternativeScanApp();
+        if (altResult.success) {
+          toast({
+            title: "Opening Scanner App",
+            description: "Please scan your document and return to this app when finished.",
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error opening scanner app:', error);
+      toast({
+        title: "Scanner Error",
+        description: "Unable to open scanner app. Please try manual upload.",
+        variant: "destructive",
+      });
+    }
+  };
 
   const startCamera = async () => {
     try {
@@ -267,10 +309,23 @@ export default function MobileScanPage({}: MobileScanPageProps) {
 
           {!isScanning ? (
             <div className="space-y-4">
+              {/* HP Scanner Button - Only show on native mobile devices */}
+              {isNativeDevice && (
+                <Button 
+                  onClick={handleHPScan}
+                  className="w-full h-16 text-lg bg-blue-600 hover:bg-blue-700"
+                  size="lg"
+                >
+                  <Printer className="w-6 h-6 mr-2" />
+                  Scan with HP Smart App
+                </Button>
+              )}
+              
               <Button 
                 onClick={startCamera}
                 className="w-full h-16 text-lg"
                 size="lg"
+                variant={isNativeDevice ? "outline" : "default"}
               >
                 <Camera className="w-6 h-6 mr-2" />
                 Start Camera Scan
