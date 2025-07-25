@@ -258,8 +258,8 @@ export default function ProgressPage({
             name,
             code
           )
-        `).in('status', ['received', 'in-progress']).order('created_at', {
-        ascending: false
+        `).in('status', ['received', 'in-progress']).order('order_number', {
+        ascending: true
       });
 
       // Apply filtering based on user role

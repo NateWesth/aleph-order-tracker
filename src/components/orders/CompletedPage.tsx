@@ -171,8 +171,8 @@ export default function CompletedPage({
             name,
             code
           )
-        `).eq('status', 'completed').order('completed_date', {
-        ascending: false
+        `).eq('status', 'completed').order('order_number', {
+        ascending: true
       });
 
       // Apply filtering based on user role
@@ -290,7 +290,7 @@ export default function CompletedPage({
     });
     const groups: MonthGroup[] = Array.from(monthMap.entries()).map(([month, orders]) => ({
       month,
-      orders: orders.sort((a, b) => (b.completedDate || b.orderDate).getTime() - (a.completedDate || a.orderDate).getTime()),
+      orders: orders.sort((a, b) => a.orderNumber.localeCompare(b.orderNumber, undefined, { numeric: true })),
       isOpen: true
     })).sort((a, b) => {
       const dateA = new Date(a.month);

@@ -159,8 +159,8 @@ export default function ProcessingPage({
             name,
             code
           )
-        `).eq('status', 'processing').order('created_at', {
-        ascending: false
+        `).eq('status', 'processing').order('order_number', {
+        ascending: true
       });
 
       // Apply filtering based on user role
