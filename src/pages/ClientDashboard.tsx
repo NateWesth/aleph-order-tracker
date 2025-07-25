@@ -87,13 +87,13 @@ const ClientDashboard = () => {
               <SidebarMenuItem>
                 <SidebarMenuButton tooltip="Progress" onClick={() => handleMenuClick("progress")} className={`sidebar-hover ${activeView === "progress" ? "sidebar-active" : ""}`}>
                   <BarChart2 />
-                  <span className="text-slate-50">Progress</span>
+                  <span>Progress</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
                 <SidebarMenuButton tooltip="Processing" onClick={() => handleMenuClick("processing")} className={`sidebar-hover ${activeView === "processing" ? "sidebar-active" : ""}`}>
                   <FileText />
-                  <span className="text-slate-50">Processing</span>
+                  <span>Processing</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
