@@ -202,15 +202,7 @@ const AdminDashboard = () => {
           <header className="toolbar-aleph py-2">{/* Reduced padding for smaller header */}
             <div className="max-w-7xl mx-auto flex justify-between items-center">
               <div className="flex items-center">
-                {theme === 'light' ? (
-                  <ProcessedLogo
-                    originalSrc="/lovable-uploads/e5573278-d431-4b7e-a327-ed9adfa99fcb.png"
-                    alt="Aleph Engineering and Supplies"
-                    className="h-16 w-auto"
-                  />
-                ) : (
-                  <h1 className="text-xl font-bold text-aleph-green">Aleph Engineering and Supplies - Admin</h1>
-                )}
+                <h1 className="text-xl font-bold text-aleph-green">Aleph Engineering and Supplies - Admin</h1>
               </div>
               <div className="flex items-center gap-4">
                 <Button 
