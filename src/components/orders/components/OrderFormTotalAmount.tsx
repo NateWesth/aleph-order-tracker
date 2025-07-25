@@ -8,26 +8,14 @@ interface OrderFormTotalAmountProps {
 const OrderFormTotalAmount = ({
   control
 }: OrderFormTotalAmountProps) => {
-  return (
-    <FormField 
-      control={control} 
-      name="totalAmount" 
-      render={({ field }) => (
-        <FormItem>
-          <FormLabel>Total Amount</FormLabel>
+  return <FormField control={control} name="totalAmount" render={({
+    field
+  }) => <FormItem>
+          
           <FormControl>
-            <Input 
-              {...field} 
-              type="number" 
-              step="0.01" 
-              placeholder="0.00"
-              onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-            />
+            
           </FormControl>
           <FormMessage />
-        </FormItem>
-      )} 
-    />
-  );
+        </FormItem>} />;
 };
 export default OrderFormTotalAmount;
