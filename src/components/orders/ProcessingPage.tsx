@@ -159,7 +159,7 @@ export default function ProcessingPage({
             name,
             code
           )
-        `).eq('status', 'processing').order('order_number', {
+        `).eq('status', 'processing').order('created_at', {
         ascending: true
       });
 

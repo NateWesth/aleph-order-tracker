@@ -258,7 +258,7 @@ export default function ProgressPage({
             name,
             code
           )
-        `).in('status', ['received', 'in-progress']).order('order_number', {
+        `).in('status', ['received', 'in-progress']).order('created_at', {
         ascending: true
       });
 

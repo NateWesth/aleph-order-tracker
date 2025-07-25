@@ -81,7 +81,7 @@ export function useOrderFetch() {
         .from('orders')
         .select('*')
         .neq('status', 'completed') // Exclude completed orders from the main orders page
-        .order('created_at', { ascending: true });
+        .order('created_at', { ascending: false });
 
       // Filter by company for non-admin users
       if (userRole === 'user' && userCompanyId) {
