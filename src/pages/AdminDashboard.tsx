@@ -92,7 +92,7 @@ const AdminDashboard = () => {
             <div className="absolute inset-0 opacity-15 bg-no-repeat bg-center pointer-events-none" 
                  style={{
                    backgroundImage: 'url("/lovable-uploads/60acfbdb-e784-45e3-ad7d-af256b7060cb.png")',
-                   backgroundSize: '180%',
+                   backgroundSize: '250%',
                    transform: 'rotate(-15deg)'
                  }}>
             </div>
