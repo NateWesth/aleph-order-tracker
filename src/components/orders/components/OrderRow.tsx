@@ -107,7 +107,7 @@ export default function OrderRow({
   return (
     <>
       <TableRow 
-        className="hover:bg-gray-50 cursor-pointer transition-colors" 
+        className="order-row-hover"
         onClick={handleRowClick}
       >
         <TableCell>
