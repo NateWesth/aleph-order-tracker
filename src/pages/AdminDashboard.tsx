@@ -189,7 +189,7 @@ const AdminDashboard = () => {
                 <div className="max-w-4xl mx-auto">
                   <TodoList />
                 </div>
-              </div> : activeView === "orders" ? <div className="bg-white dark:bg-gray-800 min-h-full">
+              </div> : activeView === "orders" ? <div className="bg-background min-h-full">
                 <OrdersPage isAdmin={true} />
               </div> : activeView === "progress" ? <div className="bg-white dark:bg-gray-800 min-h-full">
                 <ProgressPage isAdmin={true} />
