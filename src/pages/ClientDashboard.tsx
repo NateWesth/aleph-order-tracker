@@ -63,7 +63,7 @@ const ClientDashboard = () => {
       <div className="min-h-screen w-full flex bg-black dark:bg-black">
         {/* Sidebar */}
         <Sidebar className="dark:bg-black bg-white">
-          <SidebarContent className="relative">
+          <SidebarContent className="relative bg-emerald-900">
             {/* Watermark background */}
             <div className="absolute inset-0 opacity-15 bg-no-repeat bg-center pointer-events-none" style={{
             backgroundImage: 'url("/lovable-uploads/60acfbdb-e784-45e3-ad7d-af256b7060cb.png")',
