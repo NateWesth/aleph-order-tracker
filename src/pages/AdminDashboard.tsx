@@ -87,7 +87,13 @@ const AdminDashboard = () => {
       <div className="min-h-screen w-full flex bg-black dark:bg-black">
         {/* Sidebar */}
         <Sidebar className="dark:bg-black bg-white">
-          <SidebarContent>
+          <SidebarContent className="relative">
+            {/* Watermark background */}
+            <div className="absolute inset-0 opacity-10 bg-no-repeat bg-center bg-contain pointer-events-none" 
+                 style={{
+                   backgroundImage: 'url("/lovable-uploads/e1088147-889e-43f6-bdf0-271189b88913.png")'
+                 }}>
+            </div>
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton tooltip="Home" onClick={() => handleMenuClick("home")} className={`sidebar-hover ${activeView === "home" ? "sidebar-active" : ""}`}>
