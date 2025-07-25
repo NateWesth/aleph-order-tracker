@@ -176,7 +176,7 @@ const AdminDashboard = () => {
           <main className="flex-1 p-4 md:p-8 bg-background dark:bg-background">
             {activeView === "home" ? <div className="space-y-6">
                 {/* Welcome Section */}
-                <div className="flex items-center justify-center h-64 relative bg-white dark:bg-gray-800">
+                <div className="flex items-center justify-center h-64 relative bg-background">
                    <div className="text-center relative z-10">
                     <h1 className="text-4xl md:text-6xl font-bold text-aleph-green mb-4">
                       Welcome{userProfile?.full_name ? `, ${userProfile.full_name}` : ''}
