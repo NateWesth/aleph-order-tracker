@@ -40,6 +40,7 @@ export default function CreateOrderDialog({
 
   const handleSubmit = async (orderData: {
     orderNumber: string;
+    reference?: string;
     companyId: string;
     totalAmount: number;
     urgency: string;
@@ -80,9 +81,10 @@ export default function CreateOrderDialog({
       
       console.log("📝 CreateOrderDialog: Generated description with notes:", itemsDescription);
       
-      // Prepare order data for database insertion - NOW INCLUDING urgency field
+      // Prepare order data for database insertion - NOW INCLUDING urgency and reference fields
       const orderInsertData = {
         order_number: orderData.orderNumber,
+        reference: orderData.reference || null,
         description: itemsDescription,
         company_id: orderData.companyId,
         total_amount: orderData.totalAmount || 0,

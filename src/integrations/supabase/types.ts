@@ -125,6 +125,7 @@ export type Database = {
           id: string
           order_number: string
           progress_stage: string | null
+          reference: string | null
           status: string | null
           total_amount: number | null
           updated_at: string | null
@@ -139,6 +140,7 @@ export type Database = {
           id?: string
           order_number: string
           progress_stage?: string | null
+          reference?: string | null
           status?: string | null
           total_amount?: number | null
           updated_at?: string | null
@@ -153,6 +155,7 @@ export type Database = {
           id?: string
           order_number?: string
           progress_stage?: string | null
+          reference?: string | null
           status?: string | null
           total_amount?: number | null
           updated_at?: string | null

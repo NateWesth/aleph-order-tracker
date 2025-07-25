@@ -8,6 +8,7 @@ import { generateOrderNumber } from "../utils/orderUtils";
 
 interface OrderFormData {
   orderNumber: string;
+  reference?: string;
   companyId: string;
   totalAmount: number;
   urgency: string;
@@ -32,32 +33,48 @@ const OrderFormHeader = ({ control, setValue }: OrderFormHeaderProps) => {
   };
 
   return (
-    <FormField 
-      control={control} 
-      name="orderNumber" 
-      rules={{ required: "Order number is required" }} 
-      render={({ field }) => (
-        <FormItem>
-          <FormLabel>Order Number</FormLabel>
-          <div className="flex gap-2">
+    <div className="space-y-4">
+      <FormField 
+        control={control} 
+        name="orderNumber" 
+        rules={{ required: "Order number is required" }} 
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Order Number</FormLabel>
+            <div className="flex gap-2">
+              <FormControl>
+                <Input {...field} placeholder="Enter order number or generate one" />
+              </FormControl>
+              <Button 
+                type="button" 
+                variant="outline" 
+                size="sm" 
+                onClick={handleGenerateOrderNumber} 
+                className="shrink-0"
+              >
+                <RefreshCw className="w-4 h-4 mr-1" />
+                Generate
+              </Button>
+            </div>
+            <FormMessage />
+          </FormItem>
+        )} 
+      />
+      
+      <FormField 
+        control={control} 
+        name="reference" 
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Order Reference (Optional)</FormLabel>
             <FormControl>
-              <Input {...field} placeholder="Enter order number or generate one" />
+              <Input {...field} placeholder="Enter order reference" />
             </FormControl>
-            <Button 
-              type="button" 
-              variant="outline" 
-              size="sm" 
-              onClick={handleGenerateOrderNumber} 
-              className="shrink-0"
-            >
-              <RefreshCw className="w-4 h-4 mr-1" />
-              Generate
-            </Button>
-          </div>
-          <FormMessage />
-        </FormItem>
-      )} 
-    />
+            <FormMessage />
+          </FormItem>
+        )} 
+      />
+    </div>
   );
 };
 

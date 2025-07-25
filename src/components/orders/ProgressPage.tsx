@@ -42,6 +42,7 @@ interface Company {
 interface Order {
   id: string;
   orderNumber: string;
+  reference?: string;
   companyName: string;
   company?: Company;
   orderDate: Date;
@@ -50,7 +51,6 @@ interface Order {
   status: 'pending' | 'received' | 'in-progress' | 'processing' | 'completed';
   progress?: number;
   progressStage?: 'awaiting-stock' | 'packing' | 'out-for-delivery' | 'completed';
-  reference?: string;
   attention?: string;
   progress_stage?: string;
   deliveryData?: {
@@ -293,6 +293,7 @@ export default function ProgressPage({
           return {
             id: dbOrder.id,
             orderNumber: dbOrder.order_number,
+            reference: dbOrder.reference,
             companyName: dbOrder.companies?.name || "Unknown Company",
             orderDate: orderDate,
             dueDate: dueDate,
@@ -613,10 +614,15 @@ export default function ProgressPage({
           return <div key={order.id} className="p-4">
                   <div className="flex justify-between items-center">
                     <div className="flex items-center gap-4">
-                      <div className="flex items-center gap-2">
-                        {order.company?.logo && <img src={order.company.logo} alt={`${order.companyName} logo`} className="h-6 w-6 rounded object-cover" />}
-                        <span className="font-medium text-card-foreground">#{order.orderNumber}</span>
-                      </div>
+                       <div className="flex items-center gap-2">
+                         {order.company?.logo && <img src={order.company.logo} alt={`${order.companyName} logo`} className="h-6 w-6 rounded object-cover" />}
+                         <div>
+                           <span className="font-medium text-card-foreground">#{order.orderNumber}</span>
+                           {order.reference && (
+                             <div className="text-sm text-muted-foreground">{order.reference}</div>
+                           )}
+                         </div>
+                       </div>
                       <div>
                         <p className="text-sm text-muted-foreground">{order.companyName}</p>
                         <p className="text-sm text-muted-foreground">Due: {formatSafeDate(order.dueDate)}</p>

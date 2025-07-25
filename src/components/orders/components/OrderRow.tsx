@@ -110,7 +110,14 @@ export default function OrderRow({
         className="hover:bg-gray-50 cursor-pointer transition-colors" 
         onClick={handleRowClick}
       >
-        <TableCell>{order.order_number}</TableCell>
+        <TableCell>
+          <div>
+            <div className="font-medium">{order.order_number}</div>
+            {order.reference && (
+              <div className="text-sm text-muted-foreground">{order.reference}</div>
+            )}
+          </div>
+        </TableCell>
         <TableCell>{order.companyName || 'No Company'}</TableCell>
         <TableCell>{getStatusBadge(order.status)}</TableCell>
         <TableCell>{new Date(order.created_at).toLocaleDateString()}</TableCell>

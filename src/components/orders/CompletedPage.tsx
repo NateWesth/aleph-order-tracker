@@ -36,6 +36,7 @@ interface OrderItem {
 interface Order {
   id: string;
   orderNumber: string;
+  reference?: string;
   companyName: string;
   orderDate: Date;
   dueDate: Date;
@@ -201,6 +202,7 @@ export default function CompletedPage({
       const transformedOrders = (data || []).map(order => ({
         id: order.id,
         orderNumber: order.order_number,
+        reference: order.reference,
         companyName: order.companies?.name || "Unknown Company",
         orderDate: new Date(order.created_at),
         dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
@@ -383,6 +385,9 @@ export default function CompletedPage({
                           <div className="flex items-center gap-4">
                             <div>
                               <h3 className="font-medium text-card-foreground">Order #{order.orderNumber}</h3>
+                              {order.reference && (
+                                <p className="text-sm text-muted-foreground">{order.reference}</p>
+                              )}
                               <p className="text-sm text-muted-foreground">{order.companyName}</p>
                               <p className="text-sm text-muted-foreground">
                                 Completed: {format(order.completedDate || order.orderDate, 'MMM d, yyyy')}

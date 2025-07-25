@@ -38,6 +38,7 @@ interface Company {
 interface Order {
   id: string;
   orderNumber: string;
+  reference?: string;
   companyName: string;
   company?: Company;
   orderDate: Date;
@@ -46,7 +47,6 @@ interface Order {
   status: 'pending' | 'received' | 'in-progress' | 'processing' | 'completed';
   progress?: number;
   progressStage?: 'awaiting-stock' | 'packing' | 'out-for-delivery' | 'completed';
-  reference?: string;
   attention?: string;
   progress_stage?: string;
   deliveryData?: {
@@ -195,6 +195,7 @@ export default function ProcessingPage({
           return {
             id: dbOrder.id,
             orderNumber: dbOrder.order_number,
+            reference: dbOrder.reference,
             companyName: dbOrder.companies?.name || "Unknown Company",
             orderDate: orderDate,
             dueDate: dueDate,
@@ -412,7 +413,12 @@ export default function ProcessingPage({
             <TableBody>
               {orders.map(order => <TableRow key={order.id}>
                   <TableCell className="font-medium text-card-foreground">
-                    #{order.orderNumber}
+                    <div>
+                      <div>#{order.orderNumber}</div>
+                      {order.reference && (
+                        <div className="text-sm text-muted-foreground">{order.reference}</div>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell className="text-card-foreground">{order.companyName}</TableCell>
                   <TableCell className="text-card-foreground">{formatSafeDate(order.orderDate)}</TableCell>

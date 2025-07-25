@@ -17,6 +17,7 @@ import { OrderFormData, OrderItem } from "../types/OrderFormData";
 interface OrderFormProps {
   onSubmit: (orderData: {
     orderNumber: string;
+    reference?: string;
     companyId: string;
     totalAmount: number;
     urgency: string;
@@ -39,6 +40,7 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
   const form = useForm<OrderFormData>({
     defaultValues: {
       orderNumber: "",
+      reference: "",
       companyId: "",
       totalAmount: 0,
       urgency: "normal",
@@ -146,6 +148,7 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
 
     const finalOrderData = {
       orderNumber: data.orderNumber,
+      reference: data.reference || undefined,
       companyId: finalCompanyId,
       totalAmount: data.totalAmount,
       urgency: data.urgency,

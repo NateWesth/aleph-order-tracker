@@ -9,6 +9,7 @@ export interface OrderItem {
 
 export interface OrderFormData {
   orderNumber: string;
+  reference?: string;
   companyId: string;
   totalAmount: number;
   urgency: string;

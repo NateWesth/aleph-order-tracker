@@ -2,6 +2,7 @@
 export interface OrderWithCompany {
   id: string;
   order_number: string;
+  reference?: string | null;
   description?: string | null;
   status: string | null;
   total_amount?: number | null;

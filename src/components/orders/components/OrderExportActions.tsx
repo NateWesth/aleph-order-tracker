@@ -277,6 +277,8 @@ export default function OrderExportActions({
           </div>
 
           <div class="order-info">
+            <div><strong>Order Number:</strong> ${orderToPrint.order_number}</div>
+            ${orderToPrint.reference ? `<div><strong>Reference:</strong> ${orderToPrint.reference}</div>` : ''}
             <div><strong>Order Date:</strong> ${new Date(orderToPrint.created_at).toLocaleDateString()}</div>
             <div><strong>Status:</strong> ${orderToPrint.status || 'pending'}</div>
           </div>
@@ -421,10 +423,17 @@ export default function OrderExportActions({
         yPosition += 5;
       });
       
-      // Order info - centered
+      // Order info - centered with reference
       doc.setFontSize(10);
-      doc.text(`Order Date: ${new Date(orderToExport.created_at).toLocaleDateString()}`, 105, 110, { align: 'center' });
-      doc.text(`Status: ${orderToExport.status || 'pending'}`, 105, 118, { align: 'center' });
+      doc.text(`Order Number: ${orderToExport.order_number}`, 105, 110, { align: 'center' });
+      if (orderToExport.reference) {
+        doc.text(`Reference: ${orderToExport.reference}`, 105, 116, { align: 'center' });
+        doc.text(`Order Date: ${new Date(orderToExport.created_at).toLocaleDateString()}`, 105, 122, { align: 'center' });
+        doc.text(`Status: ${orderToExport.status || 'pending'}`, 105, 128, { align: 'center' });
+      } else {
+        doc.text(`Order Date: ${new Date(orderToExport.created_at).toLocaleDateString()}`, 105, 116, { align: 'center' });
+        doc.text(`Status: ${orderToExport.status || 'pending'}`, 105, 122, { align: 'center' });
+      }
       
       // Items table with blue header and notes support
       const tableData = items.map(item => {
@@ -440,7 +449,7 @@ export default function OrderExportActions({
       autoTable(doc, {
         head: [['Item Description', 'Quantity', 'Unit', 'Notes']],
         body: tableData,
-        startY: 130,
+        startY: orderToExport.reference ? 140 : 134,
         styles: {
           fontSize: 9,
           cellPadding: 4,
