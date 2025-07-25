@@ -128,7 +128,7 @@ const AdminDashboard = () => {
               </SidebarMenuItem>
             </SidebarMenu>
           </SidebarContent>
-          <SidebarFooter className="bg-sidebar dark:bg-sidebar rounded-none">
+          <SidebarFooter className="bg-[#162014] rounded-none">
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton tooltip="Files" onClick={() => handleMenuClick("files")} className={`sidebar-hover btn-hover ${activeView === "files" ? "sidebar-active" : ""}`}>
