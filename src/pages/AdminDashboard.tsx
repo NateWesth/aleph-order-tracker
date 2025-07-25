@@ -129,22 +129,22 @@ const AdminDashboard = () => {
               </SidebarMenuItem>
             </SidebarMenu>
           </SidebarContent>
-          <SidebarFooter className="toolbar-aleph">
+          <SidebarFooter className="toolbar-aleph border-t border-gray-200 dark:border-aleph-green/20">
             <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton tooltip="Files" onClick={() => handleMenuClick("files")} className={`sidebar-hover ${activeView === "files" ? "sidebar-active" : ""}`}>
+                <SidebarMenuButton tooltip="Files" onClick={() => handleMenuClick("files")} className={`sidebar-hover btn-hover ${activeView === "files" ? "sidebar-active" : ""}`}>
                   <Files />
                   <span>Files</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <SidebarMenuButton tooltip="Companies" onClick={() => handleMenuClick("companies")} className={`sidebar-hover ${activeView === "companies" ? "sidebar-active" : ""}`}>
+                <SidebarMenuButton tooltip="Companies" onClick={() => handleMenuClick("companies")} className={`sidebar-hover btn-hover ${activeView === "companies" ? "sidebar-active" : ""}`}>
                   <Building2 />
                   <span>Companies</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <SidebarMenuButton tooltip="Users" onClick={() => handleMenuClick("users")} className={`sidebar-hover ${activeView === "users" ? "sidebar-active" : ""}`}>
+                <SidebarMenuButton tooltip="Users" onClick={() => handleMenuClick("users")} className={`sidebar-hover btn-hover ${activeView === "users" ? "sidebar-active" : ""}`}>
                   <Users />
                   <span>Users</span>
                 </SidebarMenuButton>
