@@ -229,15 +229,16 @@
   @apply bg-background border-gray-800;
 }
 
-/* Hover states for sidebar - breathing motion in dark mode */
+/* Hover states for sidebar - breathing motion for all users */
 .sidebar-hover {
   @apply transition-all duration-300;
 }
 
 .sidebar-hover:hover {
-  @apply text-white;
+  @apply text-white transform scale-105;
   color: white !important;
   background-color: transparent !important;
+  animation: pulse 1.5s ease-in-out infinite;
 }
 
 .dark .sidebar-hover:hover {
@@ -258,15 +259,16 @@
   background-color: transparent !important;
 }
 
-/* Button hover states - breathing motion in dark mode */
+/* Button hover states - breathing motion for all users */
 .btn-hover {
   @apply transition-all duration-300;
 }
 
 .btn-hover:hover {
-  @apply text-white bg-transparent;
+  @apply text-white bg-transparent transform scale-105;
   color: white !important;
   background-color: transparent !important;
+  animation: pulse 1.5s ease-in-out infinite;
 }
 
 .dark .btn-hover:hover {
