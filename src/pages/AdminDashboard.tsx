@@ -156,7 +156,7 @@ const AdminDashboard = () => {
         {/* Main content */}
         <div className="flex-1 flex flex-col">
           {/* Header - light grey in light mode */}
-          <header className="toolbar-aleph py-2">{/* Reduced padding for smaller header */}
+          <header className="toolbar-aleph p-4">{/* Match client dashboard padding */}
             <div className="max-w-7xl mx-auto flex justify-between items-center">
               <div className="flex items-center">
                 
