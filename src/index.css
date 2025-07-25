@@ -236,6 +236,7 @@
 
 .sidebar-hover:hover {
   @apply text-white;
+  color: white !important;
   background-color: transparent !important;
 }
 
