@@ -22,6 +22,7 @@ const ClientDashboard = () => {
   } = useAuth();
   const [activeView, setActiveView] = useState("home");
   const [userProfile, setUserProfile] = useState<any>(null);
+  const [userCompany, setUserCompany] = useState<any>(null);
   useEffect(() => {
     if (user) {
       fetchUserProfile();
@@ -29,10 +30,25 @@ const ClientDashboard = () => {
   }, [user]);
   const fetchUserProfile = async () => {
     if (!user) return;
-    const {
-      data
-    } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+    const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
     setUserProfile(data);
+    
+    // Fetch company information if user has a company_code or company_id
+    if (data?.company_code) {
+      const { data: companyData } = await supabase
+        .from('companies')
+        .select('*')
+        .eq('code', data.company_code)
+        .single();
+      setUserCompany(companyData);
+    } else if (data?.company_id) {
+      const { data: companyData } = await supabase
+        .from('companies')
+        .select('*')
+        .eq('id', data.company_id)
+        .single();
+      setUserCompany(companyData);
+    }
   };
   const handleLogout = async () => {
     await signOut();
@@ -109,7 +125,7 @@ const ClientDashboard = () => {
           <header className="toolbar-aleph p-4">
             <div className="max-w-7xl mx-auto flex justify-between items-center">
               <div className="flex items-center">
-                <h1 className="text-2xl font-bold text-aleph-green">Aleph Engineering and Supplies</h1>
+                <h1 className="text-2xl font-bold text-aleph-green">{userCompany?.name || 'Company Dashboard'}</h1>
               </div>
               <div className="flex items-center gap-4">
                 {/* Real-time Status Indicator */}
