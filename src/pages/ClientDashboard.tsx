@@ -104,7 +104,7 @@ const ClientDashboard = () => {
               </SidebarMenuItem>
             </SidebarMenu>
           </SidebarContent>
-          <SidebarFooter>
+          <SidebarFooter className="bg-[#162014]">
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton tooltip="Files" onClick={() => handleMenuClick("files")} className={`sidebar-hover ${activeView === "files" ? "sidebar-active" : ""}`}>
