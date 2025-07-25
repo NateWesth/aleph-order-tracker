@@ -226,7 +226,7 @@
 
 /* Dark mode specific styles */
 .dark .toolbar-aleph {
-  @apply bg-gray-900 border-aleph-green/20;
+  @apply bg-background border-sidebar-border;
 }
 
 /* Hover states for sidebar - white text on hover */
