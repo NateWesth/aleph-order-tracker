@@ -129,7 +129,7 @@ const AdminDashboard = () => {
               </SidebarMenuItem>
             </SidebarMenu>
           </SidebarContent>
-          <SidebarFooter>
+          <SidebarFooter className="toolbar-aleph">
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton tooltip="Files" onClick={() => handleMenuClick("files")} className={`sidebar-hover ${activeView === "files" ? "sidebar-active" : ""}`}>
