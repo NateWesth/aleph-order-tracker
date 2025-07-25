@@ -122,7 +122,7 @@ const ClientDashboard = () => {
           <header className="toolbar-aleph p-4">
             <div className="max-w-7xl mx-auto flex justify-between items-center">
               <div className="flex items-center">
-                <h1 className="text-2xl font-bold text-aleph-green">{userCompany?.name || 'Company Dashboard'}</h1>
+                <h1 className="text-2xl font-bold text-aleph-green dark:text-white">{userCompany?.name || 'Company Dashboard'}</h1>
               </div>
               <div className="flex items-center gap-4">
                 {/* Real-time Status Indicator */}
