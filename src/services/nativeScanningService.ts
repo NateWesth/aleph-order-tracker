@@ -18,15 +18,22 @@ export class NativeScanningService {
   }
 
   /**
-   * Attempts to open the HP Smart app for scanning
+   * Attempts to open the HP Smart app for scanning or provides web alternatives
    */
   async openHPScanApp(): Promise<ScanResult> {
-    if (!Capacitor.isNativePlatform()) {
-      return {
-        success: false,
-        error: 'Native scanning is only available on mobile devices'
-      };
+    // For native mobile platforms, try to open HP Smart app
+    if (Capacitor.isNativePlatform()) {
+      return this.openNativeHPApp();
     }
+    
+    // For web/desktop, provide web-based scanning alternatives
+    return this.openWebScanningAlternatives();
+  }
+
+  /**
+   * Opens HP Smart app on native mobile platforms
+   */
+  private async openNativeHPApp(): Promise<ScanResult> {
 
     try {
       // HP Smart app package names/URLs
@@ -53,6 +60,27 @@ export class NativeScanningService {
       return {
         success: false,
         error: 'Could not open HP Smart app. Please ensure it is installed.'
+      };
+    }
+  }
+
+  /**
+   * Provides web-based scanning alternatives for desktop/web platforms
+   */
+  private async openWebScanningAlternatives(): Promise<ScanResult> {
+    try {
+      // Try to open HP Smart web app first
+      const hpWebUrl = 'https://www.hpsmart.com/us/en';
+      await Browser.open({ url: hpWebUrl });
+      
+      return {
+        success: true
+      };
+    } catch (error) {
+      console.error('Error opening web scanning alternatives:', error);
+      return {
+        success: false,
+        error: 'Could not open scanning alternatives. Please use the camera or upload features instead.'
       };
     }
   }
@@ -89,15 +117,22 @@ export class NativeScanningService {
   }
 
   /**
-   * Alternative scanning options if HP app is not available
+   * Alternative scanning options for all devices
    */
   async openAlternativeScanApp(): Promise<ScanResult> {
-    if (!Capacitor.isNativePlatform()) {
-      return {
-        success: false,
-        error: 'Native scanning is only available on mobile devices'
-      };
+    // For native platforms, try mobile scanning apps
+    if (Capacitor.isNativePlatform()) {
+      return this.openNativeScanningApps();
     }
+    
+    // For web/desktop, provide web scanning alternatives
+    return this.openWebScanningOptions();
+  }
+
+  /**
+   * Opens alternative scanning apps on native mobile platforms
+   */
+  private async openNativeScanningApps(): Promise<ScanResult> {
 
     try {
       const platform = Capacitor.getPlatform();
@@ -146,28 +181,37 @@ export class NativeScanningService {
   }
 
   /**
-   * Checks if HP Smart app is likely available
+   * Provides web-based scanning options for desktop/web platforms
+   */
+  private async openWebScanningOptions(): Promise<ScanResult> {
+    try {
+      // List of web-based scanning services
+      const webScanServices = [
+        'https://www.camscanner.com/user/scan',
+        'https://acrobat.adobe.com/us/en/mobile/scanner-app.html',
+        'https://www.office.com/launch/lens'
+      ];
+
+      // Try the first available service
+      await Browser.open({ url: webScanServices[0] });
+      
+      return {
+        success: true
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: 'Could not open web scanning services. Please use the camera or upload features instead.'
+      };
+    }
+  }
+
+  /**
+   * Checks if HP Smart app is likely available (works for all platforms now)
    */
   async isHPAppAvailable(): Promise<boolean> {
-    if (!Capacitor.isNativePlatform()) {
-      return false;
-    }
-
-    try {
-      const platform = Capacitor.getPlatform();
-      
-      if (platform === 'android') {
-        // On Android, we can't directly check if an app is installed
-        // We'll try to open it and catch the error
-        return true; // Assume available, let the user try
-      } else if (platform === 'ios') {
-        // On iOS, we can check URL scheme availability
-        return true; // Assume available, let the user try
-      }
-      
-      return false;
-    } catch (error) {
-      return false;
-    }
+    // Always return true - let the user try regardless of platform
+    // The actual availability will be determined when they try to use it
+    return true;
   }
 }

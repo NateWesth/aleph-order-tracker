@@ -511,7 +511,7 @@ export default function ProcessingOrderFilesDialog({
         </div>
         
         <p className="text-xs text-muted-foreground mt-2">
-          Use Upload for files, Camera for quick photos, or HP Scan for high-quality document scanning through your HP app.
+          Use Upload for files, Camera for quick photos, or HP Scan for document scanning (works on all devices).
         </p>
       </div>
     );
@@ -588,8 +588,8 @@ export default function ProcessingOrderFilesDialog({
       fetchOrderFiles();
     }
     
-    // Check if running on native mobile device
-    setIsNativeDevice(Capacitor.isNativePlatform());
+    // HP Scan is now available on all devices, not just native
+    setIsNativeDevice(true);
   }, [isOpen, order?.id]);
 
   const handleHPScan = async (fileType: 'quote' | 'purchase-order' | 'invoice' | 'delivery-note') => {
@@ -598,13 +598,15 @@ export default function ProcessingOrderFilesDialog({
       
       if (result.success) {
         toast({
-          title: "Opening HP Smart App",
-          description: `Please scan your ${fileTypeLabels[fileType]} document in HP Smart app. After scanning, return here and upload the scanned file manually.`,
+          title: "Opening Scanning Service",
+          description: Capacitor.isNativePlatform() 
+            ? `Please scan your ${fileTypeLabels[fileType]} document in HP Smart app. After scanning, return here and upload the scanned file manually.`
+            : `Opening web scanning service. Please scan your ${fileTypeLabels[fileType]} document and save it to upload here.`,
         });
       } else {
         toast({
-          title: "HP Smart Not Available",
-          description: result.error || "HP Smart app is not installed.",
+          title: "Scanning Service Unavailable",
+          description: result.error || "Primary scanning service is not available.",
           variant: "destructive",
         });
         
@@ -612,7 +614,7 @@ export default function ProcessingOrderFilesDialog({
         const altResult = await scanningService.openAlternativeScanApp();
         if (altResult.success) {
           toast({
-            title: "Opening Scanner App",
+            title: "Opening Alternative Scanner",
             description: `Please scan your ${fileTypeLabels[fileType]} document and return here to upload.`,
           });
         }
