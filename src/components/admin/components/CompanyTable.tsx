@@ -24,7 +24,7 @@ interface CompanyTableProps {
 
 export default function CompanyTable({ companies, onCopyCode, onEditCompany, onDeleteCompany }: CompanyTableProps) {
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+    <div className="bg-card rounded-lg shadow overflow-hidden">
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
           <thead className="bg-gray-50 dark:bg-gray-700">
@@ -46,7 +46,7 @@ export default function CompanyTable({ companies, onCopyCode, onEditCompany, onD
               </th>
             </tr>
           </thead>
-          <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+          <tbody className="bg-card divide-y divide-border">
             {companies.length === 0 ? (
               <tr>
                 <td colSpan={5} className="px-6 py-4 text-center text-gray-500 dark:text-gray-400">

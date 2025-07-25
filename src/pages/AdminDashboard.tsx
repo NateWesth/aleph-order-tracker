@@ -191,19 +191,19 @@ const AdminDashboard = () => {
                 </div>
               </div> : activeView === "orders" ? <div className="bg-background min-h-full">
                 <OrdersPage isAdmin={true} />
-              </div> : activeView === "progress" ? <div className="bg-white dark:bg-gray-800 min-h-full">
+              </div> : activeView === "progress" ? <div className="bg-background min-h-full">
                 <ProgressPage isAdmin={true} />
-              </div> : activeView === "processing" ? <div className="bg-white dark:bg-gray-800 min-h-full">
+              </div> : activeView === "processing" ? <div className="bg-background min-h-full">
                 <ProcessingPage isAdmin={true} />
-              </div> : activeView === "completed" ? <div className="bg-white dark:bg-gray-800 min-h-full">
+              </div> : activeView === "completed" ? <div className="bg-background min-h-full">
                 <CompletedPage isAdmin={true} />
-              </div> : activeView === "files" ? <div className="bg-white dark:bg-gray-800 min-h-full">
+              </div> : activeView === "files" ? <div className="bg-background min-h-full">
                 <FilesPage isAdmin={true} />
-              </div> : activeView === "companies" ? <div className="bg-white dark:bg-gray-800 min-h-full">
+              </div> : activeView === "companies" ? <div className="bg-background min-h-full">
                 <ClientCompaniesPage />
-              </div> : activeView === "users" ? <div className="bg-white dark:bg-gray-800 min-h-full">
+              </div> : activeView === "users" ? <div className="bg-background min-h-full">
                 <UsersManagementPage />
-              </div> : <div className="text-center p-8 bg-white dark:bg-gray-800 min-h-full">
+              </div> : <div className="text-center p-8 bg-background min-h-full">
                 <h2 className="text-2xl font-bold mb-4 text-aleph-green">Page Not Found</h2>
                 <p className="text-gray-600 dark:text-gray-300">The requested page could not be found.</p>
               </div>}

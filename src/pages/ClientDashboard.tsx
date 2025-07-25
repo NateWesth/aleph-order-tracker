@@ -142,8 +142,8 @@ const ClientDashboard = () => {
           </header>
 
           {/* Dashboard content - White in light mode, slightly lighter grey than toolbar in dark mode */}
-          <main className="flex-1 p-4 md:p-8 bg-white dark:bg-gray-800">
-            {activeView === "home" ? <div className="flex items-center justify-center h-full relative bg-white dark:bg-gray-800">
+          <main className="flex-1 p-4 md:p-8 bg-background">
+            {activeView === "home" ? <div className="flex items-center justify-center h-full relative bg-background">
                 <div className="text-center relative z-10">
                   <h1 className="text-4xl font-bold mb-4 text-emerald-950 dark:text-white md:text-6xl">
                     Welcome{userProfile?.full_name ? `, ${userProfile.full_name}` : ''}
@@ -151,17 +151,17 @@ const ClientDashboard = () => {
                   <p className="text-xl text-gray-600 dark:text-gray-300">Client Dashboard - Aleph Engineering and Supplies</p>
                   
                 </div>
-              </div> : activeView === "orders" ? <div className="bg-white dark:bg-gray-800 min-h-full">
+              </div> : activeView === "orders" ? <div className="bg-background min-h-full">
                 <OrdersPage />
-              </div> : activeView === "progress" ? <div className="bg-white dark:bg-gray-800 min-h-full">
+              </div> : activeView === "progress" ? <div className="bg-background min-h-full">
                 <ProgressPage isAdmin={false} />
-              </div> : activeView === "processing" ? <div className="bg-white dark:bg-gray-800 min-h-full">  
+              </div> : activeView === "processing" ? <div className="bg-background min-h-full">  
                 <ProcessingPage isAdmin={false} />
-              </div> : activeView === "completed" ? <div className="bg-white dark:bg-gray-800 min-h-full">
+              </div> : activeView === "completed" ? <div className="bg-background min-h-full">
                 <CompletedPage isAdmin={false} />
-              </div> : activeView === "files" ? <div className="bg-white dark:bg-gray-800 min-h-full">
+              </div> : activeView === "files" ? <div className="bg-background min-h-full">
                 <FilesPage isAdmin={false} />
-              </div> : <div className="text-center p-8 bg-white dark:bg-gray-800 min-h-full">
+              </div> : <div className="text-center p-8 bg-background min-h-full">
                 <h2 className="text-2xl font-bold mb-4 text-aleph-green">Page Not Found</h2>
                 <p className="text-gray-600 dark:text-gray-300">The requested page could not be found.</p>
               </div>}

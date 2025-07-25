@@ -26,7 +26,7 @@ export default function OrderTable({
   onOrderClick 
 }: OrderTableProps) {
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
+    <div className="bg-card rounded-lg shadow">
       <Table>
         <TableHeader>
           <TableRow>
