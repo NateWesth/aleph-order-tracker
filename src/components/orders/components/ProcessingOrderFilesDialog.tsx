@@ -8,7 +8,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Download, Eye, FileText, Upload, Plus, Trash2, Scan, QrCode } from "lucide-react";
+import { Download, Eye, FileText, Upload, Plus, Trash2, Scan, QrCode, Printer } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -16,6 +16,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import QRCode from 'qrcode';
+import { NativeScanningService } from "@/services/nativeScanningService";
+import { Capacitor } from '@capacitor/core';
 
 interface OrderFile {
   id: string;
@@ -73,6 +75,8 @@ export default function ProcessingOrderFilesDialog({
   const [isScanning, setIsScanning] = useState(false);
   const [currentScanType, setCurrentScanType] = useState<'quote' | 'purchase-order' | 'invoice' | 'delivery-note' | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
+  const [isNativeDevice, setIsNativeDevice] = useState(false);
+  const scanningService = NativeScanningService.getInstance();
 
   const fetchOrderFiles = async () => {
     if (!order?.id || !user?.id) return;
@@ -509,6 +513,19 @@ export default function ProcessingOrderFilesDialog({
               </>
             )}
           </Button>
+          {/* HP Smart Scanner Button - Priority button for native devices */}
+          {isNativeDevice && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
+              disabled={uploadingFiles[fileType] || scanningFiles[fileType]}
+              onClick={() => handleHPScan(fileType)}
+            >
+              <Printer className="h-4 w-4 mr-1" />
+              HP Scan
+            </Button>
+          )}
           <Button
             variant="outline"
             size="sm"
@@ -646,7 +663,45 @@ export default function ProcessingOrderFilesDialog({
       console.log('Dialog opened for order:', order.id);
       fetchOrderFiles();
     }
+    
+    // Check if running on native mobile device
+    setIsNativeDevice(Capacitor.isNativePlatform());
   }, [isOpen, order?.id]);
+
+  const handleHPScan = async (fileType: 'quote' | 'purchase-order' | 'invoice' | 'delivery-note') => {
+    try {
+      const result = await scanningService.openHPScanApp();
+      
+      if (result.success) {
+        toast({
+          title: "Opening HP Smart App",
+          description: `Please scan your ${fileTypeLabels[fileType]} document in HP Smart app. After scanning, return here and upload the scanned file manually.`,
+        });
+      } else {
+        toast({
+          title: "HP Smart Not Available",
+          description: result.error || "HP Smart app is not installed.",
+          variant: "destructive",
+        });
+        
+        // Try alternative scanning apps
+        const altResult = await scanningService.openAlternativeScanApp();
+        if (altResult.success) {
+          toast({
+            title: "Opening Scanner App",
+            description: `Please scan your ${fileTypeLabels[fileType]} document and return here to upload.`,
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error opening scanner app:', error);
+      toast({
+        title: "Scanner Error",
+        description: "Unable to open scanner app. Please try manual upload or camera scan.",
+        variant: "destructive",
+      });
+    }
+  };
 
   useEffect(() => {
     if (!order?.id) return;
