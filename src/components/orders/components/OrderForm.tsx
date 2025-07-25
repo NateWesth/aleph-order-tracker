@@ -207,13 +207,7 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
 
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                Order Items
-                <Button type="button" onClick={addItem} size="sm" variant="outline">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Item
-                </Button>
-              </CardTitle>
+              <CardTitle>Order Items</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               {fields.map((field, index) => (
@@ -225,6 +219,10 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
                   canRemove={fields.length > 1}
                 />
               ))}
+              <Button type="button" onClick={addItem} size="sm" variant="outline" className="w-full">
+                <Plus className="w-4 h-4 mr-2" />
+                Add Item
+              </Button>
               <FormMessage>{form.formState.errors.items?.message}</FormMessage>
             </CardContent>
           </Card>
