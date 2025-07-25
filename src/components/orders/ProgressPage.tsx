@@ -82,7 +82,6 @@ const mockCompanies: Company[] = [{
   address: "456 Manufacturing Ave, Pretoria, 0001",
   vatNumber: "4987654321"
 }];
-
 export default function ProgressPage({
   isAdmin
 }: ProgressPageProps) {
@@ -135,16 +134,10 @@ export default function ProgressPage({
   // Fetch user info to determine filtering
   const fetchUserInfo = async () => {
     if (!user?.id) return;
-
     try {
-      const [role, profile] = await Promise.all([
-        getUserRole(user.id),
-        getUserProfile(user.id)
-      ]);
-
+      const [role, profile] = await Promise.all([getUserRole(user.id), getUserProfile(user.id)]);
       console.log('ProgressPage - User role:', role);
       console.log('ProgressPage - User profile:', profile);
-
       setUserRole(role);
       if (role === 'user' && profile?.company_id) {
         setUserCompanyId(profile.company_id);
@@ -254,13 +247,11 @@ export default function ProgressPage({
       setLoading(false);
       return;
     }
-    
     try {
       console.log('Fetching received and in-progress orders from Supabase...');
       console.log('User role:', userRole, 'Company ID:', userCompanyId);
       setLoading(true);
       setError(null);
-      
       let query = supabase.from('orders').select(`
           *,
           companies (
@@ -286,15 +277,12 @@ export default function ProgressPage({
         data,
         error: fetchError
       } = await query;
-      
       if (fetchError) {
         console.error("Error fetching progress orders:", fetchError);
         setError(`Failed to fetch orders: ${fetchError.message}`);
         return;
       }
-      
       console.log('Fetched progress orders:', data?.length || 0);
-      
       if (data && data.length > 0) {
         const convertedOrders = data.map((dbOrder: any) => {
           const progressStage = getProgressStage(dbOrder.status, dbOrder.progress_stage);
@@ -574,7 +562,6 @@ export default function ProgressPage({
       });
     }
   };
-
   if (loading) {
     return <div className="container mx-auto p-4 bg-background">
         <div className="flex justify-center items-center h-64">
@@ -653,9 +640,7 @@ export default function ProgressPage({
                         Items ({order.items.length})
                       </Button>
                       
-                      <Button variant="ghost" size="sm" onClick={() => viewOrderDetails(order)}>
-                        <Eye className="h-4 w-4" />
-                      </Button>
+                      
                       
                       {isAdmin && <>
                           {progressStages.map(stage => <Button key={stage.id} variant={order.progressStage === stage.id ? "default" : "outline"} size="sm" onClick={() => updateProgressStage(order.id, stage.id)} className={stage.id === 'completed' ? "bg-green-600 hover:bg-green-700 text-white" : ""}>
