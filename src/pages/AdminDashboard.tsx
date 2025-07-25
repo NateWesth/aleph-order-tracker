@@ -89,12 +89,11 @@ const AdminDashboard = () => {
         <Sidebar className="dark:bg-black bg-white">
           <SidebarContent className="relative bg-[#162014] overflow-hidden">
             {/* Watermark background */}
-            <div className="absolute inset-0 opacity-15 bg-no-repeat bg-center pointer-events-none" 
-                 style={{
-                   backgroundImage: 'url("/lovable-uploads/60acfbdb-e784-45e3-ad7d-af256b7060cb.png")',
-                   backgroundSize: '250%',
-                   transform: 'rotate(-15deg)'
-                 }}>
+            <div className="absolute inset-0 opacity-15 bg-no-repeat bg-center pointer-events-none" style={{
+            backgroundImage: 'url("/lovable-uploads/60acfbdb-e784-45e3-ad7d-af256b7060cb.png")',
+            backgroundSize: '250%',
+            transform: 'rotate(-15deg)'
+          }}>
             </div>
             <SidebarMenu>
               <SidebarMenuItem>
@@ -129,7 +128,7 @@ const AdminDashboard = () => {
               </SidebarMenuItem>
             </SidebarMenu>
           </SidebarContent>
-          <SidebarFooter className="toolbar-aleph border-t border-gray-200 dark:border-aleph-green/20">
+          <SidebarFooter className="toolbar-aleph border-t border-gray-200 dark:border-aleph-green/20 bg-[t#162014] bg-[#162014]">
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton tooltip="Files" onClick={() => handleMenuClick("files")} className={`sidebar-hover btn-hover ${activeView === "files" ? "sidebar-active" : ""}`}>
