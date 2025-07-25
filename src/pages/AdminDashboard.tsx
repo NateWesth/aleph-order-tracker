@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTheme } from "@/contexts/ThemeContext";
 import { supabase } from "@/integrations/supabase/client";
 import { 
   SidebarProvider, 
@@ -27,6 +28,7 @@ const AdminDashboard = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user, signOut } = useAuth();
+  const { theme } = useTheme();
   const [activeView, setActiveView] = useState("home");
   const [userProfile, setUserProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -199,7 +201,15 @@ const AdminDashboard = () => {
           <header className="toolbar-aleph p-4">
             <div className="max-w-7xl mx-auto flex justify-between items-center">
               <div className="flex items-center">
-                <h1 className="text-2xl font-bold text-aleph-green">Aleph Engineering and Supplies - Admin</h1>
+                {theme === 'light' ? (
+                  <img 
+                    src="/lovable-uploads/e5573278-d431-4b7e-a327-ed9adfa99fcb.png" 
+                    alt="Aleph Engineering and Supplies" 
+                    className="h-10 w-auto"
+                  />
+                ) : (
+                  <h1 className="text-2xl font-bold text-aleph-green">Aleph Engineering and Supplies - Admin</h1>
+                )}
               </div>
               <div className="flex items-center gap-4">
                 <Button 
