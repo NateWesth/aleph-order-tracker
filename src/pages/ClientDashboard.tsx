@@ -30,23 +30,21 @@ const ClientDashboard = () => {
   }, [user]);
   const fetchUserProfile = async () => {
     if (!user) return;
-    const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+    const {
+      data
+    } = await supabase.from('profiles').select('*').eq('id', user.id).single();
     setUserProfile(data);
-    
+
     // Fetch company information if user has a company_code or company_id
     if (data?.company_code) {
-      const { data: companyData } = await supabase
-        .from('companies')
-        .select('*')
-        .eq('code', data.company_code)
-        .single();
+      const {
+        data: companyData
+      } = await supabase.from('companies').select('*').eq('code', data.company_code).single();
       setUserCompany(companyData);
     } else if (data?.company_id) {
-      const { data: companyData } = await supabase
-        .from('companies')
-        .select('*')
-        .eq('id', data.company_id)
-        .single();
+      const {
+        data: companyData
+      } = await supabase.from('companies').select('*').eq('id', data.company_id).single();
       setUserCompany(companyData);
     }
   };
@@ -67,12 +65,11 @@ const ClientDashboard = () => {
         <Sidebar className="dark:bg-black bg-white">
           <SidebarContent className="relative">
             {/* Watermark background */}
-            <div className="absolute inset-0 opacity-15 bg-no-repeat bg-center pointer-events-none" 
-                 style={{
-                   backgroundImage: 'url("/lovable-uploads/60acfbdb-e784-45e3-ad7d-af256b7060cb.png")',
-                   backgroundSize: '250%',
-                   transform: 'rotate(-15deg)'
-                 }}>
+            <div className="absolute inset-0 opacity-15 bg-no-repeat bg-center pointer-events-none" style={{
+            backgroundImage: 'url("/lovable-uploads/60acfbdb-e784-45e3-ad7d-af256b7060cb.png")',
+            backgroundSize: '250%',
+            transform: 'rotate(-15deg)'
+          }}>
             </div>
             <SidebarMenu>
               <SidebarMenuItem>
@@ -154,7 +151,7 @@ const ClientDashboard = () => {
               zIndex: 0
             }}></div>
                 <div className="text-center relative z-10">
-                  <h1 className="text-4xl md:text-6xl font-bold text-aleph-green mb-4">
+                  <h1 className="text-4xl font-bold mb-4 text-emerald-950 md:text-6xl">
                     Welcome{userProfile?.full_name ? `, ${userProfile.full_name}` : ''}
                   </h1>
                   <p className="text-xl text-gray-600 dark:text-gray-300">Client Dashboard - Aleph Engineering and Supplies</p>
