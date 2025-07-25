@@ -173,7 +173,7 @@ const AdminDashboard = () => {
           </header>
 
           {/* Dashboard content - White in light mode, slightly lighter grey than toolbar in dark mode */}
-          <main className="flex-1 p-4 md:p-8 bg-white dark:bg-gray-800">
+          <main className="flex-1 p-4 md:p-8 bg-background dark:bg-background">
             {activeView === "home" ? <div className="space-y-6">
                 {/* Welcome Section */}
                 <div className="flex items-center justify-center h-64 relative bg-white dark:bg-gray-800">
