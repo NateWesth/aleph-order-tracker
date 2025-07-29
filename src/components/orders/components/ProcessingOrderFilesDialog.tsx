@@ -285,8 +285,15 @@ export default function ProcessingOrderFilesDialog({
   const canUploadFileType = (fileType: 'quote' | 'purchase-order' | 'invoice' | 'delivery-note') => {
     console.log('Checking upload permissions:', {
       fileType,
-      isAdmin
+      isAdmin,
+      orderStatus: order?.status
     });
+    
+    // Disable uploads for completed orders - users can only view files
+    if (order?.status === 'completed') {
+      return false;
+    }
+    
     return true;
   };
   const canDeleteFile = (file: OrderFile) => {
