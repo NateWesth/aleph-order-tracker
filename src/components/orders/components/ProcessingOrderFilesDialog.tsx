@@ -399,7 +399,75 @@ export default function ProcessingOrderFilesDialog({
       console.log('Upload not allowed for file type:', fileType);
       return null;
     }
-    return;
+    
+    return (
+      <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 space-y-4">
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="flex-1">
+            <Label htmlFor={inputId} className="text-sm font-medium text-gray-700">
+              Upload {fileTypeLabels[fileType]}
+            </Label>
+            <div className="mt-1">
+              <Input
+                id={inputId}
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    handleFileUpload(file, fileType);
+                    e.target.value = '';
+                  }
+                }}
+                disabled={uploadingFiles[fileType]}
+                className="w-full"
+              />
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              Supported formats: PDF, JPG, PNG (Max 10MB)
+            </p>
+          </div>
+          
+          {isNativeDevice && (
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => handleHPScan(fileType)}
+                disabled={scanningFiles[fileType]}
+                className="flex items-center gap-2"
+              >
+                {scanningFiles[fileType] ? (
+                  <Upload className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Scan className="h-4 w-4" />
+                )}
+                HP Scan
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => startScanning(fileType)}
+                disabled={uploadingFiles[fileType]}
+                className="flex items-center gap-2"
+              >
+                <Scan className="h-4 w-4" />
+                Camera
+              </Button>
+            </div>
+          )}
+        </div>
+        
+        {uploadingFiles[fileType] && (
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <Upload className="h-4 w-4 animate-spin" />
+            Uploading...
+          </div>
+        )}
+      </div>
+    );
   };
   const FileRow = ({
     file
