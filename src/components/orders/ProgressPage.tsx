@@ -188,32 +188,72 @@ export default function ProgressPage({
   };
 
   // Load delivery quantities from localStorage
-  const loadDeliveryQuantities = () => {
+  const loadDeliveryQuantities = async () => {
     try {
+      // Load from localStorage as backup
       const saved = localStorage.getItem('deliveryQuantities');
       if (saved) {
         setDeliveryQuantities(JSON.parse(saved));
       }
+      
+      // Load from database (this would require a delivery_tracking table)
+      // For now, we'll store this data in the order description format
     } catch (error) {
       console.error('Error loading delivery quantities:', error);
     }
   };
 
-  // Save delivery quantities to localStorage
-  const saveDeliveryQuantities = (quantities: {
-    [orderId: string]: {
-      [itemName: string]: number;
-    };
-  }) => {
+  // Save delivery quantities to both localStorage and database
+  const saveDeliveryQuantitiesToDatabase = async (orderId: string, itemName: string, delivered: number) => {
     try {
-      localStorage.setItem('deliveryQuantities', JSON.stringify(quantities));
+      // Get current order
+      const { data: order, error: fetchError } = await supabase
+        .from('orders')
+        .select('description')
+        .eq('id', orderId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      if (order?.description) {
+        // Parse current description and update the specific item
+        const lines = order.description.split('\n');
+        const updatedLines = lines.map(line => {
+          const match = line.match(/^(.+?)\s*\(Qty:\s*\d+\)\s*\[Delivered:\s*(\d+)\].*$/);
+          if (match && match[1].trim() === itemName) {
+            // Add delivered quantity to the line
+            return `${match[1]} (Qty: ${match[2]}) [Delivered: ${delivered}]`;
+          }
+          return line;
+        });
+
+        const updatedDescription = updatedLines.join('\n');
+
+        // Update the order in database
+        const { error: updateError } = await supabase
+          .from('orders')
+          .update({ 
+            description: updatedDescription,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', orderId);
+
+        if (updateError) throw updateError;
+
+        console.log(`Successfully saved delivery quantity for ${itemName}: ${delivered}`);
+      }
     } catch (error) {
-      console.error('Error saving delivery quantities:', error);
+      console.error('Error saving delivery quantities to database:', error);
+      toast({
+        title: "Warning",
+        description: "Delivery quantity saved locally but failed to sync to database.",
+        variant: "destructive",
+      });
     }
   };
 
-  // Update delivery quantity for an item
-  const updateDeliveryQuantity = (orderId: string, itemName: string, delivered: number) => {
+  // Update delivery quantity for an item with database persistence
+  const updateDeliveryQuantity = async (orderId: string, itemName: string, delivered: number) => {
     setDeliveryQuantities(prev => {
       const updated = {
         ...prev,
@@ -222,9 +262,39 @@ export default function ProgressPage({
           [itemName]: delivered
         }
       };
-      saveDeliveryQuantities(updated);
+      
+      // Save to localStorage immediately
+      try {
+        localStorage.setItem('deliveryQuantities', JSON.stringify(updated));
+      } catch (error) {
+        console.error('Error saving to localStorage:', error);
+      }
+      
       return updated;
     });
+
+    // Save to database if admin
+    if (isAdmin) {
+      await saveDeliveryQuantitiesToDatabase(orderId, itemName, delivered);
+    }
+  };
+
+  // Parse delivery quantities from order description
+  const parseDeliveryQuantitiesFromDescription = (description: string | null): { [itemName: string]: number } => {
+    const deliveries: { [itemName: string]: number } = {};
+    
+    if (!description) return deliveries;
+
+    const lines = description.split('\n');
+    lines.forEach(line => {
+      // Look for pattern: "Item Name (Qty: X) [Delivered: Y]"
+      const match = line.match(/^(.+?)\s*\(Qty:\s*\d+\)\s*\[Delivered:\s*(\d+)\].*$/);
+      if (match) {
+        deliveries[match[1].trim()] = parseInt(match[2]);
+      }
+    });
+
+    return deliveries;
   };
 
   // Toggle order expansion
@@ -240,7 +310,7 @@ export default function ProgressPage({
     });
   };
 
-  // Fetch orders from database with company information
+  // Fetch orders from database with company information and delivery quantities
   const fetchProgressOrders = async () => {
     if (!user?.id) {
       setError('User not authenticated');
@@ -284,12 +354,20 @@ export default function ProgressPage({
       }
       console.log('Fetched progress orders:', data?.length || 0);
       if (data && data.length > 0) {
+        // Extract delivery quantities from descriptions and update state
+        const allDeliveryQuantities: { [orderId: string]: { [itemName: string]: number } } = {};
+        
         const convertedOrders = data.map((dbOrder: any) => {
           const progressStage = getProgressStage(dbOrder.status, dbOrder.progress_stage);
           const progressValue = progressStage === 'awaiting-stock' ? 25 : progressStage === 'packing' ? 50 : progressStage === 'out-for-delivery' ? 75 : 100;
           const orderDate = new Date(dbOrder.created_at);
           const dueDate = new Date();
           dueDate.setDate(dueDate.getDate() + 30);
+          
+          // Parse delivery quantities from description
+          const orderDeliveries = parseDeliveryQuantitiesFromDescription(dbOrder.description);
+          allDeliveryQuantities[dbOrder.id] = orderDeliveries;
+          
           return {
             id: dbOrder.id,
             orderNumber: dbOrder.order_number,
@@ -304,6 +382,13 @@ export default function ProgressPage({
             items: parseOrderItems(dbOrder.description)
           };
         });
+        
+        // Update delivery quantities state with database values
+        setDeliveryQuantities(prev => ({
+          ...prev,
+          ...allDeliveryQuantities
+        }));
+        
         console.log('Converted orders for progress page:', convertedOrders.length);
         setOrders(convertedOrders);
         localStorage.setItem('progressOrders', JSON.stringify(convertedOrders));
@@ -646,8 +731,6 @@ export default function ProgressPage({
                         Items ({order.items.length})
                       </Button>
                       
-                      
-                      
                       {isAdmin ? <>
                           {progressStages.map(stage => <Button key={stage.id} variant={order.progressStage === stage.id ? "default" : "outline"} size="sm" onClick={() => updateProgressStage(order.id, stage.id)} className={stage.id === 'completed' ? "bg-green-600 hover:bg-green-700 text-white" : ""}>
                               {stage.name}
@@ -708,7 +791,12 @@ export default function ProgressPage({
                                   <TableCell className="font-medium text-card-foreground">{item.name}</TableCell>
                                   <TableCell className="text-card-foreground">{item.quantity}</TableCell>
                                   <TableCell>
-                                    {isAdmin ? <input type="number" min="0" max={item.quantity} value={delivered} onChange={e => updateDeliveryQuantity(order.id, item.name, parseInt(e.target.value) || 0)} className="w-20 px-2 py-1 border border-border rounded text-sm bg-background text-foreground" /> : <span className="text-card-foreground font-medium">{delivered}</span>}
+                                    {isAdmin ? <input type="number" min="0" max={item.quantity} value={delivered} onChange={e => updateDeliveryQuantity(order.id, item.name, parseInt(e.target.value) || 0)} onBlur={() => {
+                                        // Force a save when user leaves the input field
+                                        if (isAdmin) {
+                                          saveDeliveryQuantitiesToDatabase(order.id, item.name, delivered);
+                                        }
+                                      }} className="w-20 px-2 py-1 border border-border rounded text-sm bg-background text-foreground" /> : <span className="text-card-foreground font-medium">{delivered}</span>}
                                   </TableCell>
                                   <TableCell>
                                     {isCompleted ? <Badge variant="outline" className="bg-green-100 text-green-800">
