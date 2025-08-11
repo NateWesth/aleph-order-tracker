@@ -17,12 +17,13 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { format, startOfMonth, endOfMonth, isSameMonth } from "date-fns";
-import { Eye, ChevronDown, ChevronRight, FileText, Search, Trash2, Download } from "lucide-react";
+import { Eye, ChevronDown, ChevronRight, FileText, Search, Trash2, Download, Edit } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useGlobalRealtimeOrders } from "./hooks/useGlobalRealtimeOrders";
 import ProcessingOrderFilesDialog from "./components/ProcessingOrderFilesDialog";
 import OrderDetailsDialog from "./components/OrderDetailsDialog";
+import ProgressOrderDetailsDialog from "./components/ProgressOrderDetailsDialog";
 import OrderExportActions from "./components/OrderExportActions";
 import { getUserRole, getUserProfile } from "@/utils/authService";
 
@@ -68,6 +69,8 @@ export default function CompletedPage({
   const [showFilesDialog, setShowFilesDialog] = useState(false);
   const [filesDialogOrder, setFilesDialogOrder] = useState<Order | null>(null);
   const [showOrderDetails, setShowOrderDetails] = useState(false);
+  const [showEditOrderDetails, setShowEditOrderDetails] = useState(false);
+  const [editOrderData, setEditOrderData] = useState<any>(null);
   const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
   const [userRole, setUserRole] = useState<'admin' | 'user'>('user');
   const [userCompanyId, setUserCompanyId] = useState<string | null>(null);
@@ -342,6 +345,38 @@ export default function CompletedPage({
     setShowOrderDetails(false);
     setSelectedOrder(null);
   };
+  
+  // Edit order details - for admins only
+  const editOrderDetails = (order: Order) => {
+    const fetchOrderForEdit = async () => {
+      try {
+        const { data } = await supabase.from('orders').select(`
+            *,
+            companies (
+              name,
+              code
+            )
+          `).eq('id', order.id).single();
+        if (data) {
+          setEditOrderData({
+            ...data,
+            companyName: data.companies?.name || "Unknown Company"
+          });
+          setShowEditOrderDetails(true);
+        }
+      } catch (error) {
+        console.error('Error fetching order for edit:', error);
+      }
+    };
+    fetchOrderForEdit();
+  };
+  const closeEditOrderDetails = () => {
+    setShowEditOrderDetails(false);
+    setEditOrderData(null);
+    // Refresh orders after edit
+    fetchCompletedOrders();
+  };
+  
   const openFilesDialog = (order: Order) => {
     setFilesDialogOrder(order);
     setShowFilesDialog(true);
@@ -428,11 +463,17 @@ export default function CompletedPage({
                               <FileText className="h-4 w-4 mr-2" />
                               Files
                             </Button>
-                            <Button variant="outline" size="sm" onClick={() => viewOrderDetails(order)}>
-                              <Eye className="h-4 w-4 mr-2" />
-                              View Details
-                            </Button>
-                            {isAdmin && (
+                             <Button variant="outline" size="sm" onClick={() => viewOrderDetails(order)}>
+                               <Eye className="h-4 w-4 mr-2" />
+                               View Details
+                             </Button>
+                             {isAdmin && (
+                               <Button variant="outline" size="sm" onClick={() => editOrderDetails(order)}>
+                                 <Edit className="h-4 w-4 mr-2" />
+                                 Edit Details
+                               </Button>
+                             )}
+                             {isAdmin && (
                               <AlertDialog>
                                 <AlertDialogTrigger asChild>
                                   <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700">
@@ -498,6 +539,13 @@ export default function CompletedPage({
         onOpenChange={closeOrderDetails} 
         order={selectedOrder} 
       />}
+
+      <ProgressOrderDetailsDialog 
+        order={editOrderData} 
+        isOpen={showEditOrderDetails} 
+        onClose={closeEditOrderDetails} 
+        isAdmin={isAdmin} 
+      />
 
       <ProcessingOrderFilesDialog order={filesDialogOrder} isOpen={showFilesDialog} onClose={closeFilesDialog} isAdmin={isAdmin} />
     </div>;
