@@ -289,8 +289,8 @@ export default function ProcessingOrderFilesDialog({
       orderStatus: order?.status
     });
     
-    // Disable uploads for completed orders - users can only view files
-    if (order?.status === 'completed') {
+    // Disable uploads for completed orders for non-admin users
+    if (order?.status === 'completed' && !isAdmin) {
       return false;
     }
     
