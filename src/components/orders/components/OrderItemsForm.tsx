@@ -14,9 +14,8 @@ interface OrderItemsFormProps {
 
 export const OrderItemsForm = ({ control, index, onRemove, canRemove }: OrderItemsFormProps) => {
   const handleItemNameChange = (e: React.ChangeEvent<HTMLInputElement>, onChange: (value: string) => void) => {
-    // Remove special characters, keeping only letters, numbers, and spaces
-    const cleanValue = e.target.value.replace(/[^a-zA-Z0-9\s]/g, '');
-    onChange(cleanValue);
+    // Allow all characters including special characters
+    onChange(e.target.value);
   };
 
   return (
@@ -32,7 +31,7 @@ export const OrderItemsForm = ({ control, index, onRemove, canRemove }: OrderIte
               <FormControl>
                 <Input 
                   {...field} 
-                  placeholder="Enter item name (letters, numbers, spaces only)" 
+                  placeholder="Enter item name" 
                   onChange={(e) => handleItemNameChange(e, field.onChange)}
                 />
               </FormControl>
