@@ -18,6 +18,9 @@ export function ProcessedLogo({ originalSrc, alt, className }: ProcessedLogoProp
         setIsProcessing(true);
         setError(null);
         
+        // Defer heavy processing to not block initial render
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
         // Load the original image
         const img = await loadImageFromUrl(originalSrc);
         
@@ -36,7 +39,12 @@ export function ProcessedLogo({ originalSrc, alt, className }: ProcessedLogoProp
       }
     };
 
-    processImage();
+    // Use requestIdleCallback for better performance
+    if ('requestIdleCallback' in window) {
+      requestIdleCallback(() => processImage());
+    } else {
+      setTimeout(processImage, 0);
+    }
 
     // Cleanup function to revoke object URL
     return () => {
