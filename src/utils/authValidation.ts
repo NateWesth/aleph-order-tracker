@@ -22,19 +22,16 @@ export const validateAccessCode = async (formData: FormData) => {
       throw new Error("Company code is required.");
     }
     
-    // Validate company code exists
-    const { data: company, error: companyError } = await supabase
-      .from('companies')
-      .select('id, code')
-      .eq('code', formData.accessCode)
-      .maybeSingle();
+    // Validate company code exists using secure function
+    const { data: isValidCode, error: companyError } = await supabase
+      .rpc('validate_company_code', { company_code: formData.accessCode });
 
     if (companyError) {
       console.error('Company validation error:', companyError);
       throw new Error("Unable to validate company code. Please try again.");
     }
 
-    if (!company) {
+    if (!isValidCode) {
       throw new Error("Invalid company code. Please check with your company administrator.");
     }
   }

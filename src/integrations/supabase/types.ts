@@ -262,6 +262,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: boolean
       }
+      validate_company_code: {
+        Args: { company_code: string }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role: "admin" | "user"
