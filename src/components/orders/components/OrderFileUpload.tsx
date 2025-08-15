@@ -1,10 +1,11 @@
-import { useState, useRef, useEffect } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Upload, FileSpreadsheet, X, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import * as XLSX from "xlsx";
 import { OrderItem } from "../types/OrderFormData";
 
 interface OrderFileUploadProps {
@@ -18,76 +19,119 @@ interface ParsedItem {
   notes?: string;
 }
 
-interface WorkerResponse {
-  type: 'PARSE_SUCCESS' | 'PARSE_ERROR' | 'PARSE_PROGRESS';
-  data?: ParsedItem[];
-  error?: string;
-  progress?: number;
-}
-
 export const OrderFileUpload = ({ onItemsImported }: OrderFileUploadProps) => {
   const [isDragging, setIsDragging] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
-  const workerRef = useRef<Worker | null>(null);
 
-  // Initialize Web Worker
-  useEffect(() => {
-    const worker = new Worker(new URL('/src/workers/fileProcessingWorker.ts', import.meta.url), {
-      type: 'module'
-    });
-    
-    worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
-      const { type, data, error, progress } = event.data;
+  const parseExcelFileAsync = async (file: File): Promise<ParsedItem[]> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
       
-      switch (type) {
-        case 'PARSE_PROGRESS':
-          if (progress !== undefined) {
-            setProgress(progress);
-          }
-          break;
+      reader.onload = async (e) => {
+        try {
+          const data = new Uint8Array(e.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+          const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
           
-        case 'PARSE_SUCCESS':
-          if (data) {
-            // Convert to OrderItem format
-            const orderItems: OrderItem[] = data.map(item => ({
-              id: crypto.randomUUID(),
-              name: item.name,
-              quantity: item.quantity,
-              unit: item.unit || "",
-              notes: item.notes || ""
-            }));
+          const items: ParsedItem[] = [];
+          const totalRows = jsonData.length - 1; // Exclude header
+          
+          // Process data in chunks with progress updates
+          const processChunk = async (startIndex: number): Promise<void> => {
+            const chunkSize = 100;
+            const endIndex = Math.min(startIndex + chunkSize, jsonData.length);
+            
+            for (let i = startIndex; i < endIndex; i++) {
+              const row = jsonData[i];
+              if (i > 0 && row.length >= 2 && row[0] && row[1]) { // Skip header row
+                items.push({
+                  name: String(row[0]).trim(),
+                  quantity: Number(row[1]) || 1,
+                  unit: row[2] ? String(row[2]).trim() : undefined,
+                  notes: row[3] ? String(row[3]).trim() : undefined
+                });
+              }
+            }
+            
+            // Update progress
+            const currentProgress = Math.round((endIndex / totalRows) * 100);
+            setProgress(currentProgress);
+            
+            if (endIndex < jsonData.length) {
+              // Use setTimeout to allow UI updates
+              await new Promise(resolve => setTimeout(resolve, 10));
+              await processChunk(endIndex);
+            }
+          };
+          
+          await processChunk(1); // Start from row 1 (skip header)
+          resolve(items);
+        } catch (error) {
+          reject(new Error('Failed to parse Excel file'));
+        }
+      };
+      
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.readAsArrayBuffer(file);
+    });
+  };
 
-            onItemsImported(orderItems);
-            toast.success(`Successfully imported ${orderItems.length} items from file`);
-          }
-          setIsProcessing(false);
-          setProgress(0);
-          break;
+  const parseCSVFileAsync = async (file: File): Promise<ParsedItem[]> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      
+      reader.onload = async (e) => {
+        try {
+          const text = e.target?.result as string;
+          const lines = text.split('\n').filter(line => line.trim());
           
-        case 'PARSE_ERROR':
-          console.error('File parsing error:', error);
-          toast.error(error || 'Failed to parse file. Please check the format and try again.');
-          setIsProcessing(false);
-          setProgress(0);
-          break;
-      }
-    };
-    
-    worker.onerror = (error) => {
-      console.error('Worker error:', error);
-      toast.error('An error occurred while processing the file');
-      setIsProcessing(false);
-      setProgress(0);
-    };
-    
-    workerRef.current = worker;
-    
-    return () => {
-      worker.terminate();
-    };
-  }, [onItemsImported]);
+          const items: ParsedItem[] = [];
+          const totalLines = lines.length - 1; // Exclude header
+          
+          // Process lines in chunks with progress updates
+          const processChunk = async (startIndex: number): Promise<void> => {
+            const chunkSize = 200;
+            const endIndex = Math.min(startIndex + chunkSize, lines.length);
+            
+            for (let i = startIndex; i < endIndex; i++) {
+              if (i > 0) { // Skip header row
+                const columns = lines[i].split(',').map(col => col.trim().replace(/"/g, ''));
+                if (columns.length >= 2 && columns[0] && columns[1]) {
+                  items.push({
+                    name: columns[0],
+                    quantity: Number(columns[1]) || 1,
+                    unit: columns[2] || undefined,
+                    notes: columns[3] || undefined
+                  });
+                }
+              }
+            }
+            
+            // Update progress
+            const currentProgress = Math.round((endIndex / totalLines) * 100);
+            setProgress(currentProgress);
+            
+            if (endIndex < lines.length) {
+              // Use setTimeout to allow UI updates
+              await new Promise(resolve => setTimeout(resolve, 10));
+              await processChunk(endIndex);
+            }
+          };
+          
+          await processChunk(1); // Start from line 1 (skip header)
+          resolve(items);
+        } catch (error) {
+          reject(new Error('Failed to parse CSV file'));
+        }
+      };
+      
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.readAsText(file);
+    });
+  };
 
   const handleFileUpload = async (file: File) => {
     const fileExtension = file.name.split('.').pop()?.toLowerCase();
@@ -97,22 +141,46 @@ export const OrderFileUpload = ({ onItemsImported }: OrderFileUploadProps) => {
       return;
     }
 
-    if (!workerRef.current) {
-      toast.error('File processor not ready. Please try again.');
-      return;
-    }
-
     setIsProcessing(true);
     setProgress(0);
     setUploadedFile(file);
+    
+    try {
+      console.log('Starting file processing...');
+      let parsedItems: ParsedItem[];
+      
+      if (fileExtension === 'csv') {
+        parsedItems = await parseCSVFileAsync(file);
+      } else {
+        parsedItems = await parseExcelFileAsync(file);
+      }
 
-    // Send file to Web Worker for processing
-    const fileType = fileExtension === 'csv' ? 'csv' : 'excel';
-    workerRef.current.postMessage({
-      type: 'PARSE_FILE',
-      file,
-      fileType
-    });
+      if (parsedItems.length === 0) {
+        toast.error('No valid items found in the file. Please check the format.');
+        setIsProcessing(false);
+        setProgress(0);
+        return;
+      }
+
+      // Convert to OrderItem format
+      const orderItems: OrderItem[] = parsedItems.map(item => ({
+        id: crypto.randomUUID(),
+        name: item.name,
+        quantity: item.quantity,
+        unit: item.unit || "",
+        notes: item.notes || ""
+      }));
+
+      console.log('Successfully processed items:', orderItems.length);
+      onItemsImported(orderItems);
+      toast.success(`Successfully imported ${orderItems.length} items from file`);
+    } catch (error) {
+      console.error('File parsing error:', error);
+      toast.error('Failed to parse file. Please check the format and try again.');
+    } finally {
+      setIsProcessing(false);
+      setProgress(0);
+    }
   };
 
   const handleDragOver = (e: React.DragEvent) => {
