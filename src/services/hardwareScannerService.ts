@@ -525,66 +525,30 @@ export class HardwareScannerService {
   private async launchSystemScanner(scanner: HardwareScanner): Promise<{ success: boolean; message: string }> {
     try {
       if (navigator.userAgent.includes('Windows')) {
-        // Try to open Windows Fax and Scan directly
-        try {
-          // Method 1: Try to execute Windows Fax and Scan
-          const wfsCommand = 'C:\\Windows\\System32\\WFS.exe';
-          
-          // Create a batch file command to run WFS
-          const batchCommand = `cmd /c start "" "${wfsCommand}"`;
-          
-          // Try using a data URI to trigger download of batch file
-          const batchContent = `@echo off\nstart "" "C:\\Windows\\System32\\WFS.exe"\n`;
-          const encodedBatch = btoa(batchContent);
-          const dataUri = `data:application/octet-stream;base64,${encodedBatch}`;
-          
-          // Create download link for batch file
-          const link = document.createElement('a');
-          link.href = dataUri;
-          link.download = 'open_scanner.bat';
-          link.style.display = 'none';
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          
-          setTimeout(() => {
-            alert(`A batch file has been downloaded to open Windows Fax and Scan.
+        // Provide simple, direct instructions without downloads
+        const instructions = `To open your scanner directly:
 
-Please:
-1. Check your Downloads folder for "open_scanner.bat" 
-2. Double-click the file to run it
-3. This will open Windows Fax and Scan directly
-
-Or manually open Windows Fax and Scan:
-- Search "Windows Fax and Scan" in Start Menu
-- Click "New Scan" to start scanning`);
-          }, 1000);
-          
-          return {
-            success: true,
-            message: 'Download the batch file to open Windows Fax and Scan directly.'
-          };
-        } catch (error) {
-          // Fallback: Direct instructions for Windows Fax and Scan
-          alert(`To open Windows Fax and Scan directly:
-
+QUICKEST METHOD:
 1. Press Windows key + R
-2. Type: WFS.exe
+2. Type: WFS
 3. Press Enter
+(This opens Windows Fax and Scan)
 
 OR
 
-1. Search "Windows Fax and Scan" in Start Menu  
-2. Click on it to open
-3. Click "New Scan" to start scanning
+1. Click Start Menu
+2. Search "Windows Fax and Scan"
+3. Click on it
+4. Click "New Scan"
 
-This will open the scanning app directly without going through settings.`);
-          
-          return {
-            success: true,
-            message: 'Please use the manual steps to open Windows Fax and Scan directly.'
-          };
-        }
+Your scanner should appear in the list to select and scan from.`;
+
+        alert(instructions);
+        
+        return {
+          success: true,
+          message: 'Use Windows+R then type WFS to open the scanner app directly.'
+        };
       } else if (navigator.userAgent.includes('Mac')) {
         // Try to launch Image Capture on Mac
         await Browser.open({
