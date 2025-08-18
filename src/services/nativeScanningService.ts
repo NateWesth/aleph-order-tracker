@@ -247,34 +247,20 @@ export class NativeScanningService {
   }
 
   /**
-   * Discover network printers
+   * Discover network printers (placeholder for native implementation)
    */
   async discoverPrinters(): Promise<PrinterDevice[]> {
     try {
-      // Get local network information
-      const printers: PrinterDevice[] = [];
-      
-      // Common printer ports and protocols
-      const commonPorts = [631, 9100, 515]; // IPP, RAW, LPR
-      const networkPrefix = this.getNetworkPrefix();
-      
-      if (networkPrefix) {
-        // Scan common printer IP ranges
-        const scanPromises = [];
-        for (let i = 1; i <= 254; i++) {
-          const ip = `${networkPrefix}.${i}`;
-          scanPromises.push(this.checkPrinterAtIP(ip));
-        }
-        
-        const results = await Promise.allSettled(scanPromises);
-        results.forEach((result, index) => {
-          if (result.status === 'fulfilled' && result.value) {
-            printers.push(result.value);
-          }
-        });
+      // In web browsers, direct network scanning is blocked by CORS policy
+      // This would only work in a native mobile app with proper network permissions
+      if (!Capacitor.isNativePlatform()) {
+        console.log('Printer discovery requires native platform with network permissions');
+        return [];
       }
 
-      return printers;
+      // For native platforms, you would use platform-specific printer discovery APIs
+      // This is a placeholder - actual implementation would use Capacitor plugins
+      return [];
     } catch (error) {
       console.error('Error discovering printers:', error);
       return [];
@@ -282,111 +268,26 @@ export class NativeScanningService {
   }
 
   /**
-   * Check if a printer exists at given IP
-   */
-  private async checkPrinterAtIP(ip: string): Promise<PrinterDevice | null> {
-    try {
-      // Try IPP discovery first
-      const response = await fetch(`http://${ip}:631/`, {
-        method: 'GET',
-        signal: AbortSignal.timeout(2000)
-      });
-      
-      if (response.ok) {
-        return {
-          id: `printer-${ip}`,
-          name: `Network Printer (${ip})`,
-          ip,
-          status: 'online',
-          canScan: true
-        };
-      }
-      
-      return null;
-    } catch (error) {
-      return null;
-    }
-  }
-
-  /**
-   * Get network prefix for scanning
-   */
-  private getNetworkPrefix(): string | null {
-    try {
-      // This is a simplified approach - in a real app you'd use more sophisticated network discovery
-      return '192.168.1'; // Most common home network
-    } catch (error) {
-      return null;
-    }
-  }
-
-  /**
-   * Scan from a specific printer
+   * Scan from a specific printer (placeholder for native implementation)
    */
   async scanFromPrinter(printer: PrinterDevice): Promise<ScanResult> {
     try {
-      // For now, implement a basic scanning protocol
-      // This would typically use printer-specific APIs or protocols like WSD, eSCL, or proprietary APIs
-      
-      const scanRequest = {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          action: 'scan',
-          format: 'jpeg',
-          resolution: 300,
-          colorMode: 'color'
-        })
-      };
-
-      // Try eSCL (AirScan) protocol first
-      let response = await fetch(`http://${printer.ip}:80/eSCL/ScannerStatus`, {
-        method: 'GET',
-        signal: AbortSignal.timeout(5000)
-      });
-
-      if (response.ok) {
-        // Initiate scan using eSCL
-        response = await fetch(`http://${printer.ip}:80/eSCL/ScanJobs`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'text/xml',
-          },
-          body: `<?xml version="1.0" encoding="UTF-8"?>
-            <scan:ScanSettings xmlns:scan="http://schemas.hp.com/imaging/escl/2011/05/03" xmlns:pwg="http://www.pwg.org/schemas/2010/12/sm">
-              <pwg:Version>2.0</pwg:Version>
-              <scan:Intent>Document</scan:Intent>
-              <pwg:ScanRegions>
-                <pwg:ScanRegion>
-                  <pwg:Height>3300</pwg:Height>
-                  <pwg:Width>2550</pwg:Width>
-                  <pwg:XOffset>0</pwg:XOffset>
-                  <pwg:YOffset>0</pwg:YOffset>
-                </pwg:ScanRegion>
-              </pwg:ScanRegions>
-              <scan:DocumentFormat>image/jpeg</scan:DocumentFormat>
-              <scan:XResolution>300</scan:XResolution>
-              <scan:YResolution>300</scan:YResolution>
-              <scan:ColorMode>RGB24</scan:ColorMode>
-            </scan:ScanSettings>`
-        });
-
-        if (response.ok) {
-          const location = response.headers.get('Location');
-          if (location) {
-            // Poll for scan completion
-            const scanResult = await this.pollForScanCompletion(printer.ip, location);
-            return scanResult;
-          }
-        }
+      // This would require native platform with direct network access
+      if (!Capacitor.isNativePlatform()) {
+        return {
+          success: false,
+          error: 'Network printer scanning is only available on mobile devices with proper network permissions.'
+        };
       }
 
-      // Fallback: try WSD (Web Services for Devices) or show manual instruction
+      // For actual implementation, you would use:
+      // 1. Native printer SDKs (Brother, HP, Canon, etc.)
+      // 2. Platform-specific scanning APIs
+      // 3. Proper network permissions and protocols
+      
       return {
         success: false,
-        error: `Unable to scan from printer ${printer.name}. Please ensure the printer supports network scanning and is properly configured.`
+        error: 'Native printer scanning not yet implemented. Please use camera scan instead.'
       };
 
     } catch (error) {
@@ -398,59 +299,6 @@ export class NativeScanningService {
     }
   }
 
-  /**
-   * Poll for scan completion
-   */
-  private async pollForScanCompletion(printerIP: string, jobLocation: string): Promise<ScanResult> {
-    const maxAttempts = 30; // 30 seconds timeout
-    let attempts = 0;
-
-    while (attempts < maxAttempts) {
-      try {
-        const response = await fetch(`http://${printerIP}${jobLocation}`, {
-          method: 'GET',
-          signal: AbortSignal.timeout(2000)
-        });
-
-        if (response.ok) {
-          const imageData = await response.blob();
-          const base64Data = await this.blobToBase64(imageData);
-          
-          const timestamp = new Date().getTime();
-          const fileName = `printer-scan-${timestamp}.jpg`;
-
-          return {
-            success: true,
-            fileName,
-            base64Data: base64Data.split(',')[1] // Remove data URL prefix
-          };
-        }
-
-        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
-        attempts++;
-      } catch (error) {
-        attempts++;
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
-    }
-
-    return {
-      success: false,
-      error: 'Scan timeout - please try again'
-    };
-  }
-
-  /**
-   * Convert blob to base64
-   */
-  private async blobToBase64(blob: Blob): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
-  }
 
   /**
    * Get device info for debugging

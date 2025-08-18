@@ -53,7 +53,7 @@ export default function OrderDetailsDialog({
     let itemQuantity = item.quantity || 0;
     let itemNotes = item.notes || '';
     
-    console.log('Parsing item:', { fullName, itemQuantity, itemNotes });
+    
     
     // Extract quantity from name if present and update the quantity
     const qtyMatch = fullName.match(/\(Qty:\s*(\d+)\)/i);
@@ -87,12 +87,6 @@ export default function OrderDetailsDialog({
       finalNotes = extractedNotes;
     }
     
-    console.log('Parsed result:', { 
-      name: itemName, 
-      quantity: itemQuantity, 
-      notes: finalNotes,
-      unit: item.unit || 'pcs'
-    });
     
     return {
       name: itemName,
@@ -105,8 +99,6 @@ export default function OrderDetailsDialog({
   // Use structured items directly
   const displayItems = order.items || [];
 
-  console.log('Items count:', displayItems.length);
-  console.log('Raw items:', JSON.stringify(displayItems, null, 2));
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

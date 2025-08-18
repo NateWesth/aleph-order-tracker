@@ -204,8 +204,8 @@ export default function ProcessingOrderFilesDialog({
       
       if (discoveredPrinters.length === 0) {
         toast({
-          title: "No printers found",
-          description: "Make sure your printer is connected to the same network and supports scanning.",
+          title: "Printer discovery not available",
+          description: "Network printer scanning requires a native mobile app. Please use camera scan instead.",
         });
       } else {
         toast({
@@ -216,8 +216,8 @@ export default function ProcessingOrderFilesDialog({
     } catch (error) {
       console.error('Printer discovery error:', error);
       toast({
-        title: "Discovery failed",
-        description: "Failed to discover network printers",
+        title: "Discovery not supported",
+        description: "Network printer discovery is not supported in web browsers.",
         variant: "destructive",
       });
     } finally {
