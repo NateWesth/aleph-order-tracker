@@ -36,9 +36,11 @@ function App() {
   console.log('Full URL:', window.location.href);
   
   // Capture reset password parameters before router processes them
-  const resetParams = window.location.pathname === '/reset-password' && window.location.hash 
-    ? new URLSearchParams(window.location.hash.substring(1))
-    : null;
+  if (window.location.pathname === '/reset-password' && window.location.hash) {
+    const hashParams = window.location.hash.substring(1);
+    console.log('Storing reset params in localStorage:', hashParams);
+    localStorage.setItem('resetPasswordParams', hashParams);
+  }
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
