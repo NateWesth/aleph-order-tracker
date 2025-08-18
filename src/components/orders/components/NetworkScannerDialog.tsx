@@ -14,50 +14,56 @@ import {
   CheckCircle
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { NativePrintScanService, NativePrintApp } from "@/services/nativePrintScanService";
+import { HardwareScannerService, HardwareScanner } from "@/services/hardwareScannerService";
 import { NativeScanningService } from "@/services/nativeScanningService";
 
-interface NativeScannerDialogProps {
+interface HardwareScannerDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onScanComplete?: (scannedFile: File) => void;
 }
 
-export default function NativeScannerDialog({
+export default function HardwareScannerDialog({
   isOpen,
   onClose,
   onScanComplete
-}: NativeScannerDialogProps) {
+}: HardwareScannerDialogProps) {
   const { toast } = useToast();
-  const [apps, setApps] = useState<NativePrintApp[]>([]);
+  const [scanners, setScanners] = useState<HardwareScanner[]>([]);
   const [loading, setLoading] = useState(false);
-  const [instructions, setInstructions] = useState<string[]>([]);
-  const [recommended, setRecommended] = useState<NativePrintApp | null>(null);
+  const [scanning, setScanning] = useState(false);
+  const [selectedScanner, setSelectedScanner] = useState<HardwareScanner | null>(null);
   
-  const printScanService = NativePrintScanService.getInstance();
+  const hardwareScannerService = HardwareScannerService.getInstance();
   const nativeScanService = NativeScanningService.getInstance();
 
-  const loadScanApps = async () => {
+  const discoverScanners = async () => {
     setLoading(true);
     try {
-      const availableApps = await printScanService.getAvailablePrintScanApps();
-      const scanInstructions = await printScanService.getScanningInstructions();
-      const recommendedApp = await printScanService.getRecommendedScanningMethod();
+      console.log('🔍 Discovering hardware scanners...');
+      const discoveredScanners = await hardwareScannerService.discoverHardwareScanners();
+      setScanners(discoveredScanners);
       
-      setApps(availableApps);
-      setInstructions(scanInstructions);
-      setRecommended(recommendedApp);
+      console.log(`✅ Found ${discoveredScanners.length} hardware scanners:`, discoveredScanners);
       
-      toast({
-        title: "Scanning Options Ready",
-        description: `Found ${availableApps.length} available scanning method(s)`,
-        variant: "default"
-      });
+      if (discoveredScanners.length === 0) {
+        toast({
+          title: "No Scanners Found",
+          description: "No physical scanners detected. Check connections and try camera scanning instead.",
+          variant: "default"
+        });
+      } else {
+        toast({
+          title: "Scanners Discovered",
+          description: `Found ${discoveredScanners.length} physical scanner(s)`,
+          variant: "default"
+        });
+      }
     } catch (error) {
-      console.error('Loading scan apps error:', error);
+      console.error('Scanner discovery error:', error);
       toast({
-        title: "Setup Failed",
-        description: "Failed to load scanning options. Please try again.",
+        title: "Discovery Failed",
+        description: "Failed to discover physical scanners. Please try again.",
         variant: "destructive"
       });
     } finally {
@@ -65,32 +71,36 @@ export default function NativeScannerDialog({
     }
   };
 
-  const openScanApp = async (app: NativePrintApp) => {
-    setLoading(true);
+  const scanWithHardware = async (scanner: HardwareScanner) => {
+    setScanning(true);
+    setSelectedScanner(scanner);
+    
     try {
-      const result = await printScanService.openPrintScanApp(app);
+      console.log(`🖨️ Attempting to scan with: ${scanner.name} (${scanner.type})`);
+      const result = await hardwareScannerService.scanFromHardware(scanner);
       
       if (result.success) {
         toast({
           title: "Scanner Opened",
-          description: `${app.name} opened successfully. Scan your document and return to upload.`,
+          description: result.message,
           variant: "default"
         });
       } else {
         toast({
-          title: "Failed to Open Scanner",
-          description: result.error || "Unable to open the scanning app",
+          title: "Scanner Access Failed",
+          description: result.message,
           variant: "destructive"
         });
       }
     } catch (error) {
+      console.error('Hardware scanning error:', error);
       toast({
-        title: "Error",
-        description: "Failed to open scanning app",
+        title: "Scanning Error",
+        description: "Failed to access the physical scanner",
         variant: "destructive"
       });
     } finally {
-      setLoading(false);
+      setScanning(false);
     }
   };
 
@@ -162,43 +172,55 @@ export default function NativeScannerDialog({
 
   useEffect(() => {
     if (isOpen) {
-      loadScanApps();
+      discoverScanners();
     }
   }, [isOpen]);
 
-  const ScanAppCard = ({ app }: { app: NativePrintApp }) => (
+  const ScannerCard = ({ scanner }: { scanner: HardwareScanner }) => (
     <div className="border rounded-lg p-4 space-y-3">
       <div className="flex items-start justify-between">
         <div className="flex items-center space-x-3">
-          {app.type === 'native' ? (
-            <Smartphone className="h-8 w-8 text-primary" />
-          ) : (
-            <ExternalLink className="h-8 w-8 text-primary" />
-          )}
+          <Printer className="h-8 w-8 text-primary" />
           <div>
-            <h4 className="font-medium">{app.name}</h4>
-            <p className="text-sm text-muted-foreground">{app.description}</p>
-            <Badge variant="outline" className="mt-1">
-              {app.platform} • {app.type}
-            </Badge>
+            <h4 className="font-medium">{scanner.name}</h4>
+            <p className="text-sm text-muted-foreground">Type: {scanner.type.toUpperCase()}</p>
+            <div className="flex gap-1 mt-1">
+              <Badge 
+                variant={scanner.status === 'available' ? 'default' : 'secondary'}
+                className={scanner.status === 'available' ? 'bg-green-500' : ''}
+              >
+                {scanner.status}
+              </Badge>
+              {scanner.capabilities.map(cap => (
+                <Badge key={cap} variant="outline" className="text-xs">
+                  {cap}
+                </Badge>
+              ))}
+            </div>
           </div>
         </div>
-        {recommended?.id === app.id && (
-          <Badge variant="default" className="bg-green-500">
-            <CheckCircle className="h-3 w-3 mr-1" />
-            Recommended
-          </Badge>
-        )}
       </div>
 
       <Button
-        onClick={() => openScanApp(app)}
-        disabled={loading}
+        onClick={() => scanWithHardware(scanner)}
+        disabled={scanning || scanner.status !== 'available'}
         className="w-full flex items-center gap-2"
       >
         <ScanLine className="h-4 w-4" />
-        Open {app.name}
+        {scanning && selectedScanner?.id === scanner.id 
+          ? 'Opening Scanner...' 
+          : 'Start Scanning'
+        }
       </Button>
+
+      <div className="bg-muted rounded-lg p-3">
+        <h5 className="font-medium text-sm mb-2">Instructions:</h5>
+        <ul className="text-xs text-muted-foreground space-y-1">
+          {hardwareScannerService.getScanningInstructions(scanner).map((instruction, index) => (
+            <li key={index}>{instruction}</li>
+          ))}
+        </ul>
+      </div>
     </div>
   );
 
@@ -206,56 +228,75 @@ export default function NativeScannerDialog({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Document Scanner</DialogTitle>
+          <DialogTitle>Physical Scanner Access</DialogTitle>
         </DialogHeader>
 
-        <Tabs defaultValue="apps" className="w-full">
+        <Tabs defaultValue="hardware" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="apps">Scanner Apps</TabsTrigger>
-            <TabsTrigger value="camera">Camera</TabsTrigger>
+            <TabsTrigger value="hardware">Hardware Scanners</TabsTrigger>
+            <TabsTrigger value="camera">Camera Backup</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="apps" className="space-y-4">
-            <div className="space-y-3">
-              <h3 className="text-lg font-medium">Available Scanning Apps</h3>
-              
-              {loading && apps.length === 0 && (
-                <div className="text-center py-8">
-                  <ScanLine className="h-8 w-8 animate-spin mx-auto mb-2 text-muted-foreground" />
-                  <p className="text-muted-foreground">Loading scanning options...</p>
-                </div>
-              )}
-
-              {apps.map(app => (
-                <ScanAppCard key={app.id} app={app} />
-              ))}
-
-              {apps.length === 0 && !loading && (
-                <div className="text-center py-8">
-                  <FileText className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                  <p className="text-muted-foreground">No scanning apps available</p>
-                  <p className="text-sm text-muted-foreground">Try using the camera tab instead</p>
-                </div>
-              )}
+          <TabsContent value="hardware" className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-medium">Connected Scanners</h3>
+              <Button
+                onClick={discoverScanners}
+                disabled={loading}
+                className="flex items-center gap-2"
+              >
+                {loading ? (
+                  <ScanLine className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Printer className="h-4 w-4" />
+                )}
+                {loading ? 'Discovering...' : 'Refresh'}
+              </Button>
             </div>
-
-            {instructions.length > 0 && (
-              <div className="bg-muted rounded-lg p-4">
-                <h4 className="font-medium mb-3">How to Scan Documents:</h4>
-                <ol className="text-sm text-muted-foreground space-y-2">
-                  {instructions.map((instruction, index) => (
-                    <li key={index}>{instruction}</li>
-                  ))}
-                </ol>
+            
+            {loading && scanners.length === 0 && (
+              <div className="text-center py-8">
+                <ScanLine className="h-8 w-8 animate-spin mx-auto mb-2 text-muted-foreground" />
+                <p className="text-muted-foreground">Scanning for physical scanners...</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Checking USB, network, and system scanners...
+                </p>
               </div>
             )}
+
+            <div className="space-y-3">
+              {scanners.map(scanner => (
+                <ScannerCard key={scanner.id} scanner={scanner} />
+              ))}
+            </div>
+
+            {scanners.length === 0 && !loading && (
+              <div className="text-center py-8">
+                <Printer className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                <p className="text-muted-foreground">No physical scanners detected</p>
+                <p className="text-sm text-muted-foreground">
+                  Ensure your scanner is connected and powered on, then try refreshing
+                </p>
+              </div>
+            )}
+
+            <div className="bg-muted rounded-lg p-4">
+              <h4 className="font-medium mb-2">Troubleshooting:</h4>
+              <ul className="text-sm text-muted-foreground space-y-1">
+                <li>• Ensure scanner is connected via USB or network</li>
+                <li>• Check that scanner drivers are installed</li>
+                <li>• For network scanners, verify they're on the same network</li>
+                <li>• Try using manufacturer's scanning software directly</li>
+                <li>• Use camera backup if hardware scanner isn't available</li>
+              </ul>
+            </div>
           </TabsContent>
 
           <TabsContent value="camera" className="space-y-4">
             <div className="space-y-4">
-              <h3 className="text-lg font-medium">Direct Camera Scanning</h3>
+              <h3 className="text-lg font-medium">Camera Scanning (Backup)</h3>
               <p className="text-sm text-muted-foreground">
-                Use your device camera to capture documents directly
+                Use device camera if physical scanner is not available
               </p>
 
               <div className="grid gap-3">
