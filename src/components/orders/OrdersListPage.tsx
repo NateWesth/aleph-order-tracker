@@ -150,10 +150,13 @@ export const OrdersListPage: React.FC = () => {
           <h1 className="text-3xl font-bold text-foreground">Orders List</h1>
           <p className="text-muted-foreground">
             {format(new Date(), "MMMM yyyy")} - Current Month Orders
+            {userRole === 'user' && selectedCompany && (
+              <span className="ml-2">• {selectedCompany.name}</span>
+            )}
           </p>
         </div>
 
-        {/* Company Selector for Admin */}
+        {/* Company Selector for Admin Only */}
         {userRole === 'admin' && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -182,7 +185,9 @@ export const OrdersListPage: React.FC = () => {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
-              <span>{selectedCompany?.name || 'Company'} Orders</span>
+              <span>
+                {userRole === 'admin' ? selectedCompany?.name || 'Company' : 'Your'} Orders
+              </span>
               <span className="text-sm font-normal text-muted-foreground">
                 {filteredOrders.length} order{filteredOrders.length !== 1 ? 's' : ''}
               </span>
@@ -214,7 +219,7 @@ export const OrdersListPage: React.FC = () => {
             <div className="text-center text-muted-foreground">
               {userRole === 'admin' 
                 ? 'Please select a company to view their orders.' 
-                : 'No company associated with your account.'}
+                : 'No company associated with your account. Please contact your administrator.'}
             </div>
           </CardContent>
         </Card>
