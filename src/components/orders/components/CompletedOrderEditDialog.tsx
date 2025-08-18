@@ -13,9 +13,16 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { Trash2, Plus } from "lucide-react";
+
+interface Company {
+  id: string;
+  name: string;
+  code: string;
+}
 
 interface OrderItem {
   id: string;
@@ -80,11 +87,37 @@ export default function CompletedOrderEditDialog({
   const { toast } = useToast();
   const [items, setItems] = useState<OrderItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string>('');
+
+  // Fetch companies for selection
+  const fetchCompanies = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('companies')
+        .select('id, name, code')
+        .order('name');
+
+      if (error) throw error;
+      setCompanies(data || []);
+    } catch (error) {
+      console.error('Error fetching companies:', error);
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen && isAdmin) {
+      fetchCompanies();
+    }
+  }, [isOpen, isAdmin]);
 
   useEffect(() => {
     if (order?.description) {
       const parsedItems = parseOrderItems(order.description);
       setItems(parsedItems);
+    }
+    if (order?.company_id) {
+      setSelectedCompanyId(order.company_id);
     }
   }, [order]);
 
@@ -145,12 +178,19 @@ export default function CompletedOrderEditDialog({
         `${item.name.trim()} (Qty: ${item.quantity})`
       ).join('\n');
 
+      const updateData: any = {
+        description,
+        updated_at: new Date().toISOString()
+      };
+
+      // Include company_id if it was changed
+      if (selectedCompanyId && selectedCompanyId !== order.company_id) {
+        updateData.company_id = selectedCompanyId;
+      }
+
       const { error } = await supabase
         .from('orders')
-        .update({ 
-          description,
-          updated_at: new Date().toISOString()
-        })
+        .update(updateData)
         .eq('id', order.id);
 
       if (error) {
@@ -165,7 +205,7 @@ export default function CompletedOrderEditDialog({
 
       toast({
         title: "Success",
-        description: "Order items updated successfully.",
+        description: "Order updated successfully.",
       });
       onClose();
     } catch (error) {
@@ -202,7 +242,21 @@ export default function CompletedOrderEditDialog({
           </div>
           <div>
             <p className="text-sm text-muted-foreground">Company</p>
-            <p className="font-medium">{order?.companyName || 'Unknown Company'}</p>
+            <div className="space-y-2">
+              <p className="font-medium">{order?.companyName || 'Unknown Company'}</p>
+              <Select value={selectedCompanyId} onValueChange={setSelectedCompanyId}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Change company..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {companies.map((company) => (
+                    <SelectItem key={company.id} value={company.id}>
+                      {company.name} ({company.code})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <div>
             <p className="text-sm text-muted-foreground">Created At</p>
