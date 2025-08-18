@@ -1,9 +1,13 @@
 import { Capacitor } from '@capacitor/core';
-import { Browser } from '@capacitor/browser';
+import { Camera, CameraResultType, CameraSource, Photo } from '@capacitor/camera';
+import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
+import { Device } from '@capacitor/device';
 
 export interface ScanResult {
   success: boolean;
   filePath?: string;
+  fileName?: string;
+  base64Data?: string;
   error?: string;
 }
 
@@ -18,200 +22,237 @@ export class NativeScanningService {
   }
 
   /**
-   * Attempts to open the HP Smart app for scanning or provides web alternatives
+   * Request camera permissions
    */
-  async openHPScanApp(): Promise<ScanResult> {
-    // For native mobile platforms, try to open HP Smart app
-    if (Capacitor.isNativePlatform()) {
-      return this.openNativeHPApp();
-    }
-    
-    // For web/desktop, provide web-based scanning alternatives
-    return this.openWebScanningAlternatives();
-  }
-
-  /**
-   * Opens HP Smart app on native mobile platforms
-   */
-  private async openNativeHPApp(): Promise<ScanResult> {
-
+  async requestCameraPermissions(): Promise<boolean> {
     try {
-      // HP Smart app package names/URLs
-      const hpAppUrls = {
-        android: 'intent://scan#Intent;scheme=hpsmart;package=com.hp.android.printservice;end',
-        ios: 'hpsmart://scan' // HP Smart app URL scheme for scanning
-      };
-
-      const platform = Capacitor.getPlatform();
-      
-      if (platform === 'android') {
-        // Try to open HP Smart app on Android
-        await this.openAndroidApp(hpAppUrls.android);
-      } else if (platform === 'ios') {
-        // Try to open HP Smart app on iOS
-        await this.openIOSApp(hpAppUrls.ios);
+      if (!Capacitor.isNativePlatform()) {
+        return true; // Web doesn't need explicit permission request
       }
 
-      return {
-        success: true
-      };
-    } catch (error) {
-      console.error('Error opening HP Smart app:', error);
-      return {
-        success: false,
-        error: 'Could not open HP Smart app. Please ensure it is installed.'
-      };
-    }
-  }
-
-  /**
-   * Provides web-based scanning alternatives for desktop/web platforms
-   */
-  private async openWebScanningAlternatives(): Promise<ScanResult> {
-    try {
-      // Try to open HP Smart web app first
-      const hpWebUrl = 'https://www.hpsmart.com/us/en';
-      await Browser.open({ url: hpWebUrl });
-      
-      return {
-        success: true
-      };
-    } catch (error) {
-      console.error('Error opening web scanning alternatives:', error);
-      return {
-        success: false,
-        error: 'Could not open scanning alternatives. Please use the camera or upload features instead.'
-      };
-    }
-  }
-
-  /**
-   * Opens an Android app by intent URL
-   */
-  private async openAndroidApp(intentUrl: string): Promise<void> {
-    try {
-      // First try to open the app directly with intent
-      await Browser.open({ url: intentUrl });
-    } catch (error) {
-      // If direct opening fails, try the Play Store
-      await Browser.open({ 
-        url: 'https://play.google.com/store/apps/details?id=com.hp.android.printservice' 
+      const permissions = await Camera.requestPermissions({
+        permissions: ['camera', 'photos']
       });
-      throw new Error('HP Smart app not installed. Redirected to Play Store.');
-    }
-  }
 
-  /**
-   * Opens an iOS app by URL scheme
-   */
-  private async openIOSApp(urlScheme: string): Promise<void> {
-    try {
-      await Browser.open({ url: urlScheme });
+      return permissions.camera === 'granted' && permissions.photos === 'granted';
     } catch (error) {
-      // If URL scheme fails, try App Store
-      await Browser.open({ 
-        url: 'https://apps.apple.com/app/hp-smart/id469284907' 
-      });
-      throw new Error('HP Smart app not installed. Redirected to App Store.');
+      console.error('Error requesting camera permissions:', error);
+      return false;
     }
   }
 
   /**
-   * Alternative scanning options for all devices
+   * Check if camera permissions are granted
    */
-  async openAlternativeScanApp(): Promise<ScanResult> {
-    // For native platforms, try mobile scanning apps
-    if (Capacitor.isNativePlatform()) {
-      return this.openNativeScanningApps();
-    }
-    
-    // For web/desktop, provide web scanning alternatives
-    return this.openWebScanningOptions();
-  }
-
-  /**
-   * Opens alternative scanning apps on native mobile platforms
-   */
-  private async openNativeScanningApps(): Promise<ScanResult> {
-
+  async checkCameraPermissions(): Promise<boolean> {
     try {
-      const platform = Capacitor.getPlatform();
-      
-      if (platform === 'android') {
-        // Try common scanning apps on Android
-        const scanApps = [
-          'intent://scan#Intent;scheme=camscanner;package=com.intsig.camscanner;end',
-          'intent://scan#Intent;scheme=adobescan;package=com.adobe.scan.android;end',
-          'intent://scan#Intent;scheme=googledrive;package=com.google.android.apps.docs;end',
-        ];
+      if (!Capacitor.isNativePlatform()) {
+        return true; // Web has implicit permissions
+      }
 
-        for (const app of scanApps) {
-          try {
-            await this.openAndroidApp(app);
-            return { success: true };
-          } catch (error) {
-            continue; // Try next app
-          }
-        }
-      } else if (platform === 'ios') {
-        // Try common scanning apps on iOS
-        const scanApps = [
-          'camscanner://scan',
-          'adobescan://scan',
-          'googledrive://scan',
-        ];
+      const permissions = await Camera.checkPermissions();
+      return permissions.camera === 'granted' && permissions.photos === 'granted';
+    } catch (error) {
+      console.error('Error checking camera permissions:', error);
+      return false;
+    }
+  }
 
-        for (const app of scanApps) {
-          try {
-            await this.openIOSApp(app);
-            return { success: true };
-          } catch (error) {
-            continue; // Try next app
-          }
+  /**
+   * Scan a document using device camera
+   */
+  async scanDocument(): Promise<ScanResult> {
+    try {
+      // Check permissions first
+      const hasPermissions = await this.checkCameraPermissions();
+      if (!hasPermissions) {
+        const granted = await this.requestCameraPermissions();
+        if (!granted) {
+          return {
+            success: false,
+            error: 'Camera permissions are required to scan documents'
+          };
         }
       }
 
-      throw new Error('No scanning apps found');
+      // Take photo using camera
+      const photo = await Camera.getPhoto({
+        quality: 90,
+        allowEditing: true,
+        resultType: CameraResultType.Base64,
+        source: CameraSource.Camera,
+        correctOrientation: true,
+        width: 1920,
+        height: 1920
+      });
+
+      if (!photo.base64String) {
+        return {
+          success: false,
+          error: 'Failed to capture image'
+        };
+      }
+
+      // Generate filename
+      const timestamp = new Date().getTime();
+      const fileName = `scan-${timestamp}.jpg`;
+
+      if (Capacitor.isNativePlatform()) {
+        // Save to device storage on native platforms
+        const savedFile = await this.saveToDevice(photo.base64String, fileName);
+        return {
+          success: true,
+          filePath: savedFile.uri,
+          fileName,
+          base64Data: photo.base64String
+        };
+      } else {
+        // For web, return base64 data directly
+        return {
+          success: true,
+          fileName,
+          base64Data: photo.base64String
+        };
+      }
     } catch (error) {
+      console.error('Error scanning document:', error);
       return {
         success: false,
-        error: 'No compatible scanning apps found on your device'
+        error: `Failed to scan document: ${error instanceof Error ? error.message : 'Unknown error'}`
       };
     }
   }
 
   /**
-   * Provides web-based scanning options for desktop/web platforms
+   * Select an image from gallery/photos
    */
-  private async openWebScanningOptions(): Promise<ScanResult> {
+  async selectFromGallery(): Promise<ScanResult> {
     try {
-      // List of web-based scanning services
-      const webScanServices = [
-        'https://www.camscanner.com/user/scan',
-        'https://acrobat.adobe.com/us/en/mobile/scanner-app.html',
-        'https://www.office.com/launch/lens'
-      ];
+      // Check permissions first
+      const hasPermissions = await this.checkCameraPermissions();
+      if (!hasPermissions) {
+        const granted = await this.requestCameraPermissions();
+        if (!granted) {
+          return {
+            success: false,
+            error: 'Photo library permissions are required'
+          };
+        }
+      }
 
-      // Try the first available service
-      await Browser.open({ url: webScanServices[0] });
-      
-      return {
-        success: true
-      };
+      // Select photo from gallery
+      const photo = await Camera.getPhoto({
+        quality: 90,
+        allowEditing: true,
+        resultType: CameraResultType.Base64,
+        source: CameraSource.Photos,
+        correctOrientation: true,
+        width: 1920,
+        height: 1920
+      });
+
+      if (!photo.base64String) {
+        return {
+          success: false,
+          error: 'Failed to select image'
+        };
+      }
+
+      // Generate filename
+      const timestamp = new Date().getTime();
+      const fileName = `selected-${timestamp}.jpg`;
+
+      if (Capacitor.isNativePlatform()) {
+        // Save to device storage on native platforms
+        const savedFile = await this.saveToDevice(photo.base64String, fileName);
+        return {
+          success: true,
+          filePath: savedFile.uri,
+          fileName,
+          base64Data: photo.base64String
+        };
+      } else {
+        // For web, return base64 data directly
+        return {
+          success: true,
+          fileName,
+          base64Data: photo.base64String
+        };
+      }
     } catch (error) {
+      console.error('Error selecting from gallery:', error);
       return {
         success: false,
-        error: 'Could not open web scanning services. Please use the camera or upload features instead.'
+        error: `Failed to select image: ${error instanceof Error ? error.message : 'Unknown error'}`
       };
     }
   }
 
   /**
-   * Checks if HP Smart app is likely available (works for all platforms now)
+   * Save base64 image to device storage
    */
-  async isHPAppAvailable(): Promise<boolean> {
-    // Always return true - let the user try regardless of platform
-    // The actual availability will be determined when they try to use it
-    return true;
+  private async saveToDevice(base64Data: string, fileName: string) {
+    try {
+      const result = await Filesystem.writeFile({
+        path: fileName,
+        data: base64Data,
+        directory: Directory.Cache,
+        encoding: Encoding.UTF8
+      });
+
+      return result;
+    } catch (error) {
+      console.error('Error saving file to device:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Convert base64 to File object for web upload
+   */
+  base64ToFile(base64Data: string, fileName: string): File {
+    const byteCharacters = atob(base64Data);
+    const byteNumbers = new Array(byteCharacters.length);
+    for (let i = 0; i < byteCharacters.length; i++) {
+      byteNumbers[i] = byteCharacters.charCodeAt(i);
+    }
+    const byteArray = new Uint8Array(byteNumbers);
+    return new File([byteArray], fileName, { type: 'image/jpeg' });
+  }
+
+  /**
+   * Check if scanning is available on current platform
+   */
+  async isScanningAvailable(): Promise<boolean> {
+    try {
+      if (Capacitor.isNativePlatform()) {
+        const info = await Device.getInfo();
+        return info.platform === 'ios' || info.platform === 'android';
+      }
+      // Check if browser supports camera API
+      return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+    } catch (error) {
+      console.error('Error checking scanning availability:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Get device info for debugging
+   */
+  async getDeviceInfo() {
+    try {
+      if (Capacitor.isNativePlatform()) {
+        return await Device.getInfo();
+      }
+      return {
+        platform: 'web',
+        operatingSystem: navigator.platform,
+        userAgent: navigator.userAgent
+      };
+    } catch (error) {
+      console.error('Error getting device info:', error);
+      return null;
+    }
   }
 }

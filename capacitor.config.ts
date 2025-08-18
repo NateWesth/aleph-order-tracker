@@ -14,6 +14,9 @@ const config: CapacitorConfig = {
     },
     App: {
       launchShowDuration: 0
+    },
+    Camera: {
+      permissions: ['camera', 'photos']
     }
   }
 };

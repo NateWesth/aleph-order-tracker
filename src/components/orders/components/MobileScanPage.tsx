@@ -51,36 +51,61 @@ export default function MobileScanPage({}: MobileScanPageProps) {
     setIsNativeDevice(Capacitor.isNativePlatform());
   }, [sessionId, orderId, fileType]);
 
-  const handleHPScan = async () => {
+  const handleNativeScan = async () => {
     try {
-      const result = await scanningService.openHPScanApp();
+      const result = await scanningService.scanDocument();
       
-      if (result.success) {
+      if (result.success && result.base64Data) {
+        // Convert to file and upload
+        const file = scanningService.base64ToFile(result.base64Data, result.fileName!);
+        await handleFileUpload(file);
+        
         toast({
-          title: "Opening HP Smart App",
-          description: "Please scan your document and return to this app when finished.",
+          title: "Document Scanned!",
+          description: "Document has been scanned and uploaded successfully.",
         });
       } else {
         toast({
-          title: "HP Smart Not Available",
-          description: result.error || "HP Smart app is not installed.",
+          title: "Scan Failed",
+          description: result.error || "Failed to scan document",
           variant: "destructive",
         });
-        
-        // Try alternative scanning apps
-        const altResult = await scanningService.openAlternativeScanApp();
-        if (altResult.success) {
-          toast({
-            title: "Opening Scanner App",
-            description: "Please scan your document and return to this app when finished.",
-          });
-        }
       }
     } catch (error) {
-      console.error('Error opening scanner app:', error);
+      console.error('Error scanning document:', error);
       toast({
-        title: "Scanner Error",
-        description: "Unable to open scanner app. Please try manual upload.",
+        title: "Scanner Error", 
+        description: "Unable to access camera. Please try manual upload.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleGallerySelect = async () => {
+    try {
+      const result = await scanningService.selectFromGallery();
+      
+      if (result.success && result.base64Data) {
+        // Convert to file and upload
+        const file = scanningService.base64ToFile(result.base64Data, result.fileName!);
+        await handleFileUpload(file);
+        
+        toast({
+          title: "Image Selected!",
+          description: "Image has been selected and uploaded successfully.",
+        });
+      } else {
+        toast({
+          title: "Selection Failed",
+          description: result.error || "Failed to select image",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error('Error selecting from gallery:', error);
+      toast({
+        title: "Selection Error",
+        description: "Unable to access photo library. Please try manual upload.",
         variant: "destructive",
       });
     }
@@ -309,26 +334,39 @@ export default function MobileScanPage({}: MobileScanPageProps) {
 
           {!isScanning ? (
             <div className="space-y-4">
-              {/* HP Scanner Button - Only show on native mobile devices */}
-              {isNativeDevice && (
-                <Button 
-                  onClick={handleHPScan}
-                  className="w-full h-16 text-lg bg-blue-600 hover:bg-blue-700"
-                  size="lg"
-                >
-                  <Printer className="w-6 h-6 mr-2" />
-                  Scan with HP Smart App
-                </Button>
-              )}
-              
-              <Button 
-                onClick={startCamera}
-                className="w-full h-16 text-lg"
+              {/* Native Camera Scan Button */}
+              <Button
+                onClick={handleNativeScan}
                 size="lg"
-                variant={isNativeDevice ? "outline" : "default"}
+                className="w-full h-16 text-lg"
+                disabled={isScanning}
               >
-                <Camera className="w-6 h-6 mr-2" />
-                Start Camera Scan
+                <Camera className="h-6 w-6 mr-3" />
+                Scan with Camera
+              </Button>
+
+              {/* Gallery Selection Button */}
+              <Button
+                onClick={handleGallerySelect}
+                variant="outline"
+                size="lg"
+                className="w-full h-16 text-lg"
+                disabled={isScanning}
+              >
+                <Upload className="h-6 w-6 mr-3" />
+                Select from Gallery
+              </Button>
+
+              {/* Manual Camera Scan Button (fallback) */}
+              <Button
+                onClick={startCamera}
+                variant="outline"
+                size="lg"
+                className="w-full h-16 text-lg"
+                disabled={isScanning}
+              >
+                <Camera className="h-6 w-6 mr-3" />
+                Manual Camera Scan
               </Button>
               
               <div className="text-center">
