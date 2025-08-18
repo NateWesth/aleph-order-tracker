@@ -525,41 +525,13 @@ export class HardwareScannerService {
   private async launchSystemScanner(scanner: HardwareScanner): Promise<{ success: boolean; message: string }> {
     try {
       if (navigator.userAgent.includes('Windows')) {
-        // Try multiple methods to directly launch Windows scanner
-        try {
-          // Method 1: Try Windows shell execute protocol
-          window.location.href = 'shell:AppsFolder\\Microsoft.WindowsScan_8wekyb3d8bbwe!App';
-          
-          setTimeout(() => {
-            // If first method fails, try WFS directly
-            try {
-              window.location.href = 'shell:system\\WFS.exe';
-            } catch (e) {
-              // Final fallback - try Windows Run command
-              window.location.href = 'ms-windows-store://pdp/?productid=9WZDNCRFJ3PV';
-            }
-          }, 1000);
-          
-          return {
-            success: true,
-            message: 'Opening Windows scanner application directly...'
-          };
-        } catch (error) {
-          // Alternative method using Windows URI schemes
-          try {
-            // Try launching through Windows App URI
-            window.open('ms-windows-store://launch/?name=Microsoft.WindowsScan', '_blank');
-            return {
-              success: true,
-              message: 'Launching Windows Scan app...'
-            };
-          } catch (e) {
-            return {
-              success: false,
-              message: 'Unable to launch scanner automatically. Please open Windows Fax and Scan manually.'
-            };
-          }
-        }
+        // Due to browser security restrictions, we cannot directly launch desktop apps
+        // Provide the most practical approach
+        
+        return {
+          success: false,
+          message: 'Browser security prevents direct scanner access. Please use the Camera Backup tab instead, or manually open Windows Fax and Scan from your Start Menu.'
+        };
       } else if (navigator.userAgent.includes('Mac')) {
         // Try to launch Image Capture on Mac
         await Browser.open({

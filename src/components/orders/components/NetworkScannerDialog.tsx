@@ -293,10 +293,10 @@ export default function HardwareScannerDialog({
           <DialogTitle>Physical Scanner Access</DialogTitle>
         </DialogHeader>
 
-        <Tabs defaultValue="hardware" className="w-full">
+        <Tabs defaultValue="camera" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="camera">Camera Scanning</TabsTrigger>
             <TabsTrigger value="hardware">Hardware Scanners</TabsTrigger>
-            <TabsTrigger value="camera">Camera Backup</TabsTrigger>
           </TabsList>
 
           <TabsContent value="hardware" className="space-y-4">
@@ -376,9 +376,9 @@ export default function HardwareScannerDialog({
 
           <TabsContent value="camera" className="space-y-4">
             <div className="space-y-4">
-              <h3 className="text-lg font-medium">Camera Scanning (Backup)</h3>
+              <h3 className="text-lg font-medium">Document Scanning</h3>
               <p className="text-sm text-muted-foreground">
-                Use device camera if physical scanner is not available
+                Scan documents using your device camera or select from gallery
               </p>
 
               <div className="grid gap-3">
