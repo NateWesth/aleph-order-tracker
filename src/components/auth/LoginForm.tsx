@@ -4,9 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { getUserRole } from "@/utils/authService";
+import ForgotPasswordForm from "./ForgotPasswordForm";
 
 const LoginForm = () => {
   const navigate = useNavigate();
@@ -290,6 +292,24 @@ const LoginForm = () => {
       >
         {loading ? "Signing In..." : "Sign In"}
       </Button>
+      
+      <div className="text-center">
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button variant="link" className="text-sm text-muted-foreground hover:text-primary">
+              Forgot your password?
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Reset Password</DialogTitle>
+            </DialogHeader>
+            <ForgotPasswordForm onSuccess={() => {
+              // Dialog will close automatically when successful
+            }} />
+          </DialogContent>
+        </Dialog>
+      </div>
     </form>
   );
 };
