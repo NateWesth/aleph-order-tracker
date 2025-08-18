@@ -525,53 +525,64 @@ export class HardwareScannerService {
   private async launchSystemScanner(scanner: HardwareScanner): Promise<{ success: boolean; message: string }> {
     try {
       if (navigator.userAgent.includes('Windows')) {
-        // Simple approach - try to open Windows Fax and Scan directly
+        // Try to open Windows Fax and Scan directly
         try {
-          // Open printer settings which should show scanners
-          window.open('ms-settings:printers', '_blank');
+          // Method 1: Try to execute Windows Fax and Scan
+          const wfsCommand = 'C:\\Windows\\System32\\WFS.exe';
+          
+          // Create a batch file command to run WFS
+          const batchCommand = `cmd /c start "" "${wfsCommand}"`;
+          
+          // Try using a data URI to trigger download of batch file
+          const batchContent = `@echo off\nstart "" "C:\\Windows\\System32\\WFS.exe"\n`;
+          const encodedBatch = btoa(batchContent);
+          const dataUri = `data:application/octet-stream;base64,${encodedBatch}`;
+          
+          // Create download link for batch file
+          const link = document.createElement('a');
+          link.href = dataUri;
+          link.download = 'open_scanner.bat';
+          link.style.display = 'none';
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
           
           setTimeout(() => {
-            alert(`Scanner access opened in Windows Settings.
+            alert(`A batch file has been downloaded to open Windows Fax and Scan.
 
-To scan:
-1. Find your scanner in the devices list
-2. Click on your scanner
-3. Click "Open scanner" or use the scanning features
-4. Or search "Windows Fax and Scan" in Start Menu for dedicated scanning app
+Please:
+1. Check your Downloads folder for "open_scanner.bat" 
+2. Double-click the file to run it
+3. This will open Windows Fax and Scan directly
 
-Your scanned documents can then be uploaded to this app.`);
+Or manually open Windows Fax and Scan:
+- Search "Windows Fax and Scan" in Start Menu
+- Click "New Scan" to start scanning`);
           }, 1000);
           
           return {
             success: true,
-            message: 'Opening Windows printer/scanner settings. Follow the instructions to access your scanner.'
+            message: 'Download the batch file to open Windows Fax and Scan directly.'
           };
         } catch (error) {
-          // Fallback: Provide comprehensive manual instructions
-          const manualInstructions = `To access your scanner on Windows:
+          // Fallback: Direct instructions for Windows Fax and Scan
+          alert(`To open Windows Fax and Scan directly:
 
-METHOD 1 - Windows Settings:
-1. Press Windows key + I to open Settings
-2. Go to Devices > Printers & scanners  
-3. Click on your scanner device
-4. Click "Open scanner" 
+1. Press Windows key + R
+2. Type: WFS.exe
+3. Press Enter
 
-METHOD 2 - Windows Fax and Scan:
-1. Search "Windows Fax and Scan" in Start Menu
-2. Click "New Scan" 
-3. Select your scanner and scan settings
-4. Click "Scan"
+OR
 
-METHOD 3 - Printer Software:
-Use your printer manufacturer's scanning software
+1. Search "Windows Fax and Scan" in Start Menu  
+2. Click on it to open
+3. Click "New Scan" to start scanning
 
-After scanning, upload the file to this app.`;
-          
-          alert(manualInstructions);
+This will open the scanning app directly without going through settings.`);
           
           return {
             success: true,
-            message: 'Please follow the manual instructions to access your scanner.'
+            message: 'Please use the manual steps to open Windows Fax and Scan directly.'
           };
         }
       } else if (navigator.userAgent.includes('Mac')) {
