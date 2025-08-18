@@ -70,6 +70,7 @@ export default function ProcessingOrderFilesDialog({
   const [isNativeDevice, setIsNativeDevice] = useState(false);
   const [printers, setPrinters] = useState<any[]>([]);
   const [isDiscovering, setIsDiscovering] = useState(false);
+  const [autoDiscoveryRunning, setAutoDiscoveryRunning] = useState(false);
   const [manualIPInput, setManualIPInput] = useState('');
   const [showManualIP, setShowManualIP] = useState(false);
   const scanningService = NativeScanningService.getInstance();
@@ -197,16 +198,53 @@ export default function ProcessingOrderFilesDialog({
     }
   };
 
-  // Printer discovery and scanning
+  // Auto-discovery of network printers
+  const autoDiscoverPrinters = async () => {
+    try {
+      setAutoDiscoveryRunning(true);
+      console.log('Starting automatic printer discovery...');
+      
+      const discoveredPrinters = await scanningService.discoverPrinters();
+      
+      // Filter out devices that are already in the list
+      const newPrinters = discoveredPrinters.filter(newPrinter => 
+        !printers.some(existingPrinter => existingPrinter.id === newPrinter.id)
+      );
+      
+      if (newPrinters.length > 0) {
+        setPrinters(prev => [...prev, ...newPrinters]);
+        console.log(`Auto-discovered ${newPrinters.length} new device(s):`, newPrinters);
+        
+        // Show subtle notification for auto-discovered devices
+        const networkPrinters = newPrinters.filter(p => p.type === 'network');
+        if (networkPrinters.length > 0) {
+          toast({
+            title: `Found ${networkPrinters.length} network printer(s)`,
+            description: "Automatically added to your device list.",
+          });
+        }
+      }
+      
+      console.log('Auto-discovery completed. Total devices:', discoveredPrinters.length);
+    } catch (error) {
+      console.error('Auto printer discovery error:', error);
+      // Don't show error toast for automatic discovery to avoid spam
+    } finally {
+      setAutoDiscoveryRunning(false);
+    }
+  };
+
+  // Manual discovery with user feedback
   const discoverPrinters = async () => {
     try {
       setIsDiscovering(true);
-      console.log('Starting printer discovery...');
+      console.log('Starting manual printer discovery...');
       
       const discoveredPrinters = await scanningService.discoverPrinters();
-      setPrinters(discoveredPrinters);
       
-      console.log('Discovered devices:', discoveredPrinters);
+      // Replace the entire list with fresh discovery
+      setPrinters(discoveredPrinters);
+      console.log('Manual discovery completed. Devices found:', discoveredPrinters);
       
       if (discoveredPrinters.length === 0) {
         // Check capabilities to give better error message
@@ -216,7 +254,7 @@ export default function ProcessingOrderFilesDialog({
         if (!capabilities.usb && !capabilities.bluetooth) {
           message += "Your browser doesn't support direct device access. Use Chrome for better device support.";
         } else {
-          message += "Click 'Find Printers/Scanners' to grant device permissions.";
+          message += "Try adding a network printer manually or check device connections.";
         }
         
         toast({
@@ -224,13 +262,24 @@ export default function ProcessingOrderFilesDialog({
           description: message,
         });
       } else {
+        const deviceTypes = {
+          usb: discoveredPrinters.filter(p => p.type === 'usb').length,
+          bluetooth: discoveredPrinters.filter(p => p.type === 'bluetooth').length,
+          network: discoveredPrinters.filter(p => p.type === 'network').length
+        };
+        
+        const typesSummary = Object.entries(deviceTypes)
+          .filter(([_, count]) => count > 0)
+          .map(([type, count]) => `${count} ${type}`)
+          .join(', ');
+        
         toast({
           title: "Devices found!",
-          description: `Found ${discoveredPrinters.length} device(s). Select one to scan.`,
+          description: `Found ${discoveredPrinters.length} device(s): ${typesSummary}`,
         });
       }
     } catch (error) {
-      console.error('Printer discovery error:', error);
+      console.error('Manual printer discovery error:', error);
       toast({
         title: "Device Access Error",
         description: "Unable to access devices. Please try using Chrome browser or grant device permissions.",
@@ -627,21 +676,29 @@ export default function ProcessingOrderFilesDialog({
             {/* Printer Scanning Section */}
             <div className="space-y-2">
               <div className="flex items-center gap-2 flex-wrap">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={discoverPrinters}
-                  disabled={isDiscovering}
-                  className="flex items-center gap-2"
-                >
-                  {isDiscovering ? (
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
-                  ) : (
-                    <Search className="h-4 w-4" />
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={discoverPrinters}
+                    disabled={isDiscovering || autoDiscoveryRunning}
+                    className="flex items-center gap-2"
+                  >
+                    {(isDiscovering || autoDiscoveryRunning) ? (
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                    ) : (
+                      <Search className="h-4 w-4" />
+                    )}
+                    {isDiscovering ? "Searching..." : autoDiscoveryRunning ? "Auto-discovering..." : "Refresh Devices"}
+                  </Button>
+                  
+                  {autoDiscoveryRunning && (
+                    <span className="text-xs text-muted-foreground">
+                      Auto-discovering network printers...
+                    </span>
                   )}
-                  {isDiscovering ? "Discovering..." : "Find Devices"}
-                </Button>
+                </div>
                 
                 <Button
                   type="button"
@@ -653,15 +710,24 @@ export default function ProcessingOrderFilesDialog({
                   <Wifi className="h-4 w-4" />
                   Add Network Printer
                 </Button>
-                
-                {printers.length > 0 && (
-                   <span className="text-sm text-muted-foreground">
-                    {printers.length} device(s) found
-                  </span>
-                )}
               </div>
               
-              {printers.length > 0 && (
+              <div className="flex items-center gap-2">
+                {printers.length > 0 && (
+                  <span className="text-sm text-muted-foreground">
+                    {printers.length} device(s) available
+                  </span>
+                )}
+                
+                {autoDiscoveryRunning && (
+                  <span className="text-xs text-blue-600 flex items-center gap-1">
+                    <div className="animate-pulse w-2 h-2 bg-blue-600 rounded-full"></div>
+                    Auto-discovering...
+                  </span>
+                 )}
+               </div>
+               
+               {printers.length > 0 && (
                 <div className="grid gap-2 max-h-32 overflow-y-auto border rounded-lg p-2">
                   {printers.map((printer) => (
                     <Button
@@ -673,8 +739,12 @@ export default function ProcessingOrderFilesDialog({
                       className="flex items-center justify-between text-left h-auto py-2"
                     >
                       <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full bg-green-500" />
-                       <div>
+                        <div className={`w-2 h-2 rounded-full ${
+                          printer.type === 'network' ? 'bg-blue-500' :
+                          printer.type === 'usb' ? 'bg-green-500' : 
+                          'bg-purple-500'
+                        }`} />
+                        <div>
                           <div className="font-medium text-sm">{printer.name}</div>
                           <div className="text-xs text-muted-foreground">
                             {printer.type === 'usb' ? 'USB Device' : 
@@ -846,9 +916,25 @@ export default function ProcessingOrderFilesDialog({
     if (isOpen && order) {
       console.log('Dialog opened for order:', order.id);
       fetchOrderFiles();
+      
+      // Auto-discover printers when dialog opens
+      autoDiscoverPrinters();
     }
     setIsNativeDevice(Capacitor.isNativePlatform());
   }, [isOpen, order?.id]);
+
+  // Periodic auto-discovery every 30 seconds when dialog is open
+  useEffect(() => {
+    if (!isOpen) return;
+    
+    const interval = setInterval(() => {
+      if (!isDiscovering && !autoDiscoveryRunning) {
+        autoDiscoverPrinters();
+      }
+    }, 30000); // 30 seconds
+    
+    return () => clearInterval(interval);
+  }, [isOpen, isDiscovering, autoDiscoveryRunning]);
 
   useEffect(() => {
     if (!order?.id) return;
