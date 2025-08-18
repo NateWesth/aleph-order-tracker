@@ -116,38 +116,77 @@ export class NetworkPrinterService {
     const baseIP = localIP.substring(0, localIP.lastIndexOf('.'));
     console.log('🔍 Scanning network range:', `${baseIP}.x`);
     
-    // More comprehensive list of common printer IPs
+    // Scan the entire network range (2-253) for better detection
+    const allIPs = [];
+    
+    // Add common static printer IPs first for priority
     const commonPrinterIPs = [
-      // Very common static IPs for printers
       `${baseIP}.10`, `${baseIP}.11`, `${baseIP}.12`, `${baseIP}.15`,
       `${baseIP}.20`, `${baseIP}.21`, `${baseIP}.25`, `${baseIP}.30`,
       `${baseIP}.50`, `${baseIP}.100`, `${baseIP}.101`, `${baseIP}.102`, 
       `${baseIP}.110`, `${baseIP}.150`, `${baseIP}.200`, `${baseIP}.201`,
-      `${baseIP}.250`, `${baseIP}.254` // Router/gateway range
+      `${baseIP}.250`, `${baseIP}.254`
     ];
+    
+    // Then scan the entire range (except the local IP and router)
+    for (let i = 2; i <= 253; i++) {
+      const ip = `${baseIP}.${i}`;
+      if (ip !== localIP && !commonPrinterIPs.includes(ip) && i !== 1) {
+        allIPs.push(ip);
+      }
+    }
+    
+    // Priority scanning: common IPs first, then all others
+    const scanIPs = [...commonPrinterIPs, ...allIPs];
 
-    console.log(`🎯 Checking ${commonPrinterIPs.length} potential printer IPs...`);
+    console.log(`🎯 Scanning ${scanIPs.length} IP addresses...`);
+    console.log(`🔥 Priority IPs: ${commonPrinterIPs.join(', ')}`);
 
-    const probePromises = commonPrinterIPs.map(async (ip, index) => {
-      try {
-        console.log(`🔍 [${index + 1}/${commonPrinterIPs.length}] Checking ${ip}...`);
-        const printer = await this.probePrinterAtIP(ip);
-        if (printer) {
-          console.log(`✅ Found printer at ${ip}: ${printer.name}`);
+    // Use a batch approach to avoid overwhelming the browser
+    const batchSize = 10;
+    const batches = [];
+    for (let i = 0; i < scanIPs.length; i += batchSize) {
+      batches.push(scanIPs.slice(i, i + batchSize));
+    }
+
+    console.log(`📦 Scanning in ${batches.length} batches of ${batchSize} IPs each`);
+
+    for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+      const batch = batches[batchIndex];
+      console.log(`📦 Batch ${batchIndex + 1}/${batches.length}: ${batch.join(', ')}`);
+      
+      const batchPromises = batch.map(async (ip, index) => {
+        try {
+          const globalIndex = batchIndex * batchSize + index + 1;
+          console.log(`🔍 [${globalIndex}/${scanIPs.length}] Checking ${ip}...`);
+          const printer = await this.probePrinterAtIP(ip);
+          if (printer) {
+            console.log(`🎉 FOUND PRINTER at ${ip}: ${printer.name}`);
+          }
+          return printer;
+        } catch (error) {
+          return null;
         }
-        return printer;
-      } catch (error) {
-        console.log(`❌ No printer at ${ip}`);
-        return null;
-      }
-    });
+      });
 
-    const results = await Promise.allSettled(probePromises);
-    results.forEach((result, index) => {
-      if (result.status === 'fulfilled' && result.value) {
-        printers.push(result.value);
+      const batchResults = await Promise.allSettled(batchPromises);
+      batchResults.forEach((result) => {
+        if (result.status === 'fulfilled' && result.value) {
+          printers.push(result.value);
+        }
+      });
+
+      // If we found printers in priority IPs, we can stop early
+      if (printers.length > 0 && batchIndex === 0) {
+        console.log(`✅ Found ${printers.length} printer(s) in priority batch, stopping scan`);
+        break;
       }
-    });
+
+      // Small delay between batches to prevent overwhelming
+      if (batchIndex < batches.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    }
 
     console.log(`🎯 Network scan complete: ${printers.length} printers found`);
     return printers;
