@@ -3,14 +3,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Download, Eye, FileText, Upload, Plus, Trash2, Printer, Scan } from "lucide-react";
+import { Download, Eye, FileText, Upload, Plus, Trash2, Printer } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import NetworkScannerDialog from "./NetworkScannerDialog";
+
 
 interface OrderFile {
   id: string;
@@ -60,8 +60,6 @@ export default function ProcessingOrderFilesDialog({
   const [loading, setLoading] = useState(false);
   const [uploadingFiles, setUploadingFiles] = useState<{ [key: string]: boolean }>({});
   const [deletingFiles, setDeletingFiles] = useState<{ [key: string]: boolean }>({});
-  const [showScannerDialog, setShowScannerDialog] = useState(false);
-  const [scanFileType, setScanFileType] = useState<'quote' | 'purchase-order' | 'invoice' | 'delivery-note' | null>(null);
 
   const fetchOrderFiles = async () => {
     if (!order?.id || !user?.id) return;
@@ -309,18 +307,6 @@ export default function ProcessingOrderFilesDialog({
     }
   };
 
-  const handleScanRequest = (fileType: 'quote' | 'purchase-order' | 'invoice' | 'delivery-note') => {
-    setScanFileType(fileType);
-    setShowScannerDialog(true);
-  };
-
-  const handleScanComplete = async (scannedFile: File) => {
-    if (scanFileType) {
-      await handleFileUpload(scannedFile, scanFileType);
-      setShowScannerDialog(false);
-      setScanFileType(null);
-    }
-  };
 
   const FileUploadSection = ({ fileType }: { fileType: 'quote' | 'purchase-order' | 'invoice' | 'delivery-note' }) => {
     const inputId = `file-upload-${fileType}`;
@@ -331,7 +317,7 @@ export default function ProcessingOrderFilesDialog({
     }
     
     return (
-        <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 space-y-4">
+      <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 space-y-4">
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="flex-1">
             <Label htmlFor={inputId} className="text-sm font-medium text-gray-700">
@@ -356,17 +342,6 @@ export default function ProcessingOrderFilesDialog({
             <p className="text-xs text-gray-500 mt-1">
               Supported formats: PDF, JPG, PNG (Max 10MB)
             </p>
-          </div>
-          <div className="flex flex-col gap-2">
-            <Button
-              variant="outline"
-              onClick={() => handleScanRequest(fileType)}
-              disabled={uploadingFiles[fileType]}
-              className="flex items-center gap-2 whitespace-nowrap"
-            >
-              <Scan className="h-4 w-4" />
-              Network Scan
-            </Button>
           </div>
         </div>
         
@@ -568,14 +543,6 @@ export default function ProcessingOrderFilesDialog({
           </TabsContent>
         </Tabs>
 
-        <NetworkScannerDialog
-          isOpen={showScannerDialog}
-          onClose={() => {
-            setShowScannerDialog(false);
-            setScanFileType(null);
-          }}
-          onScanComplete={handleScanComplete}
-        />
       </DialogContent>
     </Dialog>
   );

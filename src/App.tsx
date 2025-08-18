@@ -9,7 +9,7 @@ const ClientDashboard = lazy(() => import('./pages/ClientDashboard'));
 const Settings = lazy(() => import('./pages/Settings'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 const ResetPassword = lazy(() => import('./pages/ResetPassword'));
-const MobileScanPage = lazy(() => import('./components/orders/components/MobileScanPage'));
+
 import { AuthProvider } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
@@ -66,7 +66,7 @@ function App() {
                       <Settings />
                     </ProtectedRoute>
                   } />
-                  <Route path="/mobile-scan/:sessionId/:orderId/:fileType" element={<MobileScanPage />} />
+                  
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </Suspense>
