@@ -525,41 +525,53 @@ export class HardwareScannerService {
   private async launchSystemScanner(scanner: HardwareScanner): Promise<{ success: boolean; message: string }> {
     try {
       if (navigator.userAgent.includes('Windows')) {
-        // Launch Windows scanner without navigation
+        // Simple approach - try to open Windows Fax and Scan directly
         try {
-          // Method 1: Try creating and clicking a link without adding to DOM
-          const tempLink = document.createElement('a');
-          tempLink.href = 'ms-winscan:';
-          tempLink.style.display = 'none';
+          // Open printer settings which should show scanners
+          window.open('ms-settings:printers', '_blank');
           
-          // Add event listener to prevent default navigation
-          tempLink.addEventListener('click', (e) => {
-            e.preventDefault();
-            // The protocol will still trigger even with preventDefault
-            return false;
-          });
-          
-          tempLink.click();
+          setTimeout(() => {
+            alert(`Scanner access opened in Windows Settings.
+
+To scan:
+1. Find your scanner in the devices list
+2. Click on your scanner
+3. Click "Open scanner" or use the scanning features
+4. Or search "Windows Fax and Scan" in Start Menu for dedicated scanning app
+
+Your scanned documents can then be uploaded to this app.`);
+          }, 1000);
           
           return {
             success: true,
-            message: 'Opening Windows Scan app...'
+            message: 'Opening Windows printer/scanner settings. Follow the instructions to access your scanner.'
           };
         } catch (error) {
-          // Fallback: Provide manual instructions
-          const instructions = `To open Windows Scan manually:
-          
-1. Press Windows key + R to open Run dialog
-2. Type: ms-winscan:
-3. Press Enter
+          // Fallback: Provide comprehensive manual instructions
+          const manualInstructions = `To access your scanner on Windows:
 
-Or search for "Windows Scan" in Start Menu`;
+METHOD 1 - Windows Settings:
+1. Press Windows key + I to open Settings
+2. Go to Devices > Printers & scanners  
+3. Click on your scanner device
+4. Click "Open scanner" 
+
+METHOD 2 - Windows Fax and Scan:
+1. Search "Windows Fax and Scan" in Start Menu
+2. Click "New Scan" 
+3. Select your scanner and scan settings
+4. Click "Scan"
+
+METHOD 3 - Printer Software:
+Use your printer manufacturer's scanning software
+
+After scanning, upload the file to this app.`;
           
-          alert(instructions);
+          alert(manualInstructions);
           
           return {
             success: true,
-            message: 'Please follow the manual instructions to open Windows Scan.'
+            message: 'Please follow the manual instructions to access your scanner.'
           };
         }
       } else if (navigator.userAgent.includes('Mac')) {
