@@ -199,25 +199,39 @@ export default function ProcessingOrderFilesDialog({
   const discoverPrinters = async () => {
     try {
       setIsDiscovering(true);
+      console.log('Starting printer discovery...');
+      
       const discoveredPrinters = await scanningService.discoverPrinters();
       setPrinters(discoveredPrinters);
       
+      console.log('Discovered devices:', discoveredPrinters);
+      
       if (discoveredPrinters.length === 0) {
+        // Check capabilities to give better error message
+        const capabilities = await scanningService.getDeviceAccessCapabilities();
+        
+        let message = "No devices found. ";
+        if (!capabilities.usb && !capabilities.bluetooth) {
+          message += "Your browser doesn't support direct device access. Use Chrome for better device support.";
+        } else {
+          message += "Click 'Find Printers/Scanners' to grant device permissions.";
+        }
+        
         toast({
-          title: "Printer discovery not available",
-          description: "Network printer scanning requires a native mobile app. Please use camera scan instead.",
+          title: "No devices discovered",
+          description: message,
         });
       } else {
         toast({
-          title: "Printers discovered",
-          description: `Found ${discoveredPrinters.length} printer(s) on the network.`,
+          title: "Devices found!",
+          description: `Found ${discoveredPrinters.length} device(s). Select one to scan.`,
         });
       }
     } catch (error) {
       console.error('Printer discovery error:', error);
       toast({
-        title: "Discovery not supported",
-        description: "Network printer discovery is not supported in web browsers.",
+        title: "Device Access Error",
+        description: "Unable to access devices. Please try using Chrome browser or grant device permissions.",
         variant: "destructive",
       });
     } finally {
@@ -582,11 +596,11 @@ export default function ProcessingOrderFilesDialog({
                   ) : (
                     <Search className="h-4 w-4" />
                   )}
-                  {isDiscovering ? "Discovering..." : "Find Printers"}
+                  {isDiscovering ? "Discovering..." : "Find Devices"}
                 </Button>
                 {printers.length > 0 && (
-                  <span className="text-sm text-muted-foreground">
-                    {printers.length} printer(s) found
+                   <span className="text-sm text-muted-foreground">
+                    {printers.length} device(s) found
                   </span>
                 )}
               </div>
@@ -604,9 +618,13 @@ export default function ProcessingOrderFilesDialog({
                     >
                       <div className="flex items-center gap-2">
                         <div className="w-2 h-2 rounded-full bg-green-500" />
-                        <div>
+                       <div>
                           <div className="font-medium text-sm">{printer.name}</div>
-                          <div className="text-xs text-muted-foreground">{printer.ip}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {printer.type === 'usb' ? 'USB Device' : 
+                             printer.type === 'bluetooth' ? 'Bluetooth' : 
+                             printer.ip || 'Network Device'}
+                          </div>
                         </div>
                       </div>
                       <div className="flex items-center gap-1">
@@ -782,7 +800,7 @@ export default function ProcessingOrderFilesDialog({
         <DialogHeader>
           <DialogTitle>Files for Order #{order.orderNumber}</DialogTitle>
           <DialogDescription>
-            Manage and upload files for this order. You can scan documents using your device camera, select from gallery, or discover network printers.
+            Manage and upload files for this order. You can scan documents using your device camera, select from gallery, or connect directly to printers and scanners using Chrome's device access APIs.
           </DialogDescription>
         </DialogHeader>
 

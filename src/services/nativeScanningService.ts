@@ -2,6 +2,33 @@ import { Capacitor } from '@capacitor/core';
 import { Camera, CameraResultType, CameraSource, Photo } from '@capacitor/camera';
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { Device } from '@capacitor/device';
+import { Browser } from '@capacitor/browser';
+
+// Type definitions for Web APIs
+declare global {
+  interface Navigator {
+    usb?: {
+      requestDevice(options: { filters: { vendorId: number }[] }): Promise<USBDevice>;
+    };
+    bluetooth?: {
+      requestDevice(options: { acceptAllDevices?: boolean; filters?: { services: string[] }[] }): Promise<BluetoothDevice>;
+    };
+  }
+}
+
+interface USBDevice {
+  vendorId: number;
+  productId: number;
+  manufacturerName?: string;
+  productName?: string;
+  open(): Promise<void>;
+  close(): Promise<void>;
+}
+
+interface BluetoothDevice {
+  id: string;
+  name?: string;
+}
 
 export interface ScanResult {
   success: boolean;
@@ -14,10 +41,12 @@ export interface ScanResult {
 export interface PrinterDevice {
   id: string;
   name: string;
-  ip: string;
+  ip?: string;
   model?: string;
   status: 'online' | 'offline' | 'unknown';
   canScan?: boolean;
+  type: 'network' | 'usb' | 'bluetooth';
+  usbDevice?: USBDevice;
 }
 
 export class NativeScanningService {
@@ -238,8 +267,22 @@ export class NativeScanningService {
         const info = await Device.getInfo();
         return info.platform === 'ios' || info.platform === 'android';
       }
+      
       // Check if browser supports camera API
-      return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+      const hasCamera = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+      
+      // Check for advanced device access APIs
+      const hasUSB = 'usb' in navigator;
+      const hasBluetooth = 'bluetooth' in navigator;
+      
+      console.log('Scanning capabilities:', {
+        camera: hasCamera,
+        usb: hasUSB,
+        bluetooth: hasBluetooth,
+        platform: 'web'
+      });
+      
+      return hasCamera; // At minimum, camera scanning should be available
     } catch (error) {
       console.error('Error checking scanning availability:', error);
       return false;
@@ -247,20 +290,93 @@ export class NativeScanningService {
   }
 
   /**
-   * Discover network printers (placeholder for native implementation)
+   * Check if device access APIs are available (USB, Bluetooth)
+   */
+  async getDeviceAccessCapabilities() {
+    return {
+      usb: 'usb' in navigator,
+      bluetooth: 'bluetooth' in navigator,
+      mediaDevices: !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia),
+      webRTC: !!(window.RTCPeerConnection || (window as any).webkitRTCPeerConnection),
+      permissions: 'permissions' in navigator
+    };
+  }
+
+  /**
+   * Discover available printers and scanners using Web USB API
    */
   async discoverPrinters(): Promise<PrinterDevice[]> {
     try {
-      // In web browsers, direct network scanning is blocked by CORS policy
-      // This would only work in a native mobile app with proper network permissions
-      if (!Capacitor.isNativePlatform()) {
-        console.log('Printer discovery requires native platform with network permissions');
+      const devices: PrinterDevice[] = [];
+      
+      if (Capacitor.isNativePlatform()) {
+        // For native platforms, use platform-specific APIs
+        console.log('Native printer discovery would use platform-specific APIs');
         return [];
       }
 
-      // For native platforms, you would use platform-specific printer discovery APIs
-      // This is a placeholder - actual implementation would use Capacitor plugins
-      return [];
+      // Web USB API for direct device access (like Chrome)
+      if ('usb' in navigator) {
+        try {
+          console.log('Requesting USB device access...');
+          const usbDevices = await navigator.usb!.requestDevice({
+            filters: [
+              // Common printer/scanner vendor IDs
+              { vendorId: 0x04b8 }, // Epson
+              { vendorId: 0x03f0 }, // HP
+              { vendorId: 0x04a9 }, // Canon
+              { vendorId: 0x04f9 }, // Brother
+              { vendorId: 0x04b4 }, // Cypress (some scanners)
+              { vendorId: 0x0924 }, // Xerox
+              { vendorId: 0x04da }, // Panasonic
+              { vendorId: 0x0483 }, // STMicroelectronics
+            ]
+          });
+
+          if (usbDevices) {
+            const device: PrinterDevice = {
+              id: `usb-${usbDevices.vendorId}-${usbDevices.productId}`,
+              name: `${usbDevices.manufacturerName || 'Unknown'} ${usbDevices.productName || 'Device'}`,
+              model: usbDevices.productName || 'Unknown Model',
+              status: 'online',
+              canScan: true,
+              type: 'usb',
+              usbDevice: usbDevices
+            };
+            devices.push(device);
+          }
+        } catch (error) {
+          console.log('USB device access denied or not available:', error);
+        }
+      }
+
+      // Check for Web Bluetooth API (some wireless printers)
+      if ('bluetooth' in navigator) {
+        try {
+          console.log('Checking for Bluetooth printers...');
+          const bluetoothDevice = await navigator.bluetooth!.requestDevice({
+            acceptAllDevices: false,
+            filters: [
+              { services: ['000018f0-0000-1000-8000-00805f9b34fb'] } // Print service UUID
+            ]
+          });
+
+          if (bluetoothDevice) {
+            const device: PrinterDevice = {
+              id: `bluetooth-${bluetoothDevice.id}`,
+              name: bluetoothDevice.name || 'Bluetooth Printer',
+              status: 'online',
+              canScan: false, // Most Bluetooth printers don't scan
+              type: 'bluetooth'
+            };
+            devices.push(device);
+          }
+        } catch (error) {
+          console.log('Bluetooth device access denied or not available:', error);
+        }
+      }
+
+      return devices;
     } catch (error) {
       console.error('Error discovering printers:', error);
       return [];
@@ -268,26 +384,27 @@ export class NativeScanningService {
   }
 
   /**
-   * Scan from a specific printer (placeholder for native implementation)
+   * Scan from a specific printer using Web APIs or native access
    */
   async scanFromPrinter(printer: PrinterDevice): Promise<ScanResult> {
     try {
-      // This would require native platform with direct network access
-      if (!Capacitor.isNativePlatform()) {
-        return {
-          success: false,
-          error: 'Network printer scanning is only available on mobile devices with proper network permissions.'
-        };
+      if (printer.type === 'usb' && printer.usbDevice) {
+        return await this.scanFromUSBDevice(printer.usbDevice);
       }
 
-      // For actual implementation, you would use:
-      // 1. Native printer SDKs (Brother, HP, Canon, etc.)
-      // 2. Platform-specific scanning APIs
-      // 3. Proper network permissions and protocols
+      if (Capacitor.isNativePlatform()) {
+        // For native platforms, use platform-specific scanning APIs
+        return await this.scanFromNativePrinter(printer);
+      }
+
+      // For web, try to open printer's web interface if it's a network printer
+      if (printer.ip) {
+        return await this.scanFromNetworkPrinter(printer);
+      }
       
       return {
         success: false,
-        error: 'Native printer scanning not yet implemented. Please use camera scan instead.'
+        error: 'Scanning from this printer type is not supported. Please use camera scan instead.'
       };
 
     } catch (error) {
@@ -295,6 +412,83 @@ export class NativeScanningService {
       return {
         success: false,
         error: `Failed to scan from printer: ${error instanceof Error ? error.message : 'Unknown error'}`
+      };
+    }
+  }
+
+  /**
+   * Scan from USB device using Web USB API
+   */
+  private async scanFromUSBDevice(usbDevice: USBDevice): Promise<ScanResult> {
+    try {
+      console.log('Attempting to scan from USB device:', usbDevice.productName);
+      
+      // Open connection to USB device
+      await usbDevice.open();
+      
+      // This is a simplified example - real implementation would depend on the specific device protocol
+      // Different manufacturers use different protocols (ESC/POS, PCL, etc.)
+      
+      // For now, return an error with instructions
+      await usbDevice.close();
+      
+      return {
+        success: false,
+        error: 'Direct USB scanning requires device-specific drivers. Please use the camera scan feature instead.'
+      };
+    } catch (error) {
+      console.error('USB scanning error:', error);
+      return {
+        success: false,
+        error: `USB device error: ${error instanceof Error ? error.message : 'Unknown error'}`
+      };
+    }
+  }
+
+  /**
+   * Scan from network printer by opening web interface
+   */
+  private async scanFromNetworkPrinter(printer: PrinterDevice): Promise<ScanResult> {
+    try {
+      // Open printer's web interface in a new tab
+      const printerUrl = `http://${printer.ip}`;
+      
+      if (Capacitor.isNativePlatform()) {
+        await Browser.open({ url: printerUrl });
+      } else {
+        window.open(printerUrl, '_blank');
+      }
+      
+      return {
+        success: false,
+        error: 'Please use the printer\'s web interface to scan, then upload the file manually.'
+      };
+    } catch (error) {
+      console.error('Network printer access error:', error);
+      return {
+        success: false,
+        error: 'Unable to access printer web interface. Please scan manually and upload the file.'
+      };
+    }
+  }
+
+  /**
+   * Scan from native printer using platform-specific APIs
+   */
+  private async scanFromNativePrinter(printer: PrinterDevice): Promise<ScanResult> {
+    try {
+      // This would use Capacitor plugins for Brother, HP, Canon, etc. SDKs
+      // For now, return instructions for manual scanning
+      
+      return {
+        success: false,
+        error: 'Native printer scanning requires manufacturer-specific plugins. Please use camera scan instead.'
+      };
+    } catch (error) {
+      console.error('Native printer scanning error:', error);
+      return {
+        success: false,
+        error: `Native scanning error: ${error instanceof Error ? error.message : 'Unknown error'}`
       };
     }
   }
