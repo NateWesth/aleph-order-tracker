@@ -32,6 +32,8 @@ const PageFallback = () => (
 );
 
 function App() {
+  console.log('App component loaded, current path:', window.location.pathname);
+  console.log('Full URL:', window.location.href);
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
