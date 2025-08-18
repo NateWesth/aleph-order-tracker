@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -508,20 +508,14 @@ export default function ProcessingOrderFilesDialog({
     return files.filter(file => file.file_type === type);
   };
 
-  const canUploadFileType = (fileType: 'quote' | 'purchase-order' | 'invoice' | 'delivery-note') => {
-    console.log('Checking upload permissions:', {
-      fileType,
-      isAdmin,
-      orderStatus: order?.status
-    });
-    
+  const canUploadFileType = useCallback((fileType: 'quote' | 'purchase-order' | 'invoice' | 'delivery-note') => {
     // Disable uploads for completed orders for non-admin users
     if (order?.status === 'completed' && !isAdmin) {
       return false;
     }
     
     return true;
-  };
+  }, [order?.status, isAdmin]);
 
   const canDeleteFile = (file: OrderFile) => {
     return isAdmin || file.uploaded_by_user_id === user?.id;
@@ -787,6 +781,9 @@ export default function ProcessingOrderFilesDialog({
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Files for Order #{order.orderNumber}</DialogTitle>
+          <DialogDescription>
+            Manage and upload files for this order. You can scan documents using your device camera, select from gallery, or discover network printers.
+          </DialogDescription>
         </DialogHeader>
 
         {isScanning && (
