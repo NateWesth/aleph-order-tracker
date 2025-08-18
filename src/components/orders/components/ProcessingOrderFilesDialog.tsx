@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Download, Eye, FileText, Upload, Plus, Trash2, Scan, Printer, Camera, ImageIcon, Search } from "lucide-react";
+import { Download, Eye, FileText, Upload, Plus, Trash2, Scan, Printer, Camera, ImageIcon, Search, Wifi } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -70,6 +70,8 @@ export default function ProcessingOrderFilesDialog({
   const [isNativeDevice, setIsNativeDevice] = useState(false);
   const [printers, setPrinters] = useState<any[]>([]);
   const [isDiscovering, setIsDiscovering] = useState(false);
+  const [manualIPInput, setManualIPInput] = useState('');
+  const [showManualIP, setShowManualIP] = useState(false);
   const scanningService = NativeScanningService.getInstance();
 
   const fetchOrderFiles = async () => {
@@ -232,6 +234,48 @@ export default function ProcessingOrderFilesDialog({
       toast({
         title: "Device Access Error",
         description: "Unable to access devices. Please try using Chrome browser or grant device permissions.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDiscovering(false);
+    }
+  };
+
+  // Add network printer manually
+  const addNetworkPrinter = async () => {
+    if (!manualIPInput.trim()) {
+      toast({
+        title: "IP Address Required",
+        description: "Please enter a valid IP address.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setIsDiscovering(true);
+      const printer = await scanningService.addNetworkPrinter(manualIPInput.trim());
+      
+      if (printer) {
+        setPrinters(prev => [...prev, printer]);
+        setManualIPInput('');
+        setShowManualIP(false);
+        toast({
+          title: "Printer Added",
+          description: `Network printer at ${printer.ip} has been added.`,
+        });
+      } else {
+        toast({
+          title: "Printer Not Found",
+          description: `No printer found at ${manualIPInput}. Check the IP address and ensure the printer is online.`,
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error('Error adding network printer:', error);
+      toast({
+        title: "Connection Error",
+        description: "Unable to connect to the printer. Please verify the IP address.",
         variant: "destructive",
       });
     } finally {
@@ -582,7 +626,7 @@ export default function ProcessingOrderFilesDialog({
           <div className="space-y-3">
             {/* Printer Scanning Section */}
             <div className="space-y-2">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <Button
                   type="button"
                   variant="outline"
@@ -598,6 +642,18 @@ export default function ProcessingOrderFilesDialog({
                   )}
                   {isDiscovering ? "Discovering..." : "Find Devices"}
                 </Button>
+                
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowManualIP(!showManualIP)}
+                  className="flex items-center gap-2"
+                >
+                  <Wifi className="h-4 w-4" />
+                  Add Network Printer
+                </Button>
+                
                 {printers.length > 0 && (
                    <span className="text-sm text-muted-foreground">
                     {printers.length} device(s) found
@@ -636,6 +692,37 @@ export default function ProcessingOrderFilesDialog({
                 </div>
               )}
             </div>
+
+            {/* Manual IP Input */}
+            {showManualIP && (
+              <div className="border rounded-lg p-3 bg-muted/50">
+                <Label htmlFor="printer-ip" className="text-sm font-medium">
+                  Network Printer IP Address
+                </Label>
+                <div className="flex gap-2 mt-1">
+                  <Input
+                    id="printer-ip"
+                    type="text"
+                    placeholder="e.g., 192.168.1.100"
+                    value={manualIPInput}
+                    onChange={(e) => setManualIPInput(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && addNetworkPrinter()}
+                    className="flex-1"
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={addNetworkPrinter}
+                    disabled={isDiscovering || !manualIPInput.trim()}
+                  >
+                    Add
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Enter the IP address of your network printer (e.g., HP, Canon, Brother)
+                </p>
+              </div>
+            )}
 
             {/* Alternative Methods */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">

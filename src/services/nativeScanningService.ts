@@ -303,9 +303,9 @@ export class NativeScanningService {
   }
 
   /**
-   * Discover available printers and scanners using Web USB API
+   * Discover available printers and scanners using multiple methods
    */
-  async discoverPrinters(): Promise<PrinterDevice[]> {
+   async discoverPrinters(): Promise<PrinterDevice[]> {
     try {
       const devices: PrinterDevice[] = [];
       
@@ -315,7 +315,7 @@ export class NativeScanningService {
         return [];
       }
 
-      // Web USB API for direct device access (like Chrome)
+      // 1. Web USB API for direct USB device access
       if ('usb' in navigator) {
         try {
           console.log('Requesting USB device access...');
@@ -350,7 +350,7 @@ export class NativeScanningService {
         }
       }
 
-      // Check for Web Bluetooth API (some wireless printers)
+      // 2. Web Bluetooth API for wireless printers
       if ('bluetooth' in navigator) {
         try {
           console.log('Checking for Bluetooth printers...');
@@ -376,10 +376,180 @@ export class NativeScanningService {
         }
       }
 
+      // 3. Network printer discovery using WebRTC local network enumeration
+      try {
+        console.log('Discovering network printers...');
+        const networkDevices = await this.discoverNetworkPrinters();
+        devices.push(...networkDevices);
+      } catch (error) {
+        console.log('Network printer discovery failed:', error);
+      }
+
       return devices;
     } catch (error) {
       console.error('Error discovering printers:', error);
       return [];
+    }
+  }
+
+  /**
+   * Discover network printers using WebRTC and common printer protocols
+   */
+  private async discoverNetworkPrinters(): Promise<PrinterDevice[]> {
+    const devices: PrinterDevice[] = [];
+    
+    try {
+      // Get local network IP range using WebRTC
+      const localIPs = await this.getLocalNetworkIPs();
+      console.log('Local network IPs detected:', localIPs);
+      
+      // Scan common printer ports on local network
+      for (const baseIP of localIPs) {
+        const networkDevices = await this.scanNetworkRange(baseIP);
+        devices.push(...networkDevices);
+      }
+      
+      // Add manually discoverable common network printers
+      const commonPrinters = await this.checkCommonPrinterIPs();
+      devices.push(...commonPrinters);
+      
+    } catch (error) {
+      console.log('Network discovery error:', error);
+    }
+    
+    return devices;
+  }
+
+  /**
+   * Get local network IP addresses using WebRTC
+   */
+  private async getLocalNetworkIPs(): Promise<string[]> {
+    return new Promise((resolve) => {
+      const ips: string[] = [];
+      const rtc = new RTCPeerConnection({
+        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+      });
+
+      rtc.createDataChannel('');
+      rtc.onicecandidate = (event) => {
+        if (event.candidate) {
+          const ip = event.candidate.candidate.match(/(\d+\.\d+\.\d+\.\d+)/);
+          if (ip && ip[1] && !ips.includes(ip[1])) {
+            // Only add private IP ranges
+            const ipAddr = ip[1];
+            if (ipAddr.startsWith('192.168.') || 
+                ipAddr.startsWith('10.') || 
+                ipAddr.startsWith('172.')) {
+              ips.push(ipAddr);
+            }
+          }
+        }
+      };
+
+      rtc.createOffer().then(offer => rtc.setLocalDescription(offer));
+      
+      // Give it 2 seconds to collect IPs
+      setTimeout(() => {
+        rtc.close();
+        resolve(ips);
+      }, 2000);
+    });
+  }
+
+  /**
+   * Scan network range for printers
+   */
+  private async scanNetworkRange(baseIP: string): Promise<PrinterDevice[]> {
+    const devices: PrinterDevice[] = [];
+    const ipParts = baseIP.split('.');
+    const networkBase = `${ipParts[0]}.${ipParts[1]}.${ipParts[2]}`;
+    
+    // Check common printer IP addresses (avoiding full network scan due to browser limitations)
+    const commonLastOctets = [1, 2, 3, 4, 5, 10, 20, 50, 100, 150, 200, 250];
+    
+    const checkPromises = commonLastOctets.map(async (lastOctet) => {
+      const ip = `${networkBase}.${lastOctet}`;
+      try {
+        const printer = await this.checkPrinterAtIP(ip);
+        if (printer) devices.push(printer);
+      } catch (error) {
+        // Ignore errors for individual IP checks
+      }
+    });
+    
+    await Promise.all(checkPromises);
+    return devices;
+  }
+
+  /**
+   * Check common printer IPs that users often configure
+   */
+  private async checkCommonPrinterIPs(): Promise<PrinterDevice[]> {
+    const devices: PrinterDevice[] = [];
+    const commonIPs = [
+      '192.168.1.100', '192.168.1.200', '192.168.1.150',
+      '192.168.0.100', '192.168.0.200', '192.168.0.150',
+      '10.0.0.100', '10.0.0.200', '10.0.1.100'
+    ];
+    
+    const checkPromises = commonIPs.map(async (ip) => {
+      try {
+        const printer = await this.checkPrinterAtIP(ip);
+        if (printer) devices.push(printer);
+      } catch (error) {
+        // Ignore errors
+      }
+    });
+    
+    await Promise.all(checkPromises);
+    return devices;
+  }
+
+  /**
+   * Check if a printer exists at the given IP
+   */
+  private async checkPrinterAtIP(ip: string): Promise<PrinterDevice | null> {
+    try {
+      // Try to access common printer web interfaces
+      const response = await fetch(`http://${ip}`, { 
+        method: 'HEAD',
+        mode: 'no-cors',
+        signal: AbortSignal.timeout(1000) // 1 second timeout
+      });
+      
+      // If we get here, there's something at this IP
+      return {
+        id: `network-${ip}`,
+        name: `Network Printer (${ip})`,
+        ip: ip,
+        status: 'online',
+        canScan: true,
+        type: 'network'
+      };
+    } catch (error) {
+      // Try alternative ports
+      const alternatePorts = [631, 9100, 8080, 80];
+      for (const port of alternatePorts) {
+        try {
+          await fetch(`http://${ip}:${port}`, { 
+            method: 'HEAD',
+            mode: 'no-cors',
+            signal: AbortSignal.timeout(500)
+          });
+          
+          return {
+            id: `network-${ip}-${port}`,
+            name: `Network Printer (${ip}:${port})`,
+            ip: `${ip}:${port}`,
+            status: 'online',
+            canScan: true,
+            type: 'network'
+          };
+        } catch (portError) {
+          // Continue to next port
+        }
+      }
+      return null;
     }
   }
 
@@ -493,7 +663,22 @@ export class NativeScanningService {
     }
   }
 
-
+  
+  /**
+   * Add a network printer manually by IP address
+   */
+  async addNetworkPrinter(ip: string, name?: string): Promise<PrinterDevice | null> {
+    try {
+      const printer = await this.checkPrinterAtIP(ip);
+      if (printer && name) {
+        printer.name = name;
+      }
+      return printer;
+    } catch (error) {
+      console.error('Error adding network printer:', error);
+      return null;
+    }
+  }
   /**
    * Get device info for debugging
    */
