@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Download, Eye, FileText, Upload, Plus, Trash2, Scan, Printer, Camera } from "lucide-react";
+import { Download, Eye, FileText, Upload, Plus, Trash2, Scan, Printer, Camera, ImageIcon, Search } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -68,6 +68,8 @@ export default function ProcessingOrderFilesDialog({
   const [currentScanType, setCurrentScanType] = useState<'quote' | 'purchase-order' | 'invoice' | 'delivery-note' | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [isNativeDevice, setIsNativeDevice] = useState(false);
+  const [printers, setPrinters] = useState<any[]>([]);
+  const [isDiscovering, setIsDiscovering] = useState(false);
   const scanningService = NativeScanningService.getInstance();
 
   const fetchOrderFiles = async () => {
@@ -190,6 +192,67 @@ export default function ProcessingOrderFilesDialog({
       });
     } finally {
       setUploadingFiles(prev => ({ ...prev, [fileType]: false }));
+    }
+  };
+
+  // Printer discovery and scanning
+  const discoverPrinters = async () => {
+    try {
+      setIsDiscovering(true);
+      const discoveredPrinters = await scanningService.discoverPrinters();
+      setPrinters(discoveredPrinters);
+      
+      if (discoveredPrinters.length === 0) {
+        toast({
+          title: "No printers found",
+          description: "Make sure your printer is connected to the same network and supports scanning.",
+        });
+      } else {
+        toast({
+          title: "Printers discovered",
+          description: `Found ${discoveredPrinters.length} printer(s) on the network.`,
+        });
+      }
+    } catch (error) {
+      console.error('Printer discovery error:', error);
+      toast({
+        title: "Discovery failed",
+        description: "Failed to discover network printers",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDiscovering(false);
+    }
+  };
+
+  const handlePrinterScan = async (printer: any, fileType: 'quote' | 'purchase-order' | 'invoice' | 'delivery-note') => {
+    try {
+      setScanningFiles(prev => ({ ...prev, [fileType]: true }));
+      const result = await scanningService.scanFromPrinter(printer);
+      
+      if (result.success && result.base64Data) {
+        const file = scanningService.base64ToFile(result.base64Data, result.fileName || 'scan.jpg');
+        await handleFileUpload(file, fileType);
+        toast({
+          title: "Document scanned successfully",
+          description: `Document scanned from ${printer.name}`,
+        });
+      } else {
+        toast({
+          title: "Scan failed",
+          description: result.error || "Failed to scan from printer",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error('Printer scan error:', error);
+      toast({
+        title: "Scan error",
+        description: "An error occurred while scanning from printer",
+        variant: "destructive",
+      });
+    } finally {
+      setScanningFiles(prev => ({ ...prev, [fileType]: false }));
     }
   };
 
@@ -508,44 +571,100 @@ export default function ProcessingOrderFilesDialog({
             </p>
           </div>
           
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => handleNativeScan(fileType)}
-              disabled={scanningFiles[fileType]}
-              className="w-full"
-            >
-              {scanningFiles[fileType] ? (
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
-              ) : (
-                <Scan className="h-4 w-4" />
+          <div className="space-y-3">
+            {/* Printer Scanning Section */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={discoverPrinters}
+                  disabled={isDiscovering}
+                  className="flex items-center gap-2"
+                >
+                  {isDiscovering ? (
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                  ) : (
+                    <Search className="h-4 w-4" />
+                  )}
+                  {isDiscovering ? "Discovering..." : "Find Printers"}
+                </Button>
+                {printers.length > 0 && (
+                  <span className="text-sm text-muted-foreground">
+                    {printers.length} printer(s) found
+                  </span>
+                )}
+              </div>
+              
+              {printers.length > 0 && (
+                <div className="grid gap-2 max-h-32 overflow-y-auto border rounded-lg p-2">
+                  {printers.map((printer) => (
+                    <Button
+                      key={printer.id}
+                      onClick={() => handlePrinterScan(printer, fileType)}
+                      disabled={scanningFiles[fileType]}
+                      variant="outline"
+                      size="sm"
+                      className="flex items-center justify-between text-left h-auto py-2"
+                    >
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-green-500" />
+                        <div>
+                          <div className="font-medium text-sm">{printer.name}</div>
+                          <div className="text-xs text-muted-foreground">{printer.ip}</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Printer className="h-3 w-3" />
+                        <span className="text-xs">Scan</span>
+                      </div>
+                    </Button>
+                  ))}
+                </div>
               )}
-              Camera Scan
-            </Button>
-            
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => handleGallerySelect(fileType)}
-              className="w-full"
-            >
-              <Upload className="h-4 w-4" />
-              Select from Gallery
-            </Button>
+            </div>
 
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => startScanning(fileType)}
-              className="w-full"
-            >
-              <Scan className="h-4 w-4" />
-              Manual Scan
-            </Button>
+            {/* Alternative Methods */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => handleNativeScan(fileType)}
+                disabled={scanningFiles[fileType]}
+                className="w-full"
+              >
+                {scanningFiles[fileType] ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                ) : (
+                  <Camera className="h-4 w-4" />
+                )}
+                Camera Scan
+              </Button>
+              
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => handleGallerySelect(fileType)}
+                className="w-full"
+              >
+                <ImageIcon className="h-4 w-4" />
+                From Gallery
+              </Button>
+
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => startScanning(fileType)}
+                className="w-full"
+              >
+                <Scan className="h-4 w-4" />
+                Web Camera
+              </Button>
+            </div>
           </div>
         </div>
         
