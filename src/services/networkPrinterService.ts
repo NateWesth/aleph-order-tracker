@@ -264,12 +264,41 @@ export class NetworkPrinterService {
     const protocol = port === 443 ? 'https' : 'http';
     const url = `${protocol}://${ip}${port !== 80 && port !== 443 ? `:${port}` : ''}`;
     
-    // Method 1: Try fetch with very short timeout
+    // Method 1: Try creating an image element to test connectivity (bypasses CORS)
+    try {
+      return new Promise((resolve) => {
+        const img = new Image();
+        const timeout = setTimeout(() => {
+          img.src = '';
+          resolve(false);
+        }, 2000);
+        
+        img.onload = () => {
+          clearTimeout(timeout);
+          console.log(`✅ Image load successful for ${url}`);
+          resolve(true);
+        };
+        
+        img.onerror = () => {
+          clearTimeout(timeout);
+          // Even an error response means the server is responding
+          console.log(`✅ Server responding at ${url} (image error expected)`);
+          resolve(true);
+        };
+        
+        // Try to load a common printer interface file
+        img.src = `${url}/favicon.ico`;
+      });
+    } catch (error) {
+      console.log(`❌ Image test failed for ${url}`);
+    }
+
+    // Method 2: Try fetch with no-cors (last resort)
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 1500);
+      const timeoutId = setTimeout(() => controller.abort(), 1000);
       
-      const response = await fetch(url, {
+      await fetch(url, {
         method: 'HEAD',
         signal: controller.signal,
         mode: 'no-cors'
@@ -282,33 +311,6 @@ export class NetworkPrinterService {
       console.log(`❌ Fetch failed for ${url}: ${fetchError instanceof Error ? fetchError.message : 'Unknown'}`);
     }
 
-    // Method 2: Try WebSocket connection (for devices that support it)
-    try {
-      const wsUrl = `ws://${ip}${port !== 80 ? `:${port}` : ''}`;
-      const ws = new WebSocket(wsUrl);
-      
-      return new Promise((resolve) => {
-        const timeout = setTimeout(() => {
-          ws.close();
-          resolve(false);
-        }, 1000);
-        
-        ws.onopen = () => {
-          clearTimeout(timeout);
-          ws.close();
-          console.log(`✅ WebSocket connection successful for ${wsUrl}`);
-          resolve(true);
-        };
-        
-        ws.onerror = () => {
-          clearTimeout(timeout);
-          resolve(false);
-        };
-      });
-    } catch (wsError) {
-      console.log(`❌ WebSocket failed for ${ip}:${port}`);
-    }
-
     return false;
   }
 
@@ -318,37 +320,43 @@ export class NetworkPrinterService {
       const protocol = port === 443 ? 'https' : 'http';
       const url = `${protocol}://${ip}${port !== 80 && port !== 443 ? `:${port}` : ''}`;
       
-      // Try to get server headers or page title
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 2000);
+      // Use Image element to test common printer endpoints
+      const testPaths = [
+        '/hp/device/info_device_status.html',
+        '/general/information.html',
+        '/DevMgmt/ProductConfigDyn.xml',
+        '/canon',
+        '/epson',
+        '/brother'
+      ];
       
-      const response = await fetch(url, {
-        method: 'GET',
-        signal: controller.signal,
-        mode: 'cors' // Try CORS first
-      });
-      
-      clearTimeout(timeoutId);
-      
-      if (response.ok) {
-        const text = await response.text();
-        
-        // Look for common printer identifiers in the page
-        const identifiers = [
-          { pattern: /HP\s+\w+/i, name: 'HP Printer' },
-          { pattern: /Canon\s+\w+/i, name: 'Canon Printer' },
-          { pattern: /Epson\s+\w+/i, name: 'Epson Printer' },
-          { pattern: /Brother\s+\w+/i, name: 'Brother Printer' },
-          { pattern: /Xerox\s+\w+/i, name: 'Xerox Printer' },
-          { pattern: /Samsung\s+\w+/i, name: 'Samsung Printer' },
-          { pattern: /Kyocera\s+\w+/i, name: 'Kyocera Printer' }
-        ];
-        
-        for (const { pattern, name } of identifiers) {
-          if (pattern.test(text)) {
-            console.log(`🏷️ Identified printer: ${name}`);
-            return name;
+      for (const path of testPaths) {
+        try {
+          const testUrl = `${url}${path}`;
+          const reachable = await new Promise<boolean>((resolve) => {
+            const img = new Image();
+            const timeout = setTimeout(() => {
+              img.src = '';
+              resolve(false);
+            }, 1000);
+            
+            img.onload = img.onerror = () => {
+              clearTimeout(timeout);
+              resolve(true);
+            };
+            
+            img.src = testUrl;
+          });
+          
+          if (reachable) {
+            if (path.includes('hp')) return 'HP Printer';
+            if (path.includes('canon')) return 'Canon Printer';
+            if (path.includes('epson')) return 'Epson Printer';
+            if (path.includes('brother')) return 'Brother Printer';
+            return 'Network Printer';
           }
+        } catch {
+          continue;
         }
       }
     } catch (error) {
@@ -438,37 +446,45 @@ export class NetworkPrinterService {
     try {
       console.log(`📊 Enriching info for ${printer.name}...`);
       
-      // Try common printer info endpoints
-      const infoUrls = [
-        `${printer.webUrl}/general/information.html`,
-        `${printer.webUrl}/hp/device/info_device_status.html`,
-        `${printer.webUrl}/DevMgmt/ProductConfigDyn.xml`,
-        `${printer.webUrl}/general/status.html`,
-        `${printer.webUrl}/status.html`,
-        `${printer.webUrl}/`,
+      // Use image test for common printer endpoints
+      const infoEndpoints = [
+        '/general/information.html',
+        '/hp/device/info_device_status.html',
+        '/DevMgmt/ProductConfigDyn.xml',
+        '/general/status.html',
+        '/status.html'
       ];
 
-      for (const url of infoUrls) {
+      for (const endpoint of infoEndpoints) {
         try {
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 1000);
-          
-          const response = await fetch(url, {
-            method: 'GET',
-            signal: controller.signal,
-            mode: 'no-cors'
+          const testUrl = `${printer.webUrl}${endpoint}`;
+          const reachable = await new Promise<boolean>((resolve) => {
+            const img = new Image();
+            const timeout = setTimeout(() => {
+              img.src = '';
+              resolve(false);
+            }, 1000);
+            
+            img.onload = img.onerror = () => {
+              clearTimeout(timeout);
+              resolve(true);
+            };
+            
+            img.src = testUrl;
           });
           
-          clearTimeout(timeoutId);
-          
-          if (response.type === 'opaque' || response.ok) {
-            // Successfully connected to info page
+          if (reachable) {
             printer.status = 'online';
-            console.log(`📊 Successfully connected to ${url}`);
+            console.log(`📊 Successfully reached ${testUrl}`);
+            
+            // Set manufacturer based on endpoint type
+            if (endpoint.includes('hp')) {
+              printer.manufacturer = 'HP';
+            }
             break;
           }
         } catch {
-          // Continue to next URL
+          // Continue to next endpoint
         }
       }
     } catch (error) {
