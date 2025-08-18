@@ -34,6 +34,11 @@ const PageFallback = () => (
 function App() {
   console.log('App component loaded, current path:', window.location.pathname);
   console.log('Full URL:', window.location.href);
+  
+  // Capture reset password parameters before router processes them
+  const resetParams = window.location.pathname === '/reset-password' && window.location.hash 
+    ? new URLSearchParams(window.location.hash.substring(1))
+    : null;
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>

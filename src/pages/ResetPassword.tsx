@@ -23,17 +23,18 @@ type ResetPasswordValues = z.infer<typeof resetPasswordSchema>;
 
 const ResetPassword = () => {
   console.log('ResetPassword component loaded');
-  console.log('Current URL:', window.location.href);
-  console.log('Current pathname:', window.location.pathname);
-  console.log('Current hash:', window.location.hash);
-  console.log('Current search:', window.location.search);
   
-  // Capture hash parameters immediately before they get lost
-  const [hashParams] = useState(() => {
-    const hash = window.location.hash.substring(1);
-    console.log('Captured hash on mount:', hash);
-    return new URLSearchParams(hash);
-  });
+  // Parse the original URL from the browser's location
+  const originalUrl = window.location.href;
+  console.log('Original URL from href:', originalUrl);
+  
+  // Extract hash parameters from the original URL
+  const hashMatch = originalUrl.match(/#(.+)$/);
+  const hashString = hashMatch ? hashMatch[1] : '';
+  console.log('Extracted hash string:', hashString);
+  
+  const hashParams = new URLSearchParams(hashString);
+  console.log('Parsed hash params:', Object.fromEntries(hashParams.entries()));
   
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
