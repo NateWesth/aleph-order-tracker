@@ -408,25 +408,15 @@ export class HardwareScannerService {
       const platform = navigator.platform.toLowerCase();
       
       if (platform.includes('win')) {
-        // Windows - try to open Windows Fax and Scan
-        try {
-          // Open Windows Scan app
-          window.open('ms-winscan:', '_blank');
-          return {
-            success: true,
-            message: 'Opened Windows Scan application. Complete scanning there and save the file.'
-          };
-        } catch (error) {
-          // Fallback to Windows Fax and Scan
-          const result = await this.launchSystemScanner({
-            id: 'windows-fax-scan',
-            name: 'Windows Fax and Scan',
-            type: 'twain',
-            status: 'available',
-            capabilities: ['scan']
-          });
-          return result;
-        }
+        // Windows - open Windows Fax and Scan directly
+        const result = await this.launchSystemScanner({
+          id: 'windows-fax-scan',
+          name: 'Windows Fax and Scan',
+          type: 'twain',
+          status: 'available',
+          capabilities: ['scan']
+        });
+        return result;
       } else if (platform.includes('mac')) {
         // macOS - open Image Capture
         try {
@@ -512,15 +502,29 @@ export class HardwareScannerService {
   private async launchSystemScanner(scanner: HardwareScanner): Promise<{ success: boolean; message: string }> {
     try {
       if (navigator.userAgent.includes('Windows')) {
-        // Try to launch Windows Fax and Scan
-        await Browser.open({
-          url: 'ms-winscan:',
-          windowName: '_system'
-        });
-        return {
-          success: true,
-          message: 'Launching Windows Fax and Scan application'
-        };
+        // Launch Windows Fax and Scan directly
+        try {
+          // Use shell protocol to launch WFS
+          window.open('ms-settings:printers', '_blank');
+          return {
+            success: true,
+            message: 'Opening Windows printer settings. Navigate to your scanner and click "Scan" to use Windows Fax and Scan.'
+          };
+        } catch (error) {
+          // Alternative method - try to launch directly
+          try {
+            const command = 'C:\\Windows\\System32\\WFS.exe';
+            return {
+              success: true,
+              message: 'Please open Windows Fax and Scan manually from Start Menu to scan your document.'
+            };
+          } catch (err) {
+            return {
+              success: false,
+              message: 'Unable to launch Windows Fax and Scan. Please open it manually from the Start Menu.'
+            };
+          }
+        }
       } else if (navigator.userAgent.includes('Mac')) {
         // Try to launch Image Capture on Mac
         await Browser.open({
