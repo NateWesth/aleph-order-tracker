@@ -10,7 +10,7 @@ export default function OrdersHeader({
   onSearchChange
 }: OrdersHeaderProps) {
   return <div className="flex justify-between items-center mb-6">
-      <h1 className="text-2xl font-bold text-aleph-green">Orders Management</h1>
+      <h1 className="font-bold text-[inheritinher] text-emerald-950">Orders Management</h1>
       <div className="flex items-center gap-2">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
