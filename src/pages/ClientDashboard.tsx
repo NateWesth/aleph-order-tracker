@@ -5,7 +5,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { SidebarProvider, Sidebar, SidebarContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarFooter } from "@/components/ui/sidebar";
-import { Home, FileText, ListOrdered, BarChart2, Settings, Files } from "lucide-react";
+import { Home, FileText, ListOrdered, BarChart2, Settings, Files, List } from "lucide-react";
+import { OrdersListButton } from "@/components/OrdersListButton";
 import OrdersPage from "@/components/orders/OrdersPage";
 import ProgressPage from "@/components/orders/ProgressPage";
 import ProcessingPage from "@/components/orders/ProcessingPage";
@@ -101,6 +102,11 @@ const ClientDashboard = () => {
                   <FileText />
                   <span>Completed</span>
                 </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <div className="px-3 py-2">
+                  <OrdersListButton />
+                </div>
               </SidebarMenuItem>
             </SidebarMenu>
           </SidebarContent>

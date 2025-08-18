@@ -7,7 +7,8 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { ProcessedLogo } from "@/components/ui/ProcessedLogo";
 import { supabase } from "@/integrations/supabase/client";
 import { SidebarProvider, Sidebar, SidebarContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarFooter } from "@/components/ui/sidebar";
-import { Home, FileText, ListOrdered, BarChart2, Settings, Files, Building2, Users } from "lucide-react";
+import { Home, FileText, ListOrdered, BarChart2, Settings, Files, Building2, Users, List } from "lucide-react";
+import { OrdersListButton } from "@/components/OrdersListButton";
 import OrdersPage from "@/components/orders/OrdersPage";
 import ProgressPage from "@/components/orders/ProgressPage";
 import ProcessingPage from "@/components/orders/ProcessingPage";
@@ -125,6 +126,11 @@ const AdminDashboard = () => {
                   <FileText />
                   <span>Completed</span>
                 </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <div className="px-3 py-2">
+                  <OrdersListButton />
+                </div>
               </SidebarMenuItem>
             </SidebarMenu>
           </SidebarContent>
