@@ -527,13 +527,19 @@ export class HardwareScannerService {
       if (navigator.userAgent.includes('Windows')) {
         // Launch Windows Scan app directly
         try {
-          // Create a temporary link and click it to bypass popup blockers
-          const link = document.createElement('a');
-          link.href = 'ms-winscan:';
-          link.target = '_blank';
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
+          // Method 1: Use window.open with proper parameters
+          const scanWindow = window.open('ms-winscan:', '_blank', 'noopener,noreferrer');
+          
+          // Close the blank window that might open if protocol isn't handled
+          if (scanWindow) {
+            setTimeout(() => {
+              try {
+                scanWindow.close();
+              } catch (e) {
+                // Ignore close errors
+              }
+            }, 1000);
+          }
           
           return {
             success: true,
@@ -541,24 +547,29 @@ export class HardwareScannerService {
           };
         } catch (error) {
           try {
-            // Fallback: try to open via window.location
-            const originalLocation = window.location.href;
-            window.location.href = 'ms-winscan:';
-            // Restore location after a moment
+            // Method 2: Create iframe to trigger protocol
+            const iframe = document.createElement('iframe');
+            iframe.style.display = 'none';
+            iframe.src = 'ms-winscan:';
+            document.body.appendChild(iframe);
+            
+            // Remove iframe after attempting to launch
             setTimeout(() => {
-              if (window.location.href.startsWith('ms-winscan:')) {
-                window.location.href = originalLocation;
+              try {
+                document.body.removeChild(iframe);
+              } catch (e) {
+                // Ignore removal errors
               }
-            }, 1000);
+            }, 2000);
             
             return {
               success: true,
-              message: 'Launching Windows Scan app.'
+              message: 'Attempting to launch Windows Scan app.'
             };
           } catch (err) {
             return {
               success: false,
-              message: 'Please manually open Windows Scan app from Start Menu. Search for "Windows Scan" and click on it.'
+              message: 'Unable to launch Windows Scan automatically. Please open Windows Scan manually from Start Menu.'
             };
           }
         }
