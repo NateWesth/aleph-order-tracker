@@ -38,11 +38,28 @@ const ResetPassword = () => {
   });
 
   useEffect(() => {
-    // Check if we have the required parameters from the reset link
-    const accessToken = searchParams.get('access_token');
-    const refreshToken = searchParams.get('refresh_token');
+    // Supabase sends reset links with hash parameters, not query parameters
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    const accessToken = hashParams.get('access_token');
+    const refreshToken = hashParams.get('refresh_token');
+    const type = hashParams.get('type');
     
-    if (!accessToken || !refreshToken) {
+    console.log('Hash parameters:', { accessToken, refreshToken, type });
+    console.log('Full hash:', window.location.hash);
+    
+    // Also check query parameters as fallback
+    const queryAccessToken = searchParams.get('access_token');
+    const queryRefreshToken = searchParams.get('refresh_token');
+    const queryType = searchParams.get('type');
+    
+    console.log('Query parameters:', { queryAccessToken, queryRefreshToken, queryType });
+    
+    const finalAccessToken = accessToken || queryAccessToken;
+    const finalRefreshToken = refreshToken || queryRefreshToken;
+    const finalType = type || queryType;
+    
+    if (!finalAccessToken || !finalRefreshToken || finalType !== 'recovery') {
+      console.error('Missing required parameters for password reset');
       toast({
         title: "Invalid reset link",
         description: "This reset link is invalid or has expired. Please request a new one.",
@@ -52,10 +69,22 @@ const ResetPassword = () => {
       return;
     }
 
-    // Set the session with the tokens from the URL
+    // Set the session with the tokens
     supabase.auth.setSession({
-      access_token: accessToken,
-      refresh_token: refreshToken,
+      access_token: finalAccessToken,
+      refresh_token: finalRefreshToken,
+    }).then(({ error }) => {
+      if (error) {
+        console.error('Error setting session:', error);
+        toast({
+          title: "Session error",
+          description: "Unable to verify reset link. Please try again.",
+          variant: "destructive",
+        });
+        navigate("/");
+      } else {
+        console.log('Session set successfully');
+      }
     });
   }, [searchParams, navigate, toast]);
 
