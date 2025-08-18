@@ -23,7 +23,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useGlobalRealtimeOrders } from "./hooks/useGlobalRealtimeOrders";
 import ProcessingOrderFilesDialog from "./components/ProcessingOrderFilesDialog";
 import OrderDetailsDialog from "./components/OrderDetailsDialog";
-import ProgressOrderDetailsDialog from "./components/ProgressOrderDetailsDialog";
+import CompletedOrderEditDialog from "./components/CompletedOrderEditDialog";
 import OrderExportActions from "./components/OrderExportActions";
 import { getUserRole, getUserProfile } from "@/utils/authService";
 
@@ -540,7 +540,7 @@ export default function CompletedPage({
         order={selectedOrder} 
       />}
 
-      <ProgressOrderDetailsDialog 
+      <CompletedOrderEditDialog 
         order={editOrderData} 
         isOpen={showEditOrderDetails} 
         onClose={closeEditOrderDetails} 
