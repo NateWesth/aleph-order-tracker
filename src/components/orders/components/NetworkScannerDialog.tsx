@@ -108,6 +108,37 @@ export default function HardwareScannerDialog({
     
     try {
       console.log(`🖨️ Attempting to scan with: ${scanner.name} (${scanner.type})`);
+      
+      if (scanner.id === 'network-manual') {
+        // Show network scanner input dialog
+        const ip = prompt('Enter your network scanner IP address (e.g., 192.168.1.100):');
+        if (ip) {
+          // Try common scanner web interfaces
+          const urls = [
+            `http://${ip}`,
+            `http://${ip}/scan`,
+            `http://${ip}/webscan`,
+            `http://${ip}/scanner.html`,
+            `https://${ip}`
+          ];
+          
+          for (const url of urls) {
+            try {
+              window.open(url, '_blank');
+              toast({
+                title: "Network Scanner Opened",
+                description: `Opened ${url} - If this doesn't work, try the next URL manually.`,
+                variant: "default"
+              });
+              break;
+            } catch (error) {
+              continue;
+            }
+          }
+        }
+        return;
+      }
+      
       const result = await hardwareScannerService.scanFromHardware(scanner);
       
       if (result.success) {

@@ -29,37 +29,45 @@ export class HardwareScannerService {
   }
 
   /**
-   * Discover available hardware scanners
+   * Main method to discover available hardware scanners
    */
   async discoverHardwareScanners(): Promise<HardwareScanner[]> {
     const scanners: HardwareScanner[] = [];
-
+    
     try {
-      if (Capacitor.isNativePlatform()) {
-        // On mobile, look for network scanners that mobile can access
-        const networkScanners = await this.discoverNetworkScanners();
-        scanners.push(...networkScanners);
-      } else {
-        // On web/desktop, use multiple detection methods
-        const detectedScanners = await Promise.allSettled([
-          this.detectTWAINScanners(),
-          this.detectWIAScanners(),
-          this.discoverNetworkScanners(),
-          this.detectUSBScanners()
-        ]);
+      // Add system default scanner as primary option
+      scanners.push({
+        id: 'system-default',
+        name: 'System Default Scanner',
+        type: 'twain',
+        status: 'available',
+        capabilities: ['scan', 'preview'],
+        webInterface: undefined,
+        driverRequired: false
+      });
 
-        detectedScanners.forEach(result => {
-          if (result.status === 'fulfilled') {
-            scanners.push(...result.value);
-          }
-        });
-      }
+      // Try to detect local USB scanners
+      const usbScanners = await this.detectUSBScanners();
+      scanners.push(...usbScanners);
+      
+      // For network scanners, provide manual entry option
+      scanners.push({
+        id: 'network-manual',
+        name: 'Network Scanner (Manual Entry)',
+        type: 'ipp',
+        status: 'available',
+        capabilities: ['scan', 'network'],
+        webInterface: undefined,
+        driverRequired: false
+      });
 
-      return this.deduplicateScanners(scanners);
+      console.log(`✅ Found ${scanners.length} scanner options:`, scanners);
+      
     } catch (error) {
-      console.error('Error discovering hardware scanners:', error);
-      return [];
+      console.error('Scanner discovery error:', error);
     }
+
+    return this.deduplicateScanners(scanners);
   }
 
   /**
@@ -461,7 +469,22 @@ export class HardwareScannerService {
    */
   async scanFromHardware(scanner: HardwareScanner, settings?: ScanSettings): Promise<{ success: boolean; message: string; url?: string }> {
     try {
-      if (scanner.webInterface) {
+      if (scanner.id === 'system-default') {
+        // Use system default scanner
+        const result = await this.openSystemDefaultScanner();
+        return {
+          success: result.success,
+          message: result.message || result.error || 'Unknown error',
+          url: undefined
+        };
+      } else if (scanner.id === 'network-manual') {
+        // Network scanner handled in UI
+        return {
+          success: true,
+          message: 'Network scanner setup initiated',
+          url: undefined
+        };
+      } else if (scanner.webInterface) {
         // Open web interface for scanning
         await Browser.open({
           url: scanner.webInterface,
