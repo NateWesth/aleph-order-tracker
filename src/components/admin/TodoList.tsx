@@ -5,7 +5,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CheckCircle, Clock, AlertCircle, Package, BarChart2, FileText, Flame } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-
 interface TodoItem {
   id: string;
   order_number: string;
@@ -17,22 +16,22 @@ interface TodoItem {
   priority: 'high' | 'medium' | 'low';
   progress_stage?: string;
 }
-
 export default function TodoList() {
   const [todoItems, setTodoItems] = useState<TodoItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const { toast } = useToast();
-
+  const {
+    toast
+  } = useToast();
   useEffect(() => {
     fetchTodoItems();
   }, []);
-
   const fetchTodoItems = async () => {
     try {
       // Fetch orders that need attention
-      const { data: orders, error } = await supabase
-        .from('orders')
-        .select(`
+      const {
+        data: orders,
+        error
+      } = await supabase.from('orders').select(`
           id,
           order_number,
           status,
@@ -41,17 +40,15 @@ export default function TodoList() {
           company_id,
           progress_stage,
           companies (name)
-        `)
-        .in('status', ['pending', 'received', 'processing', 'in-progress'])
-        .order('created_at', { ascending: false });
-
+        `).in('status', ['pending', 'received', 'processing', 'in-progress']).order('created_at', {
+        ascending: false
+      });
       if (error) throw error;
 
       // Transform orders into todo items
       const todos: TodoItem[] = orders?.map(order => {
         let actionNeeded = '';
         let priority: 'high' | 'medium' | 'low' = 'medium';
-
         switch (order.status) {
           case 'pending':
             actionNeeded = 'Review and receive order';
@@ -67,7 +64,6 @@ export default function TodoList() {
             priority = 'high';
             break;
         }
-
         return {
           id: order.id,
           order_number: order.order_number,
@@ -80,7 +76,6 @@ export default function TodoList() {
           progress_stage: order.progress_stage
         };
       }) || [];
-
       setTodoItems(todos);
     } catch (error) {
       console.error('Error fetching todo items:', error);
@@ -93,12 +88,10 @@ export default function TodoList() {
       setLoading(false);
     }
   };
-
   const handleOrderClick = (order: TodoItem) => {
     // Dispatch custom event to change active view in AdminDashboard
     const status = order.status?.toLowerCase();
     let targetView = 'orders';
-    
     switch (status) {
       case 'pending':
         targetView = 'orders';
@@ -116,11 +109,11 @@ export default function TodoList() {
       default:
         targetView = 'orders';
     }
-    
-    const event = new CustomEvent('setActiveView', { detail: targetView });
+    const event = new CustomEvent('setActiveView', {
+      detail: targetView
+    });
     window.dispatchEvent(event);
   };
-
   const getPriorityIcon = (priority: string) => {
     switch (priority) {
       case 'high':
@@ -131,7 +124,6 @@ export default function TodoList() {
         return <Package className="h-4 w-4 text-blue-500" />;
     }
   };
-
   const getPriorityColor = (priority: string) => {
     switch (priority) {
       case 'high':
@@ -142,7 +134,6 @@ export default function TodoList() {
         return 'bg-blue-100 text-blue-800 border-blue-200';
     }
   };
-
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'pending':
@@ -156,7 +147,6 @@ export default function TodoList() {
         return 'bg-gray-100 text-gray-800';
     }
   };
-
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       month: 'short',
@@ -165,7 +155,6 @@ export default function TodoList() {
       minute: '2-digit'
     });
   };
-
   const isOrderOld = (createdAt: string) => {
     const orderDate = new Date(createdAt);
     const fourDaysAgo = new Date();
@@ -174,22 +163,14 @@ export default function TodoList() {
   };
 
   // Get priority items (urgent orders or orders older than 4 days that haven't moved to processing)
-  const priorityItems = todoItems.filter(item => 
-    item.urgency === 'urgent' || 
-    (isOrderOld(item.created_at) && item.status !== 'processing')
-  );
+  const priorityItems = todoItems.filter(item => item.urgency === 'urgent' || isOrderOld(item.created_at) && item.status !== 'processing');
 
   // Categorize items based on the new requirements
   const pendingItems = todoItems.filter(item => item.status === 'pending');
-  const progressItems = todoItems.filter(item => 
-    (item.status === 'received' || item.status === 'in-progress') && 
-    (!item.progress_stage || item.progress_stage === 'packaging' || item.progress_stage === 'packing')
-  );
+  const progressItems = todoItems.filter(item => (item.status === 'received' || item.status === 'in-progress') && (!item.progress_stage || item.progress_stage === 'packaging' || item.progress_stage === 'packing'));
   const processingItems = todoItems.filter(item => item.status === 'processing');
-
   if (loading) {
-    return (
-      <div className="space-y-4">
+    return <div className="space-y-4">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -203,31 +184,20 @@ export default function TodoList() {
             </div>
           </CardContent>
         </Card>
-      </div>
-    );
+      </div>;
   }
-
-  const renderTodoSection = (items: TodoItem[], title: string, icon: React.ReactNode, emptyMessage: string) => (
-    <Card className="flex-1">
+  const renderTodoSection = (items: TodoItem[], title: string, icon: React.ReactNode, emptyMessage: string) => <Card className="flex-1">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+        <CardTitle className="flex items-center gap-2 text-inherit">
           {icon}
           {title} ({items.length} items)
         </CardTitle>
       </CardHeader>
       <CardContent>
-        {items.length === 0 ? (
-          <div className="text-center py-4">
+        {items.length === 0 ? <div className="text-center py-4">
             <div className="text-sm text-gray-500">{emptyMessage}</div>
-          </div>
-        ) : (
-          <div className="space-y-3 max-h-64 overflow-y-auto">
-            {items.map((item) => (
-              <div 
-                key={item.id} 
-                className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
-                onClick={() => handleOrderClick(item)}
-              >
+          </div> : <div className="space-y-3 max-h-64 overflow-y-auto">
+            {items.map(item => <div key={item.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => handleOrderClick(item)}>
                 <div className="flex items-center gap-3 flex-1">
                   {getPriorityIcon(item.priority)}
                   <div className="flex-1">
@@ -236,16 +206,12 @@ export default function TodoList() {
                       <Badge variant="outline" className={getStatusColor(item.status)}>
                         {item.status}
                       </Badge>
-                      {item.urgency === 'urgent' && (
-                        <Badge variant="outline" className="bg-red-100 text-red-800">
+                      {item.urgency === 'urgent' && <Badge variant="outline" className="bg-red-100 text-red-800">
                           Urgent
-                        </Badge>
-                      )}
-                      {item.progress_stage && (
-                        <Badge variant="outline" className="bg-gray-100 text-gray-800">
+                        </Badge>}
+                      {item.progress_stage && <Badge variant="outline" className="bg-gray-100 text-gray-800">
                           {item.progress_stage}
-                        </Badge>
-                      )}
+                        </Badge>}
                     </div>
                     <div className="text-sm text-gray-600">
                       {item.action_needed} • {item.company_name}
@@ -260,24 +226,18 @@ export default function TodoList() {
                     {item.priority}
                   </Badge>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
+              </div>)}
+          </div>}
       </CardContent>
-    </Card>
-  );
-
-  return (
-    <div className="space-y-6 w-full">
+    </Card>;
+  return <div className="space-y-6 w-full">
       <div className="text-center">
         <h2 className="text-lg font-semibold text-gray-800 mb-2">Order Management Dashboard</h2>
         <p className="text-sm text-gray-600">Track and manage orders across different stages</p>
       </div>
       
       {/* Priority Section */}
-      {priorityItems.length > 0 && (
-        <div className="mb-6 w-full">
+      {priorityItems.length > 0 && <div className="mb-6 w-full">
           <Card className="w-full">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -287,12 +247,7 @@ export default function TodoList() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3 max-h-64 overflow-y-auto">
-                {priorityItems.map((item) => (
-                  <div 
-                    key={item.id} 
-                    className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
-                    onClick={() => handleOrderClick(item)}
-                  >
+                {priorityItems.map(item => <div key={item.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => handleOrderClick(item)}>
                     <div className="flex items-center gap-3 flex-1">
                       {getPriorityIcon(item.priority)}
                       <div className="flex-1">
@@ -301,16 +256,12 @@ export default function TodoList() {
                           <Badge variant="outline" className={getStatusColor(item.status)}>
                             {item.status}
                           </Badge>
-                          {item.urgency === 'urgent' && (
-                            <Badge variant="outline" className="bg-red-100 text-red-800">
+                          {item.urgency === 'urgent' && <Badge variant="outline" className="bg-red-100 text-red-800">
                               Urgent
-                            </Badge>
-                          )}
-                          {item.progress_stage && (
-                            <Badge variant="outline" className="bg-gray-100 text-gray-800">
+                            </Badge>}
+                          {item.progress_stage && <Badge variant="outline" className="bg-gray-100 text-gray-800">
                               {item.progress_stage}
-                            </Badge>
-                          )}
+                            </Badge>}
                         </div>
                         <div className="text-sm text-gray-600">
                           {item.action_needed} • {item.company_name}
@@ -325,46 +276,26 @@ export default function TodoList() {
                         {item.priority}
                       </Badge>
                     </div>
-                  </div>
-                ))}
+                  </div>)}
               </div>
             </CardContent>
           </Card>
-        </div>
-      )}
+        </div>}
       
       <div className="flex gap-4 w-full">
-        {renderTodoSection(
-          pendingItems, 
-          "Pending Orders", 
-          <AlertCircle className="h-5 w-5 text-orange-500" />, 
-          "No pending orders to review"
-        )}
+        {renderTodoSection(pendingItems, "Pending Orders", <AlertCircle className="h-5 w-5 text-orange-500" />, "No pending orders to review")}
         
-        {renderTodoSection(
-          progressItems, 
-          "In Progress", 
-          <BarChart2 className="h-5 w-5 text-blue-500" />, 
-          "No orders awaiting packaging/packing"
-        )}
+        {renderTodoSection(progressItems, "In Progress", <BarChart2 className="h-5 w-5 text-blue-500" />, "No orders awaiting packaging/packing")}
         
-        {renderTodoSection(
-          processingItems, 
-          "Processing", 
-          <FileText className="h-5 w-5 text-purple-500" />, 
-          "No orders awaiting file uploads"
-        )}
+        {renderTodoSection(processingItems, "Processing", <FileText className="h-5 w-5 text-purple-500" />, "No orders awaiting file uploads")}
       </div>
 
-      {todoItems.length === 0 && (
-        <Card>
+      {todoItems.length === 0 && <Card>
           <CardContent className="text-center py-8">
             <CheckCircle className="h-12 w-12 text-aleph-green mx-auto mb-4" />
             <div className="text-lg font-medium text-gray-600">All caught up!</div>
             <div className="text-sm text-gray-500">No orders need immediate attention</div>
           </CardContent>
-        </Card>
-      )}
-    </div>
-  );
+        </Card>}
+    </div>;
 }

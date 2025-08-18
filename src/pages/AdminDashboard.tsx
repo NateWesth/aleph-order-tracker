@@ -178,7 +178,7 @@ const AdminDashboard = () => {
                 {/* Welcome Section */}
                 <div className="flex items-center justify-center h-64 relative bg-background">
                    <div className="text-center relative z-10">
-                    <h1 className="text-4xl md:text-6xl font-bold text-aleph-green mb-4">
+                    <h1 className="text-4xl md:text-6xl font-bold mb-4 text-emerald-950">
                       Welcome{userProfile?.full_name ? `, ${userProfile.full_name}` : ''}
                     </h1>
                     <p className="text-xl text-gray-600 dark:text-gray-300">Admin Dashboard - Aleph Engineering and Supplies</p>
