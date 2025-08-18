@@ -544,7 +544,7 @@ export default function ProcessingOrderFilesDialog({
             <Label htmlFor={inputId} className="text-sm font-medium text-gray-700">
               Upload {fileTypeLabels[fileType]}
             </Label>
-            <div className="mt-1">
+            <div className="mt-1 space-y-3">
               <Input
                 id={inputId}
                 type="file"
@@ -559,106 +559,89 @@ export default function ProcessingOrderFilesDialog({
                 disabled={uploadingFiles[fileType]}
                 className="w-full"
               />
+              <p className="text-xs text-gray-500">
+                Supported formats: PDF, JPG, PNG (Max 10MB) • Drag files here or click to browse
+              </p>
             </div>
-            <p className="text-xs text-gray-500 mt-1">
-              Supported formats: PDF, JPG, PNG (Max 10MB)
-            </p>
           </div>
           
-          <div className="space-y-3">
-            {/* Printer Scanning Section */}
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={discoverPrinters}
-                  disabled={isDiscovering}
-                  className="flex items-center gap-2"
-                >
-                  {isDiscovering ? (
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
-                  ) : (
-                    <Search className="h-4 w-4" />
-                  )}
-                  {isDiscovering ? "Discovering..." : "Find Printers"}
-                </Button>
-                {printers.length > 0 && (
-                  <span className="text-sm text-muted-foreground">
-                    {printers.length} printer(s) found
-                  </span>
-                )}
-              </div>
-              
-              {printers.length > 0 && (
-                <div className="grid gap-2 max-h-32 overflow-y-auto border rounded-lg p-2">
-                  {printers.map((printer) => (
-                    <Button
-                      key={printer.id}
-                      onClick={() => handlePrinterScan(printer, fileType)}
-                      disabled={scanningFiles[fileType]}
-                      variant="outline"
-                      size="sm"
-                      className="flex items-center justify-between text-left h-auto py-2"
-                    >
-                      <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full bg-green-500" />
-                        <div>
-                          <div className="font-medium text-sm">{printer.name}</div>
-                          <div className="text-xs text-muted-foreground">{printer.ip}</div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Printer className="h-3 w-3" />
-                        <span className="text-xs">Scan</span>
-                      </div>
-                    </Button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Alternative Methods */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold">📱 Document Scanning Options</h3>
+            
+            {/* Enhanced Scanning Methods */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Button
-                type="button"
-                variant="outline"
-                size="sm"
                 onClick={() => handleNativeScan(fileType)}
                 disabled={scanningFiles[fileType]}
-                className="w-full"
+                className="flex flex-col items-center gap-3 h-auto py-6 bg-primary hover:bg-primary/90"
               >
                 {scanningFiles[fileType] ? (
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
                 ) : (
-                  <Camera className="h-4 w-4" />
+                  <Camera className="h-8 w-8" />
                 )}
-                Camera Scan
+                <div className="text-center">
+                  <div className="font-semibold">📸 Camera Scan</div>
+                  <div className="text-sm opacity-90">Take photo with device camera</div>
+                </div>
               </Button>
               
               <Button
-                type="button"
-                variant="outline"
-                size="sm"
                 onClick={() => handleGallerySelect(fileType)}
-                className="w-full"
+                disabled={scanningFiles[fileType]}
+                variant="outline"
+                className="flex flex-col items-center gap-3 h-auto py-6"
               >
-                <ImageIcon className="h-4 w-4" />
-                From Gallery
+                <ImageIcon className="h-8 w-8" />
+                <div className="text-center">
+                  <div className="font-semibold">🖼️ From Gallery</div>
+                  <div className="text-sm text-muted-foreground">Select existing photo</div>
+                </div>
               </Button>
 
               <Button
-                type="button"
-                variant="outline"
-                size="sm"
                 onClick={() => startScanning(fileType)}
-                className="w-full"
+                disabled={scanningFiles[fileType]}
+                variant="outline"
+                className="flex flex-col items-center gap-3 h-auto py-6"
               >
-                <Scan className="h-4 w-4" />
-                Web Camera
+                <Scan className="h-8 w-8" />
+                <div className="text-center">
+                  <div className="font-semibold">💻 Web Camera</div>
+                  <div className="text-sm text-muted-foreground">Advanced camera controls</div>
+                </div>
               </Button>
+
+              <div className="flex flex-col items-center justify-center border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 hover:border-muted-foreground/50 transition-colors">
+                <Upload className="h-8 w-8 text-muted-foreground mb-2" />
+                <div className="text-center">
+                  <div className="font-semibold text-sm">📎 Drag & Drop</div>
+                  <div className="text-xs text-muted-foreground">Or use file input above</div>
+                </div>
+              </div>
             </div>
+
+            {/* Scanning Tips */}
+            <div className="bg-muted/50 rounded-lg p-4">
+              <h4 className="font-medium mb-2">💡 Scanning Tips:</h4>
+              <ul className="text-sm text-muted-foreground space-y-1">
+                <li>• <strong>📸 Camera Scan:</strong> Best for mobile devices - auto-optimized for documents</li>
+                <li>• <strong>💻 Web Camera:</strong> Advanced controls, good lighting adjustment</li>
+                <li>• <strong>🖼️ Gallery:</strong> Use photos of documents you've already taken</li>
+                <li>• <strong>📎 File Upload:</strong> Support for PDF, JPG, PNG files</li>
+              </ul>
+            </div>
+
+            {/* For Mobile Users */}
+            {isNativeDevice && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h4 className="font-medium text-blue-900 mb-2">📱 Mobile Device Detected</h4>
+                <p className="text-sm text-blue-800">
+                  You're on a mobile device! Camera Scan will give you the best document scanning experience 
+                  with automatic edge detection and image enhancement.
+                </p>
+              </div>
+            )}
           </div>
         </div>
         
