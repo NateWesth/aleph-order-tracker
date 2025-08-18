@@ -89,6 +89,7 @@ export default function CompletedOrderEditDialog({
   const [loading, setLoading] = useState(false);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>('');
+  const [orderNumber, setOrderNumber] = useState<string>('');
 
   // Fetch companies for selection
   const fetchCompanies = async () => {
@@ -118,6 +119,9 @@ export default function CompletedOrderEditDialog({
     }
     if (order?.company_id) {
       setSelectedCompanyId(order.company_id);
+    }
+    if (order?.order_number) {
+      setOrderNumber(order.order_number);
     }
   }, [order]);
 
@@ -188,6 +192,11 @@ export default function CompletedOrderEditDialog({
         updateData.company_id = selectedCompanyId;
       }
 
+      // Include order_number if it was changed
+      if (orderNumber && orderNumber !== order.order_number) {
+        updateData.order_number = orderNumber;
+      }
+
       const { error } = await supabase
         .from('orders')
         .update(updateData)
@@ -238,7 +247,12 @@ export default function CompletedOrderEditDialog({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
           <div>
             <p className="text-sm text-muted-foreground">Order Number</p>
-            <p className="font-medium">{order?.order_number || 'Unknown'}</p>
+            <Input
+              value={orderNumber}
+              onChange={(e) => setOrderNumber(e.target.value)}
+              placeholder="Order number"
+              className="mt-1"
+            />
           </div>
           <div>
             <p className="text-sm text-muted-foreground">Company</p>
