@@ -9,7 +9,6 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useToast } from "@/hooks/use-toast";
 import { Mail } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { supabase } from "@/integrations/supabase/client";
 
 const forgotPasswordSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address" }),
@@ -40,33 +39,30 @@ const ForgotPasswordForm = ({ onSuccess }: ForgotPasswordFormProps) => {
     setIsLoading(true);
     
     try {
-      const redirectUrl = `${window.location.origin}/reset-password`;
+      // This is where you would integrate with your authentication service
+      console.log("Password reset email requested for:", values.email, "User type:", values.userType);
       
-      const { error } = await supabase.auth.resetPasswordForEmail(values.email, {
-        redirectTo: redirectUrl,
-      });
-
-      if (error) {
-        throw error;
-      }
-
-      toast({
-        title: "Reset link sent",
-        description: `Password reset instructions have been sent to ${values.email}`,
-      });
+      // Simulating a successful password reset email
+      setTimeout(() => {
+        toast({
+          title: "Reset link sent",
+          description: `Password reset instructions have been sent to ${values.email}`,
+        });
+        
+        if (onSuccess) {
+          onSuccess();
+        }
+        
+        setIsLoading(false);
+      }, 1000);
       
-      if (onSuccess) {
-        onSuccess();
-      }
-      
-    } catch (error: any) {
+    } catch (error) {
       console.error("Password reset error:", error);
       toast({
         title: "Failed to send reset link",
-        description: error.message || "Please try again later",
+        description: "Please try again later",
         variant: "destructive",
       });
-    } finally {
       setIsLoading(false);
     }
   };

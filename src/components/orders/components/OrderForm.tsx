@@ -12,7 +12,6 @@ import OrderFormHeader from "./OrderFormHeader";
 import OrderFormCompanySelector from "./OrderFormCompanySelector";
 import OrderFormTotalAmount from "./OrderFormTotalAmount";
 import { OrderItemsForm } from "./OrderItemsForm";
-import { OrderFileUpload } from "./OrderFileUpload";
 import { OrderFormData, OrderItem } from "../types/OrderFormData";
 
 interface OrderFormProps {
@@ -85,18 +84,6 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
       quantity: 1,
       unit: "",
       notes: ""
-    });
-  };
-
-  const handleItemsImport = (importedItems: OrderItem[]) => {
-    // Clear existing items first
-    while (fields.length > 0) {
-      remove(0);
-    }
-    
-    // Add imported items
-    importedItems.forEach(item => {
-      append(item);
     });
   };
 
@@ -220,8 +207,6 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
               </FormItem>
             )}
           />
-
-          <OrderFileUpload onItemsImported={handleItemsImport} />
 
           <Card>
             <CardHeader>

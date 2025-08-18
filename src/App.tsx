@@ -8,7 +8,6 @@ const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 const ClientDashboard = lazy(() => import('./pages/ClientDashboard'));
 const Settings = lazy(() => import('./pages/Settings'));
 const NotFound = lazy(() => import('./pages/NotFound'));
-const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const MobileScanPage = lazy(() => import('./components/orders/components/MobileScanPage'));
 import { AuthProvider } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
@@ -41,7 +40,6 @@ function App() {
               <Suspense fallback={<PageFallback />}>
                 <Routes>
                   <Route path="/" element={<Auth />} />
-                  <Route path="/reset-password" element={<ResetPassword />} />
                   <Route path="/admin-dashboard" element={
                     <ProtectedRoute>
                       <AdminDashboard />
