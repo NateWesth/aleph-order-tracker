@@ -504,24 +504,26 @@ export class HardwareScannerService {
       if (navigator.userAgent.includes('Windows')) {
         // Launch Windows Fax and Scan directly
         try {
-          // Use shell protocol to launch WFS
-          window.open('ms-settings:printers', '_blank');
+          // Try to launch WFS directly using file protocol
+          window.location.href = 'file:///C:/Windows/System32/WFS.exe';
           return {
             success: true,
-            message: 'Opening Windows printer settings. Navigate to your scanner and click "Scan" to use Windows Fax and Scan.'
+            message: 'Launching Windows Fax and Scan application for document scanning.'
           };
         } catch (error) {
-          // Alternative method - try to launch directly
           try {
-            const command = 'C:\\Windows\\System32\\WFS.exe';
+            // Alternative method using shell execute
+            const link = document.createElement('a');
+            link.href = 'ms-winscan:';
+            link.click();
             return {
               success: true,
-              message: 'Please open Windows Fax and Scan manually from Start Menu to scan your document.'
+              message: 'Launching Windows scanning application.'
             };
           } catch (err) {
             return {
               success: false,
-              message: 'Unable to launch Windows Fax and Scan. Please open it manually from the Start Menu.'
+              message: 'Please manually open Windows Fax and Scan from Start Menu > Windows Accessories > Windows Fax and Scan.'
             };
           }
         }
