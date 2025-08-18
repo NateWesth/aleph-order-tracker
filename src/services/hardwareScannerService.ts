@@ -527,24 +527,38 @@ export class HardwareScannerService {
       if (navigator.userAgent.includes('Windows')) {
         // Launch Windows Scan app directly
         try {
-          // Use the Windows Scan app URI scheme
-          window.open('ms-winscan:', '_blank');
+          // Create a temporary link and click it to bypass popup blockers
+          const link = document.createElement('a');
+          link.href = 'ms-winscan:';
+          link.target = '_blank';
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          
           return {
             success: true,
-            message: 'Launching Windows Scan app. Select your scanner and scan your document.'
+            message: 'Opening Windows Scan app. Select your scanner and scan your document.'
           };
         } catch (error) {
           try {
-            // Fallback to launch via Windows 10/11 scan app
-            window.open('ms-windows-store://pdp/?productid=9WZDNCRFJ3PV', '_blank');
+            // Fallback: try to open via window.location
+            const originalLocation = window.location.href;
+            window.location.href = 'ms-winscan:';
+            // Restore location after a moment
+            setTimeout(() => {
+              if (window.location.href.startsWith('ms-winscan:')) {
+                window.location.href = originalLocation;
+              }
+            }, 1000);
+            
             return {
               success: true,
-              message: 'Opening Windows Store to install Windows Scan app if not available.'
+              message: 'Launching Windows Scan app.'
             };
           } catch (err) {
             return {
               success: false,
-              message: 'Please manually open Windows Scan app from Start Menu or install it from Microsoft Store.'
+              message: 'Please manually open Windows Scan app from Start Menu. Search for "Windows Scan" and click on it.'
             };
           }
         }
