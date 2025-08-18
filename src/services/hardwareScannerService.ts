@@ -525,30 +525,41 @@ export class HardwareScannerService {
   private async launchSystemScanner(scanner: HardwareScanner): Promise<{ success: boolean; message: string }> {
     try {
       if (navigator.userAgent.includes('Windows')) {
-        // Provide simple, direct instructions without downloads
-        const instructions = `To open your scanner directly:
-
-QUICKEST METHOD:
-1. Press Windows key + R
-2. Type: WFS
-3. Press Enter
-(This opens Windows Fax and Scan)
-
-OR
-
-1. Click Start Menu
-2. Search "Windows Fax and Scan"
-3. Click on it
-4. Click "New Scan"
-
-Your scanner should appear in the list to select and scan from.`;
-
-        alert(instructions);
-        
-        return {
-          success: true,
-          message: 'Use Windows+R then type WFS to open the scanner app directly.'
-        };
+        // Try multiple methods to directly launch Windows scanner
+        try {
+          // Method 1: Try Windows shell execute protocol
+          window.location.href = 'shell:AppsFolder\\Microsoft.WindowsScan_8wekyb3d8bbwe!App';
+          
+          setTimeout(() => {
+            // If first method fails, try WFS directly
+            try {
+              window.location.href = 'shell:system\\WFS.exe';
+            } catch (e) {
+              // Final fallback - try Windows Run command
+              window.location.href = 'ms-windows-store://pdp/?productid=9WZDNCRFJ3PV';
+            }
+          }, 1000);
+          
+          return {
+            success: true,
+            message: 'Opening Windows scanner application directly...'
+          };
+        } catch (error) {
+          // Alternative method using Windows URI schemes
+          try {
+            // Try launching through Windows App URI
+            window.open('ms-windows-store://launch/?name=Microsoft.WindowsScan', '_blank');
+            return {
+              success: true,
+              message: 'Launching Windows Scan app...'
+            };
+          } catch (e) {
+            return {
+              success: false,
+              message: 'Unable to launch scanner automatically. Please open Windows Fax and Scan manually.'
+            };
+          }
+        }
       } else if (navigator.userAgent.includes('Mac')) {
         // Try to launch Image Capture on Mac
         await Browser.open({
