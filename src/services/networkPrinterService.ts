@@ -509,20 +509,34 @@ export class NetworkPrinterService {
   getScanUrl(printer: NetworkPrinter, settings?: ScanSettings): string {
     const baseUrl = printer.webUrl;
     
+    // Ensure baseUrl is properly formatted
+    const formattedBaseUrl = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+    
     // Try to generate a direct scan URL if we know the printer type
     if (printer.manufacturer?.toLowerCase().includes('hp')) {
-      return `${baseUrl}/hp/device/ScanMenu.html`;
+      return `${formattedBaseUrl}/hp/device/ScanMenu.html`;
     } else if (printer.manufacturer?.toLowerCase().includes('canon')) {
-      return `${baseUrl}/scan.html`;
+      return `${formattedBaseUrl}/scan.html`;
     } else if (printer.manufacturer?.toLowerCase().includes('epson')) {
-      return `${baseUrl}/PRESENTATION/HTML/TOP/PHTM/TOP.HTM`;
+      return `${formattedBaseUrl}/PRESENTATION/HTML/TOP/PHTM/TOP.HTM`;
     } else if (printer.manufacturer?.toLowerCase().includes('brother')) {
-      return `${baseUrl}/general/status.html`;
+      return `${formattedBaseUrl}/general/status.html`;
     }
     
-    // Generic fallback URLs
-    const scanPaths = ['/scan', '/scan.html', '/scanner', '/device/scan'];
-    return `${baseUrl}${scanPaths[0]}`;
+    // Generic fallback - try multiple common scan paths
+    const scanPaths = [
+      '/scan', 
+      '/scan.html', 
+      '/scanner', 
+      '/device/scan',
+      '/web/guest/en/websys/webArch/mainFrame.cgi',
+      '/cgi-bin/dynamic/printer/config/main.html',
+      '/main/main.html',
+      '/'  // Fallback to root page
+    ];
+    
+    // Return the first scan path, but we could try multiple in sequence
+    return `${formattedBaseUrl}${scanPaths[0]}`;
   }
 
   // Generate QR code data for mobile access
