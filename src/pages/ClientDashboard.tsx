@@ -6,12 +6,12 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { SidebarProvider, Sidebar, SidebarContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarFooter } from "@/components/ui/sidebar";
 import { Home, FileText, ListOrdered, BarChart2, Settings, Files, List } from "lucide-react";
-import { OrdersListButton } from "@/components/OrdersListButton";
 import OrdersPage from "@/components/orders/OrdersPage";
 import ProgressPage from "@/components/orders/ProgressPage";
 import ProcessingPage from "@/components/orders/ProcessingPage";
 import CompletedPage from "@/components/orders/CompletedPage";
 import FilesPage from "@/components/orders/FilesPage";
+import { OrdersListPage } from "@/components/orders/OrdersListPage";
 const ClientDashboard = () => {
   const navigate = useNavigate();
   const {
@@ -104,9 +104,10 @@ const ClientDashboard = () => {
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <div className="px-3 py-2">
-                  <OrdersListButton />
-                </div>
+                <SidebarMenuButton tooltip="Orders List" onClick={() => handleMenuClick("orders-list")} className={`sidebar-hover ${activeView === "orders-list" ? "sidebar-active" : ""}`}>
+                  <List />
+                  <span>Orders List</span>
+                </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
           </SidebarContent>
@@ -167,6 +168,8 @@ const ClientDashboard = () => {
                 <CompletedPage isAdmin={false} />
               </div> : activeView === "files" ? <div className="bg-background min-h-full">
                 <FilesPage isAdmin={false} />
+              </div> : activeView === "orders-list" ? <div className="bg-background min-h-full">
+                <OrdersListPage />
               </div> : <div className="text-center p-8 bg-background min-h-full">
                 <h2 className="text-2xl font-bold mb-4 text-aleph-green">Page Not Found</h2>
                 <p className="text-gray-600 dark:text-gray-300">The requested page could not be found.</p>
