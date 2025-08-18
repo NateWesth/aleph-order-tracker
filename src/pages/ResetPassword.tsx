@@ -25,6 +25,7 @@ const ResetPassword = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [validToken, setValidToken] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -83,10 +84,23 @@ const ResetPassword = () => {
         });
         navigate("/");
       } else {
-        console.log('Session set successfully');
+        console.log('Session set successfully for password reset');
+        // Successfully authenticated for password reset
+        setValidToken(true);
       }
     });
   }, [searchParams, navigate, toast]);
+
+  // Prevent automatic redirects when authenticated during password reset
+  useEffect(() => {
+    if (validToken) {
+      // Clear any potential redirects by updating browser history
+      const currentPath = window.location.pathname;
+      if (currentPath !== '/reset-password') {
+        window.history.replaceState(null, '', '/reset-password');
+      }
+    }
+  }, [validToken]);
 
   const onSubmit = async (values: ResetPasswordValues) => {
     setIsLoading(true);
@@ -120,6 +134,22 @@ const ResetPassword = () => {
       setIsLoading(false);
     }
   };
+
+  // Don't render the form until we have a valid token
+  if (!validToken) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-background to-muted flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="space-y-1">
+            <CardTitle className="text-2xl font-bold text-center">Verifying Reset Link</CardTitle>
+            <CardDescription className="text-center">
+              Please wait while we verify your password reset link...
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-muted flex items-center justify-center p-4">
