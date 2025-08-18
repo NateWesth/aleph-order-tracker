@@ -401,6 +401,72 @@ export class HardwareScannerService {
   }
 
   /**
+   * Open device default scanner (system integrated)
+   */
+  async openSystemDefaultScanner(): Promise<{ success: boolean; message?: string; error?: string }> {
+    try {
+      const platform = navigator.platform.toLowerCase();
+      
+      if (platform.includes('win')) {
+        // Windows - try to open Windows Fax and Scan
+        try {
+          // Open Windows Scan app
+          window.open('ms-winscan:', '_blank');
+          return {
+            success: true,
+            message: 'Opened Windows Scan application. Complete scanning there and save the file.'
+          };
+        } catch (error) {
+          // Fallback to Windows Fax and Scan
+          const result = await this.launchSystemScanner({
+            id: 'windows-fax-scan',
+            name: 'Windows Fax and Scan',
+            type: 'twain',
+            status: 'available',
+            capabilities: ['scan']
+          });
+          return result;
+        }
+      } else if (platform.includes('mac')) {
+        // macOS - open Image Capture
+        try {
+          window.open('imagecapture:', '_blank');
+          return {
+            success: true,
+            message: 'Opened Image Capture. Select your scanner and complete scanning.'
+          };
+        } catch (error) {
+          return {
+            success: false,
+            error: 'Unable to open Image Capture. Please open it manually from Applications.'
+          };
+        }
+      } else {
+        // Linux or other platforms
+        try {
+          // Try to open Simple Scan or XSane
+          window.open('simple-scan:', '_blank');
+          return {
+            success: true,
+            message: 'Attempting to open system scanner application.'
+          };
+        } catch (error) {
+          return {
+            success: false,
+            error: 'Please use your system\'s scanning application (like Simple Scan or XSane).'
+          };
+        }
+      }
+    } catch (error) {
+      console.error('Error opening system default scanner:', error);
+      return {
+        success: false,
+        error: 'Failed to open default scanner. Please use your system\'s scanning application.'
+      };
+    }
+  }
+
+  /**
    * Initiate scan from hardware scanner
    */
   async scanFromHardware(scanner: HardwareScanner, settings?: ScanSettings): Promise<{ success: boolean; message: string; url?: string }> {

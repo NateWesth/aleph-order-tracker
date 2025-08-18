@@ -37,6 +37,37 @@ export default function HardwareScannerDialog({
   const hardwareScannerService = HardwareScannerService.getInstance();
   const nativeScanService = NativeScanningService.getInstance();
 
+  const openDefaultScanner = async () => {
+    setLoading(true);
+    try {
+      console.log('🖨️ Opening device default scanner...');
+      const result = await hardwareScannerService.openSystemDefaultScanner();
+      
+      if (result.success) {
+        toast({
+          title: "Default Scanner Opened",
+          description: result.message || "Device default scanner opened successfully",
+          variant: "default"
+        });
+      } else {
+        toast({
+          title: "Scanner Access Failed",
+          description: result.error || "Failed to open default scanner",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('Default scanner error:', error);
+      toast({
+        title: "Scanner Error",
+        description: "Failed to access the device default scanner",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const discoverScanners = async () => {
     setLoading(true);
     try {
@@ -48,14 +79,14 @@ export default function HardwareScannerDialog({
       
       if (discoveredScanners.length === 0) {
         toast({
-          title: "No Scanners Found",
-          description: "No physical scanners detected. Check connections and try camera scanning instead.",
+          title: "No Additional Scanners Found",
+          description: "No additional physical scanners detected. Use default scanner instead.",
           variant: "default"
         });
       } else {
         toast({
-          title: "Scanners Discovered",
-          description: `Found ${discoveredScanners.length} physical scanner(s)`,
+          title: "Additional Scanners Discovered",
+          description: `Found ${discoveredScanners.length} additional physical scanner(s)`,
           variant: "default"
         });
       }
@@ -63,7 +94,7 @@ export default function HardwareScannerDialog({
       console.error('Scanner discovery error:', error);
       toast({
         title: "Discovery Failed",
-        description: "Failed to discover physical scanners. Please try again.",
+        description: "Failed to discover additional physical scanners. Try default scanner.",
         variant: "destructive"
       });
     } finally {
@@ -238,20 +269,40 @@ export default function HardwareScannerDialog({
           </TabsList>
 
           <TabsContent value="hardware" className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-medium">Connected Scanners</h3>
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium">Device Default Scanner</h3>
+              <p className="text-sm text-muted-foreground">
+                Use your device's default scanning application
+              </p>
+              
               <Button
-                onClick={discoverScanners}
+                onClick={openDefaultScanner}
                 disabled={loading}
-                className="flex items-center gap-2"
+                className="w-full flex items-center gap-2"
+                size="lg"
               >
-                {loading ? (
-                  <ScanLine className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Printer className="h-4 w-4" />
-                )}
-                {loading ? 'Discovering...' : 'Refresh'}
+                <Printer className="h-5 w-5" />
+                {loading ? 'Opening Default Scanner...' : 'Open Default Scanner'}
               </Button>
+            </div>
+
+            <div className="border-t pt-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-medium">Additional Scanners</h3>
+                <Button
+                  onClick={discoverScanners}
+                  disabled={loading}
+                  variant="outline"
+                  className="flex items-center gap-2"
+                >
+                  {loading ? (
+                    <ScanLine className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Printer className="h-4 w-4" />
+                  )}
+                  {loading ? 'Discovering...' : 'Find More'}
+                </Button>
+              </div>
             </div>
             
             {loading && scanners.length === 0 && (
