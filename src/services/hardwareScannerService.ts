@@ -408,10 +408,10 @@ export class HardwareScannerService {
       const platform = navigator.platform.toLowerCase();
       
       if (platform.includes('win')) {
-        // Windows - open Windows Fax and Scan directly
+        // Windows - open Windows Scan app directly
         const result = await this.launchSystemScanner({
-          id: 'windows-fax-scan',
-          name: 'Windows Fax and Scan',
+          id: 'windows-scan',
+          name: 'Windows Scan',
           type: 'twain',
           status: 'available',
           capabilities: ['scan']
@@ -502,28 +502,26 @@ export class HardwareScannerService {
   private async launchSystemScanner(scanner: HardwareScanner): Promise<{ success: boolean; message: string }> {
     try {
       if (navigator.userAgent.includes('Windows')) {
-        // Launch Windows Fax and Scan directly
+        // Launch Windows Scan app directly
         try {
-          // Try to launch WFS directly using file protocol
-          window.location.href = 'file:///C:/Windows/System32/WFS.exe';
+          // Use the Windows Scan app URI scheme
+          window.open('ms-winscan:', '_blank');
           return {
             success: true,
-            message: 'Launching Windows Fax and Scan application for document scanning.'
+            message: 'Launching Windows Scan app. Select your scanner and scan your document.'
           };
         } catch (error) {
           try {
-            // Alternative method using shell execute
-            const link = document.createElement('a');
-            link.href = 'ms-winscan:';
-            link.click();
+            // Fallback to launch via Windows 10/11 scan app
+            window.open('ms-windows-store://pdp/?productid=9WZDNCRFJ3PV', '_blank');
             return {
               success: true,
-              message: 'Launching Windows scanning application.'
+              message: 'Opening Windows Store to install Windows Scan app if not available.'
             };
           } catch (err) {
             return {
               success: false,
-              message: 'Please manually open Windows Fax and Scan from Start Menu > Windows Accessories > Windows Fax and Scan.'
+              message: 'Please manually open Windows Scan app from Start Menu or install it from Microsoft Store.'
             };
           }
         }
