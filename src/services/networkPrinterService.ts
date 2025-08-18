@@ -114,54 +114,51 @@ export class NetworkPrinterService {
     }
 
     const baseIP = localIP.substring(0, localIP.lastIndexOf('.'));
-    console.log('🔍 Scanning network range:', `${baseIP}.x`);
+    console.log('🔍 Scanning for connected printers on network:', `${baseIP}.x`);
     
-    // Scan the entire network range (2-253) for better detection
-    const allIPs = [];
+    // Only scan likely printer IPs and nearby devices that might be printers
+    const targetIPs = [];
     
-    // Add common static printer IPs first for priority
+    // Add common printer static IPs (most likely to have printers)
     const commonPrinterIPs = [
       `${baseIP}.10`, `${baseIP}.11`, `${baseIP}.12`, `${baseIP}.15`,
       `${baseIP}.20`, `${baseIP}.21`, `${baseIP}.25`, `${baseIP}.30`,
       `${baseIP}.50`, `${baseIP}.100`, `${baseIP}.101`, `${baseIP}.102`, 
-      `${baseIP}.110`, `${baseIP}.150`, `${baseIP}.200`, `${baseIP}.201`,
-      `${baseIP}.250`, `${baseIP}.254`
+      `${baseIP}.110`, `${baseIP}.150`, `${baseIP}.200`, `${baseIP}.201`
     ];
     
-    // Then scan the entire range (except the local IP and router)
-    for (let i = 2; i <= 253; i++) {
+    // Add nearby IPs around the current device (often DHCP assigned devices nearby)
+    const currentLastOctet = parseInt(localIP.split('.')[3]);
+    for (let i = Math.max(2, currentLastOctet - 10); i <= Math.min(250, currentLastOctet + 10); i++) {
       const ip = `${baseIP}.${i}`;
-      if (ip !== localIP && !commonPrinterIPs.includes(ip) && i !== 1) {
-        allIPs.push(ip);
+      if (ip !== localIP && !commonPrinterIPs.includes(ip)) {
+        targetIPs.push(ip);
       }
     }
     
-    // Priority scanning: common IPs first, then all others
-    const scanIPs = [...commonPrinterIPs, ...allIPs];
+    // Combine: common printer IPs first (higher priority), then nearby IPs
+    const scanIPs = [...commonPrinterIPs, ...targetIPs];
 
-    console.log(`🎯 Scanning ${scanIPs.length} IP addresses...`);
-    console.log(`🔥 Priority IPs: ${commonPrinterIPs.join(', ')}`);
+    console.log(`🎯 Scanning ${scanIPs.length} targeted IP addresses for connected printers`);
+    console.log(`🔥 Priority printer IPs: ${commonPrinterIPs.slice(0, 8).join(', ')}...`);
+    console.log(`📍 Your device is at ${localIP}, scanning nearby range too`);
 
-    // Use a batch approach to avoid overwhelming the browser
-    const batchSize = 10;
+    // Scan in small batches to avoid overwhelming the browser
+    const batchSize = 5;
     const batches = [];
     for (let i = 0; i < scanIPs.length; i += batchSize) {
       batches.push(scanIPs.slice(i, i + batchSize));
     }
 
-    console.log(`📦 Scanning in ${batches.length} batches of ${batchSize} IPs each`);
-
     for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
       const batch = batches[batchIndex];
-      console.log(`📦 Batch ${batchIndex + 1}/${batches.length}: ${batch.join(', ')}`);
+      console.log(`📦 Scanning batch ${batchIndex + 1}/${batches.length}: ${batch.join(', ')}`);
       
-      const batchPromises = batch.map(async (ip, index) => {
+      const batchPromises = batch.map(async (ip) => {
         try {
-          const globalIndex = batchIndex * batchSize + index + 1;
-          console.log(`🔍 [${globalIndex}/${scanIPs.length}] Checking ${ip}...`);
           const printer = await this.probePrinterAtIP(ip);
           if (printer) {
-            console.log(`🎉 FOUND PRINTER at ${ip}: ${printer.name}`);
+            console.log(`🎉 FOUND CONNECTED PRINTER: ${printer.name} at ${ip}`);
           }
           return printer;
         } catch (error) {
@@ -176,19 +173,19 @@ export class NetworkPrinterService {
         }
       });
 
-      // If we found printers in priority IPs, we can stop early
-      if (printers.length > 0 && batchIndex === 0) {
-        console.log(`✅ Found ${printers.length} printer(s) in priority batch, stopping scan`);
+      // If scanning common printer IPs and we found some, we can stop early
+      if (printers.length > 0 && batchIndex < 3) {
+        console.log(`✅ Found ${printers.length} connected printer(s), stopping early scan`);
         break;
       }
 
-      // Small delay between batches to prevent overwhelming
+      // Small delay between batches
       if (batchIndex < batches.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise(resolve => setTimeout(resolve, 200));
       }
     }
 
-    console.log(`🎯 Network scan complete: ${printers.length} printers found`);
+    console.log(`🎯 Connected printer scan complete: ${printers.length} printers found`);
     return printers;
   }
 
