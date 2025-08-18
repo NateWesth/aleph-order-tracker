@@ -75,23 +75,37 @@ export default function CompletedPage({
   const [userRole, setUserRole] = useState<'admin' | 'user'>('user');
   const [userCompanyId, setUserCompanyId] = useState<string | null>(null);
 
-  // Parse order items from description - same logic as other components
+  // Parse order items from description - enhanced to handle delivered quantities and completion status
   const parseOrderItems = (description: string | null): OrderItem[] => {
     if (!description) {
       return [];
     }
     const items = description.split('\n').map((line, index) => {
-      const match = line.match(/^(.+?)\s*\(Qty:\s*(\d+)\)$/);
-      if (match) {
+      // First try the enhanced format with delivered and status info
+      const enhancedMatch = line.match(/^(.+?)\s*\(Qty:\s*(\d+)\)(?:\s*\[Delivered:\s*(\d+)\])?(?:\s*\[Status:\s*(completed|pending)\])?/);
+      if (enhancedMatch) {
         return {
           id: `item-${index}`,
-          name: match[1].trim(),
-          quantity: parseInt(match[2]),
-          delivered: parseInt(match[2]),
-          // Completed orders are fully delivered
+          name: enhancedMatch[1].trim(),
+          quantity: parseInt(enhancedMatch[2]),
+          delivered: enhancedMatch[3] ? parseInt(enhancedMatch[3]) : parseInt(enhancedMatch[2]), // For completed orders, default to full quantity
+          completed: true // Completed orders are fully delivered
+        };
+      }
+      
+      // Fallback to basic format
+      const basicMatch = line.match(/^(.+?)\s*\(Qty:\s*(\d+)\)$/);
+      if (basicMatch) {
+        return {
+          id: `item-${index}`,
+          name: basicMatch[1].trim(),
+          quantity: parseInt(basicMatch[2]),
+          delivered: parseInt(basicMatch[2]), // For completed orders, assume fully delivered
           completed: true
         };
       }
+      
+      // Fallback for items without quantity format
       return {
         id: `item-${index}`,
         name: line.trim(),

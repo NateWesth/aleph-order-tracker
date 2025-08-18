@@ -47,24 +47,37 @@ const formatSafeDate = (date: Date | string | number | null | undefined): string
   }
 };
 
-// Parse order items from description - same logic as other components
+// Parse order items from description - enhanced to handle delivered quantities and completion status
 const parseOrderItems = (description: string | null): OrderItem[] => {
   if (!description) {
     return [];
   }
 
-  // Parse the description to extract items and quantities
-  // Format: "Item Name (Qty: 2)\nAnother Item (Qty: 1)"
+  // Parse the description to extract items, quantities, delivered amounts, and completion status
+  // Format: "Item Name (Qty: 2) [Delivered: 1] [Status: completed]"
   const items = description.split('\n').map(line => {
-    const match = line.match(/^(.+?)\s*\(Qty:\s*(\d+)\)$/);
-    if (match) {
+    // First try the enhanced format with delivered and status info
+    const enhancedMatch = line.match(/^(.+?)\s*\(Qty:\s*(\d+)\)(?:\s*\[Delivered:\s*(\d+)\])?(?:\s*\[Status:\s*(completed|pending)\])?/);
+    if (enhancedMatch) {
       return {
-        name: match[1].trim(),
-        quantity: parseInt(match[2]),
+        name: enhancedMatch[1].trim(),
+        quantity: parseInt(enhancedMatch[2]),
+        delivered: enhancedMatch[3] ? parseInt(enhancedMatch[3]) : 0,
+        completed: enhancedMatch[4] === 'completed'
+      };
+    }
+    
+    // Fallback to basic format
+    const basicMatch = line.match(/^(.+?)\s*\(Qty:\s*(\d+)\)$/);
+    if (basicMatch) {
+      return {
+        name: basicMatch[1].trim(),
+        quantity: parseInt(basicMatch[2]),
         delivered: 0,
         completed: false
       };
     }
+    
     // Fallback for items without quantity format
     return {
       name: line.trim(),
@@ -95,7 +108,7 @@ export default function ProgressOrderDetailsDialog({
       const parsedItems = parseOrderItems(order.description);
       setItems(parsedItems);
 
-      // Initialize delivered quantities from the database or default to 0
+      // Initialize delivered quantities from parsed data
       const initialDeliveredQuantities: { [key: string]: number } = {};
       parsedItems.forEach(item => {
         initialDeliveredQuantities[item.name] = item.delivered || 0;
@@ -133,21 +146,43 @@ export default function ProgressOrderDetailsDialog({
     }
 
     try {
-      // Prepare updates for each item
-      const itemUpdates = items.map(item => ({
-        name: item.name,
+      // Update items with current delivered quantities and completion status
+      const updatedItems = items.map(item => ({
+        ...item,
         delivered: deliveredQuantities[item.name] || 0,
         completed: item.completed
       }));
 
-      // For now, we'll just update the order status since the database doesn't have an items column
-      // This is a simplified approach - in a real app you'd have a separate items table
+      // Convert items back to description format for storage, including delivered info
+      // We'll store this in a format that can be parsed later: "Item Name (Qty: 5) [Delivered: 3] [Status: completed/pending]"
+      const description = updatedItems.map(item => {
+        let itemString = `${item.name} (Qty: ${item.quantity})`;
+        if (item.delivered !== undefined && item.delivered > 0) {
+          itemString += ` [Delivered: ${item.delivered}]`;
+        }
+        if (item.completed) {
+          itemString += ` [Status: completed]`;
+        }
+        return itemString;
+      }).join('\n');
+
+      // Determine if order should be marked as completed
+      const allItemsCompleted = updatedItems.every(item => item.completed);
+      const newStatus = allItemsCompleted ? 'completed' : order.status;
+      const updateData: any = {
+        description,
+        status: newStatus,
+        updated_at: new Date().toISOString()
+      };
+
+      // If marking as completed, set completion date
+      if (allItemsCompleted && order.status !== 'completed') {
+        updateData.completed_date = new Date().toISOString();
+      }
+
       const { error } = await supabase
         .from('orders')
-        .update({ 
-          status: order.status,
-          updated_at: new Date().toISOString()
-        })
+        .update(updateData)
         .eq('id', order.id);
 
       if (error) {
@@ -162,7 +197,7 @@ export default function ProgressOrderDetailsDialog({
 
       toast({
         title: "Success",
-        description: "Order updated successfully.",
+        description: allItemsCompleted ? "Order marked as completed!" : "Order updated successfully.",
       });
       onClose();
     } catch (error) {
