@@ -199,7 +199,7 @@ export const useGlobalRealtimeOrders = ({
     console.log(`Setting up enhanced real-time order subscriptions for ${pageType}...`);
     
     // Create a unique channel name per page type to avoid conflicts
-    const channelName = `orders-realtime-enhanced-${pageType}-${Date.now()}`;
+    const channelName = `orders-realtime-enhanced-${pageType}`;
     
     const channel = supabase
       .channel(channelName)
@@ -243,7 +243,7 @@ export const useGlobalRealtimeOrders = ({
       console.log(`Cleaning up enhanced real-time subscriptions for ${pageType}...`);
       supabase.removeChannel(channel);
     };
-  }, [handleOrderInsert, handleOrderUpdate, handleOrderDelete, pageType]);
+  }, [pageType]); // Only depend on pageType, not the callback functions
 
   return null;
 };
