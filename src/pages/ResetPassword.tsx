@@ -22,6 +22,12 @@ const resetPasswordSchema = z.object({
 type ResetPasswordValues = z.infer<typeof resetPasswordSchema>;
 
 const ResetPassword = () => {
+  console.log('ResetPassword component loaded');
+  console.log('Current URL:', window.location.href);
+  console.log('Current pathname:', window.location.pathname);
+  console.log('Current hash:', window.location.hash);
+  console.log('Current search:', window.location.search);
+  
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
