@@ -525,53 +525,42 @@ export class HardwareScannerService {
   private async launchSystemScanner(scanner: HardwareScanner): Promise<{ success: boolean; message: string }> {
     try {
       if (navigator.userAgent.includes('Windows')) {
-        // Launch Windows Scan app directly
+        // Launch Windows scanner without navigation
         try {
-          // Method 1: Use window.open with proper parameters
-          const scanWindow = window.open('ms-winscan:', '_blank', 'noopener,noreferrer');
+          // Method 1: Try creating and clicking a link without adding to DOM
+          const tempLink = document.createElement('a');
+          tempLink.href = 'ms-winscan:';
+          tempLink.style.display = 'none';
           
-          // Close the blank window that might open if protocol isn't handled
-          if (scanWindow) {
-            setTimeout(() => {
-              try {
-                scanWindow.close();
-              } catch (e) {
-                // Ignore close errors
-              }
-            }, 1000);
-          }
+          // Add event listener to prevent default navigation
+          tempLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            // The protocol will still trigger even with preventDefault
+            return false;
+          });
+          
+          tempLink.click();
           
           return {
             success: true,
-            message: 'Opening Windows Scan app. Select your scanner and scan your document.'
+            message: 'Opening Windows Scan app...'
           };
         } catch (error) {
-          try {
-            // Method 2: Create iframe to trigger protocol
-            const iframe = document.createElement('iframe');
-            iframe.style.display = 'none';
-            iframe.src = 'ms-winscan:';
-            document.body.appendChild(iframe);
-            
-            // Remove iframe after attempting to launch
-            setTimeout(() => {
-              try {
-                document.body.removeChild(iframe);
-              } catch (e) {
-                // Ignore removal errors
-              }
-            }, 2000);
-            
-            return {
-              success: true,
-              message: 'Attempting to launch Windows Scan app.'
-            };
-          } catch (err) {
-            return {
-              success: false,
-              message: 'Unable to launch Windows Scan automatically. Please open Windows Scan manually from Start Menu.'
-            };
-          }
+          // Fallback: Provide manual instructions
+          const instructions = `To open Windows Scan manually:
+          
+1. Press Windows key + R to open Run dialog
+2. Type: ms-winscan:
+3. Press Enter
+
+Or search for "Windows Scan" in Start Menu`;
+          
+          alert(instructions);
+          
+          return {
+            success: true,
+            message: 'Please follow the manual instructions to open Windows Scan.'
+          };
         }
       } else if (navigator.userAgent.includes('Mac')) {
         // Try to launch Image Capture on Mac
