@@ -2,79 +2,62 @@ import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
-  Wifi, 
-  Search, 
-  Plus, 
-  Star, 
-  StarOff, 
-  Monitor, 
-  QrCode, 
-  RefreshCw,
+  Smartphone, 
+  Camera, 
+  FileText, 
   ExternalLink,
-  Printer
+  Printer,
+  ScanLine,
+  Upload,
+  CheckCircle
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { NetworkPrinterService } from "@/services/networkPrinterService";
+import { NativePrintScanService, NativePrintApp } from "@/services/nativePrintScanService";
+import { NativeScanningService } from "@/services/nativeScanningService";
 
-interface NetworkPrinter {
-  id: string;
-  name: string;
-  ip: string;
-  model?: string;
-  manufacturer?: string;
-  webUrl: string;
-  status: 'online' | 'offline' | 'unknown';
-  capabilities?: string[];
-}
-
-interface NetworkScannerDialogProps {
+interface NativeScannerDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onScanComplete?: (scannedFile: File) => void;
 }
 
-export default function NetworkScannerDialog({
+export default function NativeScannerDialog({
   isOpen,
   onClose,
   onScanComplete
-}: NetworkScannerDialogProps) {
+}: NativeScannerDialogProps) {
   const { toast } = useToast();
-  const [printers, setPrinters] = useState<NetworkPrinter[]>([]);
+  const [apps, setApps] = useState<NativePrintApp[]>([]);
   const [loading, setLoading] = useState(false);
-  const [manualIP, setManualIP] = useState('');
-  const [selectedPrinter, setSelectedPrinter] = useState<NetworkPrinter | null>(null);
-  const [showQR, setShowQR] = useState<string | null>(null);
+  const [instructions, setInstructions] = useState<string[]>([]);
+  const [recommended, setRecommended] = useState<NativePrintApp | null>(null);
   
-  const printerService = NetworkPrinterService.getInstance();
+  const printScanService = NativePrintScanService.getInstance();
+  const nativeScanService = NativeScanningService.getInstance();
 
-  const discoverPrinters = async () => {
+  const loadScanApps = async () => {
     setLoading(true);
     try {
-      const discovered = await printerService.discoverPrinters();
-      setPrinters(discovered);
+      const availableApps = await printScanService.getAvailablePrintScanApps();
+      const scanInstructions = await printScanService.getScanningInstructions();
+      const recommendedApp = await printScanService.getRecommendedScanningMethod();
       
-      if (discovered.length === 0) {
-        toast({
-          title: "No Printers Found",
-          description: "No network printers were discovered. Try adding one manually.",
-          variant: "default"
-        });
-      } else {
-        toast({
-          title: "Printers Discovered",
-          description: `Found ${discovered.length} network printer(s)`,
-          variant: "default"
-        });
-      }
-    } catch (error) {
-      console.error('Discovery error:', error);
+      setApps(availableApps);
+      setInstructions(scanInstructions);
+      setRecommended(recommendedApp);
+      
       toast({
-        title: "Discovery Failed",
-        description: "Failed to discover network printers. Please try again.",
+        title: "Scanning Options Ready",
+        description: `Found ${availableApps.length} available scanning method(s)`,
+        variant: "default"
+      });
+    } catch (error) {
+      console.error('Loading scan apps error:', error);
+      toast({
+        title: "Setup Failed",
+        description: "Failed to load scanning options. Please try again.",
         variant: "destructive"
       });
     } finally {
@@ -82,38 +65,28 @@ export default function NetworkScannerDialog({
     }
   };
 
-  const addManualPrinter = async () => {
-    if (!manualIP.trim()) {
-      toast({
-        title: "Invalid IP",
-        description: "Please enter a valid IP address",
-        variant: "destructive"
-      });
-      return;
-    }
-
+  const openScanApp = async (app: NativePrintApp) => {
     setLoading(true);
     try {
-      const printer = await printerService.addPrinterByIP(manualIP.trim());
-      if (printer) {
-        setPrinters(prev => [...prev, printer]);
-        setManualIP('');
+      const result = await printScanService.openPrintScanApp(app);
+      
+      if (result.success) {
         toast({
-          title: "Printer Added",
-          description: `Successfully added printer at ${manualIP}`,
+          title: "Scanner Opened",
+          description: `${app.name} opened successfully. Scan your document and return to upload.`,
           variant: "default"
         });
       } else {
         toast({
-          title: "Printer Not Found",
-          description: `No printer found at ${manualIP}`,
+          title: "Failed to Open Scanner",
+          description: result.error || "Unable to open the scanning app",
           variant: "destructive"
         });
       }
     } catch (error) {
       toast({
-        title: "Connection Failed",
-        description: "Could not connect to printer at this IP address",
+        title: "Error",
+        description: "Failed to open scanning app",
         variant: "destructive"
       });
     } finally {
@@ -121,127 +94,111 @@ export default function NetworkScannerDialog({
     }
   };
 
-  const toggleFavorite = (printer: NetworkPrinter) => {
-    if (printerService.isFavorite(printer.id)) {
-      printerService.removeFromFavorites(printer.id);
-    } else {
-      printerService.addToFavorites(printer.id);
+  const handleCameraScan = async () => {
+    setLoading(true);
+    try {
+      const result = await nativeScanService.scanDocument();
+      
+      if (result.success && result.base64Data) {
+        const file = nativeScanService.base64ToFile(result.base64Data, result.fileName || 'scan.jpg');
+        onScanComplete?.(file);
+        onClose();
+        
+        toast({
+          title: "Document Scanned",
+          description: "Document captured successfully",
+          variant: "default"
+        });
+      } else {
+        toast({
+          title: "Scan Failed",
+          description: result.error || "Failed to capture document",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Camera Error",
+        description: "Failed to access camera",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
     }
-    // Force re-render by updating state
-    setPrinters([...printers]);
   };
 
-  const openScanInterface = (printer: NetworkPrinter) => {
-    const scanUrl = printerService.getScanUrl(printer);
-    window.open(scanUrl, '_blank', 'width=800,height=600,scrollbars=yes,resizable=yes');
-    
-    toast({
-      title: "Scan Interface Opened",
-      description: "Use the printer's web interface to scan documents. Save files to your device and upload them here.",
-      variant: "default"
-    });
-  };
-
-  const generateQRCode = (printer: NetworkPrinter) => {
-    const qrData = printerService.generateQRCodeData(printer);
-    setShowQR(qrData);
-  };
-
-  const checkPrinterStatus = async (printer: NetworkPrinter) => {
-    const status = await printerService.checkPrinterStatus(printer);
-    setPrinters(prev => 
-      prev.map(p => p.id === printer.id ? { ...p, status } : p)
-    );
+  const handleGallerySelect = async () => {
+    setLoading(true);
+    try {
+      const result = await nativeScanService.selectFromGallery();
+      
+      if (result.success && result.base64Data) {
+        const file = nativeScanService.base64ToFile(result.base64Data, result.fileName || 'image.jpg');
+        onScanComplete?.(file);
+        onClose();
+        
+        toast({
+          title: "Image Selected",
+          description: "Image selected successfully",
+          variant: "default"
+        });
+      } else {
+        toast({
+          title: "Selection Failed",
+          description: result.error || "Failed to select image",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Gallery Error",
+        description: "Failed to access photo gallery",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
     if (isOpen) {
-      // Load any previously discovered printers
-      const discovered = printerService.getDiscoveredPrinters();
-      setPrinters(discovered);
-      
-      // Auto-discover on open
-      if (discovered.length === 0) {
-        discoverPrinters();
-      }
+      loadScanApps();
     }
   }, [isOpen]);
 
-  const PrinterCard = ({ printer }: { printer: NetworkPrinter }) => (
+  const ScanAppCard = ({ app }: { app: NativePrintApp }) => (
     <div className="border rounded-lg p-4 space-y-3">
       <div className="flex items-start justify-between">
         <div className="flex items-center space-x-3">
-          <Printer className="h-8 w-8 text-primary" />
+          {app.type === 'native' ? (
+            <Smartphone className="h-8 w-8 text-primary" />
+          ) : (
+            <ExternalLink className="h-8 w-8 text-primary" />
+          )}
           <div>
-            <h4 className="font-medium">{printer.name}</h4>
-            <p className="text-sm text-muted-foreground">{printer.ip}</p>
-            {printer.model && (
-              <p className="text-xs text-muted-foreground">{printer.model}</p>
-            )}
+            <h4 className="font-medium">{app.name}</h4>
+            <p className="text-sm text-muted-foreground">{app.description}</p>
+            <Badge variant="outline" className="mt-1">
+              {app.platform} • {app.type}
+            </Badge>
           </div>
         </div>
-        <div className="flex items-center space-x-2">
-          <Badge 
-            variant={printer.status === 'online' ? 'default' : 'secondary'}
-            className={printer.status === 'online' ? 'bg-green-500' : ''}
-          >
-            {printer.status}
+        {recommended?.id === app.id && (
+          <Badge variant="default" className="bg-green-500">
+            <CheckCircle className="h-3 w-3 mr-1" />
+            Recommended
           </Badge>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => toggleFavorite(printer)}
-          >
-            {printerService.isFavorite(printer.id) ? (
-              <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-            ) : (
-              <StarOff className="h-4 w-4" />
-            )}
-          </Button>
-        </div>
+        )}
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => openScanInterface(printer)}
-          className="flex items-center gap-2"
-        >
-          <Monitor className="h-4 w-4" />
-          Open Scanner
-        </Button>
-        
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => generateQRCode(printer)}
-          className="flex items-center gap-2"
-        >
-          <QrCode className="h-4 w-4" />
-          QR Code
-        </Button>
-
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => checkPrinterStatus(printer)}
-          className="flex items-center gap-2"
-        >
-          <RefreshCw className="h-4 w-4" />
-          Check Status
-        </Button>
-      </div>
-
-      {printer.capabilities && (
-        <div className="flex gap-1">
-          {printer.capabilities.map(cap => (
-            <Badge key={cap} variant="outline" className="text-xs">
-              {cap}
-            </Badge>
-          ))}
-        </div>
-      )}
+      <Button
+        onClick={() => openScanApp(app)}
+        disabled={loading}
+        className="w-full flex items-center gap-2"
+      >
+        <ScanLine className="h-4 w-4" />
+        Open {app.name}
+      </Button>
     </div>
   );
 
@@ -249,137 +206,93 @@ export default function NetworkScannerDialog({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Network Scanner Access</DialogTitle>
+          <DialogTitle>Document Scanner</DialogTitle>
         </DialogHeader>
 
-        <Tabs defaultValue="discover" className="w-full">
+        <Tabs defaultValue="apps" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="discover">Auto Discover</TabsTrigger>
-            <TabsTrigger value="manual">Manual Setup</TabsTrigger>
+            <TabsTrigger value="apps">Scanner Apps</TabsTrigger>
+            <TabsTrigger value="camera">Camera</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="discover" className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-medium">Available Printers</h3>
-              <Button
-                onClick={discoverPrinters}
-                disabled={loading}
-                className="flex items-center gap-2"
-              >
-                {loading ? (
-                  <RefreshCw className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Search className="h-4 w-4" />
-                )}
-                {loading ? 'Discovering...' : 'Discover'}
-              </Button>
+          <TabsContent value="apps" className="space-y-4">
+            <div className="space-y-3">
+              <h3 className="text-lg font-medium">Available Scanning Apps</h3>
+              
+              {loading && apps.length === 0 && (
+                <div className="text-center py-8">
+                  <ScanLine className="h-8 w-8 animate-spin mx-auto mb-2 text-muted-foreground" />
+                  <p className="text-muted-foreground">Loading scanning options...</p>
+                </div>
+              )}
+
+              {apps.map(app => (
+                <ScanAppCard key={app.id} app={app} />
+              ))}
+
+              {apps.length === 0 && !loading && (
+                <div className="text-center py-8">
+                  <FileText className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                  <p className="text-muted-foreground">No scanning apps available</p>
+                  <p className="text-sm text-muted-foreground">Try using the camera tab instead</p>
+                </div>
+              )}
             </div>
 
-            {loading && printers.length === 0 && (
-              <div className="text-center py-8">
-                <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-2 text-muted-foreground" />
-                <p className="text-muted-foreground">Searching for network printers...</p>
+            {instructions.length > 0 && (
+              <div className="bg-muted rounded-lg p-4">
+                <h4 className="font-medium mb-3">How to Scan Documents:</h4>
+                <ol className="text-sm text-muted-foreground space-y-2">
+                  {instructions.map((instruction, index) => (
+                    <li key={index}>{instruction}</li>
+                  ))}
+                </ol>
               </div>
             )}
-
-            <div className="space-y-3">
-              {printerService.getFavoritePrinters().length > 0 && (
-                <>
-                  <h4 className="font-medium text-sm text-muted-foreground">Favorites</h4>
-                  {printerService.getFavoritePrinters().map(printer => (
-                    <PrinterCard key={printer.id} printer={printer} />
-                  ))}
-                </>
-              )}
-
-              {printers.filter(p => !printerService.isFavorite(p.id)).length > 0 && (
-                <>
-                  <h4 className="font-medium text-sm text-muted-foreground">Discovered Printers</h4>
-                  {printers.filter(p => !printerService.isFavorite(p.id)).map(printer => (
-                    <PrinterCard key={printer.id} printer={printer} />
-                  ))}
-                </>
-              )}
-
-              {printers.length === 0 && !loading && (
-                <div className="text-center py-8">
-                  <Wifi className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                  <p className="text-muted-foreground">No printers discovered</p>
-                  <p className="text-sm text-muted-foreground">Try manual setup or check your network connection</p>
-                </div>
-              )}
-            </div>
           </TabsContent>
 
-          <TabsContent value="manual" className="space-y-4">
-            <div>
-              <h3 className="text-lg font-medium mb-4">Add Printer by IP Address</h3>
-              
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="manual-ip">Printer IP Address</Label>
-                  <div className="flex gap-2 mt-1">
-                    <Input
-                      id="manual-ip"
-                      placeholder="192.168.1.100"
-                      value={manualIP}
-                      onChange={(e) => setManualIP(e.target.value)}
-                      onKeyPress={(e) => e.key === 'Enter' && addManualPrinter()}
-                    />
-                    <Button 
-                      onClick={addManualPrinter}
-                      disabled={loading || !manualIP.trim()}
-                    >
-                      <Plus className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Enter the IP address of your network printer/scanner
-                  </p>
-                </div>
+          <TabsContent value="camera" className="space-y-4">
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium">Direct Camera Scanning</h3>
+              <p className="text-sm text-muted-foreground">
+                Use your device camera to capture documents directly
+              </p>
 
-                <div className="bg-muted rounded-lg p-4">
-                  <h4 className="font-medium mb-2">How to find your printer's IP:</h4>
-                  <ul className="text-sm text-muted-foreground space-y-1">
-                    <li>• Check your router's admin panel for connected devices</li>
-                    <li>• Print a network configuration page from your printer</li>
-                    <li>• Look for the IP address in printer settings menu</li>
-                    <li>• Common ranges: 192.168.1.x or 192.168.0.x</li>
-                  </ul>
-                </div>
+              <div className="grid gap-3">
+                <Button
+                  onClick={handleCameraScan}
+                  disabled={loading}
+                  className="flex items-center gap-2"
+                  size="lg"
+                >
+                  <Camera className="h-5 w-5" />
+                  {loading ? 'Opening Camera...' : 'Scan with Camera'}
+                </Button>
+
+                <Button
+                  onClick={handleGallerySelect}
+                  disabled={loading}
+                  variant="outline"
+                  className="flex items-center gap-2"
+                  size="lg"
+                >
+                  <Upload className="h-5 w-5" />
+                  {loading ? 'Opening Gallery...' : 'Select from Gallery'}
+                </Button>
+              </div>
+
+              <div className="bg-muted rounded-lg p-4">
+                <h4 className="font-medium mb-2">Camera Scanning Tips:</h4>
+                <ul className="text-sm text-muted-foreground space-y-1">
+                  <li>• Ensure good lighting for clear document capture</li>
+                  <li>• Place document on a flat, contrasting surface</li>
+                  <li>• Hold camera steady and parallel to document</li>
+                  <li>• Tap to focus before capturing</li>
+                </ul>
               </div>
             </div>
           </TabsContent>
         </Tabs>
-
-        {showQR && (
-          <Dialog open={!!showQR} onOpenChange={() => setShowQR(null)}>
-            <DialogContent className="max-w-sm">
-              <DialogHeader>
-                <DialogTitle>Mobile Access QR Code</DialogTitle>
-              </DialogHeader>
-              <div className="text-center space-y-4">
-                <div className="bg-white p-4 rounded-lg inline-block">
-                  {/* QR Code would be generated here with a library like qrcode */}
-                  <div className="w-48 h-48 bg-gray-100 flex items-center justify-center text-gray-500">
-                    QR Code
-                  </div>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  Scan with your mobile device to access the scanner interface
-                </p>
-                <Button
-                  variant="outline"
-                  onClick={() => window.open(showQR, '_blank')}
-                  className="flex items-center gap-2"
-                >
-                  <ExternalLink className="h-4 w-4" />
-                  Open Link Instead
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-        )}
       </DialogContent>
     </Dialog>
   );
