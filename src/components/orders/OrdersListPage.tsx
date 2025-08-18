@@ -54,43 +54,72 @@ export const OrdersListPage: React.FC = () => {
     const fetchUserData = async () => {
       if (!user) return;
 
+      console.log('=== ORDERS LIST PAGE: Starting user data fetch ===');
+      console.log('User ID:', user.id);
+      console.log('Companies available:', companies.length);
+
       try {
         // Get user role
         const role = await getUserRole(user.id);
+        console.log('User role:', role);
         setUserRole(role || 'user');
 
         // Get user company if not admin
         if (role !== 'admin') {
           const { data: profile } = await supabase
             .from('profiles')
-            .select('company_id')
+            .select('company_id, company_code')
             .eq('id', user.id)
             .single();
           
+          console.log('Profile data for orders list:', profile);
+          
           if (profile?.company_id) {
+            console.log('Setting company ID from profile:', profile.company_id);
             setUserCompanyId(profile.company_id);
             setSelectedCompanyId(profile.company_id);
+          } else if (profile?.company_code) {
+            console.log('Looking up company by code:', profile.company_code);
+            // If we have a company code but no company_id, find the company by code
+            const { data: company } = await supabase
+              .from('companies')
+              .select('id')
+              .eq('code', profile.company_code)
+              .single();
+            
+            console.log('Company found by code:', company);
+            
+            if (company?.id) {
+              console.log('Setting company ID from code lookup:', company.id);
+              setUserCompanyId(company.id);
+              setSelectedCompanyId(company.id);
+            }
           }
         }
       } catch (error) {
-        console.error('Error fetching user data:', error);
+        console.error('Error fetching user data in OrdersListPage:', error);
       }
     };
 
-    fetchUserData();
-  }, [user]);
+    // Only fetch user data if we have companies loaded (to avoid race conditions)
+    if (companies.length > 0) {
+      fetchUserData();
+    }
+  }, [user, companies]);
 
   useEffect(() => {
-    if (selectedCompanyId) {
+    if (selectedCompanyId && companies.length > 0) {
       fetchOrders();
     }
-  }, [selectedCompanyId]);
+  }, [selectedCompanyId, companies]);
 
   const fetchOrders = async () => {
     if (!selectedCompanyId) return;
 
     setLoading(true);
     try {
+      console.log('Fetching orders for company:', selectedCompanyId);
+      
       // Get current month start and end dates
       const now = new Date();
       const monthStart = startOfMonth(now);
@@ -103,6 +132,9 @@ export const OrdersListPage: React.FC = () => {
         .gte('created_at', monthStart.toISOString())
         .lte('created_at', monthEnd.toISOString())
         .order('created_at', { ascending: false });
+
+      console.log('Orders data:', ordersData);
+      console.log('Orders error:', error);
 
       if (error) throw error;
 
