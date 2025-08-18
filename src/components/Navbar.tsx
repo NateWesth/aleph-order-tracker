@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { Menu, X } from 'lucide-react';
 import { Button } from "@/components/ui/button";
+import { OrdersListButton } from "./OrdersListButton";
 
 const Navbar: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -23,6 +24,7 @@ const Navbar: React.FC = () => {
               <a href="#about" className="text-gray-600 hover:text-aleph-blue px-3 py-2 rounded-md text-sm font-medium transition-colors">About</a>
               <a href="#services" className="text-gray-600 hover:text-aleph-blue px-3 py-2 rounded-md text-sm font-medium transition-colors">Services</a>
               <a href="#contact" className="text-gray-600 hover:text-aleph-blue px-3 py-2 rounded-md text-sm font-medium transition-colors">Contact</a>
+              <OrdersListButton />
               <Button variant="default" className="ml-4 bg-aleph-blue hover:bg-blue-500 text-white">Get Started</Button>
             </div>
           </div>
@@ -69,7 +71,8 @@ const Navbar: React.FC = () => {
             >
               Contact
             </a>
-            <div className="pt-2">
+            <div className="pt-2 space-y-2">
+              <OrdersListButton />
               <Button variant="default" className="w-full bg-aleph-blue hover:bg-blue-500 text-white">
                 Get Started
               </Button>
