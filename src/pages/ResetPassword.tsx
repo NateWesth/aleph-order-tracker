@@ -28,6 +28,13 @@ const ResetPassword = () => {
   console.log('Current hash:', window.location.hash);
   console.log('Current search:', window.location.search);
   
+  // Capture hash parameters immediately before they get lost
+  const [hashParams] = useState(() => {
+    const hash = window.location.hash.substring(1);
+    console.log('Captured hash on mount:', hash);
+    return new URLSearchParams(hash);
+  });
+  
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -45,14 +52,12 @@ const ResetPassword = () => {
   });
 
   useEffect(() => {
-    // Supabase sends reset links with hash parameters, not query parameters
-    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    // Use the captured hash parameters from component mount
     const accessToken = hashParams.get('access_token');
     const refreshToken = hashParams.get('refresh_token');
     const type = hashParams.get('type');
     
-    console.log('Hash parameters:', { accessToken, refreshToken, type });
-    console.log('Full hash:', window.location.hash);
+    console.log('Hash parameters from captured state:', { accessToken, refreshToken, type });
     
     // Also check query parameters as fallback
     const queryAccessToken = searchParams.get('access_token');
@@ -95,7 +100,7 @@ const ResetPassword = () => {
         setValidToken(true);
       }
     });
-  }, [searchParams, navigate, toast]);
+  }, [hashParams, searchParams, navigate, toast]);
 
   // Prevent automatic redirects when authenticated during password reset
   useEffect(() => {
