@@ -169,7 +169,7 @@ const serve_handler = async (req: Request): Promise<Response> => {
             }
           ],
           from: {
-            email: "orders@yourcompany.com",
+            email: "onboarding@resend.dev",
             name: "Order Management System"
           },
           content: [
