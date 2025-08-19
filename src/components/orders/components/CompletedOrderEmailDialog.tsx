@@ -51,49 +51,81 @@ export default function CompletedOrderEmailDialog({
 
     setLoading(true);
     try {
+      console.log('Fetching users for order:', order);
+
       // Get company users based on company_id
       let companyUsers: any[] = [];
       if (order.company_id) {
-        const { data: companyUsersData } = await supabase
+        console.log('Fetching company users for company_id:', order.company_id);
+        
+        const { data: companyUsersData, error: companyError } = await supabase
           .from('profiles')
           .select(`
             id,
             full_name,
-            email,
-            user_roles!inner(role)
+            email
           `)
           .eq('company_id', order.company_id)
-          .eq('user_roles.role', 'user');
+          .not('email', 'is', null);
         
-        if (companyUsersData) {
-          companyUsers = companyUsersData.map(user => ({
+        console.log('Company users query result:', companyUsersData, companyError);
+        
+        if (companyUsersData && !companyError) {
+          // Get user roles for these users
+          const userIds = companyUsersData.map(u => u.id);
+          const { data: userRolesData } = await supabase
+            .from('user_roles')
+            .select('user_id, role')
+            .in('user_id', userIds);
+          
+          console.log('User roles for company users:', userRolesData);
+          
+          companyUsers = companyUsersData.map(user => {
+            const userRole = userRolesData?.find(r => r.user_id === user.id);
+            return {
+              id: user.id,
+              full_name: user.full_name,
+              email: user.email,
+              role: userRole?.role || 'user' as const,
+              isSelected: false
+            };
+          });
+        }
+      }
+
+      // Get all admin users
+      console.log('Fetching admin users...');
+      const { data: adminRolesData, error: adminError } = await supabase
+        .from('user_roles')
+        .select('user_id, role')
+        .eq('role', 'admin');
+      
+      console.log('Admin roles query result:', adminRolesData, adminError);
+
+      let adminUsers: any[] = [];
+      if (adminRolesData && !adminError && adminRolesData.length > 0) {
+        const adminUserIds = adminRolesData.map(r => r.user_id);
+        const { data: adminProfilesData, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id, full_name, email')
+          .in('id', adminUserIds)
+          .not('email', 'is', null);
+        
+        console.log('Admin profiles query result:', adminProfilesData, profilesError);
+        
+        if (adminProfilesData && !profilesError) {
+          adminUsers = adminProfilesData.map(user => ({
             id: user.id,
             full_name: user.full_name,
             email: user.email,
-            role: 'user' as const,
+            role: 'admin' as const,
             isSelected: false
           }));
         }
       }
 
-      // Get all admin users
-      const { data: adminUsersData } = await supabase
-        .from('profiles')
-        .select(`
-          id,
-          full_name,
-          email,
-          user_roles!inner(role)
-        `)
-        .eq('user_roles.role', 'admin');
-
-      const adminUsers = adminUsersData?.map(user => ({
-        id: user.id,
-        full_name: user.full_name,
-        email: user.email,
-        role: 'admin' as const,
-        isSelected: false
-      })) || [];
+      console.log('Company users found:', companyUsers.length);
+      console.log('Admin users found:', adminUsers.length);
 
       // Combine and deduplicate users
       const allUsers = [...companyUsers, ...adminUsers];
@@ -101,10 +133,8 @@ export default function CompletedOrderEmailDialog({
         index === self.findIndex(u => u.id === user.id)
       );
 
-      // Filter out users without email
-      const usersWithEmail = uniqueUsers.filter(user => user.email);
-
-      setUsers(usersWithEmail);
+      console.log('Total unique users:', uniqueUsers.length);
+      setUsers(uniqueUsers);
     } catch (error) {
       console.error('Error fetching users:', error);
       toast({
