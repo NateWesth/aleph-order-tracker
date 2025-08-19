@@ -114,10 +114,21 @@ const serve_handler = async (req: Request): Promise<Response> => {
     const attachments = [];
     for (const file of emailRequest.files) {
       try {
+        // Extract the full path from the file URL
+        // URL format: https://domain.supabase.co/storage/v1/object/public/order-files/path/to/file.pdf
+        const urlParts = file.file_url.split('/storage/v1/object/public/order-files/');
+        if (urlParts.length !== 2) {
+          console.warn(`Invalid file URL format: ${file.file_url}`);
+          continue;
+        }
+        const filePath = urlParts[1];
+        
+        console.log(`Attempting to download file: ${filePath}`);
+
         // Download file from Supabase storage
         const { data: fileData, error: downloadError } = await supabase.storage
           .from('order-files')
-          .download(file.file_url.split('/').pop() || '');
+          .download(filePath);
 
         if (downloadError) {
           console.warn(`Failed to download file ${file.file_name}:`, downloadError);
@@ -134,10 +145,14 @@ const serve_handler = async (req: Request): Promise<Response> => {
           type: file.mime_type || 'application/octet-stream',
           disposition: 'attachment'
         });
+        
+        console.log(`Successfully processed file: ${file.file_name}`);
       } catch (error) {
         console.warn(`Error processing file ${file.file_name}:`, error);
       }
     }
+
+    console.log(`Prepared ${attachments.length} attachments for email`);
 
     // Send emails using SendGrid
     let sent = 0;
@@ -146,7 +161,7 @@ const serve_handler = async (req: Request): Promise<Response> => {
 
     for (const recipient of emailRequest.recipients) {
       try {
-        const emailData = {
+        const emailData: any = {
           personalizations: [
             {
               to: [{ email: recipient.email, name: recipient.name || undefined }],
@@ -162,9 +177,13 @@ const serve_handler = async (req: Request): Promise<Response> => {
               type: "text/html",
               value: emailContent
             }
-          ],
-          attachments: attachments
+          ]
         };
+
+        // Only add attachments if we have any
+        if (attachments.length > 0) {
+          emailData.attachments = attachments;
+        }
 
         const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
           method: 'POST',
