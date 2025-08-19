@@ -72,9 +72,15 @@ const serve_handler = async (req: Request): Promise<Response> => {
 
     // Prepare email content
     const subject = `Completed Order Files - Order #${emailRequest.orderNumber}`;
+    
+    // Create download links for each file
+    const fileLinks = emailRequest.files.map(file => 
+      `<li><a href="${file.file_url}" target="_blank" download="${file.file_name}" style="color: #2563eb; text-decoration: underline;">${file.file_name}</a> (${file.file_type})</li>`
+    ).join('');
+
     const emailContent = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2 style="color: #333;">Order Completed - Files Attached</h2>
+        <h2 style="color: #333;">Order Completed - Files Ready for Download</h2>
         
         <p>Hello,</p>
         
@@ -89,12 +95,13 @@ const serve_handler = async (req: Request): Promise<Response> => {
         
         ${emailRequest.files.length > 0 ? `
         <div style="margin: 20px 0;">
-          <h3 style="color: #333;">Attached Files:</h3>
+          <h3 style="color: #333;">Download Files:</h3>
           <ul style="background-color: #f8f9fa; padding: 15px; border-radius: 5px;">
-            ${emailRequest.files.map(file => 
-              `<li style="margin: 5px 0;">${file.file_name} (${file.file_type})</li>`
-            ).join('')}
+            ${fileLinks}
           </ul>
+          <p style="font-size: 14px; color: #666; margin-top: 10px;">
+            <strong>Note:</strong> Click on any file name to download it directly to your device.
+          </p>
         </div>
         ` : '<p>No files are attached to this order.</p>'}
         
@@ -110,46 +117,10 @@ const serve_handler = async (req: Request): Promise<Response> => {
       </div>
     `;
 
-    // Prepare attachments from Supabase storage
-    const attachments = [];
-    for (const file of emailRequest.files) {
-      try {
-        console.log(`Processing file: ${file.file_name}`);
-        console.log(`File URL: ${file.file_url}`);
+    // Don't try to attach files - instead send download links
+    console.log(`Email will contain download links for ${emailRequest.files.length} files`);
 
-        // For public bucket files, we can download directly using the fetch API
-        const response = await fetch(file.file_url);
-        
-        if (!response.ok) {
-          console.warn(`Failed to download file ${file.file_name}: HTTP ${response.status}`);
-          continue;
-        }
-
-        // Get the file as array buffer
-        const arrayBuffer = await response.arrayBuffer();
-        
-        if (arrayBuffer.byteLength === 0) {
-          console.warn(`File ${file.file_name} is empty`);
-          continue;
-        }
-
-        // Convert to base64
-        const base64Content = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
-
-        attachments.push({
-          content: base64Content,
-          filename: file.file_name,
-          type: file.mime_type || 'application/pdf',
-          disposition: 'attachment'
-        });
-        
-        console.log(`✅ Successfully processed file: ${file.file_name} (${arrayBuffer.byteLength} bytes)`);
-      } catch (error) {
-        console.warn(`❌ Error processing file ${file.file_name}:`, error);
-      }
-    }
-
-    console.log(`Prepared ${attachments.length} attachments for email`);
+    console.log(`Sending emails to ${emailRequest.recipients.length} recipients with download links`);
 
     // Send emails using SendGrid
     let sent = 0;
@@ -177,10 +148,8 @@ const serve_handler = async (req: Request): Promise<Response> => {
           ]
         };
 
-        // Only add attachments if we have any
-        if (attachments.length > 0) {
-          emailData.attachments = attachments;
-        }
+        // No need for attachments since we're sending download links
+        console.log(`Sending email to ${recipient.email}`);
 
         const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
           method: 'POST',
