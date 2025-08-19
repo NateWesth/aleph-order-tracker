@@ -114,41 +114,38 @@ const serve_handler = async (req: Request): Promise<Response> => {
     const attachments = [];
     for (const file of emailRequest.files) {
       try {
-        // Extract the full path from the file URL
-        // URL format: https://domain.supabase.co/storage/v1/object/public/order-files/path/to/file.pdf
-        const urlParts = file.file_url.split('/storage/v1/object/public/order-files/');
-        if (urlParts.length !== 2) {
-          console.warn(`Invalid file URL format: ${file.file_url}`);
+        console.log(`Processing file: ${file.file_name}`);
+        console.log(`File URL: ${file.file_url}`);
+
+        // For public bucket files, we can download directly using the fetch API
+        const response = await fetch(file.file_url);
+        
+        if (!response.ok) {
+          console.warn(`Failed to download file ${file.file_name}: HTTP ${response.status}`);
           continue;
         }
-        const filePath = urlParts[1];
+
+        // Get the file as array buffer
+        const arrayBuffer = await response.arrayBuffer();
         
-        console.log(`Attempting to download file: ${filePath}`);
-
-        // Download file from Supabase storage
-        const { data: fileData, error: downloadError } = await supabase.storage
-          .from('order-files')
-          .download(filePath);
-
-        if (downloadError) {
-          console.warn(`Failed to download file ${file.file_name}:`, downloadError);
+        if (arrayBuffer.byteLength === 0) {
+          console.warn(`File ${file.file_name} is empty`);
           continue;
         }
 
         // Convert to base64
-        const arrayBuffer = await fileData.arrayBuffer();
         const base64Content = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
 
         attachments.push({
           content: base64Content,
           filename: file.file_name,
-          type: file.mime_type || 'application/octet-stream',
+          type: file.mime_type || 'application/pdf',
           disposition: 'attachment'
         });
         
-        console.log(`Successfully processed file: ${file.file_name}`);
+        console.log(`✅ Successfully processed file: ${file.file_name} (${arrayBuffer.byteLength} bytes)`);
       } catch (error) {
-        console.warn(`Error processing file ${file.file_name}:`, error);
+        console.warn(`❌ Error processing file ${file.file_name}:`, error);
       }
     }
 
