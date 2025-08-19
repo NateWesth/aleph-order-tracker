@@ -169,8 +169,8 @@ const serve_handler = async (req: Request): Promise<Response> => {
             }
           ],
           from: {
-            email: "onboarding@resend.dev",
-            name: "Order Management System"
+            email: 'noreply@alepheng.co.za',
+            name: 'Order Management System'
           },
           content: [
             {
