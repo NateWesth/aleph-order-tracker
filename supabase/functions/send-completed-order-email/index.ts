@@ -1,0 +1,225 @@
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.8';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+interface EmailRequest {
+  orderId: string;
+  orderNumber: string;
+  companyName: string;
+  recipients: Array<{
+    id: string;
+    email: string;
+    name: string | null;
+  }>;
+  files: Array<{
+    id: string;
+    file_name: string;
+    file_url: string;
+    file_type: string;
+    mime_type: string | null;
+  }>;
+}
+
+const serve_handler = async (req: Request): Promise<Response> => {
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    console.log('Starting completed order email function...');
+
+    // Check for SendGrid API key
+    const sendGridApiKey = Deno.env.get('SENDGRID_API_KEY');
+    if (!sendGridApiKey) {
+      console.error('SENDGRID_API_KEY environment variable is not set');
+      return new Response(
+        JSON.stringify({ error: 'SendGrid API key not configured' }),
+        {
+          status: 500,
+          headers: { 'Content-Type': 'application/json', ...corsHeaders },
+        }
+      );
+    }
+
+    // Initialize Supabase client
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Parse request body
+    const emailRequest: EmailRequest = await req.json();
+    console.log('Email request received:', {
+      orderId: emailRequest.orderId,
+      orderNumber: emailRequest.orderNumber,
+      recipientCount: emailRequest.recipients.length,
+      fileCount: emailRequest.files.length
+    });
+
+    if (!emailRequest.recipients || emailRequest.recipients.length === 0) {
+      return new Response(
+        JSON.stringify({ error: 'No recipients provided' }),
+        {
+          status: 400,
+          headers: { 'Content-Type': 'application/json', ...corsHeaders },
+        }
+      );
+    }
+
+    // Prepare email content
+    const subject = `Completed Order Files - Order #${emailRequest.orderNumber}`;
+    const emailContent = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #333;">Order Completed - Files Attached</h2>
+        
+        <p>Hello,</p>
+        
+        <p>We're pleased to inform you that Order #${emailRequest.orderNumber} for ${emailRequest.companyName} has been completed.</p>
+        
+        <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0;">
+          <h3 style="margin-top: 0; color: #333;">Order Details:</h3>
+          <p><strong>Order Number:</strong> ${emailRequest.orderNumber}</p>
+          <p><strong>Company:</strong> ${emailRequest.companyName}</p>
+          <p><strong>Status:</strong> Completed</p>
+        </div>
+        
+        ${emailRequest.files.length > 0 ? `
+        <div style="margin: 20px 0;">
+          <h3 style="color: #333;">Attached Files:</h3>
+          <ul style="background-color: #f8f9fa; padding: 15px; border-radius: 5px;">
+            ${emailRequest.files.map(file => 
+              `<li style="margin: 5px 0;">${file.file_name} (${file.file_type})</li>`
+            ).join('')}
+          </ul>
+        </div>
+        ` : '<p>No files are attached to this order.</p>'}
+        
+        <p>If you have any questions about this order or need additional information, please don't hesitate to contact us.</p>
+        
+        <p>Best regards,<br>
+        The Order Management Team</p>
+        
+        <hr style="margin: 30px 0; border: none; border-top: 1px solid #ddd;">
+        <p style="font-size: 12px; color: #666;">
+          This is an automated message. Please do not reply directly to this email.
+        </p>
+      </div>
+    `;
+
+    // Prepare attachments from Supabase storage
+    const attachments = [];
+    for (const file of emailRequest.files) {
+      try {
+        // Download file from Supabase storage
+        const { data: fileData, error: downloadError } = await supabase.storage
+          .from('order-files')
+          .download(file.file_url.split('/').pop() || '');
+
+        if (downloadError) {
+          console.warn(`Failed to download file ${file.file_name}:`, downloadError);
+          continue;
+        }
+
+        // Convert to base64
+        const arrayBuffer = await fileData.arrayBuffer();
+        const base64Content = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+
+        attachments.push({
+          content: base64Content,
+          filename: file.file_name,
+          type: file.mime_type || 'application/octet-stream',
+          disposition: 'attachment'
+        });
+      } catch (error) {
+        console.warn(`Error processing file ${file.file_name}:`, error);
+      }
+    }
+
+    // Send emails using SendGrid
+    let sent = 0;
+    let failed = 0;
+    const failedEmails: string[] = [];
+
+    for (const recipient of emailRequest.recipients) {
+      try {
+        const emailData = {
+          personalizations: [
+            {
+              to: [{ email: recipient.email, name: recipient.name || undefined }],
+              subject: subject
+            }
+          ],
+          from: {
+            email: "orders@yourcompany.com",
+            name: "Order Management System"
+          },
+          content: [
+            {
+              type: "text/html",
+              value: emailContent
+            }
+          ],
+          attachments: attachments
+        };
+
+        const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${sendGridApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(emailData),
+        });
+
+        if (response.ok) {
+          console.log(`Email sent successfully to ${recipient.email}`);
+          sent++;
+        } else {
+          const errorText = await response.text();
+          console.error(`SendGrid API error for ${recipient.email}:`, response.status, errorText);
+          failed++;
+          failedEmails.push(recipient.email);
+        }
+      } catch (error) {
+        console.error(`Error sending email to ${recipient.email}:`, error);
+        failed++;
+        failedEmails.push(recipient.email);
+      }
+    }
+
+    console.log(`Email sending completed: ${sent} sent, ${failed} failed`);
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        sent,
+        failed,
+        failedEmails,
+        message: `Successfully sent ${sent} emails${failed > 0 ? `, ${failed} failed` : ''}`
+      }),
+      {
+        status: 200,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      }
+    );
+
+  } catch (error: any) {
+    console.error('Error in send-completed-order-email function:', error);
+    return new Response(
+      JSON.stringify({ 
+        error: 'Internal server error', 
+        details: error.message 
+      }),
+      {
+        status: 500,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      }
+    );
+  }
+};
+
+serve(serve_handler);

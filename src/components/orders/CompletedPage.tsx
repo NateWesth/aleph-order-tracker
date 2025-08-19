@@ -17,13 +17,14 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { format, startOfMonth, endOfMonth, isSameMonth } from "date-fns";
-import { Eye, ChevronDown, ChevronRight, FileText, Search, Trash2, Download, Edit } from "lucide-react";
+import { Eye, ChevronDown, ChevronRight, FileText, Search, Trash2, Download, Edit, Mail } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useGlobalRealtimeOrders } from "./hooks/useGlobalRealtimeOrders";
 import ProcessingOrderFilesDialog from "./components/ProcessingOrderFilesDialog";
 import OrderDetailsDialog from "./components/OrderDetailsDialog";
 import CompletedOrderEditDialog from "./components/CompletedOrderEditDialog";
+import CompletedOrderEmailDialog from "./components/CompletedOrderEmailDialog";
 import OrderExportActions from "./components/OrderExportActions";
 import { getUserRole, getUserProfile } from "@/utils/authService";
 
@@ -74,6 +75,8 @@ export default function CompletedPage({
   const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
   const [userRole, setUserRole] = useState<'admin' | 'user'>('user');
   const [userCompanyId, setUserCompanyId] = useState<string | null>(null);
+  const [showEmailDialog, setShowEmailDialog] = useState(false);
+  const [emailDialogOrder, setEmailDialogOrder] = useState<any>(null);
 
   // Parse order items from description - enhanced to handle delivered quantities and completion status
   const parseOrderItems = (description: string | null): OrderItem[] => {
@@ -399,6 +402,40 @@ export default function CompletedPage({
     setShowFilesDialog(false);
     setFilesDialogOrder(null);
   };
+
+  // Email dialog functions
+  const openEmailDialog = async (order: Order) => {
+    // Fetch the full order data with company_id
+    try {
+      const { data } = await supabase
+        .from('orders')
+        .select('id, order_number, company_id, companies(name)')
+        .eq('id', order.id)
+        .single();
+      
+      if (data) {
+        setEmailDialogOrder({
+          id: data.id,
+          orderNumber: data.order_number,
+          companyName: data.companies?.name || order.companyName,
+          company_id: data.company_id
+        });
+        setShowEmailDialog(true);
+      }
+    } catch (error) {
+      console.error('Error fetching order for email:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load order data for email",
+        variant: "destructive",
+      });
+    }
+  };
+  
+  const closeEmailDialog = () => {
+    setShowEmailDialog(false);
+    setEmailDialogOrder(null);
+  };
   return <div className="container mx-auto p-4 bg-background">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-foreground">Completed Orders</h1>
@@ -477,6 +514,12 @@ export default function CompletedPage({
                               <FileText className="h-4 w-4 mr-2" />
                               Files
                             </Button>
+                            {isAdmin && (
+                              <Button variant="outline" size="sm" onClick={() => openEmailDialog(order)}>
+                                <Mail className="h-4 w-4 mr-2" />
+                                Email
+                              </Button>
+                            )}
                              <Button variant="outline" size="sm" onClick={() => viewOrderDetails(order)}>
                                <Eye className="h-4 w-4 mr-2" />
                                View Details
@@ -562,5 +605,11 @@ export default function CompletedPage({
       />
 
       <ProcessingOrderFilesDialog order={filesDialogOrder} isOpen={showFilesDialog} onClose={closeFilesDialog} isAdmin={isAdmin} />
+      
+      <CompletedOrderEmailDialog 
+        isOpen={showEmailDialog} 
+        onClose={closeEmailDialog} 
+        order={emailDialogOrder} 
+      />
     </div>;
 }
