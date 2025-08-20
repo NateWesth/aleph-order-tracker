@@ -30,18 +30,18 @@ const Auth = () => {
         </Button>
       </div>
 
-      <Card className="w-full max-w-md shadow-lg dark:bg-gray-800 dark:border-gray-700">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl auth-green font-bold">
+      <Card className="w-full max-w-md mx-4 shadow-lg dark:bg-gray-800 dark:border-gray-700">
+        <CardHeader className="text-center px-4 md:px-6">
+          <CardTitle className="text-xl md:text-2xl auth-green font-bold">
             {isLogin ? "Welcome Back" : "Create an Account"}
           </CardTitle>
-          <CardDescription className="dark:text-gray-400">
+          <CardDescription className="dark:text-gray-400 text-sm md:text-base">
             {isLogin 
               ? "Please sign in to access your account" 
               : "Fill in your details to create your account"}
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-4 md:px-6">
           {isLogin ? <LoginForm /> : <RegisterForm />}
           
           <div className="mt-6 text-center">
@@ -49,7 +49,7 @@ const Auth = () => {
               {isLogin ? "Don't have an account?" : "Already have an account?"}
               <button 
                 onClick={() => setIsLogin(!isLogin)} 
-                className="ml-1 auth-green hover:text-green-500 font-medium"
+                className="ml-1 auth-green hover:text-green-500 font-medium text-sm"
               >
                 {isLogin ? "Register now" : "Login now"}
               </button>

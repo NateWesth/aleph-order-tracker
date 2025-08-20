@@ -298,9 +298,33 @@
 }
 
 .order-row-hover:hover {
-  transform: scale(1.02);
+  transform: scale(1.01);
   animation: pulse 1.5s ease-in-out infinite;
   z-index: 10;
   position: relative;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+  .order-row-hover:hover {
+    transform: none;
+    animation: none;
+  }
+  
+  /* Improve touch targets on mobile */
+  .mobile-touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Better mobile sidebar */
+  .sidebar-mobile {
+    transform: translateX(-100%);
+    transition: transform 0.3s ease-in-out;
+  }
+  
+  .sidebar-mobile.open {
+    transform: translateX(0);
+  }
 }

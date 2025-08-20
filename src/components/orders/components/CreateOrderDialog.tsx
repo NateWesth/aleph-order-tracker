@@ -186,10 +186,10 @@ export default function CreateOrderDialog({
           Create Order
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto w-[95vw] md:w-full">
         <DialogHeader>
-          <DialogTitle>Create New Order</DialogTitle>
-          <DialogDescription>
+          <DialogTitle className="text-lg md:text-xl">Create New Order</DialogTitle>
+          <DialogDescription className="text-sm md:text-base">
             Fill in the order details below. All fields marked with * are required.
           </DialogDescription>
         </DialogHeader>

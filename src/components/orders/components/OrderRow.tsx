@@ -9,6 +9,7 @@ import { useState } from "react";
 import OrderDetailsDialog from "./OrderDetailsDialog";
 import { OrderWithCompany } from "../types/orderTypes";
 import { useNavigate } from "react-router-dom";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface OrderRowProps {
   order: OrderWithCompany;
@@ -27,6 +28,7 @@ export default function OrderRow({
 }: OrderRowProps) {
   const [showDetails, setShowDetails] = useState(false);
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
 
   const getStatusColor = (status: string | null) => {
     switch (status?.toLowerCase()) {
@@ -112,28 +114,44 @@ export default function OrderRow({
       >
         <TableCell>
           <div>
-            <div className="font-medium">{order.order_number}</div>
+            <div className="font-medium text-sm md:text-base">{order.order_number}</div>
             {order.reference && (
-              <div className="text-sm text-muted-foreground">{order.reference}</div>
+              <div className="text-xs md:text-sm text-muted-foreground">{order.reference}</div>
+            )}
+            {isMobile && (
+              <div className="text-xs text-muted-foreground mt-1">
+                {order.companyName || 'No Company'}
+              </div>
             )}
           </div>
         </TableCell>
-        <TableCell>{order.companyName || 'No Company'}</TableCell>
-        <TableCell>{getStatusBadge(order.status)}</TableCell>
-        <TableCell>{new Date(order.created_at).toLocaleDateString()}</TableCell>
+        {!isMobile && <TableCell className="text-sm">{order.companyName || 'No Company'}</TableCell>}
         <TableCell>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col gap-1">
+            {getStatusBadge(order.status)}
+            {isMobile && (
+              <div className="text-xs text-muted-foreground">
+                {new Date(order.created_at).toLocaleDateString()}
+              </div>
+            )}
+          </div>
+        </TableCell>
+        {!isMobile && <TableCell className="text-sm">{new Date(order.created_at).toLocaleDateString()}</TableCell>}
+        <TableCell>
+          <div className="flex items-center gap-1 md:gap-2">
             <Button
               variant="ghost"
-              size="sm"
+              size={isMobile ? "sm" : "sm"}
               onClick={(e) => {
                 e.stopPropagation();
                 setShowDetails(true);
               }}
+              className={isMobile ? "h-8 w-8 p-0" : ""}
             >
-              <Eye className="h-4 w-4" />
+              <Eye className="h-3 w-3 md:h-4 md:w-4" />
+              {!isMobile && <span className="ml-1">View</span>}
             </Button>
-            <OrderExportActions order={order} />
+            {!isMobile && <OrderExportActions order={order} />}
             {isAdmin && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -143,10 +161,10 @@ export default function OrderRow({
                     onClick={(e) => e.stopPropagation()}
                   >
                     <span className="sr-only">Open menu</span>
-                    <MoreHorizontal className="h-4 w-4" />
+                    <MoreHorizontal className="h-3 w-3 md:h-4 md:w-4" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
+                <DropdownMenuContent align="end" className="z-50 bg-background border">
                   <DropdownMenuItem
                     onClick={(e) => {
                       e.stopPropagation();
