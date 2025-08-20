@@ -219,11 +219,20 @@ export default function ProgressPage({
         // Parse current description and update the specific item
         const lines = order.description.split('\n');
         const updatedLines = lines.map(line => {
-          const match = line.match(/^(.+?)\s*\(Qty:\s*\d+\)\s*\[Delivered:\s*(\d+)\].*$/);
-          if (match && match[1].trim() === itemName) {
-            // Add delivered quantity to the line
-            return `${match[1]} (Qty: ${match[2]}) [Delivered: ${delivered}]`;
+          // Check if line already has delivered quantity format
+          const deliveredMatch = line.match(/^(.+?)\s*\(Qty:\s*(\d+)\)\s*\[Delivered:\s*(\d+)\].*$/);
+          if (deliveredMatch && deliveredMatch[1].trim() === itemName) {
+            // Update existing delivered quantity
+            return `${deliveredMatch[1]} (Qty: ${deliveredMatch[2]}) [Delivered: ${delivered}]`;
           }
+          
+          // Check if line matches basic format without delivered quantity
+          const basicMatch = line.match(/^(.+?)\s*\(Qty:\s*(\d+)\)(.*)$/);
+          if (basicMatch && basicMatch[1].trim() === itemName) {
+            // Add delivered quantity to basic format
+            return `${basicMatch[1]} (Qty: ${basicMatch[2]}) [Delivered: ${delivered}]${basicMatch[3]}`;
+          }
+          
           return line;
         });
 
@@ -241,6 +250,9 @@ export default function ProgressPage({
         if (updateError) throw updateError;
 
         console.log(`Successfully saved delivery quantity for ${itemName}: ${delivered}`);
+        
+        // Refresh orders to get updated data
+        fetchProgressOrders();
       }
     } catch (error) {
       console.error('Error saving delivery quantities to database:', error);
@@ -790,14 +802,23 @@ export default function ProgressPage({
                     return <TableRow key={item.id} className={isCompleted ? "opacity-50" : ""}>
                                   <TableCell className="font-medium text-card-foreground">{item.name}</TableCell>
                                   <TableCell className="text-card-foreground">{item.quantity}</TableCell>
-                                  <TableCell>
-                                    {isAdmin ? <input type="number" min="0" max={item.quantity} value={delivered} onChange={e => updateDeliveryQuantity(order.id, item.name, parseInt(e.target.value) || 0)} onBlur={() => {
-                                        // Force a save when user leaves the input field
-                                        if (isAdmin) {
-                                          saveDeliveryQuantitiesToDatabase(order.id, item.name, delivered);
-                                        }
-                                      }} className="w-20 px-2 py-1 border border-border rounded text-sm bg-background text-foreground" /> : <span className="text-card-foreground font-medium">{delivered}</span>}
-                                  </TableCell>
+                                   <TableCell>
+                                     {isAdmin ? <input 
+                                       type="number" 
+                                       min="0" 
+                                       max={item.quantity} 
+                                       value={delivered} 
+                                       onChange={e => updateDeliveryQuantity(order.id, item.name, parseInt(e.target.value) || 0)} 
+                                       onBlur={(e) => {
+                                         // Force a save when user leaves the input field
+                                         const currentValue = parseInt(e.target.value) || 0;
+                                         if (isAdmin) {
+                                           saveDeliveryQuantitiesToDatabase(order.id, item.name, currentValue);
+                                         }
+                                       }} 
+                                       className="w-20 px-2 py-1 border border-border rounded text-sm bg-background text-foreground" 
+                                     /> : <span className="text-card-foreground font-medium">{delivered}</span>}
+                                   </TableCell>
                                   <TableCell>
                                     {isCompleted ? <Badge variant="outline" className="bg-green-100 text-green-800">
                                         Complete
