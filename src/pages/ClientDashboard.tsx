@@ -161,7 +161,7 @@ const ClientDashboard = () => {
           </header>
 
           {/* Dashboard content - White in light mode, slightly lighter grey than toolbar in dark mode */}
-          <main className="flex-1 p-2 md:p-4 lg:p-8 bg-background overflow-x-hidden">
+          <main className="flex-1 p-2 md:p-4 lg:p-6 bg-background overflow-x-hidden min-w-0">
             {activeView === "home" ? <div className="flex items-center justify-center h-full relative bg-background">
                 <div className="text-center relative z-10">
                   <h1 className="text-4xl font-bold mb-4 text-emerald-950 dark:text-white md:text-6xl">

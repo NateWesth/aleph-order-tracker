@@ -106,6 +106,88 @@ export default function OrderRow({
     }
   };
 
+  if (isMobile) {
+    // Mobile card layout
+    return (
+      <>
+        <div className="cursor-pointer" onClick={handleRowClick}>
+          <div className="space-y-3">
+            {/* Order header */}
+            <div className="flex justify-between items-start">
+              <div>
+                <div className="font-medium text-base">{order.order_number}</div>
+                {order.reference && (
+                  <div className="text-sm text-muted-foreground">{order.reference}</div>
+                )}
+              </div>
+              {getStatusBadge(order.status)}
+            </div>
+            
+            {/* Company and date */}
+            <div className="flex justify-between items-center text-sm text-muted-foreground">
+              <span>{order.companyName || 'No Company'}</span>
+              <span>{new Date(order.created_at).toLocaleDateString()}</span>
+            </div>
+            
+            {/* Actions */}
+            <div className="flex items-center justify-between gap-2 pt-2 border-t">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowDetails(true);
+                }}
+                className="flex-1"
+              >
+                <Eye className="h-4 w-4 mr-2" />
+                View Details
+              </Button>
+              {isAdmin && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="z-50 bg-background border">
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onReceiveOrder(order);
+                      }}
+                    >
+                      Receive Order
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDeleteOrder(order.id, order.order_number);
+                      }}
+                    >
+                      Delete Order
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <OrderDetailsDialog
+          open={showDetails}
+          onOpenChange={setShowDetails}
+          order={order}
+        />
+      </>
+    );
+  }
+
+  // Desktop table layout
   return (
     <>
       <TableRow 
@@ -114,44 +196,31 @@ export default function OrderRow({
       >
         <TableCell>
           <div>
-            <div className="font-medium text-sm md:text-base">{order.order_number}</div>
+            <div className="font-medium text-base">{order.order_number}</div>
             {order.reference && (
-              <div className="text-xs md:text-sm text-muted-foreground">{order.reference}</div>
-            )}
-            {isMobile && (
-              <div className="text-xs text-muted-foreground mt-1">
-                {order.companyName || 'No Company'}
-              </div>
+              <div className="text-sm text-muted-foreground">{order.reference}</div>
             )}
           </div>
         </TableCell>
-        {!isMobile && <TableCell className="text-sm">{order.companyName || 'No Company'}</TableCell>}
+        <TableCell className="text-sm">{order.companyName || 'No Company'}</TableCell>
         <TableCell>
-          <div className="flex flex-col gap-1">
-            {getStatusBadge(order.status)}
-            {isMobile && (
-              <div className="text-xs text-muted-foreground">
-                {new Date(order.created_at).toLocaleDateString()}
-              </div>
-            )}
-          </div>
+          {getStatusBadge(order.status)}
         </TableCell>
-        {!isMobile && <TableCell className="text-sm">{new Date(order.created_at).toLocaleDateString()}</TableCell>}
+        <TableCell className="text-sm">{new Date(order.created_at).toLocaleDateString()}</TableCell>
         <TableCell>
-          <div className="flex items-center gap-1 md:gap-2">
+          <div className="flex items-center gap-2">
             <Button
               variant="ghost"
-              size={isMobile ? "sm" : "sm"}
+              size="sm"
               onClick={(e) => {
                 e.stopPropagation();
                 setShowDetails(true);
               }}
-              className={isMobile ? "h-8 w-8 p-0" : ""}
             >
-              <Eye className="h-3 w-3 md:h-4 md:w-4" />
-              {!isMobile && <span className="ml-1">View</span>}
+              <Eye className="h-4 w-4" />
+              <span className="ml-1">View</span>
             </Button>
-            {!isMobile && <OrderExportActions order={order} />}
+            <OrderExportActions order={order} />
             {isAdmin && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -161,7 +230,7 @@ export default function OrderRow({
                     onClick={(e) => e.stopPropagation()}
                   >
                     <span className="sr-only">Open menu</span>
-                    <MoreHorizontal className="h-3 w-3 md:h-4 md:w-4" />
+                    <MoreHorizontal className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="z-50 bg-background border">

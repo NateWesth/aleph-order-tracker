@@ -28,6 +28,32 @@ export default function OrderTable({
 }: OrderTableProps) {
   const isMobile = useIsMobile();
 
+  if (isMobile) {
+    // Mobile card layout
+    return (
+      <div className="space-y-3">
+        {orders.length === 0 ? (
+          <div className="text-center py-8 bg-card rounded-lg">
+            <p className="text-muted-foreground">No orders found.</p>
+          </div>
+        ) : (
+          orders.map((order) => (
+            <div key={order.id} className="bg-card rounded-lg p-4 shadow-sm border">
+              <OrderRow
+                order={order}
+                isAdmin={isAdmin}
+                onReceiveOrder={onReceiveOrder}
+                onDeleteOrder={onDeleteOrder}
+                onOrderClick={onOrderClick}
+              />
+            </div>
+          ))
+        )}
+      </div>
+    );
+  }
+
+  // Desktop table layout
   return (
     <div className="bg-card rounded-lg shadow overflow-hidden">
       <div className="overflow-x-auto">
@@ -35,16 +61,16 @@ export default function OrderTable({
           <TableHeader>
             <TableRow>
               <TableHead className="whitespace-nowrap">Order Number</TableHead>
-              {!isMobile && <TableHead className="whitespace-nowrap">Company</TableHead>}
+              <TableHead className="whitespace-nowrap">Company</TableHead>
               <TableHead className="whitespace-nowrap">Status</TableHead>
-              {!isMobile && <TableHead className="whitespace-nowrap">Created</TableHead>}
+              <TableHead className="whitespace-nowrap">Created</TableHead>
               <TableHead className="whitespace-nowrap">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {orders.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={isMobile ? 3 : 5} className="text-center py-8">
+                <TableCell colSpan={5} className="text-center py-8">
                   No orders found.
                 </TableCell>
               </TableRow>
