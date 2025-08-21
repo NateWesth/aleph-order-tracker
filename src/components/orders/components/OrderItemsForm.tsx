@@ -4,6 +4,7 @@ import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/comp
 import { Trash2 } from "lucide-react";
 import { Control } from "react-hook-form";
 import { OrderFormData } from "../types/OrderFormData";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface OrderItemsFormProps {
   control: Control<OrderFormData>;
@@ -18,10 +19,12 @@ export const OrderItemsForm = ({ control, index, onRemove, canRemove }: OrderIte
     onChange(e.target.value);
   };
 
+  const isMobile = useIsMobile();
+
   return (
-    <div className="p-4 border rounded-lg space-y-4">
+    <div className={`border rounded-lg space-y-3 ${isMobile ? 'p-3' : 'p-4'}`}>
       {/* Mobile-first responsive layout */}
-      <div className="space-y-3 sm:space-y-4">
+      <div className={`space-y-3 ${isMobile ? '' : 'sm:space-y-4'}`}>
         {/* Item Name - Full width on mobile */}
         <div className="w-full">
           <FormField 
@@ -30,13 +33,13 @@ export const OrderItemsForm = ({ control, index, onRemove, canRemove }: OrderIte
             rules={{ required: "Item name is required" }} 
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Item Name</FormLabel>
+                <FormLabel className={isMobile ? 'text-sm' : ''}>Item Name</FormLabel>
                 <FormControl>
                   <Input 
                     {...field} 
                     placeholder="Enter item name" 
                     onChange={(e) => handleItemNameChange(e, field.onChange)}
-                    className="w-full"
+                    className={`w-full ${isMobile ? 'h-9 text-sm' : ''}`}
                   />
                 </FormControl>
                 <FormMessage />
@@ -56,14 +59,14 @@ export const OrderItemsForm = ({ control, index, onRemove, canRemove }: OrderIte
             }} 
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Quantity</FormLabel>
+                <FormLabel className={isMobile ? 'text-sm' : ''}>Quantity</FormLabel>
                 <FormControl>
                   <Input 
                     {...field} 
                     type="number" 
                     min="1" 
                     onChange={e => field.onChange(parseInt(e.target.value) || 0)} 
-                    className="w-full"
+                    className={`w-full ${isMobile ? 'h-9 text-sm' : ''}`}
                   />
                 </FormControl>
                 <FormMessage />
@@ -75,9 +78,13 @@ export const OrderItemsForm = ({ control, index, onRemove, canRemove }: OrderIte
             name={`items.${index}.unit`} 
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Unit</FormLabel>
+                <FormLabel className={isMobile ? 'text-sm' : ''}>Unit</FormLabel>
                 <FormControl>
-                  <Input {...field} placeholder="e.g., kg, pcs" className="w-full" />
+                  <Input 
+                    {...field} 
+                    placeholder="e.g., kg, pcs" 
+                    className={`w-full ${isMobile ? 'h-9 text-sm' : ''}`}
+                  />
                 </FormControl>
               </FormItem>
             )} 
@@ -92,9 +99,13 @@ export const OrderItemsForm = ({ control, index, onRemove, canRemove }: OrderIte
               name={`items.${index}.notes`} 
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Notes</FormLabel>
+                  <FormLabel className={isMobile ? 'text-sm' : ''}>Notes</FormLabel>
                   <FormControl>
-                    <Input {...field} placeholder="Additional notes" className="w-full" />
+                    <Input 
+                      {...field} 
+                      placeholder="Additional notes" 
+                      className={`w-full ${isMobile ? 'h-9 text-sm' : ''}`}
+                    />
                   </FormControl>
                 </FormItem>
               )} 
@@ -107,9 +118,9 @@ export const OrderItemsForm = ({ control, index, onRemove, canRemove }: OrderIte
               size="sm" 
               variant="outline" 
               disabled={!canRemove}
-              className="h-10 px-3"
+              className={isMobile ? 'h-9 px-2' : 'h-10 px-3'}
             >
-              <Trash2 className="w-4 h-4" />
+              <Trash2 className={isMobile ? 'w-3 h-3' : 'w-4 h-4'} />
             </Button>
           </div>
         </div>

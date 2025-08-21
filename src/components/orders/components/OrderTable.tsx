@@ -31,14 +31,14 @@ export default function OrderTable({
   if (isMobile) {
     // Mobile card layout
     return (
-      <div className="space-y-3">
+      <div className="space-y-2">
         {orders.length === 0 ? (
-          <div className="text-center py-8 bg-card rounded-lg">
-            <p className="text-muted-foreground">No orders found.</p>
+          <div className="text-center py-6 bg-card rounded-lg">
+            <p className="text-muted-foreground text-sm">No orders found.</p>
           </div>
         ) : (
           orders.map((order) => (
-            <div key={order.id} className="bg-card rounded-lg p-4 shadow-sm border">
+            <div key={order.id} className="bg-card rounded-lg p-3 shadow-sm border">
               <OrderRow
                 order={order}
                 isAdmin={isAdmin}

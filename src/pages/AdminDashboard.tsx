@@ -165,23 +165,23 @@ const AdminDashboard = () => {
         {/* Main content */}
         <div className="flex-1 flex flex-col">
           {/* Header - light grey in light mode */}
-          <header className="toolbar-aleph p-3 md:p-4">
+          <header className="toolbar-aleph p-2 md:p-4">
             <div className="max-w-7xl mx-auto flex justify-between items-center">
-              <div className="flex items-center gap-2 md:gap-0">
-                {isMobile && <SidebarTrigger className="text-aleph-green hover:bg-aleph-green/10 p-2" />}
-                <h1 className="text-lg md:text-2xl font-bold text-aleph-green dark:text-white">
-                  Admin Dashboard
+              <div className="flex items-center gap-1 md:gap-0">
+                {isMobile && <SidebarTrigger className="text-aleph-green hover:bg-aleph-green/10 p-1" />}
+                <h1 className={`font-bold text-aleph-green dark:text-white truncate ${isMobile ? 'text-sm' : 'text-lg md:text-2xl'}`}>
+                  {isMobile ? 'Admin' : 'Admin Dashboard'}
                 </h1>
               </div>
-              <div className="flex items-center gap-2 md:gap-4">
-                <Button variant="ghost" size="icon" className="rounded-full sidebar-hover" onClick={() => navigate("/settings")}>
-                  <Settings className="h-4 w-4 md:h-5 md:w-5" />
+              <div className="flex items-center gap-1 md:gap-4">
+                <Button variant="ghost" size="icon" className={`rounded-full sidebar-hover ${isMobile ? 'h-8 w-8' : ''}`} onClick={() => navigate("/settings")}>
+                  <Settings className={`${isMobile ? 'h-3 w-3' : 'h-4 w-4 md:h-5 md:w-5'}`} />
                   <span className="sr-only">Account settings</span>
                 </Button>
                 <Button 
                   variant="outline" 
                   onClick={handleLogout} 
-                  className={`border-aleph-green text-aleph-green hover:bg-aleph-green hover:text-white dark:border-aleph-green dark:text-aleph-green sidebar-hover ${isMobile ? 'text-xs px-2 py-1' : ''}`}
+                  className={`border-aleph-green text-aleph-green hover:bg-aleph-green hover:text-white dark:border-aleph-green dark:text-aleph-green sidebar-hover ${isMobile ? 'text-xs px-2 py-1 h-8' : ''}`}
                 >
                   Logout
                 </Button>
@@ -190,7 +190,7 @@ const AdminDashboard = () => {
           </header>
 
           {/* Dashboard content - White in light mode, slightly lighter grey than toolbar in dark mode */}
-          <main className="flex-1 p-2 md:p-4 lg:p-6 bg-background dark:bg-background overflow-x-hidden min-w-0">
+          <main className={`flex-1 bg-background dark:bg-background overflow-x-hidden min-w-0 ${isMobile ? 'p-1' : 'p-2 md:p-4 lg:p-6'}`}>
             {activeView === "home" ? <div className="space-y-6">
                 {/* Welcome Section */}
                 <div className="flex items-center justify-center h-64 relative bg-background px-4">

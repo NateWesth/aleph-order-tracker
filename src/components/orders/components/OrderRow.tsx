@@ -111,22 +111,24 @@ export default function OrderRow({
     return (
       <>
         <div className="cursor-pointer" onClick={handleRowClick}>
-          <div className="space-y-3">
+          <div className="space-y-2">
             {/* Order header */}
             <div className="flex justify-between items-start">
-              <div>
-                <div className="font-medium text-base">{order.order_number}</div>
+              <div className="min-w-0 flex-1">
+                <div className="font-medium text-sm truncate">{order.order_number}</div>
                 {order.reference && (
-                  <div className="text-sm text-muted-foreground">{order.reference}</div>
+                  <div className="text-xs text-muted-foreground truncate">{order.reference}</div>
                 )}
               </div>
-              {getStatusBadge(order.status)}
+              <div className="ml-2 flex-shrink-0">
+                {getStatusBadge(order.status)}
+              </div>
             </div>
             
             {/* Company and date */}
-            <div className="flex justify-between items-center text-sm text-muted-foreground">
-              <span>{order.companyName || 'No Company'}</span>
-              <span>{new Date(order.created_at).toLocaleDateString()}</span>
+            <div className="flex justify-between items-center text-xs text-muted-foreground">
+              <span className="truncate mr-2">{order.companyName || 'No Company'}</span>
+              <span className="flex-shrink-0">{new Date(order.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
             </div>
             
             {/* Actions */}
@@ -138,10 +140,10 @@ export default function OrderRow({
                   e.stopPropagation();
                   setShowDetails(true);
                 }}
-                className="flex-1"
+                className="flex-1 h-8 text-xs"
               >
-                <Eye className="h-4 w-4 mr-2" />
-                View Details
+                <Eye className="h-3 w-3 mr-1" />
+                View
               </Button>
               {isAdmin && (
                 <DropdownMenu>
@@ -150,8 +152,9 @@ export default function OrderRow({
                       variant="ghost" 
                       size="sm"
                       onClick={(e) => e.stopPropagation()}
+                      className="h-8 w-8 p-0"
                     >
-                      <MoreHorizontal className="h-4 w-4" />
+                      <MoreHorizontal className="h-3 w-3" />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="z-50 bg-background border">
@@ -160,6 +163,7 @@ export default function OrderRow({
                         e.stopPropagation();
                         onReceiveOrder(order);
                       }}
+                      className="text-xs"
                     >
                       Receive Order
                     </DropdownMenuItem>
@@ -168,6 +172,7 @@ export default function OrderRow({
                         e.stopPropagation();
                         onDeleteOrder(order.id, order.order_number);
                       }}
+                      className="text-xs"
                     >
                       Delete Order
                     </DropdownMenuItem>
