@@ -327,7 +327,7 @@ export default function ProcessingOrderFilesDialog({
               <Input
                 id={inputId}
                 type="file"
-                accept=".pdf,.jpg,.jpeg,.png"
+                accept=".pdf,.csv"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (file) {
@@ -340,7 +340,7 @@ export default function ProcessingOrderFilesDialog({
               />
             </div>
             <p className="text-xs text-gray-500 mt-1">
-              Supported formats: PDF, JPG, PNG (Max 10MB)
+              Supported formats: PDF, CSV (Max 10MB)
             </p>
           </div>
         </div>
