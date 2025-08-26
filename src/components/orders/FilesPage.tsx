@@ -226,24 +226,24 @@ export default function FilesPage({ isAdmin }: FilesPageProps) {
   const fileTypes = [...new Set(allFiles.map(file => file.type))];
 
   return (
-    <div className="container mx-auto p-4">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-        <h1 className="text-2xl font-bold text-aleph-blue">Files Repository</h1>
+    <div className="w-full max-w-full p-2 md:p-4 bg-background overflow-x-hidden">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 md:gap-4 mb-4 md:mb-6">
+        <h1 className="text-lg md:text-2xl font-bold text-foreground">Files Repository</h1>
         
         <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
           <div className="relative flex-grow">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-aleph-blue" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <input
               type="text"
               placeholder="Search files..."
-              className="pl-10 pr-4 py-2 border rounded-md w-full focus:ring-2 focus:ring-aleph-blue focus:border-aleph-blue"
+              className="pl-10 pr-4 py-2 border border-border rounded-md w-full bg-card text-card-foreground text-sm"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
           
           <select
-            className="border rounded-md px-3 py-2 focus:ring-2 focus:ring-aleph-blue focus:border-aleph-blue"
+            className="border border-border rounded-md px-3 py-2 bg-card text-card-foreground text-sm"
             value={filterType || ''}
             onChange={(e) => setFilterType(e.target.value || null)}
           >

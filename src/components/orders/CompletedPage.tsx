@@ -436,28 +436,34 @@ export default function CompletedPage({
     setShowEmailDialog(false);
     setEmailDialogOrder(null);
   };
-  return <div className="container mx-auto p-4 bg-background">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-foreground">Completed Orders</h1>
-        <div className="relative">
+  return <div className="w-full max-w-full p-2 md:p-4 bg-background overflow-x-hidden">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 md:mb-6 gap-3 md:gap-0">
+        <h1 className="text-lg md:text-2xl font-bold text-foreground">Completed Orders</h1>
+        <div className="relative w-full md:w-auto">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <input type="text" placeholder="Search orders..." className="pl-10 pr-4 py-2 border border-border rounded-md bg-card text-card-foreground" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+          <input 
+            type="text" 
+            placeholder="Search orders..." 
+            className="pl-10 pr-4 py-2 border border-border rounded-md bg-card text-card-foreground w-full md:w-64" 
+            value={searchTerm} 
+            onChange={e => setSearchTerm(e.target.value)} 
+          />
         </div>
       </div>
 
-      <div className="space-y-4">
-        {monthGroups.length === 0 && <div className="bg-card rounded-lg shadow p-8 text-center text-muted-foreground">
+      <div className="space-y-2 md:space-y-4 w-full max-w-full overflow-x-hidden">
+        {monthGroups.length === 0 && <div className="bg-card rounded-lg shadow p-4 md:p-8 text-center text-muted-foreground">
             No completed orders found.
           </div>}
 
-        {monthGroups.map((monthGroup, monthIndex) => <div key={monthGroup.month} className="bg-card rounded-lg shadow">
+        {monthGroups.map((monthGroup, monthIndex) => <div key={monthGroup.month} className="bg-card rounded-lg shadow w-full max-w-full overflow-x-hidden">
             <Collapsible open={monthGroup.isOpen} onOpenChange={() => toggleMonthGroup(monthIndex)}>
               <CollapsibleTrigger asChild>
-                <div className="p-4 border-b border-border cursor-pointer hover:bg-accent flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    {monthGroup.isOpen ? <ChevronDown className="h-4 w-4 text-foreground" /> : <ChevronRight className="h-4 w-4 text-foreground" />}
-                    <h2 className="text-lg font-semibold text-card-foreground">{monthGroup.month}</h2>
-                    <Badge variant="outline">{monthGroup.orders.length} orders</Badge>
+                <div className="p-2 md:p-4 border-b border-border cursor-pointer hover:bg-accent flex items-center justify-between">
+                  <div className="flex items-center space-x-1 md:space-x-2">
+                    {monthGroup.isOpen ? <ChevronDown className="h-4 w-4 text-foreground flex-shrink-0" /> : <ChevronRight className="h-4 w-4 text-foreground flex-shrink-0" />}
+                    <h2 className="text-sm md:text-lg font-semibold text-card-foreground truncate">{monthGroup.month}</h2>
+                    <Badge variant="outline" className="text-xs">{monthGroup.orders.length}</Badge>
                   </div>
                 </div>
               </CollapsibleTrigger>
@@ -466,27 +472,28 @@ export default function CompletedPage({
                 <div className="divide-y divide-border">
                   {monthGroup.orders.map(order => {
                 const isExpanded = expandedOrders.has(order.id);
-                return <div key={order.id} className="p-4">
-                        <div className="flex justify-between items-center">
-                          <div className="flex items-center gap-4">
-                            <div>
-                              <h3 className="font-medium text-card-foreground">Order #{order.orderNumber}</h3>
+                return <div key={order.id} className="p-2 md:p-4 w-full max-w-full overflow-x-hidden">
+                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2 md:gap-0">
+                          <div className="flex-1 min-w-0 w-full">
+                            <div className="w-full">
+                              <h3 className="font-medium text-card-foreground text-sm md:text-base truncate">Order #{order.orderNumber}</h3>
                               {order.reference && (
-                                <p className="text-sm text-muted-foreground">{order.reference}</p>
+                                <p className="text-xs md:text-sm text-muted-foreground truncate">{order.reference}</p>
                               )}
-                              <p className="text-sm text-muted-foreground">{order.companyName}</p>
-                              <p className="text-sm text-muted-foreground">
+                              <p className="text-xs md:text-sm text-muted-foreground truncate">{order.companyName}</p>
+                              <p className="text-xs md:text-sm text-muted-foreground">
                                 Completed: {format(order.completedDate || order.orderDate, 'MMM d, yyyy')}
                               </p>
                             </div>
                           </div>
-                          <div className="flex items-center space-x-2">
-                            <Button variant="ghost" size="sm" onClick={() => toggleOrderExpansion(order.id)}>
-                              {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                              Items ({order.items.length})
+                          <div className="flex items-center space-x-1 md:space-x-2 flex-wrap gap-1 w-full md:w-auto justify-start md:justify-end">
+                            <Button variant="ghost" size="sm" onClick={() => toggleOrderExpansion(order.id)} className="text-xs md:text-sm h-8">
+                              {isExpanded ? <ChevronDown className="h-3 w-3 md:h-4 md:w-4" /> : <ChevronRight className="h-3 w-3 md:h-4 md:w-4" />}
+                              <span className="hidden sm:inline">Items ({order.items.length})</span>
+                              <span className="sm:hidden">({order.items.length})</span>
                             </Button>
                             
-                            <Badge variant="outline" className="bg-green-100 text-green-800">
+                            <Badge variant="outline" className="bg-green-100 text-green-800 text-xs">
                               Completed
                             </Badge>
                             

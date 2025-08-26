@@ -194,10 +194,10 @@ export default function OrdersPage({
     companyName: order.companyName
   }));
 
-  return <div className="container mx-auto p-4 bg-background">
-      <div className="flex justify-between items-center mb-6">
+  return <div className="w-full max-w-full p-2 md:p-4 bg-background overflow-x-hidden">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 md:mb-6 gap-3 md:gap-0">
         <OrdersHeader searchTerm={searchTerm} onSearchChange={setSearchTerm} />
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-1 md:gap-2 w-full md:w-auto">
           <OrderExportActions orders={exportOrders} title="Orders" />
           <CreateOrderDialog 
             isAdmin={isAdmin} 
@@ -212,8 +212,10 @@ export default function OrdersPage({
       {/* Enhanced Real-time Status Indicator */}
       
       
-      <OrderTable orders={filteredOrders} isAdmin={isAdmin} onReceiveOrder={receiveOrder} onDeleteOrder={deleteOrder} />
-      <div className="mt-4 text-sm text-gray-600 dark:text-gray-400">
+      <div className="w-full max-w-full overflow-x-hidden">
+        <OrderTable orders={filteredOrders} isAdmin={isAdmin} onReceiveOrder={receiveOrder} onDeleteOrder={deleteOrder} />
+      </div>
+      <div className="mt-4 text-xs md:text-sm text-gray-600 dark:text-gray-400">
         Total orders: {filteredOrders.length}
       </div>
     </div>;

@@ -713,88 +713,92 @@ export default function ProgressPage({
         </div>
       </div>;
   }
-  return <div className="container mx-auto p-4 bg-background">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-foreground">Order Progress Tracking</h1>
-        <OrderExportActions orders={orders.map(order => ({
-        id: order.id,
-        order_number: order.orderNumber,
-        description: order.items.map(item => `${item.name} (Qty: ${item.quantity})`).join('\n'),
-        status: order.status,
-        total_amount: null,
-        created_at: order.orderDate.toISOString(),
-        company_id: null,
-        companyName: order.companyName
-      }))} title="Progress Orders" />
+  return <div className="w-full max-w-full p-2 md:p-4 bg-background overflow-x-hidden">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 md:mb-6 gap-3 md:gap-0">
+        <h1 className="text-lg md:text-2xl font-bold text-foreground">Order Progress Tracking</h1>
+        <div className="w-full md:w-auto">
+          <OrderExportActions orders={orders.map(order => ({
+            id: order.id,
+            order_number: order.orderNumber,
+            description: order.items.map(item => `${item.name} (Qty: ${item.quantity})`).join('\n'),
+            status: order.status,
+            total_amount: null,
+            created_at: order.orderDate.toISOString(),
+            company_id: null,
+            companyName: order.companyName
+          }))} title="Progress Orders" />
+        </div>
       </div>
 
-      <div className="bg-card rounded-lg shadow">
-        <div className="p-4 border-b border-border">
-          <h2 className="text-lg font-semibold text-card-foreground">Orders In Progress</h2>
+      <div className="bg-card rounded-lg shadow w-full max-w-full overflow-x-hidden">
+        <div className="p-2 md:p-4 border-b border-border">
+          <h2 className="text-base md:text-lg font-semibold text-card-foreground">Orders In Progress</h2>
         </div>
         
-        {orders.length === 0 ? <div className="p-4 text-center text-muted-foreground">
+        {orders.length === 0 ? <div className="p-4 text-center text-muted-foreground text-sm md:text-base">
             No orders in progress. Orders marked as "received" should appear here automatically.
-          </div> : <div className="divide-y divide-border">
+          </div> : <div className="divide-y divide-border w-full max-w-full overflow-x-hidden">
             {orders.map(order => {
           const isExpanded = expandedOrders.has(order.id);
           const orderDeliveries = deliveryQuantities[order.id] || {};
-          return <div key={order.id} className="p-4">
-                  <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-4">
+          return <div key={order.id} className="p-2 md:p-4 w-full max-w-full overflow-x-hidden">
+                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 md:gap-0">
+                    <div className="flex flex-col md:flex-row items-start md:items-center gap-2 md:gap-4 w-full">
                        <div className="flex items-center gap-2">
-                         {order.company?.logo && <img src={order.company.logo} alt={`${order.companyName} logo`} className="h-6 w-6 rounded object-cover" />}
-                         <div>
-                           <span className="font-medium text-card-foreground">#{order.orderNumber}</span>
+                         {order.company?.logo && <img src={order.company.logo} alt={`${order.companyName} logo`} className="h-4 w-4 md:h-6 md:w-6 rounded object-cover flex-shrink-0" />}
+                         <div className="min-w-0 flex-1">
+                           <span className="font-medium text-card-foreground text-sm md:text-base truncate">#{order.orderNumber}</span>
                            {order.reference && (
-                             <div className="text-sm text-muted-foreground">{order.reference}</div>
+                             <div className="text-xs md:text-sm text-muted-foreground truncate">{order.reference}</div>
                            )}
                          </div>
                        </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">{order.companyName}</p>
-                        <p className="text-sm text-muted-foreground">Due: {formatSafeDate(order.dueDate)}</p>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs md:text-sm text-muted-foreground truncate">{order.companyName}</p>
+                        <p className="text-xs md:text-sm text-muted-foreground">Due: {formatSafeDate(order.dueDate)}</p>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant={order.status === 'in-progress' ? 'default' : 'secondary'}>
+                      <div className="flex flex-col md:flex-row items-start md:items-center gap-2 w-full md:w-auto">
+                        <Badge variant={order.status === 'in-progress' ? 'default' : 'secondary'} className="text-xs">
                           {order.status}
                         </Badge>
-                        <div className="flex items-center gap-2">
-                          <Progress value={order.progress || 0} className="w-20 h-2" />
-                          <span className="text-xs text-muted-foreground">
+                        <div className="flex items-center gap-2 w-full md:w-auto">
+                          <Progress value={order.progress || 0} className="w-16 md:w-20 h-2" />
+                          <span className="text-xs text-muted-foreground truncate">
                             {progressStages.find(s => s.id === order.progressStage)?.name || 'Not started'}
                           </span>
                         </div>
                       </div>
                     </div>
                     
-                    <div className="flex items-center gap-2">
-                      <Button variant="ghost" size="sm" onClick={() => toggleOrderExpansion(order.id)}>
-                        {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                        Items ({order.items.length})
+                    <div className="flex flex-wrap items-center gap-1 md:gap-2 w-full md:w-auto justify-start md:justify-end">
+                      <Button variant="ghost" size="sm" onClick={() => toggleOrderExpansion(order.id)} className="text-xs md:text-sm h-7 md:h-8">
+                        {isExpanded ? <ChevronDown className="h-3 w-3 md:h-4 md:w-4" /> : <ChevronRight className="h-3 w-3 md:h-4 md:w-4" />}
+                        <span className="hidden sm:inline">Items ({order.items.length})</span>
+                        <span className="sm:hidden">({order.items.length})</span>
                       </Button>
                       
                       {isAdmin ? <>
-                          {progressStages.map(stage => <Button key={stage.id} variant={order.progressStage === stage.id ? "default" : "outline"} size="sm" onClick={() => updateProgressStage(order.id, stage.id)} className={stage.id === 'completed' ? "bg-green-600 hover:bg-green-700 text-white" : ""}>
-                              {stage.name}
+                          {progressStages.map(stage => <Button key={stage.id} variant={order.progressStage === stage.id ? "default" : "outline"} size="sm" onClick={() => updateProgressStage(order.id, stage.id)} className={`text-xs h-7 md:h-8 px-2 md:px-3 ${stage.id === 'completed' ? "bg-green-600 hover:bg-green-700 text-white" : ""}`}>
+                              <span className="hidden md:inline">{stage.name}</span>
+                              <span className="md:hidden">{stage.name.substring(0, 4)}</span>
                             </Button>)}
                           
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">
-                                <Trash2 className="h-4 w-4" />
+                              <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive h-7 md:h-8 w-7 md:w-8 p-0">
+                                <Trash2 className="h-3 w-3 md:h-4 md:w-4" />
                               </Button>
                             </AlertDialogTrigger>
-                            <AlertDialogContent>
+                            <AlertDialogContent className="max-w-sm md:max-w-md">
                               <AlertDialogHeader>
-                                <AlertDialogTitle>Delete Order</AlertDialogTitle>
-                                <AlertDialogDescription>
+                                <AlertDialogTitle className="text-sm md:text-base">Delete Order</AlertDialogTitle>
+                                <AlertDialogDescription className="text-xs md:text-sm">
                                   Are you sure you want to delete order {order.orderNumber}? This action cannot be undone and will remove the order from all systems.
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => deleteOrder(order.id, order.orderNumber)} className="bg-destructive hover:bg-destructive/90">
+                                <AlertDialogCancel className="text-xs md:text-sm">Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => deleteOrder(order.id, order.orderNumber)} className="bg-destructive hover:bg-destructive/90 text-xs md:text-sm">
                                   Delete
                                 </AlertDialogAction>
                               </AlertDialogFooter>

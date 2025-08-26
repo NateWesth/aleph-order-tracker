@@ -64,9 +64,9 @@ const ClientDashboard = () => {
     setActiveView(view);
   };
   return <SidebarProvider>
-      <div className="min-h-screen w-full flex bg-black dark:bg-black overflow-x-hidden">
+      <div className="min-h-screen w-full flex bg-background dark:bg-background overflow-x-hidden">
         {/* Sidebar */}
-        <Sidebar className={`dark:bg-black bg-white ${isMobile ? 'data-[state=collapsed]:w-0' : ''}`}>
+        <Sidebar className={`dark:bg-background bg-card ${isMobile ? 'data-[state=collapsed]:w-0' : ''}`}>
           <SidebarContent className="relative bg-[#162014] overflow-hidden rounded-none">
             {/* Watermark background */}
             <div className="absolute inset-0 opacity-15 bg-no-repeat bg-center pointer-events-none" style={{
