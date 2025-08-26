@@ -784,9 +784,9 @@ export default function ProgressPage({
                       </div>
                     </div>
                     
-                    <div className="flex flex-wrap items-center gap-1 md:gap-2 w-full md:w-auto justify-start md:justify-end">
-                      <Button variant="ghost" size="sm" onClick={() => toggleOrderExpansion(order.id)} className="text-xs md:text-sm h-7 md:h-8">
-                        {isExpanded ? <ChevronDown className="h-3 w-3 md:h-4 md:w-4" /> : <ChevronRight className="h-3 w-3 md:h-4 md:w-4" />}
+                    <div className="flex flex-wrap items-center gap-1 md:gap-3 w-full md:w-auto justify-start md:justify-end md:space-x-2">
+                      <Button variant="ghost" size="sm" onClick={() => toggleOrderExpansion(order.id)} className="text-xs md:text-sm h-7 md:h-9 px-2 md:px-4">
+                        {isExpanded ? <ChevronDown className="h-3 w-3 md:h-4 md:w-4 mr-1" /> : <ChevronRight className="h-3 w-3 md:h-4 md:w-4 mr-1" />}
                         <span className="hidden sm:inline">Items ({order.items.length})</span>
                         <span className="sm:hidden">({order.items.length})</span>
                        </Button>
@@ -795,21 +795,21 @@ export default function ProgressPage({
                          variant="ghost" 
                          size="sm" 
                          onClick={() => openFilesDialog(order)}
-                         className="text-xs md:text-sm h-7 md:h-8 px-2 md:px-3"
+                         className="text-xs md:text-sm h-7 md:h-9 px-2 md:px-4"
                        >
                          <FileText className="h-3 w-3 md:h-4 md:w-4 mr-1" />
                          <span className="hidden sm:inline">Files</span>
                        </Button>
                       
                       {isAdmin ? <>
-                          {progressStages.map(stage => <Button key={stage.id} variant={order.progressStage === stage.id ? "default" : "outline"} size="sm" onClick={() => updateProgressStage(order.id, stage.id)} className={`text-xs h-7 md:h-8 px-2 md:px-3 ${stage.id === 'completed' ? "bg-green-600 hover:bg-green-700 text-white" : ""}`}>
+                          {progressStages.map(stage => <Button key={stage.id} variant={order.progressStage === stage.id ? "default" : "outline"} size="sm" onClick={() => updateProgressStage(order.id, stage.id)} className={`text-xs h-7 md:h-9 px-2 md:px-4 md:min-w-[100px] ${stage.id === 'completed' ? "bg-green-600 hover:bg-green-700 text-white" : ""}`}>
                               <span className="hidden md:inline">{stage.name}</span>
                               <span className="md:hidden">{stage.name.substring(0, 4)}</span>
                             </Button>)}
                           
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive h-7 md:h-8 w-7 md:w-8 p-0">
+                              <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive h-7 md:h-9 w-7 md:w-9 p-0">
                                 <Trash2 className="h-3 w-3 md:h-4 md:w-4" />
                               </Button>
                             </AlertDialogTrigger>
