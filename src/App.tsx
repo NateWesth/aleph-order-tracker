@@ -15,6 +15,7 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { Toaster } from "@/components/ui/toaster";
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { FloatingUploadButton } from './components/FloatingUploadButton';
 
 const queryClient = new QueryClient();
 
@@ -70,6 +71,7 @@ function App() {
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </Suspense>
+              <FloatingUploadButton />
               <Toaster />
             </div>
           </Router>
