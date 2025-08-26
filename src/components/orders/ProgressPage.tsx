@@ -7,11 +7,12 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { format } from "date-fns";
-import { Trash2, Eye, ChevronDown, ChevronRight } from "lucide-react";
+import { Trash2, Eye, ChevronDown, ChevronRight, FileText } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useGlobalRealtimeOrders } from "./hooks/useGlobalRealtimeOrders";
 import ProgressOrderDetailsDialog from "./components/ProgressOrderDetailsDialog";
+import ProcessingOrderFilesDialog from "./components/ProcessingOrderFilesDialog";
 import OrderExportActions from "./components/OrderExportActions";
 import { sendOrderNotification } from "@/utils/emailNotifications";
 import { getUserRole, getUserProfile } from "@/utils/authService";
@@ -103,6 +104,8 @@ export default function ProgressPage({
   }>({});
   const [userRole, setUserRole] = useState<'admin' | 'user'>('user');
   const [userCompanyId, setUserCompanyId] = useState<string | null>(null);
+  const [showFilesDialog, setShowFilesDialog] = useState(false);
+  const [filesDialogOrder, setFilesDialogOrder] = useState<Order | null>(null);
 
   // Parse order items from description
   const parseOrderItems = (description: string | null): OrderItem[] => {
@@ -590,6 +593,17 @@ export default function ProgressPage({
     setSelectedOrder(null);
   };
 
+  // File dialog functions
+  const openFilesDialog = (order: Order) => {
+    setFilesDialogOrder(order);
+    setShowFilesDialog(true);
+  };
+  
+  const closeFilesDialog = () => {
+    setShowFilesDialog(false);
+    setFilesDialogOrder(null);
+  };
+
   // Handle order updates from the dialog
   const handleOrderUpdate = (orderId: string, updates: Partial<Order>) => {
     const updatedOrders = orders.map(order => order.id === orderId ? {
@@ -775,7 +789,17 @@ export default function ProgressPage({
                         {isExpanded ? <ChevronDown className="h-3 w-3 md:h-4 md:w-4" /> : <ChevronRight className="h-3 w-3 md:h-4 md:w-4" />}
                         <span className="hidden sm:inline">Items ({order.items.length})</span>
                         <span className="sm:hidden">({order.items.length})</span>
-                      </Button>
+                       </Button>
+                       
+                       <Button 
+                         variant="ghost" 
+                         size="sm" 
+                         onClick={() => openFilesDialog(order)}
+                         className="text-xs md:text-sm h-7 md:h-8 px-2 md:px-3"
+                       >
+                         <FileText className="h-3 w-3 md:h-4 md:w-4 mr-1" />
+                         <span className="hidden sm:inline">Files</span>
+                       </Button>
                       
                       {isAdmin ? <>
                           {progressStages.map(stage => <Button key={stage.id} variant={order.progressStage === stage.id ? "default" : "outline"} size="sm" onClick={() => updateProgressStage(order.id, stage.id)} className={`text-xs h-7 md:h-8 px-2 md:px-3 ${stage.id === 'completed' ? "bg-green-600 hover:bg-green-700 text-white" : ""}`}>
@@ -872,5 +896,12 @@ export default function ProgressPage({
       </div>
 
       <ProgressOrderDetailsDialog order={selectedOrder} isOpen={!!selectedOrder} onClose={closeOrderDetails} isAdmin={isAdmin} />
+      
+      <ProcessingOrderFilesDialog 
+        order={filesDialogOrder} 
+        isOpen={showFilesDialog} 
+        onClose={closeFilesDialog} 
+        isAdmin={isAdmin} 
+      />
     </div>;
 }
