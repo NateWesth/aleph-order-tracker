@@ -324,11 +324,11 @@ export default function ProcessingOrderFilesDialog({
               Upload {fileTypeLabels[fileType]}
             </Label>
             <div className="mt-1">
-              <Input
-                id={inputId}
-                type="file"
-                accept=".pdf,.csv"
-                onChange={(e) => {
+                <Input
+                  id={inputId}
+                  type="file"
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.png,.jpg,.jpeg,.gif,.zip,.rar"
+                  onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (file) {
                     handleFileUpload(file, fileType);
@@ -340,7 +340,7 @@ export default function ProcessingOrderFilesDialog({
               />
             </div>
             <p className="text-xs text-gray-500 mt-1">
-              Supported formats: PDF, CSV (Max 10MB)
+              Supported formats: PDF, DOC, DOCX, XLS, XLSX, CSV, PNG, JPG, JPEG, GIF, ZIP, RAR (Max 10MB)
             </p>
           </div>
         </div>
