@@ -88,7 +88,7 @@ const AdminDashboard = () => {
       </div>;
   }
   return <SidebarProvider>
-      <div className="min-h-screen w-full flex bg-black dark:bg-black">
+      <div className="min-h-screen w-full flex bg-black dark:bg-black overflow-x-hidden">
         {/* Sidebar */}
         <Sidebar className={`dark:bg-black bg-white ${isMobile ? 'data-[state=collapsed]:w-0' : ''}`}>
           <SidebarContent className="relative bg-[#162014] overflow-hidden">
@@ -190,7 +190,7 @@ const AdminDashboard = () => {
           </header>
 
           {/* Dashboard content - White in light mode, slightly lighter grey than toolbar in dark mode */}
-          <main className={`flex-1 bg-background dark:bg-background overflow-x-hidden min-w-0 ${isMobile ? 'p-1' : 'p-2 md:p-4 lg:p-6'}`}>
+          <main className={`flex-1 bg-background dark:bg-background overflow-x-hidden min-w-0 w-full ${isMobile ? 'p-1' : 'p-2 md:p-4 lg:p-6'}`}>
             {activeView === "home" ? <div className="space-y-6">
                 {/* Welcome Section */}
                 <div className="flex items-center justify-center h-64 relative bg-background px-4">

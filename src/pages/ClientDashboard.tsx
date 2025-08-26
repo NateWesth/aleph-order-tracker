@@ -64,7 +64,7 @@ const ClientDashboard = () => {
     setActiveView(view);
   };
   return <SidebarProvider>
-      <div className="min-h-screen w-full flex bg-black dark:bg-black">
+      <div className="min-h-screen w-full flex bg-black dark:bg-black overflow-x-hidden">
         {/* Sidebar */}
         <Sidebar className={`dark:bg-black bg-white ${isMobile ? 'data-[state=collapsed]:w-0' : ''}`}>
           <SidebarContent className="relative bg-[#162014] overflow-hidden rounded-none">
@@ -161,7 +161,7 @@ const ClientDashboard = () => {
           </header>
 
           {/* Dashboard content - White in light mode, slightly lighter grey than toolbar in dark mode */}
-          <main className={`flex-1 bg-background overflow-x-hidden min-w-0 ${isMobile ? 'p-1' : 'p-2 md:p-4 lg:p-6'}`}>
+          <main className={`flex-1 bg-background overflow-x-hidden min-w-0 w-full ${isMobile ? 'p-1' : 'p-2 md:p-4 lg:p-6'}`}>
             {activeView === "home" ? <div className="flex items-center justify-center h-full relative bg-background">
                 <div className="text-center relative z-10">
                   <h1 className="text-4xl font-bold mb-4 text-emerald-950 dark:text-white md:text-6xl">

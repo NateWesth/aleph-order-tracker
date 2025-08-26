@@ -4,8 +4,9 @@ import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
-import { Trash2, Eye, CheckCircle } from "lucide-react";
+import { Trash2, Eye, CheckCircle, MoreHorizontal } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useGlobalRealtimeOrders } from "./hooks/useGlobalRealtimeOrders";
@@ -13,6 +14,7 @@ import ProcessingOrderFilesDialog from "./components/ProcessingOrderFilesDialog"
 import OrderExportActions from "./components/OrderExportActions";
 import { sendOrderNotification } from "@/utils/emailNotifications";
 import { getUserRole, getUserProfile } from "@/utils/authService";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface OrderItem {
   id: string;
@@ -73,6 +75,7 @@ export default function ProcessingPage({
   const [error, setError] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<'admin' | 'user'>('user');
   const [userCompanyId, setUserCompanyId] = useState<string | null>(null);
+  const isMobile = useIsMobile();
 
   // Parse order items from description
   const parseOrderItems = (description: string | null): OrderItem[] => {
@@ -387,119 +390,221 @@ export default function ProcessingPage({
       </div>;
   }
 
-  return <div className="container mx-auto p-4 bg-background">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-foreground">Processing Orders</h1>
+  return (
+    <div className={`${isMobile ? 'p-2' : 'container mx-auto p-4'} bg-background`}>
+      <div className="flex justify-between items-center mb-4">
+        <h1 className={`${isMobile ? 'text-lg' : 'text-2xl'} font-bold text-foreground`}>Processing Orders</h1>
       </div>
 
-      <div className="bg-card rounded-lg shadow">
-        <div className="p-4 border-b border-border">
-          <h2 className="text-lg font-semibold text-card-foreground">Supporting Documents</h2>
+      <div className="bg-card rounded-lg shadow overflow-hidden">
+        <div className={`${isMobile ? 'p-3' : 'p-4'} border-b border-border`}>
+          <h2 className={`${isMobile ? 'text-base' : 'text-lg'} font-semibold text-card-foreground`}>Supporting Documents</h2>
         </div>
         
-        {orders.length === 0 ? <div className="p-4 text-center text-muted-foreground">
+        {loading ? (
+          <div className={`${isMobile ? 'p-3' : 'p-4'} text-center text-muted-foreground`}>
+            Loading processing orders...
+          </div>
+        ) : error ? (
+          <div className={`${isMobile ? 'p-3' : 'p-4'} text-center text-destructive`}>
+            {error}
+          </div>
+        ) : orders.length === 0 ? (
+          <div className={`${isMobile ? 'p-3' : 'p-4'} text-center text-muted-foreground`}>
             No orders in processing. Orders completed from the Progress page will appear here.
-          </div> : <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="text-card-foreground">Order #</TableHead>
-                <TableHead className="text-card-foreground">Company</TableHead>
-                <TableHead className="text-card-foreground">Date Created</TableHead>
-                <TableHead className="text-card-foreground">Status</TableHead>
-                <TableHead className="text-card-foreground">Items</TableHead>
-                <TableHead className="text-card-foreground">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {orders.map(order => <TableRow key={order.id}>
-                  <TableCell className="font-medium text-card-foreground">
-                    <div>
-                      <div>#{order.orderNumber}</div>
-                      {order.reference && (
-                        <div className="text-sm text-muted-foreground">{order.reference}</div>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-card-foreground">{order.companyName}</TableCell>
-                  <TableCell className="text-card-foreground">{formatSafeDate(order.orderDate)}</TableCell>
-                  <TableCell>
-                    <Badge variant="default">Processing</Badge>
-                  </TableCell>
-                  <TableCell className="text-card-foreground">{order.items.length} items</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <OrderExportActions 
-                        order={{
-                          id: order.id,
-                          order_number: order.orderNumber,
-                          description: order.items.map(item => `${item.name} (Qty: ${item.quantity})`).join('\n'),
-                          status: order.status,
-                          total_amount: null,
-                          created_at: order.orderDate.toISOString(),
-                          updated_at: order.orderDate.toISOString(),
-                          company_id: null,
-                          companyName: order.companyName,
-                          items: order.items
-                        }}
-                      />
+          </div>
+        ) : (
+          <>
+            {/* Mobile view */}
+            {isMobile ? (
+              <div className="space-y-3 p-3">
+                {orders.map(order => (
+                  <div key={order.id} className="bg-background rounded-lg p-3 border">
+                    <div className="space-y-2">
+                      {/* Header */}
+                      <div className="flex justify-between items-start">
+                        <div className="min-w-0 flex-1">
+                          <div className="font-medium text-sm">#{order.orderNumber}</div>
+                          {order.reference && (
+                            <div className="text-xs text-muted-foreground truncate">{order.reference}</div>
+                          )}
+                        </div>
+                        <Badge variant="default" className="ml-2 text-xs">Processing</Badge>
+                      </div>
                       
-                      <Button variant="ghost" size="sm" onClick={() => viewOrderDetails(order)}>
-                        <Eye className="h-4 w-4" />
-                      </Button>
+                      {/* Details */}
+                      <div className="text-xs text-muted-foreground space-y-1">
+                        <div className="truncate">{order.companyName}</div>
+                        <div>{formatSafeDate(order.orderDate)}</div>
+                        <div>{order.items.length} items</div>
+                      </div>
                       
-                      {isAdmin && <>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="default" size="sm" className="bg-green-600 hover:bg-green-700 text-white">
-                                <CheckCircle className="h-4 w-4 mr-1" />
-                                Complete
+                      {/* Actions */}
+                      <div className="flex items-center gap-2 pt-2 border-t">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => viewOrderDetails(order)}
+                          className="flex-1 h-8 text-xs"
+                        >
+                          <Eye className="h-3 w-3 mr-1" />
+                          View
+                        </Button>
+                        <OrderExportActions 
+                          order={{
+                            id: order.id,
+                            order_number: order.orderNumber,
+                            description: order.items.map(item => `${item.name} (Qty: ${item.quantity})`).join('\n'),
+                            status: order.status,
+                            total_amount: null,
+                            created_at: order.orderDate.toISOString(),
+                            updated_at: order.orderDate.toISOString(),
+                            company_id: null,
+                            companyName: order.companyName,
+                            items: order.items
+                          }}
+                        />
+                        {isAdmin && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                <MoreHorizontal className="h-3 w-3" />
                               </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Complete Order</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Are you sure you want to mark order {order.orderNumber} as completed? This will move it to the Completed page.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => completeOrder(order.id, order.orderNumber)} className="bg-green-600 hover:bg-green-700">
-                                  Complete Order
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                          
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Delete Order</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Are you sure you want to delete order {order.orderNumber}? This action cannot be undone.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => deleteOrder(order.id, order.orderNumber)} className="bg-destructive hover:bg-destructive/90">
-                                  Delete
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </>}
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="z-50">
+                              <DropdownMenuItem 
+                                onClick={() => completeOrder(order.id, order.orderNumber)} 
+                                className="text-xs"
+                              >
+                                Mark Complete
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => deleteOrder(order.id, order.orderNumber)}
+                                className="text-xs text-destructive"
+                              >
+                                Delete Order
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
+                      </div>
                     </div>
-                  </TableCell>
-                </TableRow>)}
-            </TableBody>
-          </Table>}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              /* Desktop table view */
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="text-card-foreground whitespace-nowrap">Order #</TableHead>
+                      <TableHead className="text-card-foreground whitespace-nowrap">Company</TableHead>
+                      <TableHead className="text-card-foreground whitespace-nowrap">Date Created</TableHead>
+                      <TableHead className="text-card-foreground whitespace-nowrap">Status</TableHead>
+                      <TableHead className="text-card-foreground whitespace-nowrap">Items</TableHead>
+                      <TableHead className="text-card-foreground whitespace-nowrap">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {orders.map(order => (
+                      <TableRow key={order.id}>
+                        <TableCell className="font-medium text-card-foreground">
+                          <div>
+                            <div>#{order.orderNumber}</div>
+                            {order.reference && (
+                              <div className="text-sm text-muted-foreground">{order.reference}</div>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-card-foreground">{order.companyName}</TableCell>
+                        <TableCell className="text-card-foreground">{formatSafeDate(order.orderDate)}</TableCell>
+                        <TableCell>
+                          <Badge variant="default">Processing</Badge>
+                        </TableCell>
+                        <TableCell className="text-card-foreground">{order.items.length} items</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <OrderExportActions 
+                              order={{
+                                id: order.id,
+                                order_number: order.orderNumber,
+                                description: order.items.map(item => `${item.name} (Qty: ${item.quantity})`).join('\n'),
+                                status: order.status,
+                                total_amount: null,
+                                created_at: order.orderDate.toISOString(),
+                                updated_at: order.orderDate.toISOString(),
+                                company_id: null,
+                                companyName: order.companyName,
+                                items: order.items
+                              }}
+                            />
+                            
+                            <Button variant="ghost" size="sm" onClick={() => viewOrderDetails(order)}>
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            
+                            {isAdmin && (
+                              <>
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button variant="default" size="sm" className="bg-green-600 hover:bg-green-700 text-white">
+                                      <CheckCircle className="h-4 w-4 mr-1" />
+                                      Complete
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Complete Order</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        Are you sure you want to mark order {order.orderNumber} as completed? This will move it to the Completed page.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                      <AlertDialogAction onClick={() => completeOrder(order.id, order.orderNumber)} className="bg-green-600 hover:bg-green-700">
+                                        Complete Order
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                                
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Delete Order</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        Are you sure you want to delete order {order.orderNumber}? This action cannot be undone.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                      <AlertDialogAction onClick={() => deleteOrder(order.id, order.orderNumber)} className="bg-destructive hover:bg-destructive/90">
+                                        Delete
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              </>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </>
+        )}
       </div>
 
       <ProcessingOrderFilesDialog order={selectedOrder} isOpen={!!selectedOrder} onClose={closeOrderDetails} isAdmin={isAdmin} />
-    </div>;
+    </div>
+  );
 }
