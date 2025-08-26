@@ -10,12 +10,12 @@ import { format } from "date-fns";
 import { Trash2, Eye, ChevronDown, ChevronRight, FileText } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { useGlobalRealtimeOrders } from "./hooks/useGlobalRealtimeOrders";
+import { useUserData } from "@/hooks/useUserData";
+import { useOptimizedRealtime } from "@/hooks/useOptimizedRealtime";
 import ProgressOrderDetailsDialog from "./components/ProgressOrderDetailsDialog";
 import ProcessingOrderFilesDialog from "./components/ProcessingOrderFilesDialog";
 import OrderExportActions from "./components/OrderExportActions";
 import { sendOrderNotification } from "@/utils/emailNotifications";
-import { getUserRole, getUserProfile } from "@/utils/authService";
 
 // Define the order item interface
 interface OrderItem {
@@ -92,6 +92,15 @@ export default function ProgressPage({
   const {
     user
   } = useAuth();
+
+  // Get user data from centralized hook
+  const { 
+    role: userRole, 
+    userCompany,
+    isLoading: isLoadingUserData 
+  } = useUserData();
+  const userCompanyId = userCompany?.id || null;
+
   const [orders, setOrders] = useState<Order[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
@@ -102,8 +111,6 @@ export default function ProgressPage({
       [itemName: string]: number;
     };
   }>({});
-  const [userRole, setUserRole] = useState<'admin' | 'user'>('user');
-  const [userCompanyId, setUserCompanyId] = useState<string | null>(null);
   const [showFilesDialog, setShowFilesDialog] = useState(false);
   const [filesDialogOrder, setFilesDialogOrder] = useState<Order | null>(null);
 
@@ -134,22 +141,24 @@ export default function ProgressPage({
     return items;
   };
 
-  // Fetch user info to determine filtering
-  const fetchUserInfo = async () => {
-    if (!user?.id) return;
-    try {
-      const [role, profile] = await Promise.all([getUserRole(user.id), getUserProfile(user.id)]);
-      console.log('ProgressPage - User role:', role);
-      console.log('ProgressPage - User profile:', profile);
-      setUserRole(role);
-      if (role === 'user' && profile?.company_id) {
-        setUserCompanyId(profile.company_id);
-        console.log('ProgressPage - User company ID:', profile.company_id);
-      }
-    } catch (error) {
-      console.error("Error fetching user info:", error);
+  // Load orders when user data is available
+  useEffect(() => {
+    if (user?.id && userRole && (userRole === 'admin' || userCompanyId !== null)) {
+      console.log('Loading progress orders...');
+      loadDeliveryQuantities();
+      fetchProgressOrders();
     }
-  };
+  }, [user?.id, userRole, userCompanyId]);
+
+  // Set up optimized real-time subscriptions
+  useOptimizedRealtime({
+    table: 'orders',
+    event: '*',
+    onInsert: () => fetchProgressOrders(),
+    onUpdate: () => fetchProgressOrders(),
+    onDelete: () => fetchProgressOrders(),
+    enabled: !!user?.id
+  });
 
   // Helper function to get proper progress stage based on status and progress_stage
   const getProgressStage = (status: string, progressStage?: string): 'awaiting-stock' | 'packing' | 'out-for-delivery' | 'completed' => {
@@ -450,31 +459,6 @@ export default function ProgressPage({
     }
   };
 
-  // Set up real-time subscriptions
-  useGlobalRealtimeOrders({
-    onOrdersChange: () => {
-      console.log('Real-time update detected for progress page, refreshing...');
-      fetchProgressOrders();
-    },
-    isAdmin,
-    pageType: 'progress'
-  });
-
-  // Load user info first, then orders
-  useEffect(() => {
-    if (user?.id) {
-      fetchUserInfo();
-    }
-  }, [user?.id]);
-
-  // Load orders when user info is available
-  useEffect(() => {
-    if (user?.id && (userRole === 'admin' || userCompanyId !== null)) {
-      console.log('Loading progress orders...');
-      loadDeliveryQuantities(); // Load saved quantities first
-      fetchProgressOrders();
-    }
-  }, [user?.id, userRole, userCompanyId]);
 
   // Progress stages with corresponding percentage values
   const progressStages = [{

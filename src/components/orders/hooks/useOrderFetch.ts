@@ -1,9 +1,9 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { getUserRole, getUserProfile } from "@/utils/auth";
+import { useUserData } from "@/hooks/useUserData";
 import { Order, OrderItem } from "./useOrders";
 
 export function useOrderFetch() {
@@ -11,26 +11,10 @@ export function useOrderFetch() {
   const { user } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
-  const [userRole, setUserRole] = useState<'admin' | 'user'>('user');
-  const [userCompanyId, setUserCompanyId] = useState<string | null>(null);
-
-  const fetchUserInfo = async () => {
-    if (!user?.id) return;
-
-    try {
-      const [role, profile] = await Promise.all([
-        getUserRole(user.id),
-        getUserProfile(user.id)
-      ]);
-
-      setUserRole(role);
-      if (role === 'user' && profile?.company_id) {
-        setUserCompanyId(profile.company_id);
-      }
-    } catch (error) {
-      console.error("Error fetching user info:", error);
-    }
-  };
+  
+  // Get user data from centralized hook
+  const { role: userRole, userCompany } = useUserData();
+  const userCompanyId = userCompany?.id || null;
 
   // Helper function to parse order items from description
   const parseOrderItems = (description: string): OrderItem[] => {
@@ -68,8 +52,8 @@ export function useOrderFetch() {
   };
 
   const fetchOrders = async () => {
-    if (!user?.id) {
-      console.log("No user ID available for fetching orders");
+    if (!user?.id || !userRole) {
+      console.log("No user ID or role available for fetching orders");
       setLoading(false);
       return;
     }
@@ -118,13 +102,7 @@ export function useOrderFetch() {
   };
 
   useEffect(() => {
-    if (user?.id) {
-      fetchUserInfo();
-    }
-  }, [user?.id]);
-
-  useEffect(() => {
-    if (user?.id && (userRole === 'admin' || userCompanyId)) {
+    if (user?.id && userRole && (userRole === 'admin' || userCompanyId)) {
       fetchOrders();
     }
   }, [user?.id, userRole, userCompanyId]);
