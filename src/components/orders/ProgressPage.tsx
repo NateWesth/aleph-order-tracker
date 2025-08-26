@@ -206,6 +206,8 @@ export default function ProgressPage({
   // Save delivery quantities to both localStorage and database
   const saveDeliveryQuantitiesToDatabase = async (orderId: string, itemName: string, delivered: number) => {
     try {
+      console.log(`Saving to database: Order ${orderId}, Item "${itemName}", Delivered: ${delivered}`);
+      
       // Get current order
       const { data: order, error: fetchError } = await supabase
         .from('orders')
@@ -216,6 +218,8 @@ export default function ProgressPage({
       if (fetchError) throw fetchError;
 
       if (order?.description) {
+        console.log('Current description:', order.description);
+        
         // Parse current description and update the specific item
         const lines = order.description.split('\n');
         const updatedLines = lines.map(line => {
@@ -223,20 +227,25 @@ export default function ProgressPage({
           const deliveredMatch = line.match(/^(.+?)\s*\(Qty:\s*(\d+)\)\s*\[Delivered:\s*(\d+)\].*$/);
           if (deliveredMatch && deliveredMatch[1].trim() === itemName) {
             // Update existing delivered quantity
-            return `${deliveredMatch[1]} (Qty: ${deliveredMatch[2]}) [Delivered: ${delivered}]`;
+            const newLine = `${deliveredMatch[1]} (Qty: ${deliveredMatch[2]}) [Delivered: ${delivered}]`;
+            console.log(`Updated existing line: "${line}" → "${newLine}"`);
+            return newLine;
           }
           
           // Check if line matches basic format without delivered quantity
           const basicMatch = line.match(/^(.+?)\s*\(Qty:\s*(\d+)\)(.*)$/);
           if (basicMatch && basicMatch[1].trim() === itemName) {
             // Add delivered quantity to basic format
-            return `${basicMatch[1]} (Qty: ${basicMatch[2]}) [Delivered: ${delivered}]${basicMatch[3]}`;
+            const newLine = `${basicMatch[1]} (Qty: ${basicMatch[2]}) [Delivered: ${delivered}]${basicMatch[3]}`;
+            console.log(`Added delivery to line: "${line}" → "${newLine}"`);
+            return newLine;
           }
           
           return line;
         });
 
         const updatedDescription = updatedLines.join('\n');
+        console.log('Updated description:', updatedDescription);
 
         // Update the order in database
         const { error: updateError } = await supabase
@@ -251,8 +260,8 @@ export default function ProgressPage({
 
         console.log(`Successfully saved delivery quantity for ${itemName}: ${delivered}`);
         
-        // Refresh orders to get updated data
-        fetchProgressOrders();
+        // Don't refresh orders immediately - let the real-time subscription handle it
+        // This prevents the race condition
       }
     } catch (error) {
       console.error('Error saving delivery quantities to database:', error);
@@ -266,6 +275,8 @@ export default function ProgressPage({
 
   // Update delivery quantity for an item with database persistence
   const updateDeliveryQuantity = async (orderId: string, itemName: string, delivered: number) => {
+    console.log(`Updating delivery quantity: Order ${orderId}, Item "${itemName}", Delivered: ${delivered}`);
+    
     setDeliveryQuantities(prev => {
       const updated = {
         ...prev,
@@ -275,9 +286,12 @@ export default function ProgressPage({
         }
       };
       
+      console.log('Updated delivery quantities state:', updated);
+      
       // Save to localStorage immediately
       try {
         localStorage.setItem('deliveryQuantities', JSON.stringify(updated));
+        console.log('Saved to localStorage successfully');
       } catch (error) {
         console.error('Error saving to localStorage:', error);
       }
@@ -287,6 +301,7 @@ export default function ProgressPage({
 
     // Save to database if admin
     if (isAdmin) {
+      console.log('Admin user - saving to database...');
       await saveDeliveryQuantitiesToDatabase(orderId, itemName, delivered);
     }
   };
@@ -297,15 +312,21 @@ export default function ProgressPage({
     
     if (!description) return deliveries;
 
+    console.log('Parsing delivery quantities from description:', description);
+    
     const lines = description.split('\n');
-    lines.forEach(line => {
+    lines.forEach((line, index) => {
       // Look for pattern: "Item Name (Qty: X) [Delivered: Y]"
       const match = line.match(/^(.+?)\s*\(Qty:\s*\d+\)\s*\[Delivered:\s*(\d+)\].*$/);
       if (match) {
-        deliveries[match[1].trim()] = parseInt(match[2]);
+        const itemName = match[1].trim();
+        const deliveredQty = parseInt(match[2]);
+        deliveries[itemName] = deliveredQty;
+        console.log(`Found delivered quantity for "${itemName}": ${deliveredQty}`);
       }
     });
 
+    console.log('Parsed deliveries:', deliveries);
     return deliveries;
   };
 
@@ -395,11 +416,21 @@ export default function ProgressPage({
           };
         });
         
-        // Update delivery quantities state with database values
-        setDeliveryQuantities(prev => ({
-          ...prev,
-          ...allDeliveryQuantities
-        }));
+        // Update delivery quantities state with database values, but preserve current state
+        setDeliveryQuantities(prev => {
+          const merged = { ...prev };
+          // Only update if we have data from database, but preserve any current values
+          for (const [orderId, orderDeliveries] of Object.entries(allDeliveryQuantities)) {
+            if (Object.keys(orderDeliveries).length > 0) {
+              merged[orderId] = {
+                ...(merged[orderId] || {}),
+                ...orderDeliveries
+              };
+            }
+          }
+          console.log('Merged delivery quantities:', merged);
+          return merged;
+        });
         
         console.log('Converted orders for progress page:', convertedOrders.length);
         setOrders(convertedOrders);
