@@ -4,6 +4,7 @@ export interface OrderWithCompany {
   order_number: string;
   reference?: string | null;
   description?: string | null;
+  notes?: string | null;
   status: string | null;
   total_amount?: number | null;
   created_at: string;

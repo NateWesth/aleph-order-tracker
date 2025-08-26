@@ -123,6 +123,7 @@ export type Database = {
           created_at: string | null
           description: string | null
           id: string
+          notes: string | null
           order_number: string
           progress_stage: string | null
           reference: string | null
@@ -138,6 +139,7 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           id?: string
+          notes?: string | null
           order_number: string
           progress_stage?: string | null
           reference?: string | null
@@ -153,6 +155,7 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           id?: string
+          notes?: string | null
           order_number?: string
           progress_stage?: string | null
           reference?: string | null

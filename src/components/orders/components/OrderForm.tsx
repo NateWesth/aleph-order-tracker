@@ -4,6 +4,7 @@ import { useForm, useFieldArray } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { Plus } from "lucide-react";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { generateOrderNumber } from "../utils/orderUtils";
@@ -21,6 +22,7 @@ interface OrderFormProps {
     companyId: string;
     totalAmount: number;
     urgency: string;
+    notes?: string;
     items: OrderItem[];
   }) => void;
   loading?: boolean;
@@ -44,6 +46,7 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
       companyId: "",
       totalAmount: 0,
       urgency: "normal",
+      notes: "",
       items: [{
         id: crypto.randomUUID(),
         name: "",
@@ -152,6 +155,7 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
       companyId: finalCompanyId,
       totalAmount: data.totalAmount,
       urgency: data.urgency,
+      notes: data.notes || undefined,
       items: validItems
     };
 
@@ -203,6 +207,24 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
                     <SelectItem value="high">High</SelectItem>
                   </SelectContent>
                 </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="notes"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Order Notes</FormLabel>
+                <FormControl>
+                  <Textarea
+                    placeholder="Add any additional notes or instructions for this order..."
+                    className="min-h-[100px]"
+                    {...field}
+                  />
+                </FormControl>
                 <FormMessage />
               </FormItem>
             )}

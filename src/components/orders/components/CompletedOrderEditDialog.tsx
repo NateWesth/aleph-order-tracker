@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import {
   AlertDialog,
@@ -90,6 +91,7 @@ export default function CompletedOrderEditDialog({
   const [companies, setCompanies] = useState<Company[]>([]);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>('');
   const [orderNumber, setOrderNumber] = useState<string>('');
+  const [orderNotes, setOrderNotes] = useState<string>('');
 
   // Fetch companies for selection
   const fetchCompanies = async () => {
@@ -122,6 +124,9 @@ export default function CompletedOrderEditDialog({
     }
     if (order?.order_number) {
       setOrderNumber(order.order_number);
+    }
+    if (order?.notes) {
+      setOrderNotes(order.notes);
     }
   }, [order]);
 
@@ -184,6 +189,7 @@ export default function CompletedOrderEditDialog({
 
       const updateData: any = {
         description,
+        notes: orderNotes || null,
         updated_at: new Date().toISOString()
       };
 
@@ -240,7 +246,7 @@ export default function CompletedOrderEditDialog({
         <AlertDialogHeader>
           <AlertDialogTitle>Edit Order #{order?.order_number || 'Unknown'}</AlertDialogTitle>
           <AlertDialogDescription>
-            Update the item descriptions and quantities for this completed order.
+            Update the order details, notes, and item descriptions for this completed order.
           </AlertDialogDescription>
         </AlertDialogHeader>
         
@@ -282,6 +288,16 @@ export default function CompletedOrderEditDialog({
               {order?.status || 'Unknown'}
             </Badge>
           </div>
+        </div>
+
+        <div className="mb-6">
+          <p className="text-sm text-muted-foreground mb-2">Order Notes</p>
+          <Textarea
+            value={orderNotes}
+            onChange={(e) => setOrderNotes(e.target.value)}
+            placeholder="Add notes or instructions for this order..."
+            className="min-h-[80px]"
+          />
         </div>
 
         <div className="space-y-4">

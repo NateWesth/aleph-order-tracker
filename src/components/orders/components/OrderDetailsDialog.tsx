@@ -130,6 +130,15 @@ export default function OrderDetailsDialog({
               </Badge>
             </div>
           </div>
+
+          {order.notes && (
+            <div>
+              <p className="text-sm text-gray-500 mb-2">Order Notes</p>
+              <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-md">
+                <p className="text-sm whitespace-pre-wrap">{order.notes}</p>
+              </div>
+            </div>
+          )}
           
           <div>
             <h3 className="font-medium mb-4 text-lg">Order Items</h3>

@@ -13,5 +13,6 @@ export interface OrderFormData {
   companyId: string;
   totalAmount: number;
   urgency: string;
+  notes?: string;
   items: OrderItem[];
 }

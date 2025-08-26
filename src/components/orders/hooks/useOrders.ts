@@ -11,6 +11,7 @@ export interface Order {
   id: string;
   order_number: string;
   description?: string;
+  notes?: string;
   status: string;
   progress_stage?: string;
   total_amount?: number;

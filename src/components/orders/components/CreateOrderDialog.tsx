@@ -36,6 +36,7 @@ export default function CreateOrderDialog({
     companyId: string;
     totalAmount: number;
     urgency: string;
+    notes?: string;
     items: any[];
   }) => {
     if (!user?.id) {
@@ -72,6 +73,7 @@ export default function CreateOrderDialog({
         order_number: orderData.orderNumber,
         reference: orderData.reference || null,
         description: itemsDescription,
+        notes: orderData.notes || null,
         company_id: orderData.companyId,
         total_amount: orderData.totalAmount || 0,
         user_id: user.id,
