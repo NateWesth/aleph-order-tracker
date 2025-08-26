@@ -150,16 +150,6 @@ export default function ProgressPage({
     }
   }, [user?.id, userRole, userCompanyId]);
 
-  // Set up optimized real-time subscriptions
-  useOptimizedRealtime({
-    table: 'orders',
-    event: '*',
-    onInsert: () => fetchProgressOrders(),
-    onUpdate: () => fetchProgressOrders(),
-    onDelete: () => fetchProgressOrders(),
-    enabled: !!user?.id
-  });
-
   // Helper function to get proper progress stage based on status and progress_stage
   const getProgressStage = (status: string, progressStage?: string): 'awaiting-stock' | 'packing' | 'out-for-delivery' | 'completed' => {
     if (progressStage) {
