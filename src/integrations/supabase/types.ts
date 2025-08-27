@@ -116,6 +116,57 @@ export type Database = {
         }
         Relationships: []
       }
+      order_update_reads: {
+        Row: {
+          id: string
+          order_update_id: string
+          read_at: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          order_update_id: string
+          read_at?: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          order_update_id?: string
+          read_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      order_updates: {
+        Row: {
+          created_at: string
+          id: string
+          message: string
+          order_id: string
+          parent_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message: string
+          order_id: string
+          parent_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message?: string
+          order_id?: string
+          parent_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       orders: {
         Row: {
           company_id: string | null
@@ -249,6 +300,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Database["public"]["Enums"]["app_role"]
       }
+      get_unread_updates_count: {
+        Args: { order_uuid: string; user_uuid: string }
+        Returns: number
+      }
       get_user_role: {
         Args: { user_uuid: string }
         Returns: Database["public"]["Enums"]["app_role"]
@@ -264,6 +319,10 @@ export type Database = {
       is_admin: {
         Args: Record<PropertyKey, never>
         Returns: boolean
+      }
+      mark_order_update_as_read: {
+        Args: { update_id: string; user_uuid: string }
+        Returns: undefined
       }
       validate_company_code: {
         Args: { company_code: string }

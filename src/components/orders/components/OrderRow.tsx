@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { FileText, Eye, MoreHorizontal } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import OrderExportActions from "./OrderExportActions";
+import { OrderUpdatesButton } from "./OrderUpdatesButton";
 import { useState } from "react";
 import OrderDetailsDialog from "./OrderDetailsDialog";
 import { OrderWithCompany } from "../types/orderTypes";
@@ -133,18 +134,28 @@ export default function OrderRow({
             
             {/* Actions */}
             <div className="flex items-center justify-between gap-2 pt-2 border-t">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowDetails(true);
-                }}
-                className="flex-1 h-8 text-xs"
-              >
-                <Eye className="h-3 w-3 mr-1" />
-                View
-              </Button>
+              <div className="flex gap-1 flex-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowDetails(true);
+                  }}
+                  className="flex-1 h-8 text-xs"
+                >
+                  <Eye className="h-3 w-3 mr-1" />
+                  View
+                </Button>
+                <div onClick={(e) => e.stopPropagation()}>
+                  <OrderUpdatesButton
+                    orderId={order.id}
+                    orderNumber={order.order_number}
+                    size="sm"
+                    variant="ghost"
+                  />
+                </div>
+              </div>
               {isAdmin && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -225,6 +236,12 @@ export default function OrderRow({
               <Eye className="h-4 w-4" />
               <span className="ml-1">View</span>
             </Button>
+            <div onClick={(e) => e.stopPropagation()}>
+              <OrderUpdatesButton
+                orderId={order.id}
+                orderNumber={order.order_number}
+              />
+            </div>
             <OrderExportActions order={order} />
             {isAdmin && (
               <DropdownMenu>
