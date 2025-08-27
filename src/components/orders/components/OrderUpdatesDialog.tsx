@@ -193,7 +193,7 @@ export const OrderUpdatesDialog: React.FC<OrderUpdatesDialogProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
+      <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col" aria-describedby="order-updates-description">
         <DialogHeader className="flex flex-row items-center justify-between">
           <DialogTitle className="text-xl font-semibold flex items-center gap-2">
             <MessageCircle size={20} />
@@ -208,6 +208,10 @@ export const OrderUpdatesDialog: React.FC<OrderUpdatesDialogProps> = ({
             <X size={16} />
           </Button>
         </DialogHeader>
+        
+        <div id="order-updates-description" className="sr-only">
+          Order updates and conversation history for {orderNumber}
+        </div>
         
         <div className="flex-1 flex flex-col gap-4 min-h-0">
           {/* Updates List */}
