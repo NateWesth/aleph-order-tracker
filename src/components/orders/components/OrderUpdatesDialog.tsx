@@ -102,7 +102,7 @@ export const OrderUpdatesDialog: React.FC<OrderUpdatesDialogProps> = ({
     if (!user?.id) return;
     
     try {
-      // Mark all updates in this order as read
+      // Get all updates that aren't from this user and haven't been read by this user
       const { data: unreadUpdates } = await supabase
         .from('order_updates')
         .select('id')
@@ -110,14 +110,22 @@ export const OrderUpdatesDialog: React.FC<OrderUpdatesDialogProps> = ({
         .neq('user_id', user.id);
 
       if (unreadUpdates && unreadUpdates.length > 0) {
+        // Mark each update as read for this user
         const readPromises = unreadUpdates.map(update =>
-          supabase.rpc('mark_order_update_as_read', {
-            update_id: update.id,
-            user_uuid: user.id
-          })
+          supabase
+            .from('order_update_reads')
+            .upsert({
+              order_update_id: update.id,
+              user_id: user.id,
+              read_at: new Date().toISOString()
+            }, {
+              onConflict: 'order_update_id,user_id'
+            })
         );
         
         await Promise.all(readPromises);
+        
+        // Update local count immediately
         onUnreadCountChange(0);
       }
     } catch (error) {

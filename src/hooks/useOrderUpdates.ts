@@ -31,7 +31,7 @@ export const useOrderUpdates = (orderId: string | null) => {
 
     // Set up real-time subscription for new updates
     const channel = supabase
-      .channel(`order-updates-${orderId}`)
+      .channel(`order-updates-${orderId}-${user.id}`)
       .on(
         'postgres_changes',
         {
@@ -55,8 +55,21 @@ export const useOrderUpdates = (orderId: string | null) => {
           table: 'order_update_reads',
           filter: `user_id=eq.${user.id}`
         },
+        (payload) => {
+          // When this user marks something as read, refresh count
+          fetchUnreadCount();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'order_update_reads',
+          filter: `user_id=eq.${user.id}`
+        },
         () => {
-          // When user marks something as read, refresh count
+          // If read status is removed, refresh count
           fetchUnreadCount();
         }
       )
