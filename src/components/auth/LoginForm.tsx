@@ -62,16 +62,10 @@ const LoginForm = () => {
         return;
       }
     } else {
-      // Validate company code exists with improved matching
+      // Validate company code exists using the secure function
       try {
-        // Normalize the company code for comparison
-        const normalizedCode = formData.accessCode.trim().toUpperCase();
-        
-        const { data: company, error: companyError } = await supabase
-          .from('companies')
-          .select('id, code')
-          .ilike('code', normalizedCode)
-          .maybeSingle();
+        const { data: isValidCode, error: companyError } = await supabase
+          .rpc('validate_company_code', { company_code: formData.accessCode });
 
         if (companyError) {
           console.error('Company validation error:', companyError);
@@ -83,7 +77,7 @@ const LoginForm = () => {
           return;
         }
 
-        if (!company) {
+        if (!isValidCode) {
           toast({
             title: "Error",
             description: "Invalid company code. Please check with your company administrator.",
@@ -148,11 +142,11 @@ const LoginForm = () => {
         return;
       }
 
-      // For client users, validate company association with improved matching
+      // For client users, validate company association
       if (formData.userType === "client") {
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
-          .select('company_code')
+          .select('company_code, company_id')
           .eq('id', data.user.id)
           .maybeSingle();
 
@@ -167,11 +161,46 @@ const LoginForm = () => {
           return;
         }
 
-        // Normalize both codes for comparison
-        const normalizedAccessCode = formData.accessCode.trim().toUpperCase();
-        const normalizedProfileCode = profile?.company_code?.trim().toUpperCase();
+        if (!profile) {
+          await supabase.auth.signOut();
+          toast({
+            title: "Access Denied",
+            description: "User profile not found. Please contact your administrator.",
+            variant: "destructive",
+          });
+          return;
+        }
 
-        if (!profile || normalizedProfileCode !== normalizedAccessCode) {
+        // Check if the provided company code matches any company that this user should have access to
+        const { data: validCompany, error: companyCheckError } = await supabase
+          .from('companies')
+          .select('id, code')
+          .or(`code.ilike.${formData.accessCode.trim()},id.eq.${profile.company_id}`)
+          .maybeSingle();
+
+        if (companyCheckError || !validCompany) {
+          console.error("Company check error:", companyCheckError);
+          await supabase.auth.signOut();
+          toast({
+            title: "Access Denied",
+            description: "Your account is not associated with the provided company code. Please contact your administrator.",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        // Normalize codes for comparison
+        const normalizedAccessCode = formData.accessCode.trim().toUpperCase();
+        const normalizedCompanyCode = validCompany.code.trim().toUpperCase();
+        const normalizedProfileCode = profile.company_code?.trim().toUpperCase();
+
+        // User can access if either:
+        // 1. Their profile company_code matches the entered code, OR
+        // 2. Their company_id matches a company with the entered code
+        const hasAccess = normalizedProfileCode === normalizedAccessCode || 
+                         normalizedCompanyCode === normalizedAccessCode;
+
+        if (!hasAccess) {
           await supabase.auth.signOut();
           toast({
             title: "Access Denied",
