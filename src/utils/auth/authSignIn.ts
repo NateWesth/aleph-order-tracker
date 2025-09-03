@@ -30,16 +30,16 @@ export const validateUserRole = (actualRole: 'admin' | 'user', expectedUserType:
     throw new Error("Access denied. Admin privileges required.");
   }
   
-  if (expectedUserType === "client" && actualRole === "admin") {
-    throw new Error("Admin users cannot log in as clients. Please use the admin login.");
+  if (expectedUserType === "user" && actualRole === "admin") {
+    throw new Error("Admin users cannot log in as regular users. Please use the admin login.");
   }
   
   console.log("Role validation passed");
 };
 
 export const validateCompanyAssociation = async (userId: string, accessCode: string, userType: string) => {
-  if (userType !== "client") {
-    return; // Only validate for client users
+  if (userType !== "user") {
+    return; // Only validate for regular users
   }
   
   console.log("Validating company association for user:", userId, "with code:", accessCode);
