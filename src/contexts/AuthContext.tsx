@@ -26,14 +26,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Clear any corrupted session data on app start
-    const clearCorruptedSession = async () => {
+    // Set up auth state listener FIRST to avoid missing events
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      setLoading(false);
+    });
+
+    // THEN check for existing session and clear any corrupted data
+    const init = async () => {
       try {
-        // Get initial session
         const { data: { session }, error } = await supabase.auth.getSession();
         
-        if (error?.message.includes('Invalid Refresh Token')) {
-          // Clear corrupted session
+        if (error?.message?.includes('Invalid Refresh Token')) {
           await supabase.auth.signOut();
           setSession(null);
           setUser(null);
@@ -43,7 +48,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       } catch (error) {
         console.error('Error getting session:', error);
-        // Clear any corrupted data
         await supabase.auth.signOut();
         setSession(null);
         setUser(null);
@@ -52,16 +56,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     };
 
-    clearCorruptedSession();
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        setLoading(false);
-      }
-    );
+    init();
 
     return () => subscription.unsubscribe();
   }, []);

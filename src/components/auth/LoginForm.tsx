@@ -17,7 +17,7 @@ const LoginForm = () => {
   const [formData, setFormData] = useState({
     email: "",
     password: "",
-    userType: "client",
+    userType: "user",
     accessCode: ""
   });
 
@@ -132,7 +132,7 @@ const LoginForm = () => {
         return;
       }
 
-      if (formData.userType === "client" && userRole === "admin") {
+      if (formData.userType === "user" && userRole === "admin") {
         await supabase.auth.signOut();
         toast({
           title: "Access Denied",
@@ -143,7 +143,7 @@ const LoginForm = () => {
       }
 
       // For client users, validate company association
-      if (formData.userType === "client") {
+      if (formData.userType === "user") {
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('company_code, company_id')
@@ -284,8 +284,8 @@ const LoginForm = () => {
           className="flex flex-col space-y-2"
         >
           <div className="flex items-center space-x-2">
-            <RadioGroupItem value="client" id="client" />
-            <Label htmlFor="client" className="cursor-pointer">Client User</Label>
+            <RadioGroupItem value="user" id="user" />
+            <Label htmlFor="user" className="cursor-pointer">Client User</Label>
           </div>
           <div className="flex items-center space-x-2">
             <RadioGroupItem value="admin" id="admin" />

@@ -164,7 +164,7 @@ const RegisterForm = () => {
         email: formData.email,
         password: formData.password,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth`,
+          emailRedirectTo: `${window.location.origin}/`,
           data: {
             full_name: formData.fullName,
             company_code: formData.userType === "user" ? formData.companyCode.trim().toUpperCase() : null,
