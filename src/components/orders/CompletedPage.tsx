@@ -298,27 +298,37 @@ export default function CompletedPage({
     }
   }, [user?.id, userRole, userCompanyId]);
 
-  // Group orders by order creation month (not completion month)
+  // Group orders by order creation month (not completion month) using UTC to avoid TZ shifts
   useEffect(() => {
-    const filteredOrders = orders.filter(order => order.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) || order.companyName.toLowerCase().includes(searchTerm.toLowerCase()));
+    const filteredOrders = orders.filter(order =>
+      order.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      order.companyName.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    // Key by YYYY-MM (UTC) to ensure correct month grouping regardless of local timezone
     const monthMap = new Map<string, Order[]>();
     filteredOrders.forEach(order => {
-      // Use order creation date for grouping, not completion date
-      const monthKey = format(order.orderDate, 'MMMM yyyy');
-      if (!monthMap.has(monthKey)) {
-        monthMap.set(monthKey, []);
-      }
-      monthMap.get(monthKey)!.push(order);
+      const y = order.orderDate.getUTCFullYear();
+      const m = order.orderDate.getUTCMonth(); // 0-11
+      const key = `${y}-${String(m + 1).padStart(2, '0')}`;
+      if (!monthMap.has(key)) monthMap.set(key, []);
+      monthMap.get(key)!.push(order);
     });
-    const groups: MonthGroup[] = Array.from(monthMap.entries()).map(([month, orders]) => ({
-      month,
-      orders: orders.sort((a, b) => b.orderDate.getTime() - a.orderDate.getTime()), // Descending order (newest first)
-      isOpen: true
-    })).sort((a, b) => {
-      const dateA = new Date(a.month);
-      const dateB = new Date(b.month);
-      return dateB.getTime() - dateA.getTime();
-    });
+
+    const groups: MonthGroup[] = Array.from(monthMap.entries())
+      // Sort months descending (newest first) using the YYYY-MM key
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .map(([key, groupedOrders]) => {
+        const [yy, mm] = key.split('-');
+        const monthDate = new Date(Date.UTC(Number(yy), Number(mm) - 1, 1));
+        return {
+          month: format(monthDate, 'MMMM yyyy'),
+          // Within each month sort by creation date descending (newest first)
+          orders: groupedOrders.sort((a, b) => b.orderDate.getTime() - a.orderDate.getTime()),
+          isOpen: true,
+        } as MonthGroup;
+      });
+
     setMonthGroups(groups);
   }, [orders, searchTerm]);
 
