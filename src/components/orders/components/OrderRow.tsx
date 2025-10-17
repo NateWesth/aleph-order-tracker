@@ -198,6 +198,7 @@ export default function OrderRow({
           open={showDetails}
           onOpenChange={setShowDetails}
           order={order}
+          isAdmin={isAdmin}
         />
       </>
     );
@@ -283,6 +284,7 @@ export default function OrderRow({
         open={showDetails}
         onOpenChange={setShowDetails}
         order={order}
+        isAdmin={isAdmin}
       />
     </>
   );

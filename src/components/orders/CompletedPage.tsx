@@ -601,7 +601,8 @@ export default function CompletedPage({
       {selectedOrder && <OrderDetailsDialog 
         open={showOrderDetails} 
         onOpenChange={closeOrderDetails} 
-        order={selectedOrder} 
+        order={selectedOrder}
+        isAdmin={isAdmin}
       />}
 
       <CompletedOrderEditDialog 

@@ -14,6 +14,6 @@ export interface OrderWithCompany {
   user_id?: string;
   progress_stage?: string;
   urgency?: string;
-  items?: Array<{id: string, name: string, quantity: number, notes?: string}>;
+  items?: Array<{id: string, name: string, quantity: number, unit?: string, notes?: string}>;
   companyName: string;
 }

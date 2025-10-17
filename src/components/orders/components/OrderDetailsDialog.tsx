@@ -1,24 +1,46 @@
-
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { OrderWithCompany } from "../types/orderTypes";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { Plus, Trash2, Edit2, X } from "lucide-react";
+
+interface OrderItem {
+  id: string;
+  name: string;
+  quantity: number;
+  unit?: string;
+  notes?: string;
+}
 
 interface OrderDetailsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   order: OrderWithCompany;
+  isAdmin?: boolean;
+  onSave?: () => void;
 }
 
 export default function OrderDetailsDialog({
   open,
   onOpenChange,
-  order
+  order,
+  isAdmin = false,
+  onSave
 }: OrderDetailsDialogProps) {
+  const { toast } = useToast();
+  const [isEditing, setIsEditing] = useState(false);
+  const [editableItems, setEditableItems] = useState<OrderItem[]>([]);
+  const [loading, setLoading] = useState(false);
   const getStatusColor = (status: string | null) => {
     switch (status?.toLowerCase()) {
       case 'completed':
@@ -96,15 +118,116 @@ export default function OrderDetailsDialog({
     };
   };
 
+  // Initialize editable items when entering edit mode
+  useEffect(() => {
+    if (isEditing && order.items) {
+      setEditableItems(order.items.map((item, idx) => ({
+        id: item.id || `item-${idx}`,
+        name: item.name,
+        quantity: item.quantity,
+        unit: item.unit,
+        notes: item.notes
+      })));
+    }
+  }, [isEditing, order.items]);
+
+  const addItem = () => {
+    const newItem: OrderItem = {
+      id: `item-${Date.now()}`,
+      name: '',
+      quantity: 1,
+      unit: 'pcs',
+      notes: ''
+    };
+    setEditableItems(prev => [...prev, newItem]);
+  };
+
+  const removeItem = (itemId: string) => {
+    setEditableItems(prev => prev.filter(item => item.id !== itemId));
+  };
+
+  const updateItemField = (itemId: string, field: keyof OrderItem, value: any) => {
+    setEditableItems(prev =>
+      prev.map(item =>
+        item.id === itemId ? { ...item, [field]: value } : item
+      )
+    );
+  };
+
+  const handleSave = async () => {
+    // Validate items
+    const validItems = editableItems.filter(item => item.name.trim() !== '');
+    if (validItems.length === 0) {
+      toast({
+        title: "Error",
+        description: "Please add at least one item with a name.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Convert items to description format for storage
+      const description = validItems.map(item => 
+        `${item.name.trim()} (Qty: ${item.quantity})`
+      ).join('\n');
+
+      const { error } = await supabase
+        .from('orders')
+        .update({
+          description,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', order.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Order items updated successfully.",
+      });
+      
+      setIsEditing(false);
+      if (onSave) onSave();
+    } catch (error: any) {
+      console.error("Error updating order:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update order items: " + error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCancel = () => {
+    setIsEditing(false);
+    setEditableItems([]);
+  };
+
   // Use structured items directly
-  const displayItems = order.items || [];
+  const displayItems = isEditing ? editableItems : (order.items || []);
 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Order Details - {order.order_number}</DialogTitle>
+          <div className="flex items-center justify-between">
+            <DialogTitle>Order Details - {order.order_number}</DialogTitle>
+            {isAdmin && !isEditing && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsEditing(true)}
+              >
+                <Edit2 className="h-4 w-4 mr-2" />
+                Edit Items
+              </Button>
+            )}
+          </div>
         </DialogHeader>
         
         <div className="space-y-6">
@@ -141,11 +264,63 @@ export default function OrderDetailsDialog({
           )}
           
           <div>
-            <h3 className="font-medium mb-4 text-lg">Order Items</h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-medium text-lg">Order Items</h3>
+              {isEditing && (
+                <Button type="button" variant="outline" size="sm" onClick={addItem}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Item
+                </Button>
+              )}
+            </div>
             
             {displayItems.length === 0 ? (
               <div className="text-center p-8 border rounded-md border-dashed">
-                <p className="text-gray-500">No items found in this order.</p>
+                <p className="text-gray-500">
+                  {isEditing ? 'No items. Click "Add Item" to create one.' : 'No items found in this order.'}
+                </p>
+              </div>
+            ) : isEditing ? (
+              <div className="space-y-3">
+                {displayItems.map((item) => (
+                  <div key={item.id} className="flex items-start gap-3 p-3 border rounded-lg">
+                    <div className="flex-1 space-y-2">
+                      <Input
+                        placeholder="Item name"
+                        value={item.name}
+                        onChange={(e) => updateItemField(item.id, 'name', e.target.value)}
+                      />
+                      <Input
+                        placeholder="Notes (optional)"
+                        value={item.notes || ''}
+                        onChange={(e) => updateItemField(item.id, 'notes', e.target.value)}
+                      />
+                    </div>
+                    <Input
+                      type="number"
+                      placeholder="Qty"
+                      value={item.quantity}
+                      onChange={(e) => updateItemField(item.id, 'quantity', Math.max(1, parseInt(e.target.value) || 1))}
+                      min="1"
+                      className="w-24"
+                    />
+                    <Input
+                      placeholder="Unit"
+                      value={item.unit || 'pcs'}
+                      onChange={(e) => updateItemField(item.id, 'unit', e.target.value)}
+                      className="w-24"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={() => removeItem(item.id)}
+                      className="text-red-600 hover:text-red-700 shrink-0"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
               </div>
             ) : (
               <div className="border rounded-lg divide-y">
@@ -187,6 +362,25 @@ export default function OrderDetailsDialog({
             )}
           </div>
         </div>
+
+        {isEditing && (
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={handleCancel}
+              disabled={loading}
+            >
+              <X className="h-4 w-4 mr-2" />
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSave}
+              disabled={loading}
+            >
+              {loading ? "Saving..." : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        )}
       </DialogContent>
     </Dialog>
   );
