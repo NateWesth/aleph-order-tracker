@@ -312,7 +312,7 @@ export default function CompletedPage({
     });
     const groups: MonthGroup[] = Array.from(monthMap.entries()).map(([month, orders]) => ({
       month,
-      orders: orders.sort((a, b) => a.orderNumber.localeCompare(b.orderNumber, undefined, { numeric: true })),
+      orders: orders.sort((a, b) => b.orderDate.getTime() - a.orderDate.getTime()), // Descending order (newest first)
       isOpen: true
     })).sort((a, b) => {
       const dateA = new Date(a.month);
