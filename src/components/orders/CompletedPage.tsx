@@ -298,13 +298,13 @@ export default function CompletedPage({
     }
   }, [user?.id, userRole, userCompanyId]);
 
-  // Group orders by completion month
+  // Group orders by order creation month (not completion month)
   useEffect(() => {
     const filteredOrders = orders.filter(order => order.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) || order.companyName.toLowerCase().includes(searchTerm.toLowerCase()));
     const monthMap = new Map<string, Order[]>();
     filteredOrders.forEach(order => {
-      const completionDate = order.completedDate || order.orderDate;
-      const monthKey = format(completionDate, 'MMMM yyyy');
+      // Use order creation date for grouping, not completion date
+      const monthKey = format(order.orderDate, 'MMMM yyyy');
       if (!monthMap.has(monthKey)) {
         monthMap.set(monthKey, []);
       }
