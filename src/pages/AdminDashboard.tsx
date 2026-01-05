@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Package, History, BarChart3, Settings, LogOut, Building2, Home, Search, Users } from "lucide-react";
+import { Package, History, BarChart3, Settings, LogOut, Building2, Home, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import OrdersPage from "@/components/orders/OrdersPage";
 import CompletedPage from "@/components/orders/CompletedPage";
@@ -60,6 +60,7 @@ const AdminDashboard = () => {
   const navItems = [
     { id: "orders", label: "Orders", icon: Package },
     { id: "history", label: "Order History", icon: History },
+    { id: "clients", label: "Clients", icon: Building2 },
     { id: "stats", label: "Stats", icon: BarChart3 },
   ];
 
@@ -101,15 +102,7 @@ const AdminDashboard = () => {
             </div>
 
             {/* Right side actions */}
-            <div className="flex items-center gap-1">
-              <Button
-                variant={activeView === "clients" ? "default" : "ghost"}
-                size="icon"
-                onClick={() => setActiveView("clients")}
-                title="Clients"
-              >
-                <Users className="h-4 w-4" />
-              </Button>
+            <div className="flex items-center gap-2">
               <Button
                 variant="ghost"
                 size="icon"
