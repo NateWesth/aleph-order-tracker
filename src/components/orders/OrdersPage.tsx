@@ -147,6 +147,7 @@ export default function OrdersPage({
     companyId: string;
     totalAmount: number;
     urgency: string;
+    initialStatus: string;
     notes?: string;
     items: any[];
   }) => {
@@ -177,7 +178,7 @@ export default function OrdersPage({
         company_id: orderData.companyId,
         total_amount: orderData.totalAmount || 0,
         user_id: user.id,
-        status: "ordered",
+        status: orderData.initialStatus,
         urgency: orderData.urgency,
       });
 
