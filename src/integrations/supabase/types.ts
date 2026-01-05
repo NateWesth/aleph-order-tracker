@@ -14,21 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      admin_access_codes: {
-        Row: {
-          access_code: string
-          id: number
-        }
-        Insert: {
-          access_code: string
-          id?: never
-        }
-        Update: {
-          access_code?: string
-          id?: never
-        }
-        Relationships: []
-      }
       companies: {
         Row: {
           account_manager: string | null
@@ -236,6 +221,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          approved: boolean | null
           company_code: string | null
           company_id: string | null
           created_at: string | null
@@ -247,6 +233,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          approved?: boolean | null
           company_code?: string | null
           company_id?: string | null
           created_at?: string | null
@@ -258,6 +245,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          approved?: boolean | null
           company_code?: string | null
           company_id?: string | null
           created_at?: string | null
@@ -325,6 +313,7 @@ export type Database = {
         Returns: Database["public"]["Enums"]["app_role"]
       }
       is_admin: { Args: never; Returns: boolean }
+      is_user_approved: { Args: { user_uuid: string }; Returns: boolean }
       mark_order_update_as_read: {
         Args: { update_id: string; user_uuid: string }
         Returns: undefined
