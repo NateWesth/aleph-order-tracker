@@ -2,14 +2,13 @@
 import { TableCell, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { FileText, Eye, MoreHorizontal } from "lucide-react";
+import { Eye, MoreHorizontal } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import OrderExportActions from "./OrderExportActions";
 import { OrderUpdatesButton } from "./OrderUpdatesButton";
 import { useState } from "react";
 import OrderDetailsDialog from "./OrderDetailsDialog";
 import { OrderWithCompany } from "../types/orderTypes";
-import { useNavigate } from "react-router-dom";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 interface OrderRowProps {
@@ -30,7 +29,6 @@ export default function OrderRow({
   compact = false
 }: OrderRowProps) {
   const [showDetails, setShowDetails] = useState(false);
-  const navigate = useNavigate();
   const isMobile = useIsMobile();
 
   const getStatusColor = (status: string | null) => {
@@ -68,49 +66,8 @@ export default function OrderRow({
       return;
     }
 
-    if (onOrderClick) {
-      onOrderClick(order);
-      return;
-    }
-
-    // Navigate based on order status if admin
-    if (isAdmin) {
-      const status = order.status?.toLowerCase();
-      switch (status) {
-        case 'ordered':
-        case 'pending':
-          navigate('/admin-dashboard');
-          setTimeout(() => {
-            const event = new CustomEvent('setActiveView', { detail: 'orders' });
-            window.dispatchEvent(event);
-          }, 100);
-          break;
-        case 'in-stock':
-        case 'received':
-        case 'in-progress':
-        case 'processing':
-          navigate('/admin-dashboard');
-          setTimeout(() => {
-            const event = new CustomEvent('setActiveView', { detail: 'progress' });
-            window.dispatchEvent(event);
-          }, 100);
-          break;
-        case 'delivered':
-        case 'completed':
-          navigate('/admin-dashboard');
-          setTimeout(() => {
-            const event = new CustomEvent('setActiveView', { detail: 'completed' });
-            window.dispatchEvent(event);
-          }, 100);
-          break;
-        default:
-          navigate('/admin-dashboard');
-          setTimeout(() => {
-            const event = new CustomEvent('setActiveView', { detail: 'orders' });
-            window.dispatchEvent(event);
-          }, 100);
-      }
-    }
+    // Show details dialog when clicking on any order
+    setShowDetails(true);
   };
 
   if (isMobile) {

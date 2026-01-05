@@ -40,7 +40,47 @@ export default function OrderDetailsDialog({
   const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
   const [editableItems, setEditableItems] = useState<OrderItem[]>([]);
+  const [fetchedItems, setFetchedItems] = useState<OrderItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [fetchingItems, setFetchingItems] = useState(false);
+
+  // Fetch order items from database when dialog opens
+  useEffect(() => {
+    const fetchOrderItems = async () => {
+      if (!open || !order?.id) return;
+      
+      setFetchingItems(true);
+      try {
+        const { data, error } = await supabase
+          .from('order_items')
+          .select('*')
+          .eq('order_id', order.id)
+          .order('created_at', { ascending: true });
+
+        if (error) throw error;
+
+        if (data && data.length > 0) {
+          setFetchedItems(data.map(item => ({
+            id: item.id,
+            name: item.name,
+            quantity: item.quantity,
+            unit: 'pcs',
+            notes: item.notes || ''
+          })));
+        } else {
+          // Fallback to parsing description if no order_items exist
+          setFetchedItems(order.items || []);
+        }
+      } catch (error) {
+        console.error('Error fetching order items:', error);
+        setFetchedItems(order.items || []);
+      } finally {
+        setFetchingItems(false);
+      }
+    };
+
+    fetchOrderItems();
+  }, [open, order?.id]);
   const getStatusColor = (status: string | null) => {
     switch (status?.toLowerCase()) {
       case 'completed':
@@ -120,8 +160,9 @@ export default function OrderDetailsDialog({
 
   // Initialize editable items when entering edit mode
   useEffect(() => {
-    if (isEditing && order.items) {
-      setEditableItems(order.items.map((item, idx) => ({
+    if (isEditing) {
+      const itemsToEdit = fetchedItems.length > 0 ? fetchedItems : (order.items || []);
+      setEditableItems(itemsToEdit.map((item, idx) => ({
         id: item.id || `item-${idx}`,
         name: item.name,
         quantity: item.quantity,
@@ -129,7 +170,7 @@ export default function OrderDetailsDialog({
         notes: item.notes
       })));
     }
-  }, [isEditing, order.items]);
+  }, [isEditing, fetchedItems, order.items]);
 
   const addItem = () => {
     const newItem: OrderItem = {
@@ -207,8 +248,8 @@ export default function OrderDetailsDialog({
     setEditableItems([]);
   };
 
-  // Use structured items directly
-  const displayItems = isEditing ? editableItems : (order.items || []);
+  // Use fetched items from database, fallback to order.items
+  const displayItems = isEditing ? editableItems : (fetchedItems.length > 0 ? fetchedItems : (order.items || []));
 
 
   return (
