@@ -18,5 +18,7 @@ export default defineConfig(({ mode }) => ({
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
+    // Ensure a single React instance (fixes "hooks dispatcher is null" / useEffect null errors)
+    dedupe: ["react", "react-dom"],
   },
 }));
