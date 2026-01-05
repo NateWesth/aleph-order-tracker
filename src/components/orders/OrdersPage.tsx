@@ -1,9 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Plus, Package, Trash2, Check, Filter } from "lucide-react";
+import { Plus, Filter } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -11,17 +9,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
 import {
   Select,
   SelectContent,
@@ -34,6 +21,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useGlobalRealtimeOrders } from "./hooks/useGlobalRealtimeOrders";
 import { useCompanyData } from "@/components/admin/hooks/useCompanyData";
 import OrderForm from "./components/OrderForm";
+import OrderStatusColumn from "./components/OrderStatusColumn";
 
 interface OrdersPageProps {
   isAdmin?: boolean;
@@ -45,14 +33,57 @@ interface Order {
   order_number: string;
   description: string | null;
   status: string | null;
+  urgency: string | null;
   company_id: string | null;
   created_at: string | null;
   companyName?: string;
 }
 
+// Status column configurations
+const STATUS_COLUMNS = [
+  {
+    key: "ordered",
+    label: "Ordered",
+    color: "text-amber-700",
+    bgColor: "bg-amber-100",
+    nextStatus: "in-stock",
+    nextLabel: "In Stock",
+  },
+  {
+    key: "in-stock",
+    label: "In Stock",
+    color: "text-blue-700",
+    bgColor: "bg-blue-100",
+    nextStatus: "in-progress",
+    nextLabel: "Start Progress",
+  },
+  {
+    key: "in-progress",
+    label: "In Progress",
+    color: "text-purple-700",
+    bgColor: "bg-purple-100",
+    nextStatus: "ready",
+    nextLabel: "Mark Ready",
+  },
+  {
+    key: "ready",
+    label: "Ready",
+    color: "text-emerald-700",
+    bgColor: "bg-emerald-100",
+    nextStatus: "delivered",
+    nextLabel: "Complete",
+  },
+  {
+    key: "delivered",
+    label: "Completed",
+    color: "text-slate-700",
+    bgColor: "bg-slate-100",
+  },
+];
+
 export default function OrdersPage({
   isAdmin = false,
-  searchTerm = ""
+  searchTerm = "",
 }: OrdersPageProps) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -65,30 +96,30 @@ export default function OrdersPage({
 
   const fetchOrders = async () => {
     try {
-      // Fetch orders that are NOT delivered (open orders)
       const { data, error } = await supabase
         .from("orders")
-        .select("id, order_number, description, status, company_id, created_at")
-        .neq("status", "delivered")
+        .select("id, order_number, description, status, urgency, company_id, created_at")
         .order("created_at", { ascending: false });
 
       if (error) throw error;
 
       // Fetch company names
-      const companyIds = [...new Set(data?.map(o => o.company_id).filter(Boolean))];
+      const companyIds = [...new Set(data?.map((o) => o.company_id).filter(Boolean))];
       let companyMap = new Map<string, string>();
-      
+
       if (companyIds.length > 0) {
         const { data: companiesData } = await supabase
           .from("companies")
           .select("id, name")
           .in("id", companyIds);
-        companyMap = new Map(companiesData?.map(c => [c.id, c.name]) || []);
+        companyMap = new Map(companiesData?.map((c) => [c.id, c.name]) || []);
       }
 
-      const ordersWithCompanies = (data || []).map(order => ({
+      const ordersWithCompanies = (data || []).map((order) => ({
         ...order,
-        companyName: order.company_id ? companyMap.get(order.company_id) || "Unknown" : "No Client"
+        companyName: order.company_id
+          ? companyMap.get(order.company_id) || "Unknown"
+          : "No Client",
       }));
 
       setOrders(ordersWithCompanies);
@@ -97,7 +128,7 @@ export default function OrdersPage({
       toast({
         title: "Error",
         description: "Failed to load orders",
-        variant: "destructive"
+        variant: "destructive",
       });
     } finally {
       setLoading(false);
@@ -111,7 +142,7 @@ export default function OrdersPage({
   useGlobalRealtimeOrders({
     onOrdersChange: fetchOrders,
     isAdmin,
-    pageType: "orders"
+    pageType: "orders",
   });
 
   const handleCreateOrder = async (orderData: {
@@ -127,7 +158,7 @@ export default function OrdersPage({
       toast({
         title: "Error",
         description: "Please log in to create orders",
-        variant: "destructive"
+        variant: "destructive",
       });
       return;
     }
@@ -135,8 +166,11 @@ export default function OrdersPage({
     setSubmitting(true);
     try {
       const itemsDescription = orderData.items
-        .filter(item => item.name && item.quantity > 0)
-        .map(item => `${item.name} (Qty: ${item.quantity})${item.notes ? ` - ${item.notes}` : ""}`)
+        .filter((item) => item.name && item.quantity > 0)
+        .map(
+          (item) =>
+            `${item.name} (Qty: ${item.quantity})${item.notes ? ` - ${item.notes}` : ""}`
+        )
         .join("\n");
 
       const { error } = await supabase.from("orders").insert({
@@ -148,14 +182,14 @@ export default function OrdersPage({
         total_amount: orderData.totalAmount || 0,
         user_id: user.id,
         status: "ordered",
-        urgency: orderData.urgency
+        urgency: orderData.urgency,
       });
 
       if (error) throw error;
 
       toast({
         title: "Order Created",
-        description: `Order ${orderData.orderNumber} has been created.`
+        description: `Order ${orderData.orderNumber} has been created.`,
       });
       setCreateDialogOpen(false);
       fetchOrders();
@@ -163,76 +197,78 @@ export default function OrdersPage({
       toast({
         title: "Error",
         description: error.message || "Failed to create order",
-        variant: "destructive"
+        variant: "destructive",
       });
     } finally {
       setSubmitting(false);
     }
   };
 
-  const markAsInStock = async (order: Order) => {
+  const handleMoveOrder = async (order: Order, newStatus: string) => {
     try {
+      const updateData: any = {
+        status: newStatus,
+        updated_at: new Date().toISOString(),
+      };
+
+      // Set completed_date when marking as delivered
+      if (newStatus === "delivered") {
+        updateData.completed_date = new Date().toISOString();
+      }
+
       const { error } = await supabase
         .from("orders")
-        .update({ status: "in-stock", updated_at: new Date().toISOString() })
+        .update(updateData)
         .eq("id", order.id);
 
       if (error) throw error;
 
       toast({
         title: "Updated",
-        description: `Order ${order.order_number} marked as in-stock`
+        description: `Order ${order.order_number} moved to ${newStatus}`,
       });
       fetchOrders();
     } catch (error) {
       toast({
         title: "Error",
         description: "Failed to update order",
-        variant: "destructive"
+        variant: "destructive",
       });
     }
   };
 
-  const deleteOrder = async (order: Order) => {
+  const handleDeleteOrder = async (order: Order) => {
     try {
       const { error } = await supabase.from("orders").delete().eq("id", order.id);
       if (error) throw error;
 
       toast({
         title: "Deleted",
-        description: `Order ${order.order_number} has been deleted`
+        description: `Order ${order.order_number} has been deleted`,
       });
       fetchOrders();
     } catch (error) {
       toast({
         title: "Error",
         description: "Failed to delete order",
-        variant: "destructive"
+        variant: "destructive",
       });
     }
   };
 
-  const filteredOrders = orders.filter(order => {
-    // Filter by company
-    const matchesCompany = selectedCompanyId === "all" || order.company_id === selectedCompanyId;
-    
-    // Filter by search term
-    const matchesSearch = 
+  // Filter orders by company and search term
+  const filteredOrders = orders.filter((order) => {
+    const matchesCompany =
+      selectedCompanyId === "all" || order.company_id === selectedCompanyId;
+    const matchesSearch =
       order.order_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
       order.companyName?.toLowerCase().includes(searchTerm.toLowerCase());
-    
     return matchesCompany && matchesSearch;
   });
 
-  const getStatusColor = (status: string | null) => {
-    switch (status) {
-      case "ordered":
-        return "bg-amber-100 text-amber-800";
-      case "in-stock":
-        return "bg-emerald-100 text-emerald-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
+  // Group orders by status
+  const getOrdersByStatus = (status: string) => {
+    return filteredOrders.filter((order) => order.status === status);
   };
 
   if (loading) {
@@ -244,16 +280,20 @@ export default function OrdersPage({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-2xl font-semibold text-foreground">Open Orders</h2>
+          <h2 className="text-2xl font-semibold text-foreground">Orders Board</h2>
           <p className="text-sm text-muted-foreground">
             {filteredOrders.length} order{filteredOrders.length !== 1 ? "s" : ""}
-            {selectedCompanyId !== "all" && companies.find(c => c.id === selectedCompanyId) && (
-              <span> for {companies.find(c => c.id === selectedCompanyId)?.name}</span>
-            )}
+            {selectedCompanyId !== "all" &&
+              companies.find((c) => c.id === selectedCompanyId) && (
+                <span>
+                  {" "}
+                  for {companies.find((c) => c.id === selectedCompanyId)?.name}
+                </span>
+              )}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -274,7 +314,7 @@ export default function OrdersPage({
               </SelectContent>
             </Select>
           </div>
-          
+
           <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
             <DialogTrigger asChild>
               <Button>
@@ -292,77 +332,20 @@ export default function OrdersPage({
         </div>
       </div>
 
-      {/* Orders List */}
-      {filteredOrders.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <Package className="h-12 w-12 text-muted-foreground mb-4" />
-            <p className="text-muted-foreground">No open orders</p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="space-y-3">
-          {filteredOrders.map((order) => (
-            <Card key={order.id} className="hover:shadow-md transition-shadow">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-3 mb-1">
-                      <span className="font-semibold text-foreground">
-                        {order.order_number}
-                      </span>
-                      <Badge className={getStatusColor(order.status)}>
-                        {order.status || "pending"}
-                      </Badge>
-                    </div>
-                    <p className="text-sm text-muted-foreground truncate">
-                      {order.companyName}
-                    </p>
-                    {order.description && (
-                      <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                        {order.description}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 ml-4">
-                    {order.status === "ordered" && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => markAsInStock(order)}
-                      >
-                        <Check className="h-4 w-4 mr-1" />
-                        In Stock
-                      </Button>
-                    )}
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Delete Order?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            This will permanently delete order {order.order_number}.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => deleteOrder(order)}>
-                            Delete
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+      {/* Kanban Board */}
+      <div className="overflow-x-auto pb-4">
+        <div className="flex gap-4 min-w-max">
+          {STATUS_COLUMNS.map((column) => (
+            <OrderStatusColumn
+              key={column.key}
+              config={column}
+              orders={getOrdersByStatus(column.key)}
+              onMoveOrder={handleMoveOrder}
+              onDeleteOrder={handleDeleteOrder}
+            />
           ))}
         </div>
-      )}
+      </div>
     </div>
   );
 }
