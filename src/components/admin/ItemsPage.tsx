@@ -32,6 +32,14 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { Plus, Search, Pencil, Trash2, Package, Upload, Loader2 } from "lucide-react";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 import { toast } from "sonner";
 
 interface Item {
@@ -68,15 +76,33 @@ const ItemsPage = () => {
   const [importProgress, setImportProgress] = useState(0);
   const [importTotal, setImportTotal] = useState(0);
 
-  const fetchItems = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("items")
-        .select("*")
-        .order("name");
+  const PAGE_SIZE = 50;
+  const [page, setPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
 
+  const fetchItems = async (opts?: { page?: number; q?: string }) => {
+    const nextPage = opts?.page ?? page;
+    const q = (opts?.q ?? searchTerm).trim();
+
+    try {
+      setLoading(true);
+
+      let query = supabase
+        .from("items")
+        .select("*", { count: "exact" })
+        .order("name")
+        .range((nextPage - 1) * PAGE_SIZE, nextPage * PAGE_SIZE - 1);
+
+      if (q) {
+        query = query.or(`name.ilike.%${q}%,code.ilike.%${q}%`);
+      }
+
+      const { data, error, count } = await query;
       if (error) throw error;
+
       setItems(data || []);
+      setTotalCount(count || 0);
+      setPage(nextPage);
     } catch (error) {
       console.error("Error fetching items:", error);
       toast.error("Failed to load items");
@@ -86,10 +112,17 @@ const ItemsPage = () => {
   };
 
   useEffect(() => {
-    fetchItems();
+    fetchItems({ page: 1 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Import items from CSV
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      fetchItems({ page: 1, q: searchTerm });
+    }, 250);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchTerm]);
   const handleImportCSV = async () => {
     setImporting(true);
     setImportProgress(0);
@@ -172,7 +205,7 @@ const ItemsPage = () => {
       }
       
       toast.success(`Imported ${itemsToImport.length} items successfully`);
-      fetchItems();
+      fetchItems({ page: 1 });
     } catch (error: any) {
       console.error('Import error:', error);
       toast.error(error.message || 'Failed to import items');
@@ -238,7 +271,7 @@ const ItemsPage = () => {
       }
 
       setDialogOpen(false);
-      fetchItems();
+      fetchItems({ page });
     } catch (error: any) {
       console.error("Error saving item:", error);
       toast.error(error.message || "Failed to save item");
@@ -259,18 +292,18 @@ const ItemsPage = () => {
       if (error) throw error;
       toast.success("Item deleted");
       setDeleteDialogOpen(false);
-      fetchItems();
+      fetchItems({ page });
     } catch (error: any) {
       console.error("Error deleting item:", error);
       toast.error(error.message || "Failed to delete item");
     }
   };
 
-  const filteredItems = items.filter(
-    (item) =>
-      item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.code.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+  const rangeStart = totalCount === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const rangeEnd = Math.min(page * PAGE_SIZE, totalCount);
+  const canPrev = page > 1;
+  const canNext = page < totalPages;
 
   if (loading) {
     return (
@@ -323,6 +356,10 @@ const ItemsPage = () => {
         </div>
       </div>
 
+      <div className="text-sm text-muted-foreground">
+        Showing {rangeStart}-{rangeEnd} of {totalCount}
+      </div>
+
       {/* Table */}
       <Card>
         <CardContent className="p-0">
@@ -337,7 +374,7 @@ const ItemsPage = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredItems.length === 0 ? (
+              {items.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                     <Package className="h-8 w-8 mx-auto mb-2 opacity-50" />
@@ -345,7 +382,7 @@ const ItemsPage = () => {
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredItems.map((item) => (
+                items.map((item) => (
                   <TableRow key={item.id}>
                     <TableCell className="font-mono text-xs font-medium">
                       {item.code}
@@ -384,6 +421,40 @@ const ItemsPage = () => {
           </Table>
         </CardContent>
       </Card>
+
+      {totalPages > 1 && (
+        <Pagination className="justify-end">
+          <PaginationContent>
+            <PaginationItem>
+              <PaginationPrevious
+                href="#"
+                className={!canPrev ? "pointer-events-none opacity-50" : ""}
+                onClick={(e) => {
+                  e.preventDefault();
+                  if (!canPrev) return;
+                  fetchItems({ page: page - 1 });
+                }}
+              />
+            </PaginationItem>
+            <PaginationItem>
+              <PaginationLink href="#" size="default" isActive onClick={(e) => e.preventDefault()}>
+                Page {page} / {totalPages}
+              </PaginationLink>
+            </PaginationItem>
+            <PaginationItem>
+              <PaginationNext
+                href="#"
+                className={!canNext ? "pointer-events-none opacity-50" : ""}
+                onClick={(e) => {
+                  e.preventDefault();
+                  if (!canNext) return;
+                  fetchItems({ page: page + 1 });
+                }}
+              />
+            </PaginationItem>
+          </PaginationContent>
+        </Pagination>
+      )}
 
       {/* Create/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
