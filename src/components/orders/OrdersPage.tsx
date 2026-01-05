@@ -14,12 +14,15 @@ import { OrderWithCompany } from "./types/orderTypes";
 
 interface OrdersPageProps {
   isAdmin?: boolean;
+  searchTerm?: string;
 }
 
 export default function OrdersPage({
-  isAdmin = false
+  isAdmin = false,
+  searchTerm: externalSearchTerm
 }: OrdersPageProps) {
-  const [searchTerm, setSearchTerm] = useState('');
+  const [internalSearchTerm, setInternalSearchTerm] = useState('');
+  const searchTerm = externalSearchTerm ?? internalSearchTerm;
   const [ordersWithCompanies, setOrdersWithCompanies] = useState<OrderWithCompany[]>([]);
   const {
     user
@@ -195,7 +198,7 @@ export default function OrdersPage({
 
   return <div className="w-full max-w-full p-2 md:p-4 bg-background overflow-x-hidden">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 md:mb-6 gap-3 md:gap-0">
-        <OrdersHeader searchTerm={searchTerm} onSearchChange={setSearchTerm} />
+        <OrdersHeader searchTerm={searchTerm} onSearchChange={externalSearchTerm === undefined ? setInternalSearchTerm : () => {}} />
         <div className="flex flex-wrap gap-1 md:gap-2 w-full md:w-auto">
           <OrderExportActions orders={exportOrders} title="Orders" />
           <CreateOrderDialog 

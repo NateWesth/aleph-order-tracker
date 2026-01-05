@@ -48,6 +48,7 @@ interface Order {
 }
 interface CompletedPageProps {
   isAdmin: boolean;
+  searchTerm?: string;
 }
 interface MonthGroup {
   month: string;
@@ -55,7 +56,8 @@ interface MonthGroup {
   isOpen: boolean;
 }
 export default function CompletedPage({
-  isAdmin
+  isAdmin,
+  searchTerm: externalSearchTerm
 }: CompletedPageProps) {
   const {
     toast
@@ -65,7 +67,8 @@ export default function CompletedPage({
   } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [internalSearchTerm, setInternalSearchTerm] = useState('');
+  const searchTerm = externalSearchTerm ?? internalSearchTerm;
   const [monthGroups, setMonthGroups] = useState<MonthGroup[]>([]);
   const [showFilesDialog, setShowFilesDialog] = useState(false);
   const [filesDialogOrder, setFilesDialogOrder] = useState<Order | null>(null);
@@ -456,7 +459,7 @@ export default function CompletedPage({
             placeholder="Search orders..." 
             className="pl-10 pr-4 py-2 border border-border rounded-md bg-card text-card-foreground w-full md:w-64" 
             value={searchTerm} 
-            onChange={e => setSearchTerm(e.target.value)} 
+            onChange={e => externalSearchTerm === undefined ? setInternalSearchTerm(e.target.value) : undefined} 
           />
         </div>
       </div>
