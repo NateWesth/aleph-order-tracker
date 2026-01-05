@@ -28,6 +28,14 @@ interface OrdersPageProps {
   searchTerm?: string;
 }
 
+interface OrderItem {
+  id: string;
+  name: string;
+  code: string | null;
+  quantity: number;
+  stock_status: string;
+}
+
 interface Order {
   id: string;
   order_number: string;
@@ -37,23 +45,16 @@ interface Order {
   company_id: string | null;
   created_at: string | null;
   companyName?: string;
+  items?: OrderItem[];
 }
 
-// Status column configurations - professional dark theme
+// Status column configurations - professional dark theme (no partial-stock column)
 const STATUS_COLUMNS = [
   {
     key: "ordered",
     label: "Awaiting Stock",
     color: "text-amber-50",
     bgColor: "bg-amber-600",
-    nextStatus: "partial-stock",
-    nextLabel: "Partial Stock",
-  },
-  {
-    key: "partial-stock",
-    label: "Partial Stock",
-    color: "text-orange-50",
-    bgColor: "bg-orange-600",
     nextStatus: "in-stock",
     nextLabel: "All In Stock",
   },
@@ -119,14 +120,40 @@ export default function OrdersPage({
         companyMap = new Map(companiesData?.map((c) => [c.id, c.name]) || []);
       }
 
-      const ordersWithCompanies = (data || []).map((order) => ({
+      // Fetch order items for all orders
+      const orderIds = data?.map((o) => o.id) || [];
+      let orderItemsMap = new Map<string, OrderItem[]>();
+
+      if (orderIds.length > 0) {
+        const { data: itemsData } = await supabase
+          .from("order_items")
+          .select("id, order_id, name, code, quantity, stock_status")
+          .in("order_id", orderIds);
+
+        if (itemsData) {
+          itemsData.forEach((item) => {
+            const existing = orderItemsMap.get(item.order_id) || [];
+            existing.push({
+              id: item.id,
+              name: item.name,
+              code: item.code,
+              quantity: item.quantity,
+              stock_status: item.stock_status,
+            });
+            orderItemsMap.set(item.order_id, existing);
+          });
+        }
+      }
+
+      const ordersWithData = (data || []).map((order) => ({
         ...order,
         companyName: order.company_id
           ? companyMap.get(order.company_id) || "Unknown"
           : "No Client",
+        items: orderItemsMap.get(order.id) || [],
       }));
 
-      setOrders(ordersWithCompanies);
+      setOrders(ordersWithData);
     } catch (error) {
       console.error("Error fetching orders:", error);
       toast({
@@ -155,7 +182,6 @@ export default function OrdersPage({
     companyId: string;
     totalAmount: number;
     urgency: string;
-    initialStatus: string;
     notes?: string;
     items: any[];
   }) => {
@@ -178,7 +204,8 @@ export default function OrdersPage({
         )
         .join("\n");
 
-      const { error } = await supabase.from("orders").insert({
+      // Create the order
+      const { data: newOrder, error } = await supabase.from("orders").insert({
         order_number: orderData.orderNumber,
         reference: orderData.reference || null,
         description: itemsDescription,
@@ -186,11 +213,31 @@ export default function OrdersPage({
         company_id: orderData.companyId,
         total_amount: orderData.totalAmount || 0,
         user_id: user.id,
-        status: orderData.initialStatus,
+        status: "ordered", // Always start in "ordered" (Awaiting Stock)
         urgency: orderData.urgency,
-      });
+      }).select("id").single();
 
       if (error) throw error;
+
+      // Insert order items
+      const validItems = orderData.items.filter((item) => item.name && item.quantity > 0);
+      if (validItems.length > 0 && newOrder) {
+        const orderItemsToInsert = validItems.map((item) => ({
+          order_id: newOrder.id,
+          name: item.name,
+          code: item.code || null,
+          quantity: item.quantity,
+          stock_status: "awaiting",
+        }));
+
+        const { error: itemsError } = await supabase
+          .from("order_items")
+          .insert(orderItemsToInsert);
+
+        if (itemsError) {
+          console.error("Error inserting order items:", itemsError);
+        }
+      }
 
       toast({
         title: "Order Created",
@@ -206,6 +253,27 @@ export default function OrdersPage({
       });
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleToggleItemStock = async (itemId: string, currentStatus: string) => {
+    const newStatus = currentStatus === "awaiting" ? "in-stock" : "awaiting";
+    try {
+      const { error } = await supabase
+        .from("order_items")
+        .update({ stock_status: newStatus })
+        .eq("id", itemId);
+
+      if (error) throw error;
+
+      // Refresh orders (the database trigger will auto-move the order if all items are in stock)
+      fetchOrders();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update item stock status",
+        variant: "destructive",
+      });
     }
   };
 
@@ -370,6 +438,7 @@ export default function OrdersPage({
               orders={getOrdersByStatus(column.key)}
               onMoveOrder={handleMoveOrder}
               onDeleteOrder={handleDeleteOrder}
+              onToggleItemStock={handleToggleItemStock}
             />
           ))}
         </div>

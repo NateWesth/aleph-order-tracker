@@ -131,6 +131,50 @@ export type Database = {
         }
         Relationships: []
       }
+      order_items: {
+        Row: {
+          code: string | null
+          created_at: string
+          id: string
+          name: string
+          notes: string | null
+          order_id: string
+          quantity: number
+          stock_status: string
+          updated_at: string
+        }
+        Insert: {
+          code?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          notes?: string | null
+          order_id: string
+          quantity?: number
+          stock_status?: string
+          updated_at?: string
+        }
+        Update: {
+          code?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          notes?: string | null
+          order_id?: string
+          quantity?: number
+          stock_status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_update_reads: {
         Row: {
           id: string
