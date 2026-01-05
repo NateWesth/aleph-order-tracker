@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -52,6 +53,7 @@ interface OrderFormProps {
     companyId: string;
     totalAmount: number;
     urgency: string;
+    initialStatus: string;
     items: OrderItem[];
   }) => void;
   loading?: boolean;
@@ -61,6 +63,7 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
   const [orderNumber, setOrderNumber] = useState("");
   const [companyId, setCompanyId] = useState("");
   const [urgency, setUrgency] = useState("normal");
+  const [initialStatus, setInitialStatus] = useState("ordered");
   const [items, setItems] = useState<OrderItem[]>([
     { id: crypto.randomUUID(), name: "", code: "", quantity: 1 },
   ]);
@@ -145,6 +148,7 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
       companyId,
       totalAmount: 0,
       urgency,
+      initialStatus,
       items: validItems,
     });
   };
@@ -214,6 +218,69 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
             <SelectItem value="urgent">Urgent</SelectItem>
           </SelectContent>
         </Select>
+      </div>
+
+      {/* Initial Status - Where does this order start? */}
+      <div className="space-y-3">
+        <Label>Starting Stage</Label>
+        <div className="grid grid-cols-2 gap-3">
+          <div
+            onClick={() => setInitialStatus("ordered")}
+            className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${
+              initialStatus === "ordered"
+                ? "border-amber-500 bg-amber-50 dark:bg-amber-950"
+                : "border-muted hover:border-muted-foreground/50"
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <div className={`w-3 h-3 rounded-full ${initialStatus === "ordered" ? "bg-amber-500" : "bg-muted"}`} />
+              <span className="font-medium text-sm">Awaiting Stock</span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">Items need to be ordered/sourced</p>
+          </div>
+          <div
+            onClick={() => setInitialStatus("in-stock")}
+            className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${
+              initialStatus === "in-stock"
+                ? "border-sky-500 bg-sky-50 dark:bg-sky-950"
+                : "border-muted hover:border-muted-foreground/50"
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <div className={`w-3 h-3 rounded-full ${initialStatus === "in-stock" ? "bg-sky-500" : "bg-muted"}`} />
+              <span className="font-medium text-sm">In Stock</span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">All items are already available</p>
+          </div>
+          <div
+            onClick={() => setInitialStatus("in-progress")}
+            className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${
+              initialStatus === "in-progress"
+                ? "border-violet-500 bg-violet-50 dark:bg-violet-950"
+                : "border-muted hover:border-muted-foreground/50"
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <div className={`w-3 h-3 rounded-full ${initialStatus === "in-progress" ? "bg-violet-500" : "bg-muted"}`} />
+              <span className="font-medium text-sm">In Progress</span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">Work has already started</p>
+          </div>
+          <div
+            onClick={() => setInitialStatus("ready")}
+            className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${
+              initialStatus === "ready"
+                ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950"
+                : "border-muted hover:border-muted-foreground/50"
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <div className={`w-3 h-3 rounded-full ${initialStatus === "ready" ? "bg-emerald-500" : "bg-muted"}`} />
+              <span className="font-medium text-sm">Ready for Delivery</span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">Order is complete and ready</p>
+          </div>
+        </div>
       </div>
 
       {/* Order Items */}
