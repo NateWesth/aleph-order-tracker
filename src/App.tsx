@@ -1,6 +1,12 @@
+import React, { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { lazy, Suspense } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Skeleton } from '@/components/ui/skeleton';
+import { AuthProvider } from './contexts/AuthContext';
+import { ThemeProvider } from './contexts/ThemeContext';
+import { ProtectedRoute } from './components/ProtectedRoute';
+import { Toaster } from "@/components/ui/toaster";
+import { FloatingUploadButton } from './components/FloatingUploadButton';
 
 // Lazy load heavy components for better Speed Index
 const Auth = lazy(() => import('./pages/Auth'));
@@ -9,14 +15,15 @@ const Settings = lazy(() => import('./pages/Settings'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 
-import { AuthProvider } from './contexts/AuthContext';
-import { ThemeProvider } from './contexts/ThemeContext';
-import { ProtectedRoute } from './components/ProtectedRoute';
-import { Toaster } from "@/components/ui/toaster";
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { FloatingUploadButton } from './components/FloatingUploadButton';
-
-const queryClient = new QueryClient();
+// Create QueryClient outside component to prevent recreation on renders
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000,
+      retry: 1,
+    },
+  },
+});
 
 // Loading fallback component
 const PageFallback = () => (
