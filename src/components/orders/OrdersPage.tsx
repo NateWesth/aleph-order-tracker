@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Package, Trash2, Check } from "lucide-react";
+import { Plus, Package, Trash2, Check, Filter } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -22,12 +22,18 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useGlobalRealtimeOrders } from "./hooks/useGlobalRealtimeOrders";
 import { useCompanyData } from "@/components/admin/hooks/useCompanyData";
 import OrderForm from "./components/OrderForm";
-import { getUserRole } from "@/utils/authService";
 
 interface OrdersPageProps {
   isAdmin?: boolean;
@@ -52,6 +58,7 @@ export default function OrdersPage({
   const [loading, setLoading] = useState(true);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string>("all");
   const { toast } = useToast();
   const { user } = useAuth();
   const { companies } = useCompanyData();
@@ -205,10 +212,17 @@ export default function OrdersPage({
     }
   };
 
-  const filteredOrders = orders.filter(order =>
-    order.order_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    order.companyName?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredOrders = orders.filter(order => {
+    // Filter by company
+    const matchesCompany = selectedCompanyId === "all" || order.company_id === selectedCompanyId;
+    
+    // Filter by search term
+    const matchesSearch = 
+      order.order_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      order.companyName?.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    return matchesCompany && matchesSearch;
+  });
 
   const getStatusColor = (status: string | null) => {
     switch (status) {
@@ -232,25 +246,50 @@ export default function OrdersPage({
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-2xl font-semibold text-foreground">Open Orders</h2>
-          <p className="text-sm text-muted-foreground">{filteredOrders.length} orders</p>
+          <p className="text-sm text-muted-foreground">
+            {filteredOrders.length} order{filteredOrders.length !== 1 ? "s" : ""}
+            {selectedCompanyId !== "all" && companies.find(c => c.id === selectedCompanyId) && (
+              <span> for {companies.find(c => c.id === selectedCompanyId)?.name}</span>
+            )}
+          </p>
         </div>
-        <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              New Order
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Create New Order</DialogTitle>
-            </DialogHeader>
-            <OrderForm onSubmit={handleCreateOrder} loading={submitting} />
-          </DialogContent>
-        </Dialog>
+        <div className="flex items-center gap-3">
+          {/* Company Filter */}
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4 text-muted-foreground" />
+            <Select value={selectedCompanyId} onValueChange={setSelectedCompanyId}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Filter by client" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Clients</SelectItem>
+                {companies.map((company) => (
+                  <SelectItem key={company.id} value={company.id}>
+                    {company.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          
+          <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                New Order
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Create New Order</DialogTitle>
+              </DialogHeader>
+              <OrderForm onSubmit={handleCreateOrder} loading={submitting} />
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       {/* Orders List */}
