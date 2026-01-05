@@ -7,10 +7,9 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { ProcessedLogo } from "@/components/ui/ProcessedLogo";
 import { supabase } from "@/integrations/supabase/client";
 import { SidebarProvider, Sidebar, SidebarContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarFooter, SidebarTrigger } from "@/components/ui/sidebar";
-import { Home, FileText, ListOrdered, BarChart2, Settings, Files, Building2, Users, List, Menu } from "lucide-react";
+import { Home, FileText, ListOrdered, BarChart2, Settings, Files, Building2, Users, List } from "lucide-react";
 import OrdersPage from "@/components/orders/OrdersPage";
 import ProgressPage from "@/components/orders/ProgressPage";
-import ProcessingPage from "@/components/orders/ProcessingPage";
 import CompletedPage from "@/components/orders/CompletedPage";
 import FilesPage from "@/components/orders/FilesPage";
 import { OrdersListPage } from "@/components/orders/OrdersListPage";
@@ -113,21 +112,15 @@ const AdminDashboard = () => {
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <SidebarMenuButton tooltip="Progress" onClick={() => handleMenuClick("progress")} className={`sidebar-hover ${activeView === "progress" ? "sidebar-active" : ""}`}>
+                <SidebarMenuButton tooltip="In Stock" onClick={() => handleMenuClick("progress")} className={`sidebar-hover ${activeView === "progress" ? "sidebar-active" : ""}`}>
                   <BarChart2 />
-                  <span>Progress</span>
+                  <span>In Stock</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <SidebarMenuButton tooltip="Processing" onClick={() => handleMenuClick("processing")} className={`sidebar-hover ${activeView === "processing" ? "sidebar-active" : ""}`}>
+                <SidebarMenuButton tooltip="Delivered" onClick={() => handleMenuClick("completed")} className={`sidebar-hover ${activeView === "completed" ? "sidebar-active" : ""}`}>
                   <FileText />
-                  <span>Processing</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton tooltip="Completed" onClick={() => handleMenuClick("completed")} className={`sidebar-hover ${activeView === "completed" ? "sidebar-active" : ""}`}>
-                  <FileText />
-                  <span>Completed</span>
+                  <span>Delivered</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
@@ -210,8 +203,6 @@ const AdminDashboard = () => {
                 <OrdersPage isAdmin={true} />
               </div> : activeView === "progress" ? <div className="bg-background min-h-full">
                 <ProgressPage isAdmin={true} />
-              </div> : activeView === "processing" ? <div className="bg-background min-h-full">
-                <ProcessingPage isAdmin={true} />
               </div> : activeView === "completed" ? <div className="bg-background min-h-full">
                 <CompletedPage isAdmin={true} />
               </div> : activeView === "files" ? <div className="bg-background min-h-full">

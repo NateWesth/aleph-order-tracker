@@ -33,11 +33,19 @@ export default function OrderRow({
 
   const getStatusColor = (status: string | null) => {
     switch (status?.toLowerCase()) {
+      case 'delivered':
+        return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
+      case 'in-stock':
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300';
+      case 'ordered':
+        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300';
+      // Legacy status support
       case 'completed':
         return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
       case 'processing':
         return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300';
       case 'received':
+      case 'in-progress':
         return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300';
       case 'pending':
         return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300';
@@ -67,29 +75,25 @@ export default function OrderRow({
     if (isAdmin) {
       const status = order.status?.toLowerCase();
       switch (status) {
+        case 'ordered':
         case 'pending':
           navigate('/admin-dashboard');
-          // Set active view to orders after navigation
           setTimeout(() => {
             const event = new CustomEvent('setActiveView', { detail: 'orders' });
             window.dispatchEvent(event);
           }, 100);
           break;
+        case 'in-stock':
         case 'received':
         case 'in-progress':
+        case 'processing':
           navigate('/admin-dashboard');
           setTimeout(() => {
             const event = new CustomEvent('setActiveView', { detail: 'progress' });
             window.dispatchEvent(event);
           }, 100);
           break;
-        case 'processing':
-          navigate('/admin-dashboard');
-          setTimeout(() => {
-            const event = new CustomEvent('setActiveView', { detail: 'processing' });
-            window.dispatchEvent(event);
-          }, 100);
-          break;
+        case 'delivered':
         case 'completed':
           navigate('/admin-dashboard');
           setTimeout(() => {

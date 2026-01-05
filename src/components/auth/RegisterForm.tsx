@@ -1,10 +1,8 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -17,11 +15,8 @@ const RegisterForm = () => {
     email: "",
     password: "",
     confirmPassword: "",
-    companyCode: "",
     phone: "",
     position: "",
-    userType: "user", // This maps to "user" role in database
-    adminCode: ""
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -64,101 +59,10 @@ const RegisterForm = () => {
       return;
     }
 
-    // Validate admin code if user selected admin
-    if (formData.userType === "admin") {
-      if (!formData.adminCode.trim()) {
-        toast({
-          title: "Error",
-          description: "Admin access code is required for admin users.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Hardcoded admin code validation
-      if (formData.adminCode !== "ALEPH7901") {
-        toast({
-          title: "Error",
-          description: "Invalid admin code. Please contact Aleph Engineering and Supplies for the correct code.",
-          variant: "destructive",
-        });
-        return;
-      }
-    }
-
-    // Validate company code exists only for regular users
-    if (formData.userType === "user") {
-      if (!formData.companyCode.trim()) {
-        toast({
-          title: "Error",
-          description: "Company code is required for client users.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      try {
-        console.log("Validating company code:", formData.companyCode);
-        
-        // Normalize the company code for comparison
-        const normalizedCode = formData.companyCode.trim().toUpperCase();
-        console.log("Normalized code:", normalizedCode);
-        
-        // First, let's check what companies exist
-        const { data: allCompanies, error: allError } = await supabase
-          .from('companies')
-          .select('id, code, name');
-          
-        console.log("All companies in database:", allCompanies);
-        console.log("All companies error:", allError);
-        
-        // Now try the specific lookup
-        const { data: company, error: companyError } = await supabase
-          .from('companies')
-          .select('id, code, name')
-          .eq('code', normalizedCode)
-          .maybeSingle();
-
-        console.log("Company validation result:", { company, companyError });
-        console.log("Specific lookup - normalized code used:", normalizedCode);
-
-        if (companyError) {
-          console.error("Company validation error:", companyError);
-          toast({
-            title: "Error",
-            description: "Unable to validate company code. Please try again.",
-            variant: "destructive",
-          });
-          return;
-        }
-
-        if (!company) {
-          console.log("No company found with code:", normalizedCode);
-          toast({
-            title: "Error",
-            description: "Invalid company code. Please check with your company administrator.",
-            variant: "destructive",
-          });
-          return;
-        }
-
-        console.log("Company found:", company.name, "with code:", company.code);
-      } catch (error) {
-        console.error("Network error during company validation:", error);
-        toast({
-          title: "Error",
-          description: "Network error. Please check your connection and try again.",
-          variant: "destructive",
-        });
-        return;
-      }
-    }
-
     setLoading(true);
 
     try {
       console.log("Attempting to sign up user with email:", formData.email);
-      console.log("User type selected:", formData.userType);
       
       const { data, error } = await supabase.auth.signUp({
         email: formData.email,
@@ -167,10 +71,9 @@ const RegisterForm = () => {
           emailRedirectTo: `${window.location.origin}/`,
           data: {
             full_name: formData.fullName,
-            company_code: formData.userType === "user" ? formData.companyCode.trim().toUpperCase() : null,
             phone: formData.phone,
             position: formData.position,
-            user_type: formData.userType // This will be "admin" or "user" - matches our trigger expectations
+            user_type: 'admin' // All users are admins in this app
           }
         }
       });
@@ -180,15 +83,14 @@ const RegisterForm = () => {
         throw error;
       }
 
-      console.log("User signed up successfully with user_type:", formData.userType);
-      console.log("Sign up response:", data);
+      console.log("User signed up successfully:", data);
       
       toast({
-        title: "Success",
-        description: "Account created successfully! Please check your email to confirm your account.",
+        title: "Account Created",
+        description: "Your account has been created and is pending approval by an administrator. Please check your email to confirm your account.",
       });
       
-      navigate("/auth");
+      navigate("/");
     } catch (error: any) {
       console.error("Registration error:", error);
       
@@ -243,60 +145,6 @@ const RegisterForm = () => {
         />
       </div>
 
-      <div className="space-y-3">
-        <Label>Account Type</Label>
-        <RadioGroup 
-          value={formData.userType} 
-          onValueChange={(value) => setFormData({...formData, userType: value, adminCode: "", companyCode: ""})}
-          className="flex flex-col space-y-2"
-        >
-          <div className="flex items-center space-x-2">
-            <RadioGroupItem value="user" id="user" />
-            <Label htmlFor="user" className="cursor-pointer">Client User</Label>
-          </div>
-          <div className="flex items-center space-x-2">
-            <RadioGroupItem value="admin" id="admin" />
-            <Label htmlFor="admin" className="cursor-pointer">Admin User (Aleph Engineering & Supplies)</Label>
-          </div>
-        </RadioGroup>
-      </div>
-
-      {formData.userType === "admin" && (
-        <div className="space-y-2">
-          <Label htmlFor="adminCode">Admin Access Code</Label>
-          <Input
-            id="adminCode"
-            type="password"
-            value={formData.adminCode}
-            onChange={(e) => setFormData({...formData, adminCode: e.target.value})}
-            placeholder="Enter admin access code"
-            required
-            className="dark:bg-gray-700 dark:border-gray-600"
-          />
-          <p className="text-xs text-gray-500 dark:text-gray-400">
-            Contact Aleph Engineering and Supplies for the admin access code
-          </p>
-        </div>
-      )}
-
-      {formData.userType === "user" && (
-        <div className="space-y-2">
-          <Label htmlFor="companyCode">Company Code</Label>
-          <Input
-            id="companyCode"
-            type="text"
-            value={formData.companyCode}
-            onChange={(e) => setFormData({...formData, companyCode: e.target.value})}
-            placeholder="Enter your company code (e.g., TR1BET)"
-            required
-            className="dark:bg-gray-700 dark:border-gray-600"
-          />
-          <p className="text-xs text-gray-500 dark:text-gray-400">
-            Enter the company code provided by your administrator
-          </p>
-        </div>
-      )}
-
       <div className="space-y-2">
         <Label htmlFor="phone">Phone (Optional)</Label>
         <Input
@@ -342,6 +190,10 @@ const RegisterForm = () => {
           className="dark:bg-gray-700 dark:border-gray-600"
         />
       </div>
+
+      <p className="text-xs text-gray-500 dark:text-gray-400 bg-muted p-3 rounded">
+        Note: Your account will require approval by an administrator before you can access the system.
+      </p>
       
       <Button 
         type="submit" 
