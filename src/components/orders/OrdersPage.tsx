@@ -67,7 +67,7 @@ const STATUS_COLUMNS = [
   },
   {
     key: "ready",
-    label: "Ready for Collection",
+    label: "Ready for Delivery",
     color: "text-emerald-50",
     bgColor: "bg-emerald-600",
     nextStatus: "delivered",
@@ -262,9 +262,32 @@ export default function OrdersPage({
     return matchesCompany && matchesSearch;
   });
 
-  // Group orders by status
+  // Priority order for urgency sorting (lower = higher priority)
+  const urgencyPriority: Record<string, number> = {
+    urgent: 1,
+    high: 2,
+    normal: 3,
+    low: 4,
+  };
+
+  // Group and sort orders by status
   const getOrdersByStatus = (status: string) => {
-    return filteredOrders.filter((order) => order.status === status);
+    return filteredOrders
+      .filter((order) => order.status === status)
+      .sort((a, b) => {
+        // First sort by urgency (urgent orders first)
+        const urgencyA = urgencyPriority[a.urgency || "normal"] || 3;
+        const urgencyB = urgencyPriority[b.urgency || "normal"] || 3;
+        
+        if (urgencyA !== urgencyB) {
+          return urgencyA - urgencyB;
+        }
+        
+        // Then sort by creation date (oldest first - FIFO)
+        const dateA = new Date(a.created_at || 0).getTime();
+        const dateB = new Date(b.created_at || 0).getTime();
+        return dateA - dateB;
+      });
   };
 
   if (loading) {
