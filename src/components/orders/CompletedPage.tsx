@@ -226,7 +226,7 @@ export default function CompletedPage({
       ) : (
         <OrderTable
           orders={filteredOrders}
-          isAdmin={isAdmin}
+          isAdmin={false}
           onReceiveOrder={() => {}}
           onDeleteOrder={handleDeleteOrder}
           compact
