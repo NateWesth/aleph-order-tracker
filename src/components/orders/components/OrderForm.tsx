@@ -1,269 +1,343 @@
-
 import { useState, useEffect } from "react";
-import { useForm, useFieldArray } from "react-hook-form";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { Plus } from "lucide-react";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Plus, Trash2, Search } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import { generateOrderNumber } from "../utils/orderUtils";
-import { useOrderFormData } from "../hooks/useOrderFormData";
-import OrderFormHeader from "./OrderFormHeader";
-import OrderFormCompanySelector from "./OrderFormCompanySelector";
-import OrderFormTotalAmount from "./OrderFormTotalAmount";
-import { OrderItemsForm } from "./OrderItemsForm";
-import { OrderFormData, OrderItem } from "../types/OrderFormData";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+
+interface OrderItem {
+  id: string;
+  name: string;
+  code: string;
+  quantity: number;
+}
+
+interface CatalogItem {
+  id: string;
+  code: string;
+  name: string;
+  unit: string;
+}
+
+interface Company {
+  id: string;
+  name: string;
+  code: string;
+}
 
 interface OrderFormProps {
   onSubmit: (orderData: {
     orderNumber: string;
-    reference?: string;
     companyId: string;
     totalAmount: number;
     urgency: string;
-    notes?: string;
     items: OrderItem[];
   }) => void;
   loading?: boolean;
 }
 
 const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
-  const {
-    user,
-    userProfile,
-    availableCompanies,
-    currentUserRole,
-    isLoadingUserInfo,
-    userCompany,
-    companiesLoading
-  } = useOrderFormData();
+  const [orderNumber, setOrderNumber] = useState("");
+  const [companyId, setCompanyId] = useState("");
+  const [urgency, setUrgency] = useState("normal");
+  const [items, setItems] = useState<OrderItem[]>([
+    { id: crypto.randomUUID(), name: "", code: "", quantity: 1 },
+  ]);
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [catalogItems, setCatalogItems] = useState<CatalogItem[]>([]);
+  const [loadingData, setLoadingData] = useState(true);
+  const [openPopovers, setOpenPopovers] = useState<Record<string, boolean>>({});
 
-  const form = useForm<OrderFormData>({
-    defaultValues: {
-      orderNumber: "",
-      reference: "",
-      companyId: "",
-      totalAmount: 0,
-      urgency: "normal",
-      notes: "",
-      items: [{
-        id: crypto.randomUUID(),
-        name: "",
-        quantity: 1,
-        unit: "",
-        notes: ""
-      }]
-    }
-  });
-
-  const { fields, append, remove } = useFieldArray({
-    control: form.control,
-    name: "items"
-  });
-
-  // Auto-set company ID for client users
   useEffect(() => {
-    if (currentUserRole === 'user' && userCompany) {
-      form.setValue('companyId', userCompany.id, {
-        shouldValidate: true,
-        shouldDirty: true
-      });
-    }
-  }, [currentUserRole, userCompany, form]);
+    // Auto-generate order number
+    setOrderNumber(generateOrderNumber());
 
-  // Generate order number on component mount if empty
-  useEffect(() => {
-    if (!form.getValues('orderNumber')) {
-      const newOrderNumber = generateOrderNumber();
-      form.setValue('orderNumber', newOrderNumber);
-    }
-  }, [form]);
+    // Fetch companies and catalog items
+    const fetchData = async () => {
+      try {
+        const [companiesRes, itemsRes] = await Promise.all([
+          supabase.from("companies").select("id, name, code").order("name"),
+          supabase.from("items").select("id, code, name, unit").order("name"),
+        ]);
+
+        if (companiesRes.data) setCompanies(companiesRes.data);
+        if (itemsRes.data) setCatalogItems(itemsRes.data);
+      } catch (error) {
+        console.error("Error fetching data:", error);
+      } finally {
+        setLoadingData(false);
+      }
+    };
+
+    fetchData();
+  }, []);
 
   const addItem = () => {
-    append({
-      id: crypto.randomUUID(),
-      name: "",
-      quantity: 1,
-      unit: "",
-      notes: ""
+    setItems([
+      ...items,
+      { id: crypto.randomUUID(), name: "", code: "", quantity: 1 },
+    ]);
+  };
+
+  const removeItem = (id: string) => {
+    if (items.length > 1) {
+      setItems(items.filter((item) => item.id !== id));
+    }
+  };
+
+  const updateItem = (id: string, field: keyof OrderItem, value: string | number) => {
+    setItems(
+      items.map((item) =>
+        item.id === id ? { ...item, [field]: value } : item
+      )
+    );
+  };
+
+  const selectCatalogItem = (itemId: string, catalogItem: CatalogItem) => {
+    setItems(
+      items.map((item) =>
+        item.id === itemId
+          ? { ...item, name: catalogItem.name, code: catalogItem.code }
+          : item
+      )
+    );
+    setOpenPopovers({ ...openPopovers, [itemId]: false });
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const validItems = items.filter(
+      (item) => item.name.trim() && item.quantity > 0
+    );
+
+    if (validItems.length === 0) {
+      return;
+    }
+
+    if (!companyId) {
+      return;
+    }
+
+    onSubmit({
+      orderNumber: orderNumber || generateOrderNumber(),
+      companyId,
+      totalAmount: 0,
+      urgency,
+      items: validItems,
     });
   };
 
-  const removeItem = (index: number) => {
-    if (fields.length > 1) {
-      remove(index);
-    }
+  const filterItems = (searchValue: string) => {
+    if (!searchValue) return catalogItems;
+    const search = searchValue.toLowerCase();
+    return catalogItems.filter(
+      (item) =>
+        item.code.toLowerCase().includes(search) ||
+        item.name.toLowerCase().includes(search)
+    );
   };
 
-  const handleSubmit = (data: OrderFormData) => {
-    console.log("📝 OrderForm: Starting handleSubmit with data:", data);
-    console.log("📝 OrderForm: Current user role:", currentUserRole);
-    console.log("📝 OrderForm: User company:", userCompany);
-    console.log("📝 OrderForm: Selected companyId:", data.companyId);
-
-    const validItems = data.items.filter(item => item.name.trim() && item.quantity > 0);
-    
-    if (validItems.length === 0) {
-      console.log("❌ OrderForm: No valid items found");
-      form.setError("items", {
-        type: "manual",
-        message: "Please add at least one valid item"
-      });
-      return;
-    }
-
-    if (!data.orderNumber.trim()) {
-      console.log("❌ OrderForm: Order number is missing");
-      form.setError("orderNumber", {
-        type: "manual",
-        message: "Order number is required"
-      });
-      return;
-    }
-
-    let finalCompanyId = data.companyId;
-
-    // For client users, auto-assign their company
-    if (currentUserRole === 'user') {
-      if (!finalCompanyId && userCompany) {
-        finalCompanyId = userCompany.id;
-      }
-      if (!finalCompanyId) {
-        console.log("❌ OrderForm: Client user has no associated company");
-        form.setError("companyId", {
-          type: "manual",
-          message: "Your account is not linked to a company. Please contact an administrator."
-        });
-        return;
-      }
-    }
-
-    // Final validation for company ID
-    if (!finalCompanyId) {
-      console.log("❌ OrderForm: Final companyId is missing");
-      form.setError("companyId", {
-        type: "manual",
-        message: "Please select a company"
-      });
-      return;
-    }
-
-    const finalOrderData = {
-      orderNumber: data.orderNumber,
-      reference: data.reference || undefined,
-      companyId: finalCompanyId,
-      totalAmount: data.totalAmount,
-      urgency: data.urgency,
-      notes: data.notes || undefined,
-      items: validItems
-    };
-
-    console.log("🚀 OrderForm: Submitting order with final data:", finalOrderData);
-    onSubmit(finalOrderData);
-  };
-
-  if (companiesLoading || isLoadingUserInfo) {
+  if (loadingData) {
     return (
       <div className="flex items-center justify-center py-8">
-        <div className="text-sm text-gray-600">Loading...</div>
+        <p className="text-muted-foreground">Loading...</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <Form {...form}>
-        <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-          <OrderFormHeader 
-            control={form.control} 
-            setValue={form.setValue}
-          />
+    <form onSubmit={handleSubmit} className="space-y-6">
+      {/* Order Number */}
+      <div className="space-y-2">
+        <Label htmlFor="orderNumber">Order Number</Label>
+        <Input
+          id="orderNumber"
+          value={orderNumber}
+          onChange={(e) => setOrderNumber(e.target.value)}
+          placeholder="Auto-generated if empty"
+        />
+        <p className="text-xs text-muted-foreground">
+          Leave empty to auto-generate
+        </p>
+      </div>
 
-          <OrderFormCompanySelector
-            control={form.control}
-            register={form.register}
-            currentUserRole={currentUserRole}
-            availableCompanies={availableCompanies}
-            userCompany={userCompany}
-          />
+      {/* Client Selection */}
+      <div className="space-y-2">
+        <Label htmlFor="client">Client *</Label>
+        <Select value={companyId} onValueChange={setCompanyId}>
+          <SelectTrigger>
+            <SelectValue placeholder="Select a client" />
+          </SelectTrigger>
+          <SelectContent>
+            {companies.map((company) => (
+              <SelectItem key={company.id} value={company.id}>
+                {company.name} ({company.code})
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
 
-          <FormField
-            control={form.control}
-            name="urgency"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Urgency Level</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select urgency level" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    <SelectItem value="low">Low</SelectItem>
-                    <SelectItem value="normal">Normal</SelectItem>
-                    <SelectItem value="medium">Medium</SelectItem>
-                    <SelectItem value="high">High</SelectItem>
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+      {/* Urgency */}
+      <div className="space-y-2">
+        <Label htmlFor="urgency">Urgency</Label>
+        <Select value={urgency} onValueChange={setUrgency}>
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="low">Low</SelectItem>
+            <SelectItem value="normal">Normal</SelectItem>
+            <SelectItem value="high">High</SelectItem>
+            <SelectItem value="urgent">Urgent</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
 
-          <FormField
-            control={form.control}
-            name="notes"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Order Notes</FormLabel>
-                <FormControl>
-                  <Textarea
-                    placeholder="Add any additional notes or instructions for this order..."
-                    className="min-h-[100px]"
-                    {...field}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+      {/* Order Items */}
+      <div className="space-y-4">
+        <Label>Order Items *</Label>
+        <div className="space-y-3">
+          {items.map((item, index) => (
+            <div
+              key={item.id}
+              className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg"
+            >
+              <span className="text-sm text-muted-foreground w-6">
+                {index + 1}.
+              </span>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Order Items</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {fields.map((field, index) => (
-                <OrderItemsForm
-                  key={field.id}
-                  control={form.control}
-                  index={index}
-                  onRemove={() => removeItem(index)}
-                  canRemove={fields.length > 1}
+              {/* Item Search/Select */}
+              <Popover
+                open={openPopovers[item.id]}
+                onOpenChange={(open) =>
+                  setOpenPopovers({ ...openPopovers, [item.id]: open })
+                }
+              >
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    className="flex-1 justify-start font-normal"
+                  >
+                    <Search className="h-4 w-4 mr-2 text-muted-foreground" />
+                    {item.name ? (
+                      <span>
+                        {item.code && `[${item.code}] `}
+                        {item.name}
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">
+                        Search item by code or name...
+                      </span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[300px] p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Type code or name..." />
+                    <CommandList>
+                      <CommandEmpty>
+                        <div className="p-2 text-sm text-muted-foreground">
+                          No items found. Type a custom name below.
+                        </div>
+                      </CommandEmpty>
+                      <CommandGroup>
+                        {catalogItems.map((catalogItem) => (
+                          <CommandItem
+                            key={catalogItem.id}
+                            onSelect={() => selectCatalogItem(item.id, catalogItem)}
+                          >
+                            <span className="font-mono text-xs mr-2">
+                              [{catalogItem.code}]
+                            </span>
+                            {catalogItem.name}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                  <div className="border-t p-2">
+                    <Input
+                      placeholder="Or type custom item name"
+                      value={item.name}
+                      onChange={(e) => updateItem(item.id, "name", e.target.value)}
+                    />
+                  </div>
+                </PopoverContent>
+              </Popover>
+
+              {/* Quantity */}
+              <div className="flex items-center gap-1">
+                <Label className="text-xs text-muted-foreground">Qty:</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  value={item.quantity}
+                  onChange={(e) =>
+                    updateItem(item.id, "quantity", parseInt(e.target.value) || 1)
+                  }
+                  className="w-20"
                 />
-              ))}
-              <Button type="button" onClick={addItem} size="sm" variant="outline" className="w-full">
-                <Plus className="w-4 h-4 mr-2" />
-                Add Item
-              </Button>
-              <FormMessage>{form.formState.errors.items?.message}</FormMessage>
-            </CardContent>
-          </Card>
+              </div>
 
-          <OrderFormTotalAmount control={form.control} />
+              {/* Remove Button */}
+              {items.length > 1 && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => removeItem(item.id)}
+                >
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
+              )}
+            </div>
+          ))}
+        </div>
 
-          <Button 
-            type="submit" 
-            className="w-full" 
-            disabled={loading || companiesLoading || isLoadingUserInfo}
-          >
-            {loading ? "Creating Order..." : "Create Order"}
-          </Button>
-        </form>
-      </Form>
-    </div>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={addItem}
+          className="w-full"
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          Add Item
+        </Button>
+      </div>
+
+      {/* Submit */}
+      <Button
+        type="submit"
+        className="w-full"
+        disabled={loading || !companyId || items.every((i) => !i.name.trim())}
+      >
+        {loading ? "Creating..." : "Create Order"}
+      </Button>
+    </form>
   );
 };
 
