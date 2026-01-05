@@ -1,11 +1,10 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { lazy, Suspense } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 
 // Lazy load heavy components for better Speed Index
 const Auth = lazy(() => import('./pages/Auth'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
-const ClientDashboard = lazy(() => import('./pages/ClientDashboard'));
 const Settings = lazy(() => import('./pages/Settings'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 const ResetPassword = lazy(() => import('./pages/ResetPassword'));
@@ -57,11 +56,8 @@ function App() {
                       <AdminDashboard />
                     </ProtectedRoute>
                   } />
-                  <Route path="/client-dashboard" element={
-                    <ProtectedRoute>
-                      <ClientDashboard />
-                    </ProtectedRoute>
-                  } />
+                  {/* Redirect old client-dashboard to admin-dashboard */}
+                  <Route path="/client-dashboard" element={<Navigate to="/admin-dashboard" replace />} />
                   <Route path="/settings" element={
                     <ProtectedRoute>
                       <Settings />

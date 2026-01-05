@@ -78,13 +78,13 @@ export default function OrdersPage({
 
   const receiveOrder = async (order: OrderWithCompany) => {
     try {
-      console.log('Receiving order and updating status to received:', order.id);
+      console.log('Marking order as in-stock:', order.id);
 
-      // Update order status in database to 'received' - this will trigger real-time updates
+      // Update order status in database to 'in-stock'
       const { error } = await supabase
         .from('orders')
         .update({
-          status: 'received',
+          status: 'in-stock',
           updated_at: new Date().toISOString()
         })
         .eq('id', order.id);
@@ -93,7 +93,7 @@ export default function OrdersPage({
 
       // Update local state immediately
       setOrders(orders.map(o => 
-        o.id === order.id ? { ...o, status: 'received' } : o
+        o.id === order.id ? { ...o, status: 'in-stock' } : o
       ));
 
       // Send email notification
@@ -103,25 +103,24 @@ export default function OrdersPage({
           orderNumber: order.order_number,
           companyName: order.companyName || 'Unknown Company',
           changeType: 'status_change',
-          oldStatus: 'pending',
-          newStatus: 'received'
+          oldStatus: order.status || 'ordered',
+          newStatus: 'in-stock'
         });
       } catch (emailError) {
         console.error('Failed to send email notification:', emailError);
-        // Don't fail the entire operation if email fails
       }
 
       toast({
-        title: "Order Received",
-        description: `Order ${order.order_number} has been received and moved to progress tracking. All users will see this update automatically.`
+        title: "Order Marked In-Stock",
+        description: `Order ${order.order_number} has been marked as in-stock.`
       });
 
-      console.log('Order successfully received and database updated');
+      console.log('Order successfully marked as in-stock');
     } catch (error: any) {
-      console.error('Error receiving order:', error);
+      console.error('Error updating order:', error);
       toast({
         title: "Error",
-        description: "Failed to receive order. Please try again.",
+        description: "Failed to update order. Please try again.",
         variant: "destructive"
       });
     }
