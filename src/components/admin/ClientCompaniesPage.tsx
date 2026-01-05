@@ -187,24 +187,21 @@ export default function ClientCompaniesPage() {
   }
 
   return (
-    <div className="container mx-auto p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-aleph-green">Client Companies</h1>
-        <div className="flex items-center gap-2">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-            <Input
-              placeholder="Search companies..."
-              className="pl-10 w-64"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-          <Button onClick={() => setIsNewCompanyDialogOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add New Company
-          </Button>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-4">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search clients..."
+            className="pl-9 h-9"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
         </div>
+        <Button size="sm" onClick={() => setIsNewCompanyDialogOpen(true)}>
+          <Plus className="h-4 w-4 mr-1" />
+          Add Client
+        </Button>
       </div>
 
       <CompanyTable 
@@ -220,9 +217,7 @@ export default function ClientCompaniesPage() {
         }}
       />
 
-      <div className="mt-4 text-sm text-gray-600 dark:text-gray-400">
-        Total companies: {filteredCompanies.length}
-      </div>
+      <p className="text-xs text-muted-foreground">{filteredCompanies.length} clients</p>
 
       {/* New Company Dialog */}
       <Dialog open={isNewCompanyDialogOpen} onOpenChange={handleDialogClose}>
