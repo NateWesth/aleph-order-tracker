@@ -46,8 +46,16 @@ const STATUS_COLUMNS = [
     label: "Awaiting Stock",
     color: "text-amber-50",
     bgColor: "bg-amber-600",
+    nextStatus: "partial-stock",
+    nextLabel: "Partial Stock",
+  },
+  {
+    key: "partial-stock",
+    label: "Partial Stock",
+    color: "text-orange-50",
+    bgColor: "bg-orange-600",
     nextStatus: "in-stock",
-    nextLabel: "Mark In Stock",
+    nextLabel: "All In Stock",
   },
   {
     key: "in-stock",

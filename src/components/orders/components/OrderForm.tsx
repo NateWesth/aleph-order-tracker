@@ -239,6 +239,20 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
             <p className="text-xs text-muted-foreground mt-1">Items need to be ordered/sourced</p>
           </div>
           <div
+            onClick={() => setInitialStatus("partial-stock")}
+            className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${
+              initialStatus === "partial-stock"
+                ? "border-orange-500 bg-orange-50 dark:bg-orange-950"
+                : "border-muted hover:border-muted-foreground/50"
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <div className={`w-3 h-3 rounded-full ${initialStatus === "partial-stock" ? "bg-orange-500" : "bg-muted"}`} />
+              <span className="font-medium text-sm">Partial Stock</span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">Some items available, others pending</p>
+          </div>
+          <div
             onClick={() => setInitialStatus("in-stock")}
             className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${
               initialStatus === "in-stock"
