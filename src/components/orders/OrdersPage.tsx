@@ -39,45 +39,39 @@ interface Order {
   companyName?: string;
 }
 
-// Status column configurations
+// Status column configurations - professional dark theme
 const STATUS_COLUMNS = [
   {
     key: "ordered",
-    label: "Ordered",
-    color: "text-amber-700",
-    bgColor: "bg-amber-100",
+    label: "Awaiting Stock",
+    color: "text-amber-50",
+    bgColor: "bg-amber-600",
     nextStatus: "in-stock",
-    nextLabel: "In Stock",
+    nextLabel: "Mark In Stock",
   },
   {
     key: "in-stock",
     label: "In Stock",
-    color: "text-blue-700",
-    bgColor: "bg-blue-100",
+    color: "text-sky-50",
+    bgColor: "bg-sky-600",
     nextStatus: "in-progress",
-    nextLabel: "Start Progress",
+    nextLabel: "Start Work",
   },
   {
     key: "in-progress",
     label: "In Progress",
-    color: "text-purple-700",
-    bgColor: "bg-purple-100",
+    color: "text-violet-50",
+    bgColor: "bg-violet-600",
     nextStatus: "ready",
     nextLabel: "Mark Ready",
   },
   {
     key: "ready",
-    label: "Ready",
-    color: "text-emerald-700",
-    bgColor: "bg-emerald-100",
+    label: "Ready for Collection",
+    color: "text-emerald-50",
+    bgColor: "bg-emerald-600",
     nextStatus: "delivered",
-    nextLabel: "Complete",
-  },
-  {
-    key: "delivered",
-    label: "Completed",
-    color: "text-slate-700",
-    bgColor: "bg-slate-100",
+    nextLabel: "Complete Order",
   },
 ];
 
@@ -96,9 +90,11 @@ export default function OrdersPage({
 
   const fetchOrders = async () => {
     try {
+      // Fetch all orders except delivered (those go to history)
       const { data, error } = await supabase
         .from("orders")
         .select("id, order_number, description, status, urgency, company_id, created_at")
+        .neq("status", "delivered")
         .order("created_at", { ascending: false });
 
       if (error) throw error;
