@@ -1,7 +1,8 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Trash2, ArrowRight, Package } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Trash2, ArrowRight, Package, PackageCheck, PackageX } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -15,6 +16,14 @@ import {
 } from "@/components/ui/alert-dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
+interface OrderItem {
+  id: string;
+  name: string;
+  code: string | null;
+  quantity: number;
+  stock_status: string;
+}
+
 interface Order {
   id: string;
   order_number: string;
@@ -24,6 +33,7 @@ interface Order {
   company_id: string | null;
   created_at: string | null;
   companyName?: string;
+  items?: OrderItem[];
 }
 
 interface StatusConfig {
@@ -40,6 +50,7 @@ interface OrderStatusColumnProps {
   orders: Order[];
   onMoveOrder: (order: Order, newStatus: string) => void;
   onDeleteOrder: (order: Order) => void;
+  onToggleItemStock?: (itemId: string, currentStatus: string) => void;
 }
 
 export default function OrderStatusColumn({
@@ -47,6 +58,7 @@ export default function OrderStatusColumn({
   orders,
   onMoveOrder,
   onDeleteOrder,
+  onToggleItemStock,
 }: OrderStatusColumnProps) {
   const getUrgencyBadge = (urgency: string | null) => {
     switch (urgency) {
@@ -59,6 +71,13 @@ export default function OrderStatusColumn({
       default:
         return null;
     }
+  };
+
+  const getItemStockSummary = (items: OrderItem[] | undefined) => {
+    if (!items || items.length === 0) return null;
+    const inStock = items.filter((i) => i.stock_status === "in-stock").length;
+    const total = items.length;
+    return { inStock, total, allInStock: inStock === total };
   };
 
   return (
@@ -85,72 +104,125 @@ export default function OrderStatusColumn({
                 <p className="text-sm font-medium">No orders</p>
               </div>
             ) : (
-              orders.map((order) => (
-                <Card
-                  key={order.id}
-                  className="hover:shadow-lg transition-all duration-200 border-l-4 border-l-primary/50 hover:border-l-primary"
-                >
-                  <CardContent className="p-4">
-                    <div className="space-y-3">
-                      {/* Order Header */}
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <span className="font-bold text-foreground block">
-                            {order.order_number}
-                          </span>
-                          <span className="text-xs text-muted-foreground font-medium truncate block mt-0.5">
-                            {order.companyName}
-                          </span>
+              orders.map((order) => {
+                const stockSummary = getItemStockSummary(order.items);
+
+                return (
+                  <Card
+                    key={order.id}
+                    className="hover:shadow-lg transition-all duration-200 border-l-4 border-l-primary/50 hover:border-l-primary"
+                  >
+                    <CardContent className="p-4">
+                      <div className="space-y-3">
+                        {/* Order Header */}
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <span className="font-bold text-foreground block">
+                              {order.order_number}
+                            </span>
+                            <span className="text-xs text-muted-foreground font-medium truncate block mt-0.5">
+                              {order.companyName}
+                            </span>
+                          </div>
+                          {getUrgencyBadge(order.urgency)}
                         </div>
-                        {getUrgencyBadge(order.urgency)}
-                      </div>
 
-                      {/* Description */}
-                      {order.description && (
-                        <p className="text-xs text-muted-foreground line-clamp-2 bg-muted/50 p-2 rounded">
-                          {order.description}
-                        </p>
-                      )}
-
-                      {/* Actions */}
-                      <div className="flex items-center gap-2 pt-1">
-                        {config.nextStatus && (
-                          <Button
-                            variant="default"
-                            size="sm"
-                            className="flex-1 h-8 text-xs font-semibold"
-                            onClick={() => onMoveOrder(order, config.nextStatus!)}
-                          >
-                            <ArrowRight className="h-3 w-3 mr-1" />
-                            {config.nextLabel}
-                          </Button>
+                        {/* Stock Progress for Awaiting Stock column */}
+                        {config.key === "ordered" && stockSummary && (
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-muted-foreground flex items-center gap-1">
+                                {stockSummary.allInStock ? (
+                                  <PackageCheck className="h-3 w-3 text-emerald-500" />
+                                ) : (
+                                  <PackageX className="h-3 w-3 text-amber-500" />
+                                )}
+                                Stock Status
+                              </span>
+                              <span className={`font-semibold ${stockSummary.allInStock ? "text-emerald-600" : "text-amber-600"}`}>
+                                {stockSummary.inStock}/{stockSummary.total} items
+                              </span>
+                            </div>
+                            {/* Item checkboxes */}
+                            <div className="space-y-1.5 bg-muted/50 p-2 rounded">
+                              {order.items?.map((item) => (
+                                <div
+                                  key={item.id}
+                                  className="flex items-center gap-2 text-xs"
+                                >
+                                  <Checkbox
+                                    id={item.id}
+                                    checked={item.stock_status === "in-stock"}
+                                    onCheckedChange={() =>
+                                      onToggleItemStock?.(item.id, item.stock_status)
+                                    }
+                                    className="h-4 w-4"
+                                  />
+                                  <label
+                                    htmlFor={item.id}
+                                    className={`flex-1 cursor-pointer ${
+                                      item.stock_status === "in-stock"
+                                        ? "line-through text-muted-foreground"
+                                        : "text-foreground"
+                                    }`}
+                                  >
+                                    {item.code && <span className="font-mono mr-1">[{item.code}]</span>}
+                                    {item.name}
+                                    <span className="text-muted-foreground ml-1">×{item.quantity}</span>
+                                  </label>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
                         )}
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="outline" size="icon" className="h-8 w-8">
-                              <Trash2 className="h-4 w-4 text-destructive" />
+
+                        {/* Description for non-awaiting columns */}
+                        {config.key !== "ordered" && order.description && (
+                          <p className="text-xs text-muted-foreground line-clamp-2 bg-muted/50 p-2 rounded">
+                            {order.description}
+                          </p>
+                        )}
+
+                        {/* Actions */}
+                        <div className="flex items-center gap-2 pt-1">
+                          {config.nextStatus && (
+                            <Button
+                              variant="default"
+                              size="sm"
+                              className="flex-1 h-8 text-xs font-semibold"
+                              onClick={() => onMoveOrder(order, config.nextStatus!)}
+                            >
+                              <ArrowRight className="h-3 w-3 mr-1" />
+                              {config.nextLabel}
                             </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Delete Order?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                This will permanently delete order {order.order_number}.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => onDeleteOrder(order)}>
-                                Delete
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
+                          )}
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="outline" size="icon" className="h-8 w-8">
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete Order?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  This will permanently delete order {order.order_number}.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => onDeleteOrder(order)}>
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))
+                    </CardContent>
+                  </Card>
+                );
+              })
             )}
           </div>
         </ScrollArea>
