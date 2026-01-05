@@ -4,9 +4,10 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Package, History, BarChart3, Settings, LogOut } from "lucide-react";
+import { Package, History, BarChart3, Settings, LogOut, Building2 } from "lucide-react";
 import OrdersPage from "@/components/orders/OrdersPage";
 import CompletedPage from "@/components/orders/CompletedPage";
+import ClientCompaniesPage from "@/components/admin/ClientCompaniesPage";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 const AdminDashboard = () => {
@@ -56,6 +57,7 @@ const AdminDashboard = () => {
   const navItems = [
     { id: "orders", label: "Orders", icon: Package },
     { id: "history", label: "Order History", icon: History },
+    { id: "clients", label: "Clients", icon: Building2 },
     { id: "stats", label: "Stats", icon: BarChart3 },
   ];
 
@@ -113,6 +115,7 @@ const AdminDashboard = () => {
       <main className="flex-1 p-4 md:p-6 overflow-x-hidden">
         {activeView === "orders" && <OrdersPage isAdmin={true} />}
         {activeView === "history" && <CompletedPage isAdmin={true} />}
+        {activeView === "clients" && <ClientCompaniesPage />}
         {activeView === "stats" && (
           <div className="flex items-center justify-center h-64">
             <p className="text-muted-foreground">Stats coming soon...</p>
