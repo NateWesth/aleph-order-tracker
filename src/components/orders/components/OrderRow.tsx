@@ -18,6 +18,7 @@ interface OrderRowProps {
   onReceiveOrder: (order: OrderWithCompany) => void;
   onDeleteOrder: (orderId: string, orderNumber: string) => void;
   onOrderClick?: (order: OrderWithCompany) => void;
+  compact?: boolean;
 }
 
 export default function OrderRow({ 
@@ -25,7 +26,8 @@ export default function OrderRow({
   isAdmin,
   onReceiveOrder,
   onDeleteOrder,
-  onOrderClick
+  onOrderClick,
+  compact = false
 }: OrderRowProps) {
   const [showDetails, setShowDetails] = useState(false);
   const navigate = useNavigate();
@@ -115,12 +117,12 @@ export default function OrderRow({
     // Mobile card layout
     return (
       <>
-        <div className="cursor-pointer" onClick={handleRowClick}>
-          <div className="space-y-2">
+        <div className={`cursor-pointer ${compact ? 'p-2' : ''}`} onClick={handleRowClick}>
+          <div className={compact ? 'space-y-1' : 'space-y-2'}>
             {/* Order header */}
             <div className="flex justify-between items-start">
               <div className="min-w-0 flex-1">
-                <div className="font-medium text-sm truncate">{order.order_number}</div>
+                <div className={`font-medium truncate ${compact ? 'text-xs' : 'text-sm'}`}>{order.order_number}</div>
                 {order.reference && (
                   <div className="text-xs text-muted-foreground truncate">{order.reference}</div>
                 )}
@@ -136,65 +138,67 @@ export default function OrderRow({
               <span className="flex-shrink-0">{new Date(order.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
             </div>
             
-            {/* Actions */}
-            <div className="flex items-center justify-between gap-2 pt-2 border-t">
-              <div className="flex gap-1 flex-1">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowDetails(true);
-                  }}
-                  className="flex-1 h-8 text-xs"
-                >
-                  <Eye className="h-3 w-3 mr-1" />
-                  View
-                </Button>
-                <div onClick={(e) => e.stopPropagation()}>
-                  <OrderUpdatesButton
-                    orderId={order.id}
-                    orderNumber={order.order_number}
-                    size="sm"
+            {/* Actions - hidden in compact mode */}
+            {!compact && (
+              <div className="flex items-center justify-between gap-2 pt-2 border-t">
+                <div className="flex gap-1 flex-1">
+                  <Button
                     variant="ghost"
-                  />
-                </div>
-              </div>
-              {isAdmin && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button 
-                      variant="ghost" 
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowDetails(true);
+                    }}
+                    className="flex-1 h-8 text-xs"
+                  >
+                    <Eye className="h-3 w-3 mr-1" />
+                    View
+                  </Button>
+                  <div onClick={(e) => e.stopPropagation()}>
+                    <OrderUpdatesButton
+                      orderId={order.id}
+                      orderNumber={order.order_number}
                       size="sm"
-                      onClick={(e) => e.stopPropagation()}
-                      className="h-8 w-8 p-0"
-                    >
-                      <MoreHorizontal className="h-3 w-3" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="z-50 bg-background border">
-                    <DropdownMenuItem
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onReceiveOrder(order);
-                      }}
-                      className="text-xs"
-                    >
-                      Receive Order
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onDeleteOrder(order.id, order.order_number);
-                      }}
-                      className="text-xs"
-                    >
-                      Delete Order
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
-            </div>
+                      variant="ghost"
+                    />
+                  </div>
+                </div>
+                {isAdmin && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={(e) => e.stopPropagation()}
+                        className="h-8 w-8 p-0"
+                      >
+                        <MoreHorizontal className="h-3 w-3" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="z-50 bg-background border">
+                      <DropdownMenuItem
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onReceiveOrder(order);
+                        }}
+                        className="text-xs"
+                      >
+                        Receive Order
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDeleteOrder(order.id, order.order_number);
+                        }}
+                        className="text-xs"
+                      >
+                        Delete Order
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -215,20 +219,20 @@ export default function OrderRow({
         className="order-row-hover"
         onClick={handleRowClick}
       >
-        <TableCell>
+        <TableCell className={compact ? 'py-2' : ''}>
           <div>
-            <div className="font-medium text-base">{order.order_number}</div>
+            <div className={`font-medium ${compact ? 'text-sm' : 'text-base'}`}>{order.order_number}</div>
             {order.reference && (
-              <div className="text-sm text-muted-foreground">{order.reference}</div>
+              <div className="text-xs text-muted-foreground">{order.reference}</div>
             )}
           </div>
         </TableCell>
-        <TableCell className="text-sm">{order.companyName || 'No Company'}</TableCell>
-        <TableCell>
+        <TableCell className={`text-sm ${compact ? 'py-2' : ''}`}>{order.companyName || 'No Company'}</TableCell>
+        <TableCell className={compact ? 'py-2' : ''}>
           {getStatusBadge(order.status)}
         </TableCell>
-        <TableCell className="text-sm">{new Date(order.created_at).toLocaleDateString()}</TableCell>
-        <TableCell>
+        <TableCell className={`text-sm ${compact ? 'py-2' : ''}`}>{new Date(order.created_at).toLocaleDateString()}</TableCell>
+        {!compact && <TableCell>
           <div className="flex items-center gap-2">
             <Button
               variant="ghost"
@@ -281,7 +285,7 @@ export default function OrderRow({
               </DropdownMenu>
             )}
           </div>
-        </TableCell>
+        </TableCell>}
       </TableRow>
 
       <OrderDetailsDialog

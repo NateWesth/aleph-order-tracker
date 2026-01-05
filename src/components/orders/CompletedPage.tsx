@@ -229,6 +229,7 @@ export default function CompletedPage({
           isAdmin={isAdmin}
           onReceiveOrder={() => {}}
           onDeleteOrder={handleDeleteOrder}
+          compact
         />
       )}
     </div>
