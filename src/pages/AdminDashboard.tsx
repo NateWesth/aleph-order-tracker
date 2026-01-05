@@ -4,12 +4,13 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Package, History, BarChart3, Settings, LogOut, Building2, Home, Search } from "lucide-react";
+import { Package, History, BarChart3, Settings, LogOut, Building2, Home, Search, Box } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import OrdersPage from "@/components/orders/OrdersPage";
 import CompletedPage from "@/components/orders/CompletedPage";
 import ClientCompaniesPage from "@/components/admin/ClientCompaniesPage";
 import StatsPage from "@/components/admin/StatsPage";
+import ItemsPage from "@/components/admin/ItemsPage";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 const AdminDashboard = () => {
@@ -61,6 +62,7 @@ const AdminDashboard = () => {
     { id: "orders", label: "Orders", icon: Package },
     { id: "history", label: "Order History", icon: History },
     { id: "clients", label: "Clients", icon: Building2 },
+    { id: "items", label: "Items", icon: Box },
     { id: "stats", label: "Stats", icon: BarChart3 },
   ];
 
@@ -154,6 +156,7 @@ const AdminDashboard = () => {
         {activeView === "orders" && <OrdersPage isAdmin={true} searchTerm={searchTerm} />}
         {activeView === "history" && <CompletedPage isAdmin={true} searchTerm={searchTerm} />}
         {activeView === "clients" && <ClientCompaniesPage />}
+        {activeView === "items" && <ItemsPage />}
         {activeView === "stats" && <StatsPage />}
       </main>
     </div>
