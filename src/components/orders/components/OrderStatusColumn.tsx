@@ -51,52 +51,54 @@ export default function OrderStatusColumn({
   const getUrgencyBadge = (urgency: string | null) => {
     switch (urgency) {
       case "urgent":
-        return <Badge variant="destructive" className="text-xs">Urgent</Badge>;
+        return <Badge className="bg-red-600 text-white text-xs font-semibold">Urgent</Badge>;
       case "high":
-        return <Badge className="bg-orange-100 text-orange-800 text-xs">High</Badge>;
+        return <Badge className="bg-orange-500 text-white text-xs font-semibold">High</Badge>;
       case "low":
-        return <Badge className="bg-slate-100 text-slate-600 text-xs">Low</Badge>;
+        return <Badge className="bg-slate-500 text-white text-xs">Low</Badge>;
       default:
         return null;
     }
   };
 
   return (
-    <div className="flex flex-col min-w-[280px] max-w-[320px] flex-1">
+    <div className="flex flex-col min-w-[300px] max-w-[340px] flex-1">
       {/* Column Header */}
-      <div className={`p-3 rounded-t-lg ${config.bgColor}`}>
+      <div className={`p-4 rounded-t-xl ${config.bgColor} shadow-lg`}>
         <div className="flex items-center justify-between">
-          <h3 className={`font-semibold ${config.color}`}>{config.label}</h3>
-          <Badge variant="secondary" className="bg-background/80">
+          <h3 className={`font-bold text-sm uppercase tracking-wide ${config.color}`}>
+            {config.label}
+          </h3>
+          <Badge className="bg-white/20 text-white font-bold border-0">
             {orders.length}
           </Badge>
         </div>
       </div>
 
       {/* Column Content */}
-      <div className="flex-1 bg-muted/30 rounded-b-lg border border-t-0 min-h-[400px]">
+      <div className="flex-1 bg-muted/50 rounded-b-xl border-2 border-t-0 border-muted min-h-[400px]">
         <ScrollArea className="h-[calc(100vh-320px)]">
-          <div className="p-2 space-y-2">
+          <div className="p-3 space-y-3">
             {orders.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
-                <Package className="h-8 w-8 mb-2 opacity-50" />
-                <p className="text-sm">No orders</p>
+              <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                <Package className="h-10 w-10 mb-3 opacity-40" />
+                <p className="text-sm font-medium">No orders</p>
               </div>
             ) : (
               orders.map((order) => (
                 <Card
                   key={order.id}
-                  className="hover:shadow-md transition-shadow cursor-pointer"
+                  className="hover:shadow-lg transition-all duration-200 border-l-4 border-l-primary/50 hover:border-l-primary"
                 >
-                  <CardContent className="p-3">
-                    <div className="space-y-2">
+                  <CardContent className="p-4">
+                    <div className="space-y-3">
                       {/* Order Header */}
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1 min-w-0">
-                          <span className="font-semibold text-sm text-foreground block">
+                          <span className="font-bold text-foreground block">
                             {order.order_number}
                           </span>
-                          <span className="text-xs text-muted-foreground truncate block">
+                          <span className="text-xs text-muted-foreground font-medium truncate block mt-0.5">
                             {order.companyName}
                           </span>
                         </div>
@@ -105,18 +107,18 @@ export default function OrderStatusColumn({
 
                       {/* Description */}
                       {order.description && (
-                        <p className="text-xs text-muted-foreground line-clamp-2">
+                        <p className="text-xs text-muted-foreground line-clamp-2 bg-muted/50 p-2 rounded">
                           {order.description}
                         </p>
                       )}
 
                       {/* Actions */}
-                      <div className="flex items-center gap-1 pt-1">
+                      <div className="flex items-center gap-2 pt-1">
                         {config.nextStatus && (
                           <Button
-                            variant="outline"
+                            variant="default"
                             size="sm"
-                            className="flex-1 h-7 text-xs"
+                            className="flex-1 h-8 text-xs font-semibold"
                             onClick={() => onMoveOrder(order, config.nextStatus!)}
                           >
                             <ArrowRight className="h-3 w-3 mr-1" />
@@ -125,8 +127,8 @@ export default function OrderStatusColumn({
                         )}
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-7 w-7">
-                              <Trash2 className="h-3 w-3 text-destructive" />
+                            <Button variant="outline" size="icon" className="h-8 w-8">
+                              <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
                           </AlertDialogTrigger>
                           <AlertDialogContent>
