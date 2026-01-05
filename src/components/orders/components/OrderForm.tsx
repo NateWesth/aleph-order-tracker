@@ -1,8 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -10,22 +9,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Trash2, Search } from "lucide-react";
+import { Plus, Trash2, Search, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { generateOrderNumber } from "../utils/orderUtils";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface OrderItem {
   id: string;
@@ -66,33 +58,77 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
     { id: crypto.randomUUID(), name: "", code: "", quantity: 1 },
   ]);
   const [companies, setCompanies] = useState<Company[]>([]);
-  const [catalogItems, setCatalogItems] = useState<CatalogItem[]>([]);
   const [loadingData, setLoadingData] = useState(true);
   const [openPopovers, setOpenPopovers] = useState<Record<string, boolean>>({});
+  const [searchQueries, setSearchQueries] = useState<Record<string, string>>({});
+  const [searchResults, setSearchResults] = useState<Record<string, CatalogItem[]>>({});
+  const [searchLoading, setSearchLoading] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
-    // Auto-generate order number
     setOrderNumber(generateOrderNumber());
 
-    // Fetch companies and catalog items
-    const fetchData = async () => {
+    const fetchCompanies = async () => {
       try {
-        const [companiesRes, itemsRes] = await Promise.all([
-          supabase.from("companies").select("id, name, code").order("name"),
-          supabase.from("items").select("id, code, name, unit").order("name"),
-        ]);
-
-        if (companiesRes.data) setCompanies(companiesRes.data);
-        if (itemsRes.data) setCatalogItems(itemsRes.data);
+        const { data } = await supabase
+          .from("companies")
+          .select("id, name, code")
+          .order("name");
+        if (data) setCompanies(data);
       } catch (error) {
-        console.error("Error fetching data:", error);
+        console.error("Error fetching companies:", error);
       } finally {
         setLoadingData(false);
       }
     };
 
-    fetchData();
+    fetchCompanies();
   }, []);
+
+  // Debounced search function
+  const searchItems = useCallback(async (itemId: string, query: string) => {
+    if (!query || query.length < 2) {
+      setSearchResults(prev => ({ ...prev, [itemId]: [] }));
+      return;
+    }
+
+    setSearchLoading(prev => ({ ...prev, [itemId]: true }));
+
+    try {
+      const searchTerm = query.trim().toUpperCase();
+      
+      // Search by code (exact prefix match) OR name/description (contains)
+      const { data, error } = await supabase
+        .from("items")
+        .select("id, code, name, unit")
+        .or(`code.ilike.${searchTerm}%,name.ilike.%${searchTerm}%`)
+        .limit(50)
+        .order("code");
+
+      if (error) throw error;
+      
+      setSearchResults(prev => ({ ...prev, [itemId]: data || [] }));
+    } catch (error) {
+      console.error("Error searching items:", error);
+      setSearchResults(prev => ({ ...prev, [itemId]: [] }));
+    } finally {
+      setSearchLoading(prev => ({ ...prev, [itemId]: false }));
+    }
+  }, []);
+
+  // Debounce search
+  useEffect(() => {
+    const timers: Record<string, NodeJS.Timeout> = {};
+    
+    Object.entries(searchQueries).forEach(([itemId, query]) => {
+      timers[itemId] = setTimeout(() => {
+        searchItems(itemId, query);
+      }, 300);
+    });
+
+    return () => {
+      Object.values(timers).forEach(timer => clearTimeout(timer));
+    };
+  }, [searchQueries, searchItems]);
 
   const addItem = () => {
     setItems([
@@ -104,6 +140,15 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
   const removeItem = (id: string) => {
     if (items.length > 1) {
       setItems(items.filter((item) => item.id !== id));
+      // Clean up search state for removed item
+      setSearchQueries(prev => {
+        const { [id]: _, ...rest } = prev;
+        return rest;
+      });
+      setSearchResults(prev => {
+        const { [id]: _, ...rest } = prev;
+        return rest;
+      });
     }
   };
 
@@ -124,6 +169,12 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
       )
     );
     setOpenPopovers({ ...openPopovers, [itemId]: false });
+    setSearchQueries(prev => ({ ...prev, [itemId]: "" }));
+    setSearchResults(prev => ({ ...prev, [itemId]: [] }));
+  };
+
+  const handleSearchChange = (itemId: string, value: string) => {
+    setSearchQueries(prev => ({ ...prev, [itemId]: value }));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -150,20 +201,10 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
     });
   };
 
-  const filterItems = (searchValue: string) => {
-    if (!searchValue) return catalogItems;
-    const search = searchValue.toLowerCase();
-    return catalogItems.filter(
-      (item) =>
-        item.code.toLowerCase().includes(search) ||
-        item.name.toLowerCase().includes(search)
-    );
-  };
-
   if (loadingData) {
     return (
       <div className="flex items-center justify-center py-8">
-        <p className="text-muted-foreground">Loading...</p>
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
       </div>
     );
   }
@@ -217,7 +258,7 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
         </Select>
       </div>
 
-      {/* Note: Orders start in "Awaiting Stock". Mark items as received to move the order forward. */}
+      {/* Note */}
       <div className="p-3 bg-amber-50 dark:bg-amber-950/50 rounded-lg border border-amber-200 dark:border-amber-800">
         <p className="text-sm text-amber-800 dark:text-amber-200">
           <strong>Note:</strong> Orders start in "Awaiting Stock". You can mark individual items as received on the orders board - when all items are in stock, the order automatically moves forward.
@@ -240,9 +281,13 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
               {/* Item Search/Select */}
               <Popover
                 open={openPopovers[item.id]}
-                onOpenChange={(open) =>
-                  setOpenPopovers({ ...openPopovers, [item.id]: open })
-                }
+                onOpenChange={(open) => {
+                  setOpenPopovers({ ...openPopovers, [item.id]: open });
+                  if (!open) {
+                    setSearchQueries(prev => ({ ...prev, [item.id]: "" }));
+                    setSearchResults(prev => ({ ...prev, [item.id]: [] }));
+                  }
+                }}
               >
                 <PopoverTrigger asChild>
                   <Button
@@ -252,7 +297,7 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
                   >
                     <Search className="h-4 w-4 mr-2 text-muted-foreground" />
                     {item.name ? (
-                      <span>
+                      <span className="truncate">
                         {item.code && `[${item.code}] `}
                         {item.name}
                       </span>
@@ -263,33 +308,65 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
                     )}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-[300px] p-0" align="start">
-                  <Command>
-                    <CommandInput placeholder="Type code or name..." />
-                    <CommandList>
-                      <CommandEmpty>
-                        <div className="p-2 text-sm text-muted-foreground">
-                          No items found. Type a custom name below.
-                        </div>
-                      </CommandEmpty>
-                      <CommandGroup>
-                        {catalogItems.map((catalogItem) => (
-                          <CommandItem
+                <PopoverContent className="w-[350px] p-0" align="start">
+                  <div className="p-3 border-b">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Type code or name (min 2 chars)..."
+                        value={searchQueries[item.id] || ""}
+                        onChange={(e) => handleSearchChange(item.id, e.target.value)}
+                        className="pl-9"
+                        autoFocus
+                      />
+                    </div>
+                  </div>
+                  
+                  <ScrollArea className="h-[250px]">
+                    {searchLoading[item.id] ? (
+                      <div className="flex items-center justify-center py-6">
+                        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                        <span className="ml-2 text-sm text-muted-foreground">Searching...</span>
+                      </div>
+                    ) : searchResults[item.id]?.length > 0 ? (
+                      <div className="p-2">
+                        {searchResults[item.id].map((catalogItem) => (
+                          <button
                             key={catalogItem.id}
-                            onSelect={() => selectCatalogItem(item.id, catalogItem)}
+                            type="button"
+                            onClick={() => selectCatalogItem(item.id, catalogItem)}
+                            className="w-full text-left px-3 py-2 rounded-md hover:bg-accent transition-colors flex items-start gap-2"
                           >
-                            <span className="font-mono text-xs mr-2">
-                              [{catalogItem.code}]
+                            <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded shrink-0">
+                              {catalogItem.code}
                             </span>
-                            {catalogItem.name}
-                          </CommandItem>
+                            <span className="text-sm line-clamp-2">{catalogItem.name}</span>
+                          </button>
                         ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                  <div className="border-t p-2">
+                      </div>
+                    ) : searchQueries[item.id]?.length >= 2 ? (
+                      <div className="flex flex-col items-center justify-center py-6 text-center px-4">
+                        <p className="text-sm text-muted-foreground">No items found</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Try a different search term or enter a custom name below
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-6 text-center px-4">
+                        <Search className="h-8 w-8 text-muted-foreground/50 mb-2" />
+                        <p className="text-sm text-muted-foreground">
+                          Type at least 2 characters to search
+                        </p>
+                      </div>
+                    )}
+                  </ScrollArea>
+
+                  <div className="border-t p-3">
+                    <Label className="text-xs text-muted-foreground mb-1.5 block">
+                      Or enter custom item name:
+                    </Label>
                     <Input
-                      placeholder="Or type custom item name"
+                      placeholder="Custom item name"
                       value={item.name}
                       onChange={(e) => updateItem(item.id, "name", e.target.value)}
                     />
