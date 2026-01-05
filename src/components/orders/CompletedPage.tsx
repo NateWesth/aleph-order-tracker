@@ -16,8 +16,15 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { format, startOfMonth, endOfMonth, isSameMonth } from "date-fns";
-import { Eye, ChevronDown, ChevronRight, FileText, Search, Trash2, Download, Edit, Mail } from "lucide-react";
+import { Eye, ChevronDown, ChevronRight, FileText, Search, Trash2, Download, Edit, Mail, Filter } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useGlobalRealtimeOrders } from "./hooks/useGlobalRealtimeOrders";
@@ -35,11 +42,18 @@ interface OrderItem {
   delivered: number;
   completed: boolean;
 }
+
+interface Company {
+  id: string;
+  name: string;
+}
+
 interface Order {
   id: string;
   orderNumber: string;
   reference?: string;
   companyName: string;
+  companyId: string | null;
   orderDate: Date;
   dueDate: Date;
   completedDate?: Date;
@@ -66,6 +80,8 @@ export default function CompletedPage({
     user
   } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [selectedCompanyFilter, setSelectedCompanyFilter] = useState<string>("all");
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [internalSearchTerm, setInternalSearchTerm] = useState('');
   const searchTerm = externalSearchTerm ?? internalSearchTerm;
@@ -189,14 +205,27 @@ export default function CompletedPage({
       console.log('Fetching completed orders from Supabase...');
       console.log('User role:', userRole, 'Company ID:', userCompanyId);
       
+      // Fetch all companies for the filter dropdown (admins only)
+      if (userRole === 'admin') {
+        const { data: companiesData } = await supabase
+          .from('companies')
+          .select('id, name')
+          .order('name');
+        if (companiesData) {
+          setCompanies(companiesData);
+        }
+      }
+      
+      // Fetch delivered orders (status = 'delivered')
       let query = supabase.from('orders').select(`
           *,
           companies (
+            id,
             name,
             code
           )
-        `).eq('status', 'completed').order('order_number', {
-        ascending: true
+        `).eq('status', 'delivered').order('completed_date', {
+        ascending: false
       });
 
       // Apply filtering based on user role
@@ -227,6 +256,7 @@ export default function CompletedPage({
         orderNumber: order.order_number,
         reference: order.reference,
         companyName: order.companies?.name || "Unknown Company",
+        companyId: order.company_id,
         orderDate: new Date(order.created_at),
         dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
         completedDate: order.completed_date ? new Date(order.completed_date) : new Date(),
@@ -301,18 +331,24 @@ export default function CompletedPage({
     }
   }, [user?.id, userRole, userCompanyId]);
 
-  // Group orders by order creation month (not completion month) using UTC to avoid TZ shifts
+  // Group orders by completion date month using UTC to avoid TZ shifts
   useEffect(() => {
-    const filteredOrders = orders.filter(order =>
-      order.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.companyName.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    // Filter by search term and selected company
+    const filteredOrders = orders.filter(order => {
+      const matchesSearch = 
+        order.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        order.companyName.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesCompany = 
+        selectedCompanyFilter === "all" || order.companyId === selectedCompanyFilter;
+      return matchesSearch && matchesCompany;
+    });
 
-    // Key by YYYY-MM (UTC) to ensure correct month grouping regardless of local timezone
+    // Key by YYYY-MM (UTC) based on completion date for history sorting
     const monthMap = new Map<string, Order[]>();
     filteredOrders.forEach(order => {
-      const y = order.orderDate.getUTCFullYear();
-      const m = order.orderDate.getUTCMonth(); // 0-11
+      const completedDate = order.completedDate || order.orderDate;
+      const y = completedDate.getUTCFullYear();
+      const m = completedDate.getUTCMonth(); // 0-11
       const key = `${y}-${String(m + 1).padStart(2, '0')}`;
       if (!monthMap.has(key)) monthMap.set(key, []);
       monthMap.get(key)!.push(order);
@@ -326,14 +362,18 @@ export default function CompletedPage({
         const monthDate = new Date(Date.UTC(Number(yy), Number(mm) - 1, 1));
         return {
           month: format(monthDate, 'MMMM yyyy'),
-          // Within each month sort by creation date descending (newest first)
-          orders: groupedOrders.sort((a, b) => b.orderDate.getTime() - a.orderDate.getTime()),
+          // Within each month sort by completion date descending (newest first)
+          orders: groupedOrders.sort((a, b) => {
+            const dateA = (b.completedDate || b.orderDate).getTime();
+            const dateB = (a.completedDate || a.orderDate).getTime();
+            return dateA - dateB;
+          }),
           isOpen: true,
         } as MonthGroup;
       });
 
     setMonthGroups(groups);
-  }, [orders, searchTerm]);
+  }, [orders, searchTerm, selectedCompanyFilter]);
 
   // Toggle month group
   const toggleMonthGroup = (monthIndex: number) => {
@@ -450,17 +490,49 @@ export default function CompletedPage({
     setEmailDialogOrder(null);
   };
   return <div className="w-full max-w-full p-2 md:p-4 bg-background overflow-x-hidden">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 md:mb-6 gap-3 md:gap-0">
-        <h1 className="text-lg md:text-2xl font-bold text-foreground">Completed Orders</h1>
-        <div className="relative w-full md:w-auto">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <input 
-            type="text" 
-            placeholder="Search orders..." 
-            className="pl-10 pr-4 py-2 border border-border rounded-md bg-card text-card-foreground w-full md:w-64" 
-            value={searchTerm} 
-            onChange={e => externalSearchTerm === undefined ? setInternalSearchTerm(e.target.value) : undefined} 
-          />
+      <div className="flex flex-col gap-4 mb-4 md:mb-6">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+          <div>
+            <h1 className="text-lg md:text-2xl font-bold text-foreground">Order History</h1>
+            <p className="text-sm text-muted-foreground">
+              {orders.length} completed order{orders.length !== 1 ? 's' : ''}
+              {selectedCompanyFilter !== "all" && companies.find(c => c.id === selectedCompanyFilter) && (
+                <span> for {companies.find(c => c.id === selectedCompanyFilter)?.name}</span>
+              )}
+            </p>
+          </div>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full md:w-auto">
+            {/* Client Filter - Admin only */}
+            {userRole === 'admin' && companies.length > 0 && (
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <Filter className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                <Select value={selectedCompanyFilter} onValueChange={setSelectedCompanyFilter}>
+                  <SelectTrigger className="w-full sm:w-[200px]">
+                    <SelectValue placeholder="Filter by client" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Clients</SelectItem>
+                    {companies.map((company) => (
+                      <SelectItem key={company.id} value={company.id}>
+                        {company.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {/* Search */}
+            <div className="relative w-full sm:w-auto">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <input 
+                type="text" 
+                placeholder="Search orders..." 
+                className="pl-10 pr-4 py-2 border border-border rounded-md bg-card text-card-foreground w-full sm:w-64" 
+                value={searchTerm} 
+                onChange={e => externalSearchTerm === undefined ? setInternalSearchTerm(e.target.value) : undefined} 
+              />
+            </div>
+          </div>
         </div>
       </div>
 
