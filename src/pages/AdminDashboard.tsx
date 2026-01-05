@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import OrdersPage from "@/components/orders/OrdersPage";
 import CompletedPage from "@/components/orders/CompletedPage";
 import ClientCompaniesPage from "@/components/admin/ClientCompaniesPage";
+import StatsPage from "@/components/admin/StatsPage";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 const AdminDashboard = () => {
@@ -153,11 +154,7 @@ const AdminDashboard = () => {
         {activeView === "orders" && <OrdersPage isAdmin={true} searchTerm={searchTerm} />}
         {activeView === "history" && <CompletedPage isAdmin={true} searchTerm={searchTerm} />}
         {activeView === "clients" && <ClientCompaniesPage />}
-        {activeView === "stats" && (
-          <div className="flex items-center justify-center h-64">
-            <p className="text-muted-foreground">Stats coming soon...</p>
-          </div>
-        )}
+        {activeView === "stats" && <StatsPage />}
       </main>
     </div>
   );
