@@ -30,7 +30,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Search, Pencil, Trash2, Package } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { Plus, Search, Pencil, Trash2, Package, Upload, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 interface Item {
@@ -63,6 +64,9 @@ const ItemsPage = () => {
     description: "",
   });
   const [submitting, setSubmitting] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState(0);
+  const [importTotal, setImportTotal] = useState(0);
 
   const fetchItems = async () => {
     try {
@@ -84,6 +88,99 @@ const ItemsPage = () => {
   useEffect(() => {
     fetchItems();
   }, []);
+
+  // Import items from CSV
+  const handleImportCSV = async () => {
+    setImporting(true);
+    setImportProgress(0);
+    
+    try {
+      // Fetch the CSV file
+      const response = await fetch('/data/items-import.csv');
+      const csvText = await response.text();
+      
+      // Parse CSV
+      const lines = csvText.split('\n');
+      const header = lines[0].split(',');
+      const codeIndex = header.findIndex(h => h.trim() === 'Code');
+      const descIndex = header.findIndex(h => h.trim() === 'Description');
+      
+      if (codeIndex === -1 || descIndex === -1) {
+        throw new Error('CSV must have Code and Description columns');
+      }
+      
+      // Parse all valid items (skip header and empty/invalid rows)
+      const itemsToImport: { code: string; name: string }[] = [];
+      
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+        
+        // Handle CSV with commas in quoted fields
+        const values: string[] = [];
+        let current = '';
+        let inQuotes = false;
+        
+        for (const char of line) {
+          if (char === '"') {
+            inQuotes = !inQuotes;
+          } else if (char === ',' && !inQuotes) {
+            values.push(current.trim());
+            current = '';
+          } else {
+            current += char;
+          }
+        }
+        values.push(current.trim());
+        
+        const code = values[codeIndex]?.replace(/^"|"$/g, '').trim();
+        const description = values[descIndex]?.replace(/^"|"$/g, '').trim();
+        
+        // Skip invalid items (empty code or just ".")
+        if (!code || code === '.' || !description || description === '.') continue;
+        
+        itemsToImport.push({
+          code: code.toUpperCase(),
+          name: description, // Description is the name
+        });
+      }
+      
+      setImportTotal(itemsToImport.length);
+      
+      // Batch insert in chunks of 500
+      const batchSize = 500;
+      let inserted = 0;
+      
+      for (let i = 0; i < itemsToImport.length; i += batchSize) {
+        const batch = itemsToImport.slice(i, i + batchSize).map(item => ({
+          code: item.code,
+          name: item.name,
+          unit: 'pcs',
+          description: null,
+        }));
+        
+        const { error } = await supabase
+          .from('items')
+          .upsert(batch, { onConflict: 'code', ignoreDuplicates: true });
+        
+        if (error) {
+          console.error('Batch insert error:', error);
+        }
+        
+        inserted += batch.length;
+        setImportProgress(Math.round((inserted / itemsToImport.length) * 100));
+      }
+      
+      toast.success(`Imported ${itemsToImport.length} items successfully`);
+      fetchItems();
+    } catch (error: any) {
+      console.error('Import error:', error);
+      toast.error(error.message || 'Failed to import items');
+    } finally {
+      setImporting(false);
+      setImportProgress(0);
+    }
+  };
 
   const openCreateDialog = () => {
     setSelectedItem(null);
@@ -185,6 +282,19 @@ const ItemsPage = () => {
 
   return (
     <div className="space-y-4">
+      {/* Import Progress */}
+      {importing && (
+        <Card className="p-4">
+          <div className="flex items-center gap-3 mb-2">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <span className="text-sm font-medium">
+              Importing items... {importProgress}% ({Math.round((importProgress / 100) * importTotal)} of {importTotal})
+            </span>
+          </div>
+          <Progress value={importProgress} className="h-2" />
+        </Card>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between gap-4">
         <div className="relative flex-1 max-w-sm">
@@ -196,10 +306,21 @@ const ItemsPage = () => {
             className="pl-9 h-9"
           />
         </div>
-        <Button onClick={openCreateDialog} size="sm">
-          <Plus className="h-4 w-4 mr-1" />
-          Add Item
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button 
+            onClick={handleImportCSV} 
+            size="sm" 
+            variant="outline"
+            disabled={importing}
+          >
+            <Upload className="h-4 w-4 mr-1" />
+            Import CSV
+          </Button>
+          <Button onClick={openCreateDialog} size="sm">
+            <Plus className="h-4 w-4 mr-1" />
+            Add Item
+          </Button>
+        </div>
       </div>
 
       {/* Table */}
