@@ -20,7 +20,6 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useGlobalRealtimeOrders } from "./hooks/useGlobalRealtimeOrders";
 import { useCompanyData } from "@/components/admin/hooks/useCompanyData";
-import { OrdersPageSkeleton } from "@/components/ui/skeletons";
 import OrderForm from "./components/OrderForm";
 import OrderStatusColumn from "./components/OrderStatusColumn";
 
@@ -377,7 +376,11 @@ export default function OrdersPage({
   }, [filteredOrders, urgencyPriority]);
 
   if (loading) {
-    return <OrdersPageSkeleton />;
+    return (
+      <div className="flex items-center justify-center h-64">
+        <p className="text-muted-foreground">Loading orders...</p>
+      </div>
+    );
   }
 
   return (

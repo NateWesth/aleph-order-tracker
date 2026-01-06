@@ -15,7 +15,6 @@ import OrderExportActions from "./components/OrderExportActions";
 import { sendOrderNotification } from "@/utils/emailNotifications";
 import { getUserRole, getUserProfile } from "@/utils/authService";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { ProcessingPageSkeleton } from "@/components/ui/skeletons";
 
 interface OrderItem {
   id: string;
@@ -367,7 +366,11 @@ export default function ProcessingPage({
   };
 
   if (loading) {
-    return <ProcessingPageSkeleton />;
+    return <div className="container mx-auto p-4 bg-background">
+        <div className="flex justify-center items-center h-64">
+          <div className="text-lg text-foreground">Loading processing orders...</div>
+        </div>
+      </div>;
   }
 
   if (error) {

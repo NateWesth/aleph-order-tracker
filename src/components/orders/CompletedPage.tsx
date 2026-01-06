@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -7,7 +7,6 @@ import { getUserRole, getUserProfile } from "@/utils/authService";
 import OrdersHeader from "./components/OrdersHeader";
 import OrderTable from "./components/OrderTable";
 import { OrderWithCompany } from "./types/orderTypes";
-import { CompletedPageSkeleton } from "@/components/ui/skeletons";
 import {
   Select,
   SelectContent,
@@ -223,7 +222,7 @@ export default function CompletedPage({
       </div>
 
       {loading ? (
-        <CompletedPageSkeleton />
+        <div className="text-center py-8 text-muted-foreground">Loading orders...</div>
       ) : (
         <OrderTable
           orders={filteredOrders}

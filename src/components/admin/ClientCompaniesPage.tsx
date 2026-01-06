@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -18,7 +19,6 @@ import CompanyTable from "./components/CompanyTable";
 import DeleteCompanyDialog from "./components/DeleteCompanyDialog";
 import { useCompanyData } from "./hooks/useCompanyData";
 import { generateCompanyCode, copyToClipboard } from "./utils/companyUtils";
-import { ClientCompaniesPageSkeleton } from "@/components/ui/skeletons";
 
 export default function ClientCompaniesPage() {
   const { companies, loading, refetch } = useCompanyData();
@@ -179,7 +179,11 @@ export default function ClientCompaniesPage() {
   );
 
   if (loading) {
-    return <ClientCompaniesPageSkeleton />;
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-lg">Loading companies...</div>
+      </div>
+    );
   }
 
   return (
