@@ -15,6 +15,7 @@ import { getUserRole } from "@/utils/auth";
 import OrderTable from "./components/OrderTable";
 import OrdersHeader from "./components/OrdersHeader";
 import { format, startOfMonth, endOfMonth } from "date-fns";
+import { OrdersListPageSkeleton } from "@/components/ui/skeletons";
 
 interface Company {
   id: string;
@@ -172,7 +173,7 @@ export const OrdersListPage: React.FC = () => {
   const selectedCompany = companies.find(c => c.id === selectedCompanyId);
 
   if (!user || userRole === null) {
-    return <div>Loading...</div>;
+    return <OrdersListPageSkeleton />;
   }
 
   return (

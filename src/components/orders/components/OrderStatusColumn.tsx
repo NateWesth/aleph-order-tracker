@@ -182,7 +182,7 @@ function OrderStatusColumn({
                       width: '100%',
                       transform: `translateY(${virtualRow.start}px)`,
                     }}
-                    className="pb-2"
+                    className="pb-3"
                   >
                     <Card
                       className={cn(

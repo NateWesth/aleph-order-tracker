@@ -10,6 +10,7 @@ import {
   CheckCircle, AlertTriangle, Hourglass, ShoppingCart
 } from "lucide-react";
 import { format, subMonths, startOfMonth, endOfMonth, differenceInDays, startOfYear, subYears } from "date-fns";
+import { StatsPageSkeleton } from "@/components/ui/skeletons";
 
 interface OrderStats {
   totalOrders: number;
@@ -221,11 +222,7 @@ export default function StatsPage() {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <p className="text-muted-foreground">Loading statistics...</p>
-      </div>
-    );
+    return <StatsPageSkeleton />;
   }
 
   if (!stats) {

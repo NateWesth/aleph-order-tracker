@@ -16,6 +16,7 @@ import ProgressOrderDetailsDialog from "./components/ProgressOrderDetailsDialog"
 import ProcessingOrderFilesDialog from "./components/ProcessingOrderFilesDialog";
 import OrderExportActions from "./components/OrderExportActions";
 import { sendOrderNotification } from "@/utils/emailNotifications";
+import { ProgressPageSkeleton } from "@/components/ui/skeletons";
 
 // Define the order item interface
 interface OrderItem {
@@ -680,11 +681,7 @@ export default function ProgressPage({
     }
   };
   if (loading) {
-    return <div className="container mx-auto p-4 bg-background">
-        <div className="flex justify-center items-center h-64">
-          <div className="text-lg text-foreground">Loading orders...</div>
-        </div>
-      </div>;
+    return <ProgressPageSkeleton />;
   }
   if (error) {
     return <div className="container mx-auto p-4 bg-background">

@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CheckCircle, Clock, AlertCircle, Package, BarChart2, FileText, Flame } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { TodoListSkeleton } from "@/components/ui/skeletons";
 interface TodoItem {
   id: string;
   order_number: string;
@@ -170,21 +171,7 @@ export default function TodoList() {
   const progressItems = todoItems.filter(item => (item.status === 'received' || item.status === 'in-progress') && (!item.progress_stage || item.progress_stage === 'packaging' || item.progress_stage === 'packing'));
   const processingItems = todoItems.filter(item => item.status === 'processing');
   if (loading) {
-    return <div className="space-y-4">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CheckCircle className="h-5 w-5 text-aleph-green" />
-              Order To-Do List
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-center py-8">
-              <div className="text-lg">Loading todos...</div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>;
+    return <TodoListSkeleton />;
   }
   const renderTodoSection = (items: TodoItem[], title: string, icon: React.ReactNode, emptyMessage: string) => <Card className="flex-1">
       <CardHeader>
