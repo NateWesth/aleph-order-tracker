@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback, memo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -62,7 +62,7 @@ interface OrderStatusColumnProps {
   onToggleItemStock?: (itemId: string, currentStatus: string) => void;
 }
 
-export default function OrderStatusColumn({
+function OrderStatusColumn({
   config,
   orders,
   onMoveOrder,
@@ -71,7 +71,7 @@ export default function OrderStatusColumn({
 }: OrderStatusColumnProps) {
   const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
 
-  const toggleExpanded = (orderId: string) => {
+  const toggleExpanded = useCallback((orderId: string) => {
     setExpandedOrders(prev => {
       const next = new Set(prev);
       if (next.has(orderId)) {
@@ -81,7 +81,7 @@ export default function OrderStatusColumn({
       }
       return next;
     });
-  };
+  }, []);
 
   const getUrgencyBadge = (urgency: string | null) => {
     switch (urgency) {
@@ -309,3 +309,6 @@ export default function OrderStatusColumn({
     </div>
   );
 }
+
+// Memoize the component to prevent unnecessary re-renders
+export default memo(OrderStatusColumn);
