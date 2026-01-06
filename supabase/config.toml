@@ -2,3 +2,12 @@ project_id = "cnofbtrtyiilmhlrashl"
 
 [functions.orders-api]
 verify_jwt = false
+
+[functions.notify-admin-new-user]
+verify_jwt = false
+
+[functions.send-completed-order-email]
+verify_jwt = false
+
+[functions.send-order-notifications]
+verify_jwt = false

@@ -84,6 +84,23 @@ const RegisterForm = () => {
       }
 
       console.log("User signed up successfully:", data);
+
+      // Notify admin about new user registration
+      try {
+        await supabase.functions.invoke("notify-admin-new-user", {
+          body: {
+            user_id: data.user?.id,
+            email: formData.email,
+            full_name: formData.fullName,
+            phone: formData.phone,
+            position: formData.position,
+          },
+        });
+        console.log("Admin notification sent");
+      } catch (notifyError) {
+        console.error("Failed to notify admin:", notifyError);
+        // Don't fail registration if notification fails
+      }
       
       toast({
         title: "Account Created",
