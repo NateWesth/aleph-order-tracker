@@ -32,6 +32,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { Plus, Search, Pencil, Trash2, Package, Upload, Loader2 } from "lucide-react";
+import { ItemsPageSkeleton } from "@/components/ui/skeletons";
 import {
   Pagination,
   PaginationContent,
@@ -305,12 +306,8 @@ const ItemsPage = () => {
   const canPrev = page > 1;
   const canNext = page < totalPages;
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    );
+  if (loading && items.length === 0) {
+    return <ItemsPageSkeleton />;
   }
 
   return (
