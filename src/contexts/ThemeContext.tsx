@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 
 type Theme = 'light' | 'dark';
-type ColorTheme = 'purple' | 'green' | 'blue' | 'rose' | 'orange' | 'teal';
+type ColorTheme = 'purple' | 'green' | 'blue' | 'rose' | 'orange' | 'teal' | 'red' | 'black';
 
 interface ThemeContextType {
   theme: Theme;
@@ -28,6 +28,8 @@ export const colorThemes: Record<ColorTheme, { name: string; hue: number; satura
   rose: { name: 'Rose', hue: 346, saturation: 77, lightness: 50, preview: 'hsl(346 77% 50%)' },
   orange: { name: 'Sunset Orange', hue: 24, saturation: 95, lightness: 53, preview: 'hsl(24 95% 53%)' },
   teal: { name: 'Teal', hue: 174, saturation: 72, lightness: 40, preview: 'hsl(174 72% 40%)' },
+  red: { name: 'Crimson Red', hue: 0, saturation: 84, lightness: 50, preview: 'hsl(0 84% 50%)' },
+  black: { name: 'Noir', hue: 0, saturation: 0, lightness: 20, preview: 'hsl(0 0% 20%)' },
 };
 
 interface ThemeProviderProps {
