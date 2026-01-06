@@ -115,7 +115,7 @@ export default function OrderStatusColumn({
       </div>
 
       {/* Column Content */}
-      <div className="flex-1 bg-muted/50 rounded-b-xl border-2 border-t-0 border-muted min-h-[400px]">
+      <div className="flex-1 bg-background/80 backdrop-blur-sm rounded-b-xl border-2 border-t-0 border-border/50 min-h-[400px] shadow-lg">
         <ScrollArea className="h-[calc(100vh-320px)]">
           <div className="p-3 space-y-3">
             {orders.length === 0 ? (
