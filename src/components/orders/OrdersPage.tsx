@@ -168,7 +168,7 @@ export default function OrdersPage({
 
   useEffect(() => {
     fetchOrders();
-  }, []);
+  }, [fetchOrders]);
 
   useGlobalRealtimeOrders({
     onOrdersChange: fetchOrders,
