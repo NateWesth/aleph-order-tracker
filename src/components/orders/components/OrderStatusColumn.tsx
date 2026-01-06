@@ -116,7 +116,7 @@ function OrderStatusColumn({
   };
 
   return (
-    <div className="flex flex-col min-w-[300px] max-w-[340px] flex-1">
+    <div className="flex flex-col w-full">
       {/* Column Header */}
       <div className={cn(
         "px-4 py-3 rounded-t-xl",

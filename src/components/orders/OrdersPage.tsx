@@ -436,20 +436,18 @@ export default function OrdersPage({
         </div>
       </div>
 
-      {/* Kanban Board */}
-      <div className="overflow-x-auto pb-4">
-        <div className="flex gap-4 min-w-max">
-          {STATUS_COLUMNS.map((column) => (
-            <OrderStatusColumn
-              key={column.key}
-              config={column}
-              orders={ordersByStatus[column.key as keyof typeof ordersByStatus] || []}
-              onMoveOrder={handleMoveOrder}
-              onDeleteOrder={handleDeleteOrder}
-              onToggleItemStock={handleToggleItemStock}
-            />
-          ))}
-        </div>
+      {/* Kanban Board - Responsive grid that fills screen width */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+        {STATUS_COLUMNS.map((column) => (
+          <OrderStatusColumn
+            key={column.key}
+            config={column}
+            orders={ordersByStatus[column.key as keyof typeof ordersByStatus] || []}
+            onMoveOrder={handleMoveOrder}
+            onDeleteOrder={handleDeleteOrder}
+            onToggleItemStock={handleToggleItemStock}
+          />
+        ))}
       </div>
     </div>
   );
