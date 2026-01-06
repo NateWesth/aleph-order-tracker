@@ -3,7 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Trash2, ArrowRight, Package, PackageCheck, PackageX, ChevronDown } from "lucide-react";
+import { Trash2, ArrowRight, ArrowLeft, Package, PackageCheck, PackageX, ChevronDown, Undo2 } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -50,6 +50,8 @@ interface StatusConfig {
   bgColor: string;
   nextStatus?: string;
   nextLabel?: string;
+  prevStatus?: string;
+  prevLabel?: string;
 }
 
 interface OrderStatusColumnProps {
@@ -244,6 +246,18 @@ export default function OrderStatusColumn({
 
                         {/* Actions */}
                         <div className="flex items-center gap-2 pt-1">
+                          {/* Back button for In Stock column */}
+                          {config.key === "in-stock" && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 text-xs font-medium rounded-lg"
+                              onClick={() => onMoveOrder(order, "ordered")}
+                            >
+                              <Undo2 className="h-3.5 w-3.5 mr-1" />
+                              Back
+                            </Button>
+                          )}
                           {config.nextStatus && (
                             <Button
                               size="sm"
