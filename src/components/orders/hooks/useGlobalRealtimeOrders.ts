@@ -1,5 +1,5 @@
 
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -9,12 +9,26 @@ interface UseGlobalRealtimeOrdersProps {
   pageType?: 'orders' | 'progress' | 'processing' | 'completed' | 'files' | 'delivery-notes';
 }
 
+// Debounce delay for rapid updates
+const DEBOUNCE_DELAY = 300;
+
 export const useGlobalRealtimeOrders = ({ 
   onOrdersChange, 
   isAdmin, 
   pageType = 'orders' 
 }: UseGlobalRealtimeOrdersProps) => {
   const { toast } = useToast();
+  const debounceTimer = useRef<NodeJS.Timeout | null>(null);
+  
+  // Debounced refresh to prevent rapid successive calls
+  const debouncedRefresh = useCallback(() => {
+    if (debounceTimer.current) {
+      clearTimeout(debounceTimer.current);
+    }
+    debounceTimer.current = setTimeout(() => {
+      onOrdersChange();
+    }, DEBOUNCE_DELAY);
+  }, [onOrdersChange]);
 
   const syncLocalStorageWithDatabase = useCallback(async (payload: any) => {
     console.log(`Syncing local storage with database change (${pageType}):`, payload.new);
@@ -114,9 +128,9 @@ export const useGlobalRealtimeOrders = ({
       });
     }
     
-    // Refresh the data
-    onOrdersChange();
-  }, [toast, onOrdersChange, isAdmin, pageType]);
+    // Refresh the data with debounce
+    debouncedRefresh();
+  }, [toast, debouncedRefresh, isAdmin, pageType]);
 
   const handleOrderUpdate = useCallback(async (payload: any) => {
     console.log(`Order updated (${pageType}):`, payload.old, '->', payload.new);
@@ -161,11 +175,11 @@ export const useGlobalRealtimeOrders = ({
         });
       }
     } else {
-      // Just refresh data for other updates
+      // Just refresh data for other updates with debounce
       console.log(`Order updated without status change, refreshing data`);
-      onOrdersChange();
+      debouncedRefresh();
     }
-  }, [toast, onOrdersChange, isAdmin, pageType, syncLocalStorageWithDatabase]);
+  }, [toast, debouncedRefresh, isAdmin, pageType, syncLocalStorageWithDatabase]);
 
   const handleOrderDelete = useCallback(async (payload: any) => {
     console.log(`Order deleted (${pageType}):`, payload.old);
@@ -191,9 +205,9 @@ export const useGlobalRealtimeOrders = ({
       });
     }
     
-    // Refresh the data
-    onOrdersChange();
-  }, [toast, onOrdersChange, isAdmin, pageType]);
+    // Refresh the data with debounce
+    debouncedRefresh();
+  }, [toast, debouncedRefresh, isAdmin, pageType]);
 
   useEffect(() => {
     console.log(`Setting up enhanced real-time order subscriptions for ${pageType}...`);
@@ -241,9 +255,12 @@ export const useGlobalRealtimeOrders = ({
 
     return () => {
       console.log(`Cleaning up enhanced real-time subscriptions for ${pageType}...`);
+      if (debounceTimer.current) {
+        clearTimeout(debounceTimer.current);
+      }
       supabase.removeChannel(channel);
     };
-  }, [pageType]); // Only depend on pageType, not the callback functions
+  }, [pageType, handleOrderInsert, handleOrderUpdate, handleOrderDelete]);
 
   return null;
 };

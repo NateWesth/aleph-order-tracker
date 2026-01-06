@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo, memo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Plus, Filter } from "lucide-react";
@@ -97,7 +97,7 @@ export default function OrdersPage({
   const { user } = useAuth();
   const { companies } = useCompanyData();
 
-  const fetchOrders = async () => {
+  const fetchOrders = useCallback(async () => {
     try {
       // Fetch all orders except delivered (those go to history)
       const { data, error } = await supabase
@@ -164,7 +164,7 @@ export default function OrdersPage({
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
 
   useEffect(() => {
     fetchOrders();
@@ -256,7 +256,7 @@ export default function OrdersPage({
     }
   };
 
-  const handleToggleItemStock = async (itemId: string, currentStatus: string) => {
+  const handleToggleItemStock = useCallback(async (itemId: string, currentStatus: string) => {
     const newStatus = currentStatus === "awaiting" ? "in-stock" : "awaiting";
     try {
       const { error } = await supabase
@@ -275,9 +275,9 @@ export default function OrdersPage({
         variant: "destructive",
       });
     }
-  };
+  }, [fetchOrders, toast]);
 
-  const handleMoveOrder = async (order: Order, newStatus: string) => {
+  const handleMoveOrder = useCallback(async (order: Order, newStatus: string) => {
     try {
       const updateData: any = {
         status: newStatus,
@@ -308,9 +308,9 @@ export default function OrdersPage({
         variant: "destructive",
       });
     }
-  };
+  }, [fetchOrders, toast]);
 
-  const handleDeleteOrder = async (order: Order) => {
+  const handleDeleteOrder = useCallback(async (order: Order) => {
     try {
       const { error } = await supabase.from("orders").delete().eq("id", order.id);
       if (error) throw error;
@@ -327,32 +327,33 @@ export default function OrdersPage({
         variant: "destructive",
       });
     }
-  };
+  }, [fetchOrders, toast]);
 
-  // Filter orders by company and search term
-  const filteredOrders = orders.filter((order) => {
-    const matchesCompany =
-      selectedCompanyId === "all" || order.company_id === selectedCompanyId;
-    const matchesSearch =
-      order.order_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.companyName?.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesCompany && matchesSearch;
-  });
+  // Memoize filtered orders to prevent unnecessary recalculations
+  const filteredOrders = useMemo(() => {
+    const searchLower = searchTerm.toLowerCase();
+    return orders.filter((order) => {
+      const matchesCompany =
+        selectedCompanyId === "all" || order.company_id === selectedCompanyId;
+      const matchesSearch =
+        order.order_number.toLowerCase().includes(searchLower) ||
+        order.companyName?.toLowerCase().includes(searchLower);
+      return matchesCompany && matchesSearch;
+    });
+  }, [orders, selectedCompanyId, searchTerm]);
 
   // Priority order for urgency sorting (lower = higher priority)
-  const urgencyPriority: Record<string, number> = {
+  const urgencyPriority: Record<string, number> = useMemo(() => ({
     urgent: 1,
     high: 2,
     normal: 3,
     low: 4,
-  };
+  }), []);
 
-  // Group and sort orders by status
-  const getOrdersByStatus = (status: string) => {
-    return filteredOrders
-      .filter((order) => order.status === status)
-      .sort((a, b) => {
-        // First sort by urgency (urgent orders first)
+  // Memoize orders by status to prevent unnecessary sorting
+  const ordersByStatus = useMemo(() => {
+    const sortOrders = (ordersToSort: Order[]) => {
+      return [...ordersToSort].sort((a, b) => {
         const urgencyA = urgencyPriority[a.urgency || "normal"] || 3;
         const urgencyB = urgencyPriority[b.urgency || "normal"] || 3;
         
@@ -360,12 +361,19 @@ export default function OrdersPage({
           return urgencyA - urgencyB;
         }
         
-        // Then sort by creation date (oldest first - FIFO)
         const dateA = new Date(a.created_at || 0).getTime();
         const dateB = new Date(b.created_at || 0).getTime();
         return dateA - dateB;
       });
-  };
+    };
+
+    return {
+      ordered: sortOrders(filteredOrders.filter((o) => o.status === "ordered")),
+      "in-stock": sortOrders(filteredOrders.filter((o) => o.status === "in-stock")),
+      "in-progress": sortOrders(filteredOrders.filter((o) => o.status === "in-progress")),
+      ready: sortOrders(filteredOrders.filter((o) => o.status === "ready")),
+    };
+  }, [filteredOrders, urgencyPriority]);
 
   if (loading) {
     return (
@@ -435,7 +443,7 @@ export default function OrdersPage({
             <OrderStatusColumn
               key={column.key}
               config={column}
-              orders={getOrdersByStatus(column.key)}
+              orders={ordersByStatus[column.key as keyof typeof ordersByStatus] || []}
               onMoveOrder={handleMoveOrder}
               onDeleteOrder={handleDeleteOrder}
               onToggleItemStock={handleToggleItemStock}
