@@ -170,7 +170,7 @@ const AdminDashboard = () => {
                     "flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-t-xl transition-all duration-200 whitespace-nowrap",
                     "border-b-2 -mb-[2px]",
                     isActive
-                      ? "bg-background border-primary text-foreground"
+                      ? "bg-primary/10 border-primary text-primary"
                       : "border-transparent text-muted-foreground hover:text-foreground hover:bg-secondary/50"
                   )}
                 >
