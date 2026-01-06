@@ -9,7 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme, colorThemes, boardSingleColors, colorfulPresets } from "@/contexts/ThemeContext";
 import { supabase } from "@/integrations/supabase/client";
-import { ArrowLeft, User, Building2, Moon, Sun, Palette, Check, LayoutGrid } from "lucide-react";
+import { ArrowLeft, User, Building2, Moon, Sun, Palette, Check, LayoutGrid, RotateCcw } from "lucide-react";
 
 type ColorTheme = keyof typeof colorThemes;
 type BoardSingleColor = keyof typeof boardSingleColors;
@@ -19,7 +19,7 @@ const Settings = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
-  const { theme, colorTheme, boardColorMode, boardSingleColor, colorfulPreset, customBoardColor, toggleTheme, setColorTheme, setBoardColorMode, setBoardSingleColor, setColorfulPreset, setCustomBoardColor } = useTheme();
+  const { theme, colorTheme, boardColorMode, boardSingleColor, colorfulPreset, customBoardColor, toggleTheme, setTheme, setColorTheme, setBoardColorMode, setBoardSingleColor, setColorfulPreset, setCustomBoardColor } = useTheme();
   const [userProfile, setUserProfile] = useState<any>(null);
   const [companyInfo, setCompanyInfo] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -75,6 +75,19 @@ const Settings = () => {
     });
   };
 
+  const handleResetToDefaults = () => {
+    setTheme('light');
+    setColorTheme('purple');
+    setBoardColorMode('colorful');
+    setBoardSingleColor('primary');
+    setColorfulPreset('default');
+    setCustomBoardColor('#6366f1');
+    toast({
+      title: "Settings Reset",
+      description: "All theme preferences have been restored to defaults",
+    });
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -111,9 +124,20 @@ const Settings = () => {
             {/* Appearance Settings */}
             <Card className="md:col-span-2">
               <CardHeader>
-                <div className="flex items-center space-x-2">
-                  <Palette className="h-5 w-5 text-primary" />
-                  <CardTitle>Appearance</CardTitle>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <Palette className="h-5 w-5 text-primary" />
+                    <CardTitle>Appearance</CardTitle>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleResetToDefaults}
+                    className="text-xs"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
+                    Reset Defaults
+                  </Button>
                 </div>
                 <CardDescription>
                   Customize your viewing experience with themes and colors
