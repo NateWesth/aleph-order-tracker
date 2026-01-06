@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { useTheme, boardSingleColors } from "@/contexts/ThemeContext";
+import { useTheme, boardSingleColors, colorfulPresets } from "@/contexts/ThemeContext";
 import { useGlobalRealtimeOrders } from "./hooks/useGlobalRealtimeOrders";
 import { useCompanyData } from "@/components/admin/hooks/useCompanyData";
 import OrderForm from "./components/OrderForm";
@@ -87,9 +87,23 @@ const DEFAULT_STATUS_COLUMNS = [
 ];
 
 // Helper to get status columns based on theme settings
-const getStatusColumns = (boardColorMode: string, boardSingleColor: string) => {
+const getStatusColumns = (boardColorMode: string, boardSingleColor: string, colorfulPreset: string, customBoardColor: string) => {
   if (boardColorMode === 'colorful') {
-    return DEFAULT_STATUS_COLUMNS;
+    const preset = colorfulPresets[colorfulPreset as keyof typeof colorfulPresets] || colorfulPresets.default;
+    return DEFAULT_STATUS_COLUMNS.map((col, index) => ({
+      ...col,
+      bgColor: preset.colors[index],
+      color: preset.textColors[index],
+    }));
+  }
+  
+  if (boardSingleColor === 'custom') {
+    return DEFAULT_STATUS_COLUMNS.map(col => ({
+      ...col,
+      color: 'text-white',
+      bgColor: '',
+      customColor: customBoardColor,
+    }));
   }
   
   const colorConfig = boardSingleColors[boardSingleColor as keyof typeof boardSingleColors] || boardSingleColors.primary;
@@ -112,11 +126,11 @@ export default function OrdersPage({
   const { toast } = useToast();
   const { user } = useAuth();
   const { companies } = useCompanyData();
-  const { boardColorMode, boardSingleColor } = useTheme();
+  const { boardColorMode, boardSingleColor, colorfulPreset, customBoardColor } = useTheme();
 
   const STATUS_COLUMNS = useMemo(() => 
-    getStatusColumns(boardColorMode, boardSingleColor), 
-    [boardColorMode, boardSingleColor]
+    getStatusColumns(boardColorMode, boardSingleColor, colorfulPreset, customBoardColor), 
+    [boardColorMode, boardSingleColor, colorfulPreset, customBoardColor]
   );
   const fetchOrders = useCallback(async () => {
     try {

@@ -48,6 +48,7 @@ interface StatusConfig {
   label: string;
   color: string;
   bgColor: string;
+  customColor?: string;
   nextStatus?: string;
   nextLabel?: string;
   prevStatus?: string;
@@ -118,10 +119,13 @@ function OrderStatusColumn({
   return (
     <div className="flex flex-col w-full">
       {/* Column Header */}
-      <div className={cn(
-        "px-4 py-3 rounded-t-xl",
-        config.bgColor
-      )}>
+      <div 
+        className={cn(
+          "px-4 py-3 rounded-t-xl",
+          !config.customColor && config.bgColor
+        )}
+        style={config.customColor ? { backgroundColor: config.customColor } : undefined}
+      >
         <div className="flex items-center justify-between">
           <h3 className={cn(
             "font-semibold text-sm uppercase tracking-wide",

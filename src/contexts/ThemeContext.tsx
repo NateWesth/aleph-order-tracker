@@ -3,17 +3,22 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 type Theme = 'light' | 'dark';
 type ColorTheme = 'purple' | 'green' | 'blue' | 'rose' | 'orange' | 'teal' | 'red' | 'black';
 type BoardColorMode = 'colorful' | 'single';
-type BoardSingleColor = 'amber' | 'sky' | 'violet' | 'emerald' | 'slate' | 'primary';
+type BoardSingleColor = 'amber' | 'sky' | 'violet' | 'emerald' | 'slate' | 'rose' | 'cyan' | 'lime' | 'orange' | 'indigo' | 'pink' | 'primary' | 'custom';
+type ColorfulPreset = 'default' | 'sunset' | 'ocean' | 'forest' | 'berry' | 'earth' | 'neon' | 'pastel' | 'mono' | 'candy';
 
 interface ThemeContextType {
   theme: Theme;
   colorTheme: ColorTheme;
   boardColorMode: BoardColorMode;
   boardSingleColor: BoardSingleColor;
+  colorfulPreset: ColorfulPreset;
+  customBoardColor: string;
   setTheme: (theme: Theme) => void;
   setColorTheme: (colorTheme: ColorTheme) => void;
   setBoardColorMode: (mode: BoardColorMode) => void;
   setBoardSingleColor: (color: BoardSingleColor) => void;
+  setColorfulPreset: (preset: ColorfulPreset) => void;
+  setCustomBoardColor: (color: string) => void;
   toggleTheme: () => void;
 }
 
@@ -38,13 +43,73 @@ export const colorThemes: Record<ColorTheme, { name: string; hue: number; satura
   black: { name: 'Noir', hue: 0, saturation: 0, lightness: 20, preview: 'hsl(0 0% 20%)' },
 };
 
+export const colorfulPresets: Record<ColorfulPreset, { name: string; colors: [string, string, string, string]; textColors: [string, string, string, string] }> = {
+  default: { 
+    name: 'Default', 
+    colors: ['bg-amber-600', 'bg-sky-600', 'bg-violet-600', 'bg-emerald-600'],
+    textColors: ['text-amber-50', 'text-sky-50', 'text-violet-50', 'text-emerald-50']
+  },
+  sunset: { 
+    name: 'Sunset', 
+    colors: ['bg-orange-500', 'bg-rose-500', 'bg-pink-500', 'bg-red-500'],
+    textColors: ['text-orange-50', 'text-rose-50', 'text-pink-50', 'text-red-50']
+  },
+  ocean: { 
+    name: 'Ocean', 
+    colors: ['bg-cyan-600', 'bg-blue-600', 'bg-indigo-600', 'bg-teal-600'],
+    textColors: ['text-cyan-50', 'text-blue-50', 'text-indigo-50', 'text-teal-50']
+  },
+  forest: { 
+    name: 'Forest', 
+    colors: ['bg-lime-600', 'bg-green-600', 'bg-emerald-600', 'bg-teal-700'],
+    textColors: ['text-lime-50', 'text-green-50', 'text-emerald-50', 'text-teal-50']
+  },
+  berry: { 
+    name: 'Berry', 
+    colors: ['bg-fuchsia-600', 'bg-purple-600', 'bg-violet-600', 'bg-pink-600'],
+    textColors: ['text-fuchsia-50', 'text-purple-50', 'text-violet-50', 'text-pink-50']
+  },
+  earth: { 
+    name: 'Earth', 
+    colors: ['bg-amber-700', 'bg-orange-700', 'bg-stone-600', 'bg-yellow-700'],
+    textColors: ['text-amber-50', 'text-orange-50', 'text-stone-50', 'text-yellow-50']
+  },
+  neon: { 
+    name: 'Neon', 
+    colors: ['bg-lime-500', 'bg-cyan-500', 'bg-fuchsia-500', 'bg-yellow-500'],
+    textColors: ['text-lime-950', 'text-cyan-950', 'text-fuchsia-50', 'text-yellow-950']
+  },
+  pastel: { 
+    name: 'Pastel', 
+    colors: ['bg-pink-400', 'bg-sky-400', 'bg-violet-400', 'bg-lime-400'],
+    textColors: ['text-pink-950', 'text-sky-950', 'text-violet-950', 'text-lime-950']
+  },
+  mono: { 
+    name: 'Monochrome', 
+    colors: ['bg-slate-500', 'bg-slate-600', 'bg-slate-700', 'bg-slate-800'],
+    textColors: ['text-slate-50', 'text-slate-50', 'text-slate-50', 'text-slate-50']
+  },
+  candy: { 
+    name: 'Candy', 
+    colors: ['bg-rose-400', 'bg-orange-400', 'bg-teal-400', 'bg-indigo-400'],
+    textColors: ['text-rose-950', 'text-orange-950', 'text-teal-950', 'text-indigo-50']
+  },
+};
+
 export const boardSingleColors: Record<BoardSingleColor, { name: string; bgClass: string; textClass: string; preview: string }> = {
   amber: { name: 'Amber', bgClass: 'bg-amber-600', textClass: 'text-amber-50', preview: 'hsl(45 93% 47%)' },
   sky: { name: 'Sky Blue', bgClass: 'bg-sky-600', textClass: 'text-sky-50', preview: 'hsl(200 98% 39%)' },
   violet: { name: 'Violet', bgClass: 'bg-violet-600', textClass: 'text-violet-50', preview: 'hsl(262 83% 58%)' },
   emerald: { name: 'Emerald', bgClass: 'bg-emerald-600', textClass: 'text-emerald-50', preview: 'hsl(160 84% 39%)' },
   slate: { name: 'Slate', bgClass: 'bg-slate-600', textClass: 'text-slate-50', preview: 'hsl(215 14% 34%)' },
+  rose: { name: 'Rose', bgClass: 'bg-rose-600', textClass: 'text-rose-50', preview: 'hsl(350 89% 60%)' },
+  cyan: { name: 'Cyan', bgClass: 'bg-cyan-600', textClass: 'text-cyan-50', preview: 'hsl(185 94% 40%)' },
+  lime: { name: 'Lime', bgClass: 'bg-lime-600', textClass: 'text-lime-50', preview: 'hsl(85 85% 35%)' },
+  orange: { name: 'Orange', bgClass: 'bg-orange-600', textClass: 'text-orange-50', preview: 'hsl(25 95% 53%)' },
+  indigo: { name: 'Indigo', bgClass: 'bg-indigo-600', textClass: 'text-indigo-50', preview: 'hsl(239 84% 67%)' },
+  pink: { name: 'Pink', bgClass: 'bg-pink-600', textClass: 'text-pink-50', preview: 'hsl(330 81% 60%)' },
   primary: { name: 'Theme Color', bgClass: 'bg-primary', textClass: 'text-primary-foreground', preview: 'var(--primary)' },
+  custom: { name: 'Custom', bgClass: '', textClass: 'text-white', preview: '#6366f1' },
 };
 
 interface ThemeProviderProps {
@@ -56,6 +121,8 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
   const [colorTheme, setColorTheme] = useState<ColorTheme>('purple');
   const [boardColorMode, setBoardColorMode] = useState<BoardColorMode>('colorful');
   const [boardSingleColor, setBoardSingleColor] = useState<BoardSingleColor>('primary');
+  const [colorfulPreset, setColorfulPreset] = useState<ColorfulPreset>('default');
+  const [customBoardColor, setCustomBoardColor] = useState<string>('#6366f1');
 
   // Initialize theme from localStorage
   useEffect(() => {
@@ -75,6 +142,14 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
       const savedBoardColor = localStorage.getItem('boardSingleColor') as BoardSingleColor;
       if (savedBoardColor && boardSingleColors[savedBoardColor]) {
         setBoardSingleColor(savedBoardColor);
+      }
+      const savedColorfulPreset = localStorage.getItem('colorfulPreset') as ColorfulPreset;
+      if (savedColorfulPreset && colorfulPresets[savedColorfulPreset]) {
+        setColorfulPreset(savedColorfulPreset);
+      }
+      const savedCustomColor = localStorage.getItem('customBoardColor');
+      if (savedCustomColor) {
+        setCustomBoardColor(savedCustomColor);
       }
     } catch (error) {
       console.warn('Failed to read theme from localStorage:', error);
@@ -123,10 +198,12 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     try {
       localStorage.setItem('boardColorMode', boardColorMode);
       localStorage.setItem('boardSingleColor', boardSingleColor);
+      localStorage.setItem('colorfulPreset', colorfulPreset);
+      localStorage.setItem('customBoardColor', customBoardColor);
     } catch (error) {
       console.warn('Failed to save board color preferences:', error);
     }
-  }, [boardColorMode, boardSingleColor]);
+  }, [boardColorMode, boardSingleColor, colorfulPreset, customBoardColor]);
 
   const toggleTheme = () => {
     setTheme(prev => prev === 'light' ? 'dark' : 'light');
@@ -137,11 +214,15 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
       theme, 
       colorTheme, 
       boardColorMode, 
-      boardSingleColor, 
+      boardSingleColor,
+      colorfulPreset,
+      customBoardColor,
       setTheme, 
       setColorTheme, 
       setBoardColorMode, 
-      setBoardSingleColor, 
+      setBoardSingleColor,
+      setColorfulPreset,
+      setCustomBoardColor,
       toggleTheme 
     }}>
       {children}
