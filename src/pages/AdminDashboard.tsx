@@ -157,7 +157,12 @@ const AdminDashboard = () => {
 
       {/* Main content */}
       <main className="flex-1 overflow-x-hidden">
-        <div className="max-w-7xl mx-auto p-4 md:p-6">
+        <div
+          className={cn(
+            "mx-auto p-4 md:p-6",
+            activeView === "orders" || activeView === "history" ? "max-w-none w-full" : "max-w-7xl"
+          )}
+        >
           {activeView === "home" && (
             <div className="flex items-center justify-center min-h-[60vh]">
               <div className="text-center space-y-4 animate-fade-in">
