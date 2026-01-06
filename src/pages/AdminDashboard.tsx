@@ -6,6 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Package, History, BarChart3, Settings, LogOut, Building2, Home, Search, Box, Users, Menu } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import OrdersPage from "@/components/orders/OrdersPage";
 import CompletedPage from "@/components/orders/CompletedPage";
 import ClientCompaniesPage from "@/components/admin/ClientCompaniesPage";
@@ -13,6 +14,7 @@ import StatsPage from "@/components/admin/StatsPage";
 import ItemsPage from "@/components/admin/ItemsPage";
 import UsersManagementPage from "@/components/admin/UsersManagementPage";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useGlobalUnreadCount } from "@/hooks/useGlobalUnreadCount";
 import { cn } from "@/lib/utils";
 
 const AdminDashboard = () => {
@@ -25,7 +27,7 @@ const AdminDashboard = () => {
   const [userRole, setUserRole] = useState<'admin' | 'user'>('user');
   const [loading, setLoading] = useState(true);
   const isMobile = useIsMobile();
-
+  const { unreadOrderUpdates, pendingOrdersCount } = useGlobalUnreadCount();
   useEffect(() => {
     if (user) {
       fetchUserProfile();
@@ -87,12 +89,12 @@ const AdminDashboard = () => {
   const isAdmin = userRole === 'admin';
 
   const navItems = [
-    { id: "orders", label: "Orders", icon: Package },
-    { id: "history", label: "History", icon: History },
-    { id: "clients", label: "Clients", icon: Building2 },
-    { id: "items", label: "Items", icon: Box },
-    ...(isAdmin ? [{ id: "users", label: "Users", icon: Users }] : []),
-    { id: "stats", label: "Stats", icon: BarChart3 },
+    { id: "orders", label: "Orders", icon: Package, badge: pendingOrdersCount },
+    { id: "history", label: "History", icon: History, badge: unreadOrderUpdates },
+    { id: "clients", label: "Clients", icon: Building2, badge: 0 },
+    { id: "items", label: "Items", icon: Box, badge: 0 },
+    ...(isAdmin ? [{ id: "users", label: "Users", icon: Users, badge: 0 }] : []),
+    { id: "stats", label: "Stats", icon: BarChart3, badge: 0 },
   ];
 
   if (loading) {
@@ -167,14 +169,21 @@ const AdminDashboard = () => {
                   key={item.id}
                   onClick={() => setActiveView(item.id)}
                   className={cn(
-                    "flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-t-xl transition-all duration-200 whitespace-nowrap",
+                    "relative flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-t-xl transition-all duration-200 whitespace-nowrap",
                     "border-b-2 -mb-[2px]",
                     isActive
                       ? "bg-primary/10 border-primary text-primary"
                       : "border-transparent text-muted-foreground hover:text-foreground hover:bg-secondary/50"
                   )}
                 >
-                  <item.icon className="h-4 w-4" />
+                  <div className="relative">
+                    <item.icon className="h-4 w-4" />
+                    {item.badge > 0 && (
+                      <span className="absolute -top-2 -right-2 min-w-[18px] h-[18px] flex items-center justify-center text-[10px] font-bold bg-primary text-primary-foreground rounded-full px-1">
+                        {item.badge > 99 ? '99+' : item.badge}
+                      </span>
+                    )}
+                  </div>
                   <span className={cn(isMobile && "hidden sm:inline")}>{item.label}</span>
                 </button>
               );
