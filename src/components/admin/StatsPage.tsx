@@ -6,19 +6,28 @@ import {
 } from "recharts";
 import { 
   Package, TrendingUp, Clock, Users,
-  ArrowUpRight, ArrowDownRight
+  ArrowUpRight, ArrowDownRight, Calendar
 } from "lucide-react";
-import { format, subMonths, startOfMonth, endOfMonth, differenceInDays, startOfYear, subYears } from "date-fns";
+import { format, subMonths, startOfMonth, endOfMonth, differenceInDays, startOfYear, subDays, isWithinInterval, eachMonthOfInterval } from "date-fns";
+import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { cn } from "@/lib/utils";
+
+type PresetKey = "7d" | "30d" | "90d" | "year" | "all";
+
+interface DateRange {
+  from: Date;
+  to: Date;
+}
 
 interface OrderStats {
   totalOrders: number;
-  ordersThisMonth: number;
-  ordersLastMonth: number;
-  ordersThisYear: number;
-  ordersLastYear: number;
+  ordersInRange: number;
+  ordersPrevRange: number;
   avgCompletionDays: number;
   ordersByStatus: { name: string; value: number; color: string }[];
-  ordersByMonth: { month: string; orders: number }[];
+  ordersByPeriod: { period: string; orders: number }[];
   topItems: { name: string; quantity: number }[];
   topClients: { name: string; orders: number }[];
   totalClients: number;
@@ -33,24 +42,65 @@ const STATUS_COLORS: Record<string, string> = {
   delivered: "#22c55e",
 };
 
+const PRESETS: { key: PresetKey; label: string }[] = [
+  { key: "7d", label: "7 days" },
+  { key: "30d", label: "30 days" },
+  { key: "90d", label: "90 days" },
+  { key: "year", label: "This year" },
+  { key: "all", label: "All time" },
+];
+
+function getPresetRange(preset: PresetKey): DateRange {
+  const now = new Date();
+  const to = endOfMonth(now);
+  
+  switch (preset) {
+    case "7d":
+      return { from: subDays(now, 7), to: now };
+    case "30d":
+      return { from: subDays(now, 30), to: now };
+    case "90d":
+      return { from: subDays(now, 90), to: now };
+    case "year":
+      return { from: startOfYear(now), to: now };
+    case "all":
+    default:
+      return { from: new Date(2020, 0, 1), to: now };
+  }
+}
+
 export default function StatsPage() {
   const [stats, setStats] = useState<OrderStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [activePreset, setActivePreset] = useState<PresetKey>("30d");
+  const [dateRange, setDateRange] = useState<DateRange>(getPresetRange("30d"));
+  const [customRange, setCustomRange] = useState<{ from?: Date; to?: Date }>({});
+  const [isCustom, setIsCustom] = useState(false);
 
   useEffect(() => {
     fetchStats();
-  }, []);
+  }, [dateRange]);
+
+  const handlePresetClick = (preset: PresetKey) => {
+    setActivePreset(preset);
+    setIsCustom(false);
+    setDateRange(getPresetRange(preset));
+  };
+
+  const handleCustomDateSelect = (range: { from?: Date; to?: Date } | undefined) => {
+    if (!range) return;
+    setCustomRange(range);
+    if (range.from && range.to) {
+      setIsCustom(true);
+      setActivePreset("all");
+      setDateRange({ from: range.from, to: range.to });
+    }
+  };
 
   const fetchStats = async () => {
     try {
-      const now = new Date();
-      const thisMonthStart = startOfMonth(now);
-      const lastMonthStart = startOfMonth(subMonths(now, 1));
-      const lastMonthEnd = endOfMonth(subMonths(now, 1));
-      const thisYearStart = startOfYear(now);
-      const lastYearStart = startOfYear(subYears(now, 1));
-      const lastYearEnd = new Date(subYears(now, 1).getFullYear(), 11, 31);
-
+      setLoading(true);
+      
       const { data: orders, error: ordersError } = await supabase
         .from("orders")
         .select("*, companies(name)");
@@ -69,35 +119,37 @@ export default function StatsPage() {
 
       const totalOrders = orders?.length || 0;
       const totalClients = companies?.length || 0;
-      
-      const ordersThisMonth = orders?.filter(o => 
-        new Date(o.created_at!) >= thisMonthStart
-      ).length || 0;
 
-      const ordersLastMonth = orders?.filter(o => {
+      // Filter orders within date range
+      const ordersInRange = orders?.filter(o => {
         const date = new Date(o.created_at!);
-        return date >= lastMonthStart && date <= lastMonthEnd;
+        return isWithinInterval(date, { start: dateRange.from, end: dateRange.to });
+      }) || [];
+
+      // Calculate previous range for comparison
+      const rangeDuration = dateRange.to.getTime() - dateRange.from.getTime();
+      const prevRangeStart = new Date(dateRange.from.getTime() - rangeDuration);
+      const prevRangeEnd = new Date(dateRange.from.getTime() - 1);
+
+      const ordersPrevRange = orders?.filter(o => {
+        const date = new Date(o.created_at!);
+        return isWithinInterval(date, { start: prevRangeStart, end: prevRangeEnd });
       }).length || 0;
 
-      const ordersThisYear = orders?.filter(o => 
-        new Date(o.created_at!) >= thisYearStart
-      ).length || 0;
-
-      const ordersLastYear = orders?.filter(o => {
-        const date = new Date(o.created_at!);
-        return date >= lastYearStart && date <= lastYearEnd;
-      }).length || 0;
-
-      const completedOrders = orders?.filter(o => (o.status === "completed" || o.status === "delivered") && o.completed_date) || [];
-      const avgCompletionDays = completedOrders.length > 0
-        ? completedOrders.reduce((acc, o) => {
+      // Average completion time for orders in range
+      const completedOrdersInRange = ordersInRange.filter(o => 
+        (o.status === "completed" || o.status === "delivered") && o.completed_date
+      );
+      const avgCompletionDays = completedOrdersInRange.length > 0
+        ? completedOrdersInRange.reduce((acc, o) => {
             const days = differenceInDays(new Date(o.completed_date!), new Date(o.created_at!));
             return acc + days;
-          }, 0) / completedOrders.length
+          }, 0) / completedOrdersInRange.length
         : 0;
 
+      // Orders by status (within range)
       const statusCounts: Record<string, number> = {};
-      orders?.forEach(o => {
+      ordersInRange.forEach(o => {
         const status = o.status || "pending";
         statusCounts[status] = (statusCounts[status] || 0) + 1;
       });
@@ -107,25 +159,27 @@ export default function StatsPage() {
         color: STATUS_COLORS[name] || "#94a3b8",
       }));
 
-      const ordersByMonth = [];
-      for (let i = 5; i >= 0; i--) {
-        const monthDate = subMonths(now, i);
+      // Orders by period (dynamic based on range)
+      const months = eachMonthOfInterval({ start: dateRange.from, end: dateRange.to });
+      const ordersByPeriod = months.slice(-6).map(monthDate => {
         const monthStart = startOfMonth(monthDate);
         const monthEnd = endOfMonth(monthDate);
-
-        const count = orders?.filter(o => {
+        const count = ordersInRange.filter(o => {
           const date = new Date(o.created_at!);
-          return date >= monthStart && date <= monthEnd;
-        }).length || 0;
-
-        ordersByMonth.push({
-          month: format(monthDate, "MMM"),
+          return isWithinInterval(date, { start: monthStart, end: monthEnd });
+        }).length;
+        return {
+          period: format(monthDate, "MMM"),
           orders: count,
-        });
-      }
+        };
+      });
 
+      // Top items (within range)
+      const orderIdsInRange = new Set(ordersInRange.map(o => o.id));
+      const itemsInRange = orderItems?.filter(item => orderIdsInRange.has(item.order_id)) || [];
+      
       const itemCounts: Record<string, number> = {};
-      orderItems?.forEach(item => {
+      itemsInRange.forEach(item => {
         const name = item.name;
         itemCounts[name] = (itemCounts[name] || 0) + item.quantity;
       });
@@ -134,8 +188,9 @@ export default function StatsPage() {
         .slice(0, 5)
         .map(([name, quantity]) => ({ name: name.length > 15 ? name.slice(0, 15) + "…" : name, quantity }));
 
+      // Top clients (within range)
       const clientCounts: Record<string, number> = {};
-      orders?.forEach(o => {
+      ordersInRange.forEach(o => {
         const companyName = (o.companies as any)?.name || "Unknown";
         clientCounts[companyName] = (clientCounts[companyName] || 0) + 1;
       });
@@ -146,13 +201,11 @@ export default function StatsPage() {
 
       setStats({
         totalOrders,
-        ordersThisMonth,
-        ordersLastMonth,
-        ordersThisYear,
-        ordersLastYear,
+        ordersInRange: ordersInRange.length,
+        ordersPrevRange,
         avgCompletionDays: Math.round(avgCompletionDays * 10) / 10,
         ordersByStatus,
-        ordersByMonth,
+        ordersByPeriod,
         topItems,
         topClients,
         totalClients,
@@ -180,16 +233,52 @@ export default function StatsPage() {
     );
   }
 
-  const monthChange = stats.ordersLastMonth > 0
-    ? Math.round(((stats.ordersThisMonth - stats.ordersLastMonth) / stats.ordersLastMonth) * 100)
-    : stats.ordersThisMonth > 0 ? 100 : 0;
-
-  const yearChange = stats.ordersLastYear > 0
-    ? Math.round(((stats.ordersThisYear - stats.ordersLastYear) / stats.ordersLastYear) * 100)
-    : stats.ordersThisYear > 0 ? 100 : 0;
+  const rangeChange = stats.ordersPrevRange > 0
+    ? Math.round(((stats.ordersInRange - stats.ordersPrevRange) / stats.ordersPrevRange) * 100)
+    : stats.ordersInRange > 0 ? 100 : 0;
 
   return (
-    <div className="space-y-8 pb-8">
+    <div className="space-y-6 pb-8">
+      {/* Date Range Filter */}
+      <div className="flex flex-wrap items-center gap-2">
+        {PRESETS.map(preset => (
+          <Button
+            key={preset.key}
+            variant={activePreset === preset.key && !isCustom ? "default" : "outline"}
+            size="sm"
+            onClick={() => handlePresetClick(preset.key)}
+            className="text-xs"
+          >
+            {preset.label}
+          </Button>
+        ))}
+        
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant={isCustom ? "default" : "outline"}
+              size="sm"
+              className={cn("text-xs gap-1.5", isCustom && "bg-primary")}
+            >
+              <Calendar className="h-3.5 w-3.5" />
+              {isCustom && customRange.from && customRange.to
+                ? `${format(customRange.from, "MMM d")} - ${format(customRange.to, "MMM d")}`
+                : "Custom"
+              }
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <CalendarComponent
+              mode="range"
+              selected={customRange as any}
+              onSelect={handleCustomDateSelect as any}
+              numberOfMonths={2}
+              defaultMonth={subMonths(new Date(), 1)}
+            />
+          </PopoverContent>
+        </Popover>
+      </div>
+
       {/* Metric Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <MetricCard
@@ -198,9 +287,9 @@ export default function StatsPage() {
           icon={<Package className="h-5 w-5" />}
         />
         <MetricCard
-          label="This Month"
-          value={stats.ordersThisMonth}
-          change={monthChange}
+          label="In Period"
+          value={stats.ordersInRange}
+          change={rangeChange}
           icon={<TrendingUp className="h-5 w-5" />}
         />
         <MetricCard
@@ -222,7 +311,7 @@ export default function StatsPage() {
           <h3 className="text-sm font-medium text-muted-foreground mb-6">Orders Trend</h3>
           <div className="h-48">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={stats.ordersByMonth}>
+              <AreaChart data={stats.ordersByPeriod}>
                 <defs>
                   <linearGradient id="orderGradient" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
@@ -230,7 +319,7 @@ export default function StatsPage() {
                   </linearGradient>
                 </defs>
                 <XAxis 
-                  dataKey="month" 
+                  dataKey="period" 
                   axisLine={false}
                   tickLine={false}
                   tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
@@ -277,7 +366,7 @@ export default function StatsPage() {
               </ResponsiveContainer>
             </div>
             <div className="flex-1 space-y-2">
-              {stats.ordersByStatus.map((status, i) => (
+              {stats.ordersByStatus.length > 0 ? stats.ordersByStatus.map((status, i) => (
                 <div key={i} className="flex items-center justify-between text-sm">
                   <div className="flex items-center gap-2">
                     <div 
@@ -288,7 +377,9 @@ export default function StatsPage() {
                   </div>
                   <span className="font-medium tabular-nums">{status.value}</span>
                 </div>
-              ))}
+              )) : (
+                <p className="text-sm text-muted-foreground">No orders in this period</p>
+              )}
             </div>
           </div>
         </div>
@@ -324,7 +415,7 @@ export default function StatsPage() {
             </div>
           ) : (
             <div className="h-48 flex items-center justify-center text-muted-foreground text-sm">
-              No items data available
+              No items in this period
             </div>
           )}
         </div>
@@ -359,26 +450,28 @@ export default function StatsPage() {
             </div>
           ) : (
             <div className="h-48 flex items-center justify-center text-muted-foreground text-sm">
-              No client data available
+              No client data in this period
             </div>
           )}
         </div>
       </div>
 
-      {/* Year Summary */}
+      {/* Period Summary */}
       <div className="bg-gradient-to-br from-primary/5 to-primary/10 border border-primary/20 rounded-xl p-6">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm text-muted-foreground">This Year</p>
-            <p className="text-3xl font-bold mt-1">{stats.ordersThisYear} orders</p>
+            <p className="text-sm text-muted-foreground">
+              {format(dateRange.from, "MMM d, yyyy")} — {format(dateRange.to, "MMM d, yyyy")}
+            </p>
+            <p className="text-3xl font-bold mt-1">{stats.ordersInRange} orders</p>
           </div>
           <div className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium ${
-            yearChange >= 0 
+            rangeChange >= 0 
               ? 'bg-emerald-500/10 text-emerald-600' 
               : 'bg-red-500/10 text-red-600'
           }`}>
-            {yearChange >= 0 ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownRight className="h-4 w-4" />}
-            {Math.abs(yearChange)}% vs last year
+            {rangeChange >= 0 ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownRight className="h-4 w-4" />}
+            {Math.abs(rangeChange)}% vs prev period
           </div>
         </div>
       </div>
