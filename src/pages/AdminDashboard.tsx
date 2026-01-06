@@ -22,12 +22,14 @@ const AdminDashboard = () => {
   const [activeView, setActiveView] = useState("orders");
   const [searchTerm, setSearchTerm] = useState("");
   const [userProfile, setUserProfile] = useState<any>(null);
+  const [userRole, setUserRole] = useState<'admin' | 'user'>('user');
   const [loading, setLoading] = useState(true);
   const isMobile = useIsMobile();
 
   useEffect(() => {
     if (user) {
       fetchUserProfile();
+      fetchUserRole();
     }
   }, [user]);
 
@@ -51,6 +53,28 @@ const AdminDashboard = () => {
     }
   };
 
+  const fetchUserRole = async () => {
+    if (!user) return;
+    try {
+      const { data, error } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      
+      if (error) {
+        console.error('Error fetching user role:', error);
+        return;
+      }
+      
+      if (data) {
+        setUserRole(data.role);
+      }
+    } catch (error) {
+      console.error('Unexpected error fetching user role:', error);
+    }
+  };
+
   const handleLogout = async () => {
     await signOut();
     toast({
@@ -60,12 +84,14 @@ const AdminDashboard = () => {
     navigate("/auth");
   };
 
+  const isAdmin = userRole === 'admin';
+
   const navItems = [
     { id: "orders", label: "Orders", icon: Package },
     { id: "history", label: "History", icon: History },
     { id: "clients", label: "Clients", icon: Building2 },
     { id: "items", label: "Items", icon: Box },
-    { id: "users", label: "Users", icon: Users },
+    ...(isAdmin ? [{ id: "users", label: "Users", icon: Users }] : []),
     { id: "stats", label: "Stats", icon: BarChart3 },
   ];
 

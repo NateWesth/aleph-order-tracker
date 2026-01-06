@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { User, Shield, Search, Check, X, Clock } from "lucide-react";
+import { User, Shield, Search, Check, X, Clock, UserCog } from "lucide-react";
 
 interface UserProfile {
   id: string;
@@ -24,7 +24,7 @@ interface UserProfile {
   company_id: string;
   created_at: string;
   approved: boolean;
-  role?: string;
+  role?: 'admin' | 'user';
   company_name?: string;
 }
 
@@ -40,8 +40,6 @@ export default function UsersManagementPage() {
 
   const fetchUsers = async () => {
     try {
-      console.log("Fetching profiles...");
-      
       // Fetch profiles with company information
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
@@ -56,10 +54,7 @@ export default function UsersManagementPage() {
         throw profilesError;
       }
 
-      console.log("Profiles fetched successfully:", profiles);
-
       // Fetch user roles
-      console.log("Fetching user roles...");
       const { data: userRoles, error: rolesError } = await supabase
         .from('user_roles')
         .select('user_id, role');
@@ -69,16 +64,13 @@ export default function UsersManagementPage() {
         throw rolesError;
       }
 
-      console.log("User roles fetched successfully:", userRoles);
-
       // Combine profiles with roles and company names
       const usersWithRoles = profiles?.map(profile => ({
         ...profile,
-        role: userRoles?.find(role => role.user_id === profile.id)?.role || 'admin',
+        role: userRoles?.find(role => role.user_id === profile.id)?.role || 'user',
         company_name: profile.companies?.name || 'N/A'
       })) || [];
 
-      console.log("Combined user data:", usersWithRoles);
       setUsers(usersWithRoles);
     } catch (error: any) {
       console.error("Failed to fetch users:", error);
@@ -94,34 +86,72 @@ export default function UsersManagementPage() {
 
   const approveUser = async (userId: string, approve: boolean) => {
     try {
-      console.log("Updating user approval:", { userId, approve });
-      
       const { error } = await supabase
         .from('profiles')
         .update({ approved: approve })
         .eq('id', userId);
 
-      if (error) {
-        console.error("Approval update error:", error);
-        throw error;
-      }
+      if (error) throw error;
 
-      console.log("User approval updated successfully");
-
-      // Update local state
       setUsers(users.map(user => 
         user.id === userId ? { ...user, approved: approve } : user
       ));
 
       toast({
         title: "Success",
-        description: approve ? "User has been approved and can now access the system." : "User access has been revoked.",
+        description: approve ? "User has been approved." : "User access has been revoked.",
       });
     } catch (error: any) {
       console.error("Failed to update user approval:", error);
       toast({
         title: "Error",
-        description: "Failed to update user approval. Please try again.",
+        description: "Failed to update user approval.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const updateUserRole = async (userId: string, newRole: 'admin' | 'user') => {
+    try {
+      // Check if user already has a role record
+      const { data: existingRole, error: checkError } = await supabase
+        .from('user_roles')
+        .select('id')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (checkError) throw checkError;
+
+      if (existingRole) {
+        // Update existing role
+        const { error } = await supabase
+          .from('user_roles')
+          .update({ role: newRole })
+          .eq('user_id', userId);
+
+        if (error) throw error;
+      } else {
+        // Insert new role
+        const { error } = await supabase
+          .from('user_roles')
+          .insert({ user_id: userId, role: newRole });
+
+        if (error) throw error;
+      }
+
+      setUsers(users.map(user => 
+        user.id === userId ? { ...user, role: newRole } : user
+      ));
+
+      toast({
+        title: "Success",
+        description: `User role updated to ${newRole}.`,
+      });
+    } catch (error: any) {
+      console.error("Failed to update user role:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update user role.",
         variant: "destructive",
       });
     }
@@ -134,7 +164,6 @@ export default function UsersManagementPage() {
     user.company_name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Separate pending and approved users
   const pendingUsers = filteredUsers.filter(u => !u.approved);
   const approvedUsers = filteredUsers.filter(u => u.approved);
 
@@ -149,17 +178,15 @@ export default function UsersManagementPage() {
   return (
     <div className="container mx-auto p-6 space-y-8">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-aleph-green">User Management</h1>
-        <div className="flex items-center gap-2">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-            <Input
-              placeholder="Search users..."
-              className="pl-10 w-64"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
+        <h1 className="text-2xl font-bold text-primary">User Management</h1>
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+          <Input
+            placeholder="Search users..."
+            className="pl-10 w-64"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
         </div>
       </div>
 
@@ -172,7 +199,7 @@ export default function UsersManagementPage() {
               Pending Approval ({pendingUsers.length})
             </h2>
           </div>
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
+          <div className="bg-card rounded-lg shadow">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -187,20 +214,18 @@ export default function UsersManagementPage() {
                   <TableRow key={user.id}>
                     <TableCell>
                       <div className="flex items-center space-x-3">
-                        <div className="bg-yellow-100 p-2 rounded-full">
+                        <div className="bg-yellow-100 dark:bg-yellow-900/50 p-2 rounded-full">
                           <User className="h-4 w-4 text-yellow-600" />
                         </div>
                         <div>
                           <div className="font-medium">{user.full_name || 'N/A'}</div>
-                          <div className="text-sm text-gray-500">{user.position || 'No position'}</div>
+                          <div className="text-sm text-muted-foreground">{user.position || 'No position'}</div>
                         </div>
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div>
-                        <div className="text-sm">{user.email}</div>
-                        <div className="text-sm text-gray-500">{user.phone || 'No phone'}</div>
-                      </div>
+                      <div className="text-sm">{user.email}</div>
+                      <div className="text-sm text-muted-foreground">{user.phone || 'No phone'}</div>
                     </TableCell>
                     <TableCell>
                       <div className="text-sm">
@@ -235,17 +260,17 @@ export default function UsersManagementPage() {
         </div>
       )}
 
-      {/* Approved Users Section */}
+      {/* Active Users Section */}
       <div>
         <h2 className="text-lg font-semibold mb-4">Active Users ({approvedUsers.length})</h2>
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
+        <div className="bg-card rounded-lg shadow">
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>User</TableHead>
                 <TableHead>Contact</TableHead>
                 <TableHead>Company</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead>Role</TableHead>
                 <TableHead>Joined</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
@@ -262,34 +287,37 @@ export default function UsersManagementPage() {
                   <TableRow key={user.id}>
                     <TableCell>
                       <div className="flex items-center space-x-3">
-                        <div className="bg-aleph-green/10 p-2 rounded-full">
-                          <User className="h-4 w-4 text-aleph-green" />
+                        <div className="bg-primary/10 p-2 rounded-full">
+                          <User className="h-4 w-4 text-primary" />
                         </div>
                         <div>
                           <div className="font-medium">{user.full_name || 'N/A'}</div>
-                          <div className="text-sm text-gray-500">{user.position || 'No position'}</div>
+                          <div className="text-sm text-muted-foreground">{user.position || 'No position'}</div>
                         </div>
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div>
-                        <div className="text-sm">{user.email}</div>
-                        <div className="text-sm text-gray-500">{user.phone || 'No phone'}</div>
-                      </div>
+                      <div className="text-sm">{user.email}</div>
+                      <div className="text-sm text-muted-foreground">{user.phone || 'No phone'}</div>
                     </TableCell>
                     <TableCell>
-                      <div>
-                        <Badge variant="outline">{user.company_name}</Badge>
-                        {user.company_code && (
-                          <div className="text-xs text-gray-500 mt-1">Code: {user.company_code}</div>
-                        )}
-                      </div>
+                      <Badge variant="outline">{user.company_name}</Badge>
+                      {user.company_code && (
+                        <div className="text-xs text-muted-foreground mt-1">Code: {user.company_code}</div>
+                      )}
                     </TableCell>
                     <TableCell>
-                      <Badge className="bg-aleph-green">
-                        <Shield className="h-3 w-3 mr-1" />
-                        Admin
-                      </Badge>
+                      {user.role === 'admin' ? (
+                        <Badge className="bg-primary">
+                          <Shield className="h-3 w-3 mr-1" />
+                          Admin
+                        </Badge>
+                      ) : (
+                        <Badge variant="secondary">
+                          <User className="h-3 w-3 mr-1" />
+                          User
+                        </Badge>
+                      )}
                     </TableCell>
                     <TableCell>
                       <div className="text-sm">
@@ -297,14 +325,37 @@ export default function UsersManagementPage() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => approveUser(user.id, false)}
-                        className="text-red-600 border-red-600 hover:bg-red-50"
-                      >
-                        Revoke Access
-                      </Button>
+                      <div className="flex gap-2 flex-wrap">
+                        {user.role === 'admin' ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => updateUserRole(user.id, 'user')}
+                            className="text-orange-600 border-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/20"
+                          >
+                            <UserCog className="h-4 w-4 mr-1" />
+                            Make User
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => updateUserRole(user.id, 'admin')}
+                            className="text-primary border-primary hover:bg-primary/10"
+                          >
+                            <Shield className="h-4 w-4 mr-1" />
+                            Make Admin
+                          </Button>
+                        )}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => approveUser(user.id, false)}
+                          className="text-destructive border-destructive hover:bg-destructive/10"
+                        >
+                          Revoke Access
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))
@@ -314,7 +365,7 @@ export default function UsersManagementPage() {
         </div>
       </div>
 
-      <div className="text-sm text-gray-600 dark:text-gray-400">
+      <div className="text-sm text-muted-foreground">
         Total users: {filteredUsers.length}
       </div>
     </div>
