@@ -13,6 +13,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { User, Shield, Search, Check, X, Clock } from "lucide-react";
+import { UsersManagementPageSkeleton } from "@/components/ui/skeletons";
 
 interface UserProfile {
   id: string;
@@ -139,11 +140,7 @@ export default function UsersManagementPage() {
   const approvedUsers = filteredUsers.filter(u => u.approved);
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-lg">Loading users...</div>
-      </div>
-    );
+    return <UsersManagementPageSkeleton />;
   }
 
   return (

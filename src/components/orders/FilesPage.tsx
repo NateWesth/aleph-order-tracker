@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -14,6 +13,7 @@ import {
 } from "@/components/ui/collapsible";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { FilesPageSkeleton } from "@/components/ui/skeletons";
 
 // Define the order file interface
 interface OrderFile {
@@ -51,10 +51,12 @@ export default function FilesPage({ isAdmin }: FilesPageProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<string | null>(null);
   const [monthGroups, setMonthGroups] = useState<MonthGroup[]>([]);
+  const [loading, setLoading] = useState(true);
 
   // Fetch completed orders and their associated files
   const fetchCompletedOrderFiles = async () => {
     if (!user?.id) return;
+    setLoading(true);
 
     try {
       console.log('Fetching completed orders with files...');
@@ -124,6 +126,8 @@ export default function FilesPage({ isAdmin }: FilesPageProps) {
       setCompletedOrderFiles(validOrderFiles);
     } catch (error) {
       console.error("Failed to fetch completed order files:", error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -224,6 +228,10 @@ export default function FilesPage({ isAdmin }: FilesPageProps) {
   // Get all file types for filter
   const allFiles = completedOrderFiles.flatMap(orderFile => orderFile.files);
   const fileTypes = [...new Set(allFiles.map(file => file.type))];
+
+  if (loading) {
+    return <FilesPageSkeleton />;
+  }
 
   return (
     <div className="w-full max-w-full p-2 md:p-4 bg-background overflow-x-hidden">
