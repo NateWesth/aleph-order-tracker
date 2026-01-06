@@ -1,88 +1,92 @@
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Clean, professional light theme - inspired by modern design systems */
+    --background: 0 0% 98%;
+    --foreground: 220 13% 18%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 220 13% 18%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 220 13% 18%;
 
-    /* Updated colors to green theme */
-    --primary: 142 71% 45%;
-    --primary-foreground: 210 40% 98%;
+    /* Modern green - refined and professional */
+    --primary: 152 69% 42%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 142 71% 55%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 220 13% 18%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 9% 46%;
 
-    --accent: 142 76% 36%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 152 69% 95%;
+    --accent-foreground: 152 69% 30%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 152 69% 42%;
 
-    --radius: 0.5rem;
+    --radius: 0.75rem;
 
-    --sidebar-background: 142 71% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 142 71% 45%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 142 71% 95%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 142 75% 90%;
-    --sidebar-ring: 142 71% 60%;
+    /* Sidebar */
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 220 13% 18%;
+    --sidebar-primary: 152 69% 42%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 152 69% 96%;
+    --sidebar-accent-foreground: 152 69% 30%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 152 69% 42%;
   }
 
   .dark {
-    --background: 140 10% 8%;
-    --foreground: 140 5% 85%;
+    /* Deep, elegant dark theme */
+    --background: 220 16% 8%;
+    --foreground: 220 13% 93%;
 
-    --card: 140 15% 12%;
-    --card-foreground: 140 5% 85%;
+    --card: 220 16% 11%;
+    --card-foreground: 220 13% 93%;
 
-    --popover: 140 10% 8%;
-    --popover-foreground: 140 5% 85%;
+    --popover: 220 16% 11%;
+    --popover-foreground: 220 13% 93%;
 
-    /* Bright green colors in dark mode - slightly less shocking but brighter than light mode */
-    --primary: 120 100% 55%;
-    --primary-foreground: 0 0% 100%;
+    /* Vibrant but refined green for dark mode */
+    --primary: 152 76% 52%;
+    --primary-foreground: 220 16% 8%;
 
-    --secondary: 120 100% 55%;
-    --secondary-foreground: 0 0% 100%;
+    --secondary: 220 14% 16%;
+    --secondary-foreground: 220 13% 93%;
 
-    --muted: 140 20% 15%;
-    --muted-foreground: 140 10% 65%;
+    --muted: 220 14% 16%;
+    --muted-foreground: 220 9% 56%;
 
-    --accent: 120 100% 45%;
-    --accent-foreground: 0 0% 100%;
+    --accent: 152 76% 15%;
+    --accent-foreground: 152 76% 70%;
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 140 25% 18%;
-    --input: 140 20% 15%;
-    --ring: 120 100% 55%;
-    --sidebar-background: 140 15% 10%;
-    --sidebar-foreground: 140 5% 85%;
-    --sidebar-primary: 120 100% 55%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 140 20% 12%;
-    --sidebar-accent-foreground: 140 5% 85%;
-    --sidebar-border: 140 25% 15%;
-    --sidebar-ring: 120 100% 55%;
+    --border: 220 14% 18%;
+    --input: 220 14% 16%;
+    --ring: 152 76% 52%;
+
+    /* Sidebar */
+    --sidebar-background: 220 16% 10%;
+    --sidebar-foreground: 220 13% 93%;
+    --sidebar-primary: 152 76% 52%;
+    --sidebar-primary-foreground: 220 16% 8%;
+    --sidebar-accent: 220 14% 14%;
+    --sidebar-accent-foreground: 220 13% 93%;
+    --sidebar-border: 220 14% 16%;
+    --sidebar-ring: 152 76% 52%;
   }
 }
 
@@ -91,17 +95,26 @@
     @apply border-border;
   }
 
-  body {
-    @apply bg-background text-foreground;
-    font-family: 'Inter', sans-serif;
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
   }
 
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+    letter-spacing: -0.011em;
+  }
+
+  /* Clean, modern heading styles */
   h1, h2, h3, h4, h5, h6 {
-    @apply text-aleph-green font-bold;
+    @apply font-semibold tracking-tight text-foreground;
   }
 
   h1 {
-    @apply text-3xl md:text-4xl;
+    @apply text-3xl md:text-4xl font-bold;
   }
 
   h2 {
@@ -111,220 +124,317 @@
   h3 {
     @apply text-xl md:text-2xl;
   }
+
+  /* Mono font for codes */
+  code, .font-mono {
+    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  }
 }
 
-/* Updated gradient to match green theme */
-.hero-gradient {
-  background: linear-gradient(to right, #00FF00, #FF00C8, #00FF00, #FF8000);
+/* ============================================
+   MODERN COMPONENT STYLES
+   ============================================ */
+
+/* Smooth scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
 }
 
-.animate-in {
-  animation: fadeIn 0.6s ease-in forwards;
+::-webkit-scrollbar-track {
+  @apply bg-transparent;
 }
+
+::-webkit-scrollbar-thumb {
+  @apply bg-border rounded-full;
+  transition: background-color 0.2s;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-muted-foreground/30;
+}
+
+/* Selection */
+::selection {
+  @apply bg-primary/20 text-foreground;
+}
+
+/* Focus ring - subtle and modern */
+:focus-visible {
+  @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+}
+
+/* ============================================
+   ANIMATIONS - SMOOTH AND PERFORMANT
+   ============================================ */
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-.fade-in-delay-1 { animation-delay: 0.1s; opacity: 0; }
-.fade-in-delay-2 { animation-delay: 0.2s; opacity: 0; }
-.fade-in-delay-3 { animation-delay: 0.3s; opacity: 0; }
-.fade-in-delay-4 { animation-delay: 0.4s; opacity: 0; }
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
 
-/* Updated color classes - white text in dark mode */
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out forwards;
+}
+
+.animate-slide-in {
+  animation: slideIn 0.3s ease-out forwards;
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.2s ease-out forwards;
+}
+
+/* Staggered animations */
+.stagger-1 { animation-delay: 0.05s; }
+.stagger-2 { animation-delay: 0.1s; }
+.stagger-3 { animation-delay: 0.15s; }
+.stagger-4 { animation-delay: 0.2s; }
+
+/* ============================================
+   LEGACY COLOR CLASSES (kept for compatibility)
+   ============================================ */
+
 .text-aleph-green { 
-  color: #22C55E; 
-}
-.dark .text-aleph-green { 
-  color: #FFFFFF; 
+  @apply text-primary;
 }
 
-/* Login screen specific green - keep unchanged in dark mode */
-.auth-green {
-  color: #22C55E;
-}
-.dark .auth-green {
-  color: #00FF00;
+.text-aleph-magenta { 
+  color: hsl(316 100% 50%);
 }
 
-.text-aleph-magenta { color: #FF00C8; }
 .text-aleph-accent { 
-  color: #16A34A; 
-}
-.dark .text-aleph-accent { 
-  color: #FFFFFF; 
+  @apply text-primary;
 }
 
-.text-aleph-orange { color: #FF8000; }
+.text-aleph-orange { 
+  color: hsl(30 100% 50%);
+}
 
 .bg-aleph-green { 
-  background-color: #22C55E; 
-}
-.dark .bg-aleph-green { 
-  background-color: #22FF22; 
+  @apply bg-primary;
 }
 
-.bg-aleph-magenta { background-color: #FF00C8; }
+.bg-aleph-magenta { 
+  background-color: hsl(316 100% 50%);
+}
+
 .bg-aleph-accent { 
-  background-color: #16A34A; 
-}
-.dark .bg-aleph-accent { 
-  background-color: #22FF22; 
+  @apply bg-primary;
 }
 
-.bg-aleph-orange { background-color: #FF8000; }
+.bg-aleph-orange { 
+  background-color: hsl(30 100% 50%);
+}
 
-/* Updated button styles for less shocking green in dark mode */
+/* Auth screen green */
+.auth-green {
+  @apply text-primary;
+}
+
+/* ============================================
+   BUTTON STYLES
+   ============================================ */
+
 .btn-aleph-green {
-  @apply bg-aleph-green text-white transition-colors;
-}
-.btn-aleph-green:hover {
-  background-color: #22FF22;
-}
-.dark .btn-aleph-green {
-  background-color: #22FF22;
-  color: #000000;
-}
-.dark .btn-aleph-green:hover {
-  background-color: #11DD11;
+  @apply bg-primary text-primary-foreground hover:bg-primary/90 transition-all duration-200;
 }
 
 .btn-aleph-magenta {
-  @apply bg-aleph-magenta text-white hover:bg-pink-600 transition-colors;
+  background-color: hsl(316 100% 50%);
+  @apply text-white hover:opacity-90 transition-all duration-200;
 }
 
 .btn-aleph-accent {
-  @apply bg-aleph-accent text-white transition-colors;
-}
-.btn-aleph-accent:hover {
-  background-color: #22FF22;
-}
-.dark .btn-aleph-accent {
-  background-color: #22FF22;
-  color: #000000;
-}
-.dark .btn-aleph-accent:hover {
-  background-color: #11DD11;
+  @apply bg-primary text-primary-foreground hover:bg-primary/90 transition-all duration-200;
 }
 
 .btn-aleph-orange {
-  @apply bg-aleph-orange text-white hover:bg-orange-500 transition-colors;
+  background-color: hsl(30 100% 50%);
+  @apply text-white hover:opacity-90 transition-all duration-200;
 }
 
-/* Toolbar and header styles updated to light grey in light mode */
-.header-aleph {
-  @apply bg-gradient-to-r from-aleph-green to-aleph-magenta text-white shadow-md;
+/* ============================================
+   CARD AND SURFACE STYLES
+   ============================================ */
+
+/* Modern elevated card */
+.card-elevated {
+  @apply bg-card border border-border rounded-xl;
+  box-shadow: 
+    0 1px 2px 0 rgb(0 0 0 / 0.03),
+    0 1px 6px -1px rgb(0 0 0 / 0.02),
+    0 2px 4px 0 rgb(0 0 0 / 0.02);
 }
-.dark .header-aleph {
-  background: linear-gradient(to right, #22FF22, #FF00C8);
+
+.dark .card-elevated {
+  box-shadow: 
+    0 1px 2px 0 rgb(0 0 0 / 0.2),
+    0 2px 8px -2px rgb(0 0 0 / 0.3);
+}
+
+/* Hover lift effect */
+.hover-lift {
+  @apply transition-all duration-200 ease-out;
+}
+
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 
+    0 4px 12px -2px rgb(0 0 0 / 0.08),
+    0 2px 6px -2px rgb(0 0 0 / 0.04);
+}
+
+.dark .hover-lift:hover {
+  box-shadow: 
+    0 4px 12px -2px rgb(0 0 0 / 0.4),
+    0 2px 6px -2px rgb(0 0 0 / 0.3);
+}
+
+/* ============================================
+   HEADER & NAVIGATION
+   ============================================ */
+
+.header-aleph {
+  @apply bg-card border-b border-border;
 }
 
 .toolbar-aleph {
-  @apply bg-gray-100 border-b border-gray-200 shadow-sm;
+  @apply bg-card border-b border-border;
 }
 
-/* Dark mode specific styles */
-.dark .toolbar-aleph {
-  @apply bg-background border-gray-800;
-}
+/* ============================================
+   SIDEBAR STYLES
+   ============================================ */
 
-/* Hover states for sidebar - breathing motion for all users */
 .sidebar-hover {
-  @apply transition-all duration-300;
+  @apply transition-all duration-200 rounded-lg;
 }
 
 .sidebar-hover:hover {
-  @apply text-white transform scale-105;
-  color: white !important;
-  background-color: transparent !important;
-  animation: pulse 1.5s ease-in-out infinite;
+  @apply bg-accent text-accent-foreground;
 }
 
-.dark .sidebar-hover:hover {
-  @apply transform scale-105;
-  color: inherit !important;
-  background-color: transparent !important;
-  animation: pulse 1.5s ease-in-out infinite;
-}
-
-/* Active/selected state - stays pink in both modes */
 .sidebar-active {
-  @apply text-pink-600;
-  background-color: transparent !important;
+  @apply bg-primary/10 text-primary font-medium;
 }
 
-.dark .sidebar-active {
-  @apply text-pink-400;
-  background-color: transparent !important;
-}
+/* ============================================
+   ORDER ROW STYLES
+   ============================================ */
 
-/* Button hover states - breathing motion for all users */
-.btn-hover {
-  @apply transition-all duration-300;
-}
-
-.btn-hover:hover {
-  @apply text-white bg-transparent transform scale-105;
-  color: white !important;
-  background-color: transparent !important;
-  animation: pulse 1.5s ease-in-out infinite;
-}
-
-.dark .btn-hover:hover {
-  @apply transform scale-105;
-  color: inherit !important;
-  background-color: transparent !important;
-  animation: pulse 1.5s ease-in-out infinite;
-}
-
-/* Focus states */
-.ring-aleph-green {
-  @apply focus:ring-2 focus:ring-opacity-50;
-  --tw-ring-color: #22C55E;
-}
-.dark .ring-aleph-green {
-  --tw-ring-color: #22FF22;
-}
-
-.ring-aleph-magenta {
-  @apply focus:ring-2 focus:ring-opacity-50;
-  --tw-ring-color: #FF00C8;
-}
-
-/* Order row breathing hover effect */
 .order-row-hover {
-  @apply cursor-pointer transition-all duration-300;
+  @apply cursor-pointer transition-all duration-200;
 }
 
 .order-row-hover:hover {
-  transform: scale(1.01);
-  animation: pulse 1.5s ease-in-out infinite;
-  z-index: 10;
-  position: relative;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  @apply bg-muted/50;
 }
 
-/* Mobile optimizations */
+/* ============================================
+   GRADIENT EFFECTS
+   ============================================ */
+
+.hero-gradient {
+  background: linear-gradient(135deg, hsl(152 69% 42%) 0%, hsl(316 100% 50%) 50%, hsl(30 100% 50%) 100%);
+}
+
+/* Subtle gradient backgrounds */
+.gradient-subtle {
+  background: linear-gradient(180deg, hsl(var(--background)) 0%, hsl(var(--muted)) 100%);
+}
+
+/* ============================================
+   MOBILE OPTIMIZATIONS
+   ============================================ */
+
 @media (max-width: 768px) {
   .order-row-hover:hover {
+    @apply bg-transparent;
     transform: none;
-    animation: none;
   }
   
-  /* Improve touch targets on mobile */
   .mobile-touch-target {
     min-height: 44px;
     min-width: 44px;
   }
   
-  /* Better mobile sidebar */
   .sidebar-mobile {
     transform: translateX(-100%);
-    transition: transform 0.3s ease-in-out;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
   
   .sidebar-mobile.open {
     transform: translateX(0);
   }
+}
+
+/* ============================================
+   UTILITY CLASSES
+   ============================================ */
+
+/* Glass effect */
+.glass {
+  @apply bg-card/80 backdrop-blur-xl border border-white/10;
+}
+
+.dark .glass {
+  @apply bg-card/60;
+}
+
+/* Skeleton loading */
+.skeleton {
+  @apply bg-muted animate-pulse rounded;
+}
+
+/* Text gradient */
+.text-gradient {
+  @apply bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/60;
+}
+
+/* Ring focus */
+.ring-aleph-green {
+  @apply focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background;
+}
+
+.ring-aleph-magenta {
+  @apply focus:ring-2 focus:ring-offset-2 focus:ring-offset-background;
+  --tw-ring-color: hsl(316 100% 50%);
 }
