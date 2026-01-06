@@ -82,7 +82,7 @@ const AdminDashboard = () => {
     <div className="min-h-screen w-full flex flex-col bg-background">
       {/* Modern Top Navigation Bar */}
       <header className="sticky top-0 z-50 bg-card/80 backdrop-blur-xl border-b border-border">
-        <div className="max-w-7xl mx-auto px-4 py-3">
+        <div className="w-full px-2 sm:px-3 py-3">
           {/* Top row: Logo/Home, Search, Actions */}
           <div className="flex items-center gap-4">
             {/* Home/Brand */}
@@ -159,8 +159,8 @@ const AdminDashboard = () => {
       <main className="flex-1 overflow-x-hidden">
         <div
           className={cn(
-            "mx-auto p-4 md:p-6",
-            activeView === "orders" || activeView === "history" ? "max-w-none w-full" : "max-w-7xl"
+            "w-full px-2 sm:px-3 py-3",
+            activeView === "orders" || activeView === "history" ? "max-w-none" : "max-w-7xl mx-auto"
           )}
         >
           {activeView === "home" && (
