@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Package, History, BarChart3, Settings, LogOut, Building2, Home, Search, Box } from "lucide-react";
+import { Package, History, BarChart3, Settings, LogOut, Building2, Home, Search, Box, Menu } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import OrdersPage from "@/components/orders/OrdersPage";
 import CompletedPage from "@/components/orders/CompletedPage";
@@ -12,6 +12,7 @@ import ClientCompaniesPage from "@/components/admin/ClientCompaniesPage";
 import StatsPage from "@/components/admin/StatsPage";
 import ItemsPage from "@/components/admin/ItemsPage";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { cn } from "@/lib/utils";
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -60,7 +61,7 @@ const AdminDashboard = () => {
 
   const navItems = [
     { id: "orders", label: "Orders", icon: Package },
-    { id: "history", label: "Order History", icon: History },
+    { id: "history", label: "History", icon: History },
     { id: "clients", label: "Clients", icon: Building2 },
     { id: "items", label: "Items", icon: Box },
     { id: "stats", label: "Stats", icon: BarChart3 },
@@ -69,95 +70,127 @@ const AdminDashboard = () => {
   if (loading) {
     return (
       <div className="min-h-screen w-full flex items-center justify-center bg-background">
-        <div className="text-primary text-lg">Loading...</div>
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-8 w-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          <p className="text-muted-foreground text-sm font-medium">Loading...</p>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="min-h-screen w-full flex flex-col bg-background">
-      {/* Top Toolbar */}
-      <header className="bg-card border-b border-border px-4 py-3">
-        <div className="max-w-7xl mx-auto">
-          {/* Top row: Home button left, Search center, Actions right */}
-          <div className="flex items-center justify-between mb-3">
-            {/* Home button - icon only */}
+      {/* Modern Top Navigation Bar */}
+      <header className="sticky top-0 z-50 bg-card/80 backdrop-blur-xl border-b border-border">
+        <div className="max-w-7xl mx-auto px-4 py-3">
+          {/* Top row: Logo/Home, Search, Actions */}
+          <div className="flex items-center gap-4">
+            {/* Home/Brand */}
             <Button
-              variant={activeView === "home" ? "default" : "ghost"}
+              variant={activeView === "home" ? "secondary" : "ghost"}
               size="icon"
               onClick={() => setActiveView("home")}
+              className="shrink-0 rounded-xl"
             >
               <Home className="h-5 w-5" />
             </Button>
 
-            {/* Search bar */}
-            <div className="flex-1 max-w-md mx-4">
+            {/* Search bar - grows to fill space */}
+            <div className="flex-1 max-w-lg">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                 <Input
-                  placeholder="Search order number..."
+                  placeholder="Search orders..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
+                  className="pl-10 h-10 bg-secondary/50 border-0 focus-visible:ring-1 focus-visible:ring-primary/50 rounded-xl"
                 />
               </div>
             </div>
 
             {/* Right side actions */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1">
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => navigate("/settings")}
+                className="rounded-xl text-muted-foreground hover:text-foreground"
               >
-                <Settings className="h-4 w-4" />
+                <Settings className="h-[18px] w-[18px]" />
               </Button>
               <Button
-                variant="outline"
-                size={isMobile ? "sm" : "default"}
+                variant="ghost"
+                size={isMobile ? "icon" : "default"}
                 onClick={handleLogout}
+                className="rounded-xl text-muted-foreground hover:text-foreground"
               >
-                <LogOut className="h-4 w-4" />
-                {!isMobile && <span className="ml-2">Logout</span>}
+                <LogOut className="h-[18px] w-[18px]" />
+                {!isMobile && <span className="ml-2 text-sm">Logout</span>}
               </Button>
             </div>
           </div>
 
-          {/* Navigation Buttons - centered */}
-          <nav className="flex items-center justify-center gap-2">
-            {navItems.map((item) => (
-              <Button
-                key={item.id}
-                variant={activeView === item.id ? "default" : "ghost"}
-                size={isMobile ? "sm" : "default"}
-                onClick={() => setActiveView(item.id)}
-                className="gap-2"
-              >
-                <item.icon className="h-4 w-4" />
-                {!isMobile && <span>{item.label}</span>}
-              </Button>
-            ))}
+          {/* Navigation Tabs */}
+          <nav className="flex items-center gap-1 mt-3 -mb-3 overflow-x-auto scrollbar-none">
+            {navItems.map((item) => {
+              const isActive = activeView === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveView(item.id)}
+                  className={cn(
+                    "flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-t-xl transition-all duration-200 whitespace-nowrap",
+                    "border-b-2 -mb-[2px]",
+                    isActive
+                      ? "bg-background border-primary text-foreground"
+                      : "border-transparent text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                  )}
+                >
+                  <item.icon className="h-4 w-4" />
+                  <span className={cn(isMobile && "hidden sm:inline")}>{item.label}</span>
+                </button>
+              );
+            })}
           </nav>
         </div>
       </header>
 
       {/* Main content */}
-      <main className="flex-1 p-4 md:p-6 overflow-x-hidden">
-        {activeView === "home" && (
-          <div className="flex items-center justify-center h-64">
-            <div className="text-center">
-              <h1 className="text-2xl font-bold text-foreground mb-2">
-                Welcome{userProfile?.full_name ? `, ${userProfile.full_name}` : ''}
-              </h1>
-              <p className="text-muted-foreground">Aleph Engineering and Supplies</p>
+      <main className="flex-1 overflow-x-hidden">
+        <div className="max-w-7xl mx-auto p-4 md:p-6">
+          {activeView === "home" && (
+            <div className="flex items-center justify-center min-h-[60vh]">
+              <div className="text-center space-y-4 animate-fade-in">
+                <div className="inline-flex items-center justify-center h-16 w-16 rounded-2xl bg-primary/10 mb-2">
+                  <Package className="h-8 w-8 text-primary" />
+                </div>
+                <h1 className="text-3xl font-bold tracking-tight">
+                  Welcome{userProfile?.full_name ? `, ${userProfile.full_name}` : ''}
+                </h1>
+                <p className="text-muted-foreground text-lg">
+                  Aleph Engineering and Supplies
+                </p>
+                <div className="pt-4">
+                  <Button 
+                    onClick={() => setActiveView("orders")}
+                    className="rounded-xl h-11 px-6"
+                  >
+                    <Package className="h-4 w-4 mr-2" />
+                    View Orders
+                  </Button>
+                </div>
+              </div>
             </div>
+          )}
+          
+          <div className={cn(activeView !== "home" && "animate-fade-in")}>
+            {activeView === "orders" && <OrdersPage isAdmin={true} searchTerm={searchTerm} />}
+            {activeView === "history" && <CompletedPage isAdmin={true} searchTerm={searchTerm} />}
+            {activeView === "clients" && <ClientCompaniesPage />}
+            {activeView === "items" && <ItemsPage />}
+            {activeView === "stats" && <StatsPage />}
           </div>
-        )}
-        {activeView === "orders" && <OrdersPage isAdmin={true} searchTerm={searchTerm} />}
-        {activeView === "history" && <CompletedPage isAdmin={true} searchTerm={searchTerm} />}
-        {activeView === "clients" && <ClientCompaniesPage />}
-        {activeView === "items" && <ItemsPage />}
-        {activeView === "stats" && <StatsPage />}
+        </div>
       </main>
     </div>
   );
