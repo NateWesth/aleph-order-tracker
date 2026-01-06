@@ -7,18 +7,21 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { useTheme } from "@/contexts/ThemeContext";
+import { useTheme, colorThemes } from "@/contexts/ThemeContext";
 import { supabase } from "@/integrations/supabase/client";
-import { ArrowLeft, User, Building2, Moon, Sun } from "lucide-react";
+import { ArrowLeft, User, Building2, Moon, Sun, Palette, Check } from "lucide-react";
+
+type ColorTheme = keyof typeof colorThemes;
 
 const Settings = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
-  const { theme, toggleTheme } = useTheme();
+  const { theme, colorTheme, toggleTheme, setColorTheme } = useTheme();
   const [userProfile, setUserProfile] = useState<any>(null);
   const [companyInfo, setCompanyInfo] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [previewTheme, setPreviewTheme] = useState<ColorTheme | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -30,7 +33,6 @@ const Settings = () => {
     if (!user) return;
     
     try {
-      // Fetch user profile
       const { data: profileData } = await supabase
         .from('profiles')
         .select('*')
@@ -39,7 +41,6 @@ const Settings = () => {
       
       setUserProfile(profileData);
 
-      // Fetch company information based on user's company code
       if (profileData?.company_code) {
         const { data: companyData } = await supabase
           .from('companies')
@@ -61,18 +62,27 @@ const Settings = () => {
     }
   };
 
+  const handleColorThemeSelect = (themeKey: ColorTheme) => {
+    setColorTheme(themeKey);
+    setPreviewTheme(null);
+    toast({
+      title: "Theme Updated",
+      description: `Color theme changed to ${colorThemes[themeKey].name}`,
+    });
+  };
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-lg">Loading...</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="bg-white dark:bg-gray-800 shadow">
+      <header className="bg-card border-b border-border shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-6">
             <div className="flex items-center">
@@ -84,7 +94,7 @@ const Settings = () => {
               >
                 <ArrowLeft className="h-5 w-5" />
               </Button>
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Settings</h1>
+              <h1 className="text-2xl font-bold text-foreground">Settings</h1>
             </div>
           </div>
         </div>
@@ -94,26 +104,26 @@ const Settings = () => {
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
           <div className="grid gap-6 md:grid-cols-2">
-            {/* Theme Settings */}
-            <Card>
+            {/* Appearance Settings */}
+            <Card className="md:col-span-2">
               <CardHeader>
                 <div className="flex items-center space-x-2">
-                  {theme === 'dark' ? (
-                    <Moon className="h-5 w-5 text-aleph-green" />
-                  ) : (
-                    <Sun className="h-5 w-5 text-aleph-green" />
-                  )}
+                  <Palette className="h-5 w-5 text-primary" />
                   <CardTitle>Appearance</CardTitle>
                 </div>
                 <CardDescription>
-                  Customize your viewing experience
+                  Customize your viewing experience with themes and colors
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-6">
+                {/* Dark Mode Toggle */}
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
-                    <Label htmlFor="theme-toggle">Dark Mode</Label>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                    <Label htmlFor="theme-toggle" className="flex items-center gap-2">
+                      {theme === 'dark' ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+                      Dark Mode
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
                       Switch between light and dark themes
                     </p>
                   </div>
@@ -123,6 +133,83 @@ const Settings = () => {
                     onCheckedChange={toggleTheme}
                   />
                 </div>
+
+                {/* Color Theme Selection */}
+                <div className="space-y-3">
+                  <Label>Color Theme</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Choose a color theme for the app. Hover to preview.
+                  </p>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                    {(Object.entries(colorThemes) as [ColorTheme, typeof colorThemes[ColorTheme]][]).map(([key, themeConfig]) => {
+                      const isSelected = colorTheme === key;
+                      const isPreview = previewTheme === key;
+                      
+                      return (
+                        <button
+                          key={key}
+                          onClick={() => handleColorThemeSelect(key)}
+                          onMouseEnter={() => setPreviewTheme(key)}
+                          onMouseLeave={() => setPreviewTheme(null)}
+                          className={`
+                            relative flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all duration-200
+                            ${isSelected 
+                              ? 'border-primary bg-accent shadow-md' 
+                              : 'border-border hover:border-primary/50 hover:bg-muted/50'
+                            }
+                          `}
+                        >
+                          {/* Color Preview Circle */}
+                          <div
+                            className="w-10 h-10 rounded-full shadow-inner ring-2 ring-white/20"
+                            style={{ backgroundColor: themeConfig.preview }}
+                          />
+                          
+                          {/* Theme Name */}
+                          <span className="text-xs font-medium text-foreground">
+                            {themeConfig.name}
+                          </span>
+
+                          {/* Selected Indicator */}
+                          {isSelected && (
+                            <div 
+                              className="absolute top-2 right-2 w-5 h-5 rounded-full flex items-center justify-center"
+                              style={{ backgroundColor: themeConfig.preview }}
+                            >
+                              <Check className="h-3 w-3 text-white" />
+                            </div>
+                          )}
+
+                          {/* Preview Badge */}
+                          {isPreview && !isSelected && (
+                            <div className="absolute -top-2 left-1/2 -translate-x-1/2 px-2 py-0.5 bg-foreground text-background text-[10px] font-medium rounded-full">
+                              Preview
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Live Preview */}
+                <div className="space-y-3 pt-4 border-t border-border">
+                  <Label>Live Preview</Label>
+                  <div className="p-4 rounded-xl bg-muted/30 border border-border space-y-3">
+                    <div className="flex items-center gap-3">
+                      <Button size="sm">Primary Button</Button>
+                      <Button size="sm" variant="secondary">Secondary</Button>
+                      <Button size="sm" variant="outline">Outline</Button>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-primary" />
+                      <span className="text-sm text-primary font-medium">Primary text color</span>
+                    </div>
+                    <div className="p-3 rounded-lg bg-accent">
+                      <span className="text-sm text-accent-foreground">Accent background preview</span>
+                    </div>
+                  </div>
+                </div>
               </CardContent>
             </Card>
 
@@ -130,7 +217,7 @@ const Settings = () => {
             <Card>
               <CardHeader>
                 <div className="flex items-center space-x-2">
-                  <User className="h-5 w-5 text-aleph-green" />
+                  <User className="h-5 w-5 text-primary" />
                   <CardTitle>Profile Information</CardTitle>
                 </div>
                 <CardDescription>
@@ -144,7 +231,7 @@ const Settings = () => {
                     id="fullName"
                     value={userProfile?.full_name || ''}
                     readOnly
-                    className="bg-gray-50 dark:bg-gray-700"
+                    className="bg-muted"
                   />
                 </div>
                 <div className="space-y-2">
@@ -153,7 +240,7 @@ const Settings = () => {
                     id="email"
                     value={userProfile?.email || user?.email || ''}
                     readOnly
-                    className="bg-gray-50 dark:bg-gray-700"
+                    className="bg-muted"
                   />
                 </div>
                 <div className="space-y-2">
@@ -162,7 +249,7 @@ const Settings = () => {
                     id="phone"
                     value={userProfile?.phone || 'Not provided'}
                     readOnly
-                    className="bg-gray-50 dark:bg-gray-700"
+                    className="bg-muted"
                   />
                 </div>
                 <div className="space-y-2">
@@ -171,7 +258,7 @@ const Settings = () => {
                     id="position"
                     value={userProfile?.position || 'Not provided'}
                     readOnly
-                    className="bg-gray-50 dark:bg-gray-700"
+                    className="bg-muted"
                   />
                 </div>
                 <div className="space-y-2">
@@ -180,17 +267,17 @@ const Settings = () => {
                     id="companyCode"
                     value={userProfile?.company_code || 'Not provided'}
                     readOnly
-                    className="bg-gray-50 dark:bg-gray-700"
+                    className="bg-muted"
                   />
                 </div>
               </CardContent>
             </Card>
 
             {/* Company Information */}
-            <Card className="md:col-span-2">
+            <Card>
               <CardHeader>
                 <div className="flex items-center space-x-2">
-                  <Building2 className="h-5 w-5 text-aleph-green" />
+                  <Building2 className="h-5 w-5 text-primary" />
                   <CardTitle>Company Information</CardTitle>
                 </div>
                 <CardDescription>
@@ -199,14 +286,14 @@ const Settings = () => {
               </CardHeader>
               <CardContent className="space-y-4">
                 {companyInfo ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-4">
                     <div className="space-y-2">
                       <Label htmlFor="companyName">Company Name</Label>
                       <Input
                         id="companyName"
                         value={companyInfo.name}
                         readOnly
-                        className="bg-gray-50 dark:bg-gray-700"
+                        className="bg-muted"
                       />
                     </div>
                     <div className="space-y-2">
@@ -215,7 +302,7 @@ const Settings = () => {
                         id="contactPerson"
                         value={companyInfo.contact_person || 'Not provided'}
                         readOnly
-                        className="bg-gray-50 dark:bg-gray-700"
+                        className="bg-muted"
                       />
                     </div>
                     <div className="space-y-2">
@@ -224,7 +311,7 @@ const Settings = () => {
                         id="companyEmail"
                         value={companyInfo.email || 'Not provided'}
                         readOnly
-                        className="bg-gray-50 dark:bg-gray-700"
+                        className="bg-muted"
                       />
                     </div>
                     <div className="space-y-2">
@@ -233,7 +320,7 @@ const Settings = () => {
                         id="companyPhone"
                         value={companyInfo.phone || 'Not provided'}
                         readOnly
-                        className="bg-gray-50 dark:bg-gray-700"
+                        className="bg-muted"
                       />
                     </div>
                     <div className="space-y-2">
@@ -242,7 +329,7 @@ const Settings = () => {
                         id="companyAddress"
                         value={companyInfo.address || 'Not provided'}
                         readOnly
-                        className="bg-gray-50 dark:bg-gray-700"
+                        className="bg-muted"
                       />
                     </div>
                     <div className="space-y-2">
@@ -251,24 +338,24 @@ const Settings = () => {
                         id="vatNumber"
                         value={companyInfo.vat_number || 'Not provided'}
                         readOnly
-                        className="bg-gray-50 dark:bg-gray-700"
+                        className="bg-muted"
                       />
                     </div>
-                    <div className="space-y-2 md:col-span-2">
+                    <div className="space-y-2">
                       <Label htmlFor="accountManager">Account Manager</Label>
                       <Input
                         id="accountManager"
                         value={companyInfo.account_manager || 'Not provided'}
                         readOnly
-                        className="bg-gray-50 dark:bg-gray-700"
+                        className="bg-muted"
                       />
                     </div>
                   </div>
                 ) : (
                   <div className="text-center py-8">
-                    <Building2 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                    <p className="text-gray-500">No company information available</p>
-                    <p className="text-sm text-gray-400 mt-2">
+                    <Building2 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <p className="text-muted-foreground">No company information available</p>
+                    <p className="text-sm text-muted-foreground mt-2">
                       Company details will appear here once linked to a company code
                     </p>
                   </div>
