@@ -1,8 +1,9 @@
+import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Trash2, ArrowRight, Package, PackageCheck, PackageX } from "lucide-react";
+import { Trash2, ArrowRight, Package, PackageCheck, PackageX, ChevronDown, ChevronRight } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -15,6 +16,11 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 interface OrderItem {
   id: string;
@@ -60,6 +66,20 @@ export default function OrderStatusColumn({
   onDeleteOrder,
   onToggleItemStock,
 }: OrderStatusColumnProps) {
+  const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
+
+  const toggleExpanded = (orderId: string) => {
+    setExpandedOrders(prev => {
+      const next = new Set(prev);
+      if (next.has(orderId)) {
+        next.delete(orderId);
+      } else {
+        next.add(orderId);
+      }
+      return next;
+    });
+  };
+
   const getUrgencyBadge = (urgency: string | null) => {
     switch (urgency) {
       case "urgent":
@@ -106,6 +126,8 @@ export default function OrderStatusColumn({
             ) : (
               orders.map((order) => {
                 const stockSummary = getItemStockSummary(order.items);
+                const isExpanded = expandedOrders.has(order.id);
+                const hasItems = order.items && order.items.length > 0;
 
                 return (
                   <Card
@@ -127,60 +149,69 @@ export default function OrderStatusColumn({
                           {getUrgencyBadge(order.urgency)}
                         </div>
 
-                        {/* Stock Progress for Awaiting Stock column */}
-                        {config.key === "ordered" && stockSummary && (
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between text-xs">
-                              <span className="text-muted-foreground flex items-center gap-1">
-                                {stockSummary.allInStock ? (
-                                  <PackageCheck className="h-3 w-3 text-emerald-500" />
-                                ) : (
-                                  <PackageX className="h-3 w-3 text-amber-500" />
-                                )}
-                                Stock Status
-                              </span>
-                              <span className={`font-semibold ${stockSummary.allInStock ? "text-emerald-600" : "text-amber-600"}`}>
-                                {stockSummary.inStock}/{stockSummary.total} items
-                              </span>
-                            </div>
-                            {/* Item checkboxes */}
-                            <div className="space-y-1.5 bg-muted/50 p-2 rounded">
-                              {order.items?.map((item) => (
-                                <div
-                                  key={item.id}
-                                  className="flex items-center gap-2 text-xs"
-                                >
-                                  <Checkbox
-                                    id={item.id}
-                                    checked={item.stock_status === "in-stock"}
-                                    onCheckedChange={() =>
-                                      onToggleItemStock?.(item.id, item.stock_status)
-                                    }
-                                    className="h-4 w-4"
-                                  />
-                                  <label
-                                    htmlFor={item.id}
-                                    className={`flex-1 cursor-pointer ${
-                                      item.stock_status === "in-stock"
-                                        ? "line-through text-muted-foreground"
-                                        : "text-foreground"
-                                    }`}
-                                  >
-                                    {item.code && <span className="font-mono mr-1">[{item.code}]</span>}
-                                    {item.name}
-                                    <span className="text-muted-foreground ml-1">×{item.quantity}</span>
-                                  </label>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Description for non-awaiting columns */}
-                        {config.key !== "ordered" && order.description && (
-                          <p className="text-xs text-muted-foreground line-clamp-2 bg-muted/50 p-2 rounded">
+                        {/* Description */}
+                        {order.description && (
+                          <p className="text-xs text-muted-foreground line-clamp-2">
                             {order.description}
                           </p>
+                        )}
+
+                        {/* Collapsible Items Section */}
+                        {hasItems && (
+                          <Collapsible open={isExpanded} onOpenChange={() => toggleExpanded(order.id)}>
+                            <CollapsibleTrigger asChild>
+                              <button className="flex items-center justify-between w-full text-xs bg-muted/50 hover:bg-muted p-2 rounded transition-colors">
+                                <span className="flex items-center gap-1.5 text-muted-foreground font-medium">
+                                  {isExpanded ? (
+                                    <ChevronDown className="h-3.5 w-3.5" />
+                                  ) : (
+                                    <ChevronRight className="h-3.5 w-3.5" />
+                                  )}
+                                  {order.items?.length} item{order.items?.length !== 1 ? 's' : ''}
+                                </span>
+                                {stockSummary && config.key === "ordered" && (
+                                  <span className={`flex items-center gap-1 font-medium ${stockSummary.allInStock ? "text-emerald-600" : "text-amber-600"}`}>
+                                    {stockSummary.allInStock ? (
+                                      <PackageCheck className="h-3 w-3" />
+                                    ) : (
+                                      <PackageX className="h-3 w-3" />
+                                    )}
+                                    {stockSummary.inStock}/{stockSummary.total}
+                                  </span>
+                                )}
+                              </button>
+                            </CollapsibleTrigger>
+                            <CollapsibleContent className="mt-2">
+                              <div className="space-y-1.5 bg-muted/30 p-2 rounded border border-border/50">
+                                {order.items?.map((item) => (
+                                  <div
+                                    key={item.id}
+                                    className="flex items-center gap-2 text-xs"
+                                  >
+                                    {config.key === "ordered" && (
+                                      <Checkbox
+                                        id={item.id}
+                                        checked={item.stock_status === "in-stock"}
+                                        onCheckedChange={() =>
+                                          onToggleItemStock?.(item.id, item.stock_status)
+                                        }
+                                        className="h-4 w-4 shrink-0"
+                                      />
+                                    )}
+                                    <span className={`flex-1 ${
+                                      config.key === "ordered" && item.stock_status === "in-stock"
+                                        ? "line-through text-muted-foreground"
+                                        : "text-foreground"
+                                    }`}>
+                                      <span className="font-semibold text-primary">×{item.quantity}</span>
+                                      {item.code && <span className="font-mono text-muted-foreground ml-1.5">[{item.code}]</span>}
+                                      <span className="ml-1.5">{item.name}</span>
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </CollapsibleContent>
+                          </Collapsible>
                         )}
 
                         {/* Actions */}
