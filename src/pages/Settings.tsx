@@ -7,21 +7,23 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { useTheme, colorThemes } from "@/contexts/ThemeContext";
+import { useTheme, colorThemes, boardSingleColors } from "@/contexts/ThemeContext";
 import { supabase } from "@/integrations/supabase/client";
-import { ArrowLeft, User, Building2, Moon, Sun, Palette, Check } from "lucide-react";
+import { ArrowLeft, User, Building2, Moon, Sun, Palette, Check, LayoutGrid } from "lucide-react";
 
 type ColorTheme = keyof typeof colorThemes;
+type BoardSingleColor = keyof typeof boardSingleColors;
 
 const Settings = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
-  const { theme, colorTheme, toggleTheme, setColorTheme } = useTheme();
+  const { theme, colorTheme, boardColorMode, boardSingleColor, toggleTheme, setColorTheme, setBoardColorMode, setBoardSingleColor } = useTheme();
   const [userProfile, setUserProfile] = useState<any>(null);
   const [companyInfo, setCompanyInfo] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [previewTheme, setPreviewTheme] = useState<ColorTheme | null>(null);
+  const [previewBoardColor, setPreviewBoardColor] = useState<BoardSingleColor | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -207,6 +209,158 @@ const Settings = () => {
                     </div>
                     <div className="p-3 rounded-lg bg-accent">
                       <span className="text-sm text-accent-foreground">Accent background preview</span>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Order Board Colors */}
+            <Card className="md:col-span-2">
+              <CardHeader>
+                <div className="flex items-center space-x-2">
+                  <LayoutGrid className="h-5 w-5 text-primary" />
+                  <CardTitle>Order Board Colors</CardTitle>
+                </div>
+                <CardDescription>
+                  Customize the column header colors on the orders board
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Color Mode Selection */}
+                <div className="space-y-3">
+                  <Label>Header Style</Label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      onClick={() => setBoardColorMode('colorful')}
+                      className={`
+                        relative flex flex-col items-center gap-3 p-4 rounded-xl border-2 transition-all duration-200
+                        ${boardColorMode === 'colorful' 
+                          ? 'border-primary bg-accent shadow-md' 
+                          : 'border-border hover:border-primary/50 hover:bg-muted/50'
+                        }
+                      `}
+                    >
+                      <div className="flex gap-1">
+                        <div className="w-6 h-6 rounded bg-amber-600" />
+                        <div className="w-6 h-6 rounded bg-sky-600" />
+                        <div className="w-6 h-6 rounded bg-violet-600" />
+                        <div className="w-6 h-6 rounded bg-emerald-600" />
+                      </div>
+                      <span className="text-sm font-medium">Colorful</span>
+                      <span className="text-xs text-muted-foreground">Each column has a unique color</span>
+                      {boardColorMode === 'colorful' && (
+                        <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-primary flex items-center justify-center">
+                          <Check className="h-3 w-3 text-primary-foreground" />
+                        </div>
+                      )}
+                    </button>
+
+                    <button
+                      onClick={() => setBoardColorMode('single')}
+                      className={`
+                        relative flex flex-col items-center gap-3 p-4 rounded-xl border-2 transition-all duration-200
+                        ${boardColorMode === 'single' 
+                          ? 'border-primary bg-accent shadow-md' 
+                          : 'border-border hover:border-primary/50 hover:bg-muted/50'
+                        }
+                      `}
+                    >
+                      <div className="flex gap-1">
+                        <div className="w-6 h-6 rounded bg-primary" />
+                        <div className="w-6 h-6 rounded bg-primary" />
+                        <div className="w-6 h-6 rounded bg-primary" />
+                        <div className="w-6 h-6 rounded bg-primary" />
+                      </div>
+                      <span className="text-sm font-medium">Single Color</span>
+                      <span className="text-xs text-muted-foreground">All columns use one color</span>
+                      {boardColorMode === 'single' && (
+                        <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-primary flex items-center justify-center">
+                          <Check className="h-3 w-3 text-primary-foreground" />
+                        </div>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Single Color Selection (only show when single mode is active) */}
+                {boardColorMode === 'single' && (
+                  <div className="space-y-3">
+                    <Label>Select Column Color</Label>
+                    <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
+                      {(Object.entries(boardSingleColors) as [BoardSingleColor, typeof boardSingleColors[BoardSingleColor]][]).map(([key, config]) => {
+                        const isSelected = boardSingleColor === key;
+                        const isPreview = previewBoardColor === key;
+                        
+                        return (
+                          <button
+                            key={key}
+                            onClick={() => {
+                              setBoardSingleColor(key);
+                              setPreviewBoardColor(null);
+                              toast({
+                                title: "Board Color Updated",
+                                description: `Column color changed to ${config.name}`,
+                              });
+                            }}
+                            onMouseEnter={() => setPreviewBoardColor(key)}
+                            onMouseLeave={() => setPreviewBoardColor(null)}
+                            className={`
+                              relative flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all duration-200
+                              ${isSelected 
+                                ? 'border-primary bg-accent shadow-md' 
+                                : 'border-border hover:border-primary/50 hover:bg-muted/50'
+                              }
+                            `}
+                          >
+                            <div
+                              className={`w-8 h-8 rounded-lg shadow-inner ${config.bgClass}`}
+                            />
+                            <span className="text-xs font-medium text-foreground">
+                              {config.name}
+                            </span>
+                            {isSelected && (
+                              <div 
+                                className={`absolute top-1 right-1 w-4 h-4 rounded-full flex items-center justify-center ${config.bgClass}`}
+                              >
+                                <Check className={`h-2.5 w-2.5 ${config.textClass}`} />
+                              </div>
+                            )}
+                            {isPreview && !isSelected && (
+                              <div className="absolute -top-2 left-1/2 -translate-x-1/2 px-2 py-0.5 bg-foreground text-background text-[10px] font-medium rounded-full">
+                                Preview
+                              </div>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Board Preview */}
+                <div className="space-y-3 pt-4 border-t border-border">
+                  <Label>Board Preview</Label>
+                  <div className="p-4 rounded-xl bg-muted/30 border border-border">
+                    <div className="grid grid-cols-4 gap-2">
+                      {['Awaiting', 'In Stock', 'In Progress', 'Ready'].map((label, index) => {
+                        const defaultColors = ['bg-amber-600', 'bg-sky-600', 'bg-violet-600', 'bg-emerald-600'];
+                        const bgColor = boardColorMode === 'colorful' 
+                          ? defaultColors[index] 
+                          : boardSingleColors[boardSingleColor]?.bgClass || 'bg-primary';
+                        const textColor = boardColorMode === 'colorful'
+                          ? 'text-white'
+                          : boardSingleColors[boardSingleColor]?.textClass || 'text-primary-foreground';
+                        
+                        return (
+                          <div 
+                            key={label}
+                            className={`${bgColor} ${textColor} px-2 py-1.5 rounded-lg text-center text-xs font-medium`}
+                          >
+                            {label}
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
