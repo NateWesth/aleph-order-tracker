@@ -103,24 +103,24 @@ export default function OrderStatusColumn({
   return (
     <div className="flex flex-col min-w-[300px] max-w-[340px] flex-1">
       {/* Column Header */}
-      <div className={`p-4 rounded-t-xl ${config.bgColor} shadow-lg`}>
+      <div className={`p-4 rounded-t-xl ${config.bgColor} shadow-lg backdrop-blur-sm`}>
         <div className="flex items-center justify-between">
           <h3 className={`font-bold text-sm uppercase tracking-wide ${config.color}`}>
             {config.label}
           </h3>
-          <Badge className="bg-white/20 text-white font-bold border-0">
+          <Badge className="bg-white/20 text-white font-bold border-0 shadow-sm">
             {orders.length}
           </Badge>
         </div>
       </div>
 
-      {/* Column Content */}
-      <div className="flex-1 bg-muted/50 rounded-b-xl border-2 border-t-0 border-muted min-h-[400px]">
+      {/* Column Content - Glassmorphism dark translucent background */}
+      <div className="flex-1 bg-black/20 dark:bg-black/40 backdrop-blur-md rounded-b-xl border border-white/10 dark:border-white/5 min-h-[400px] shadow-inner">
         <ScrollArea className="h-[calc(100vh-320px)]">
           <div className="p-3 space-y-3">
             {orders.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-                <Package className="h-10 w-10 mb-3 opacity-40" />
+              <div className="flex flex-col items-center justify-center py-12 text-muted-foreground/70">
+                <Package className="h-10 w-10 mb-3 opacity-30" />
                 <p className="text-sm font-medium">No orders</p>
               </div>
             ) : (
@@ -132,7 +132,7 @@ export default function OrderStatusColumn({
                 return (
                   <Card
                     key={order.id}
-                    className="hover:shadow-lg transition-all duration-200 border-l-4 border-l-primary/50 hover:border-l-primary"
+                    className="bg-card/95 dark:bg-card/90 backdrop-blur-sm border-l-4 border-l-primary/50 hover:border-l-primary shadow-lg hover:shadow-xl hover:shadow-primary/10 transition-all duration-300 hover:-translate-y-0.5 border-white/20 dark:border-white/10"
                   >
                     <CardContent className="p-4">
                       <div className="space-y-3">
