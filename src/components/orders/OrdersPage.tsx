@@ -22,6 +22,7 @@ import { useGlobalRealtimeOrders } from "./hooks/useGlobalRealtimeOrders";
 import { useCompanyData } from "@/components/admin/hooks/useCompanyData";
 import OrderForm from "./components/OrderForm";
 import OrderStatusColumn from "./components/OrderStatusColumn";
+import { PageSkeleton } from "@/components/ui/PageSkeleton";
 
 interface OrdersPageProps {
   isAdmin?: boolean;
@@ -376,11 +377,7 @@ export default function OrdersPage({
   }, [filteredOrders, urgencyPriority]);
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <p className="text-muted-foreground">Loading orders...</p>
-      </div>
-    );
+    return <PageSkeleton variant="kanban" />;
   }
 
   return (

@@ -13,6 +13,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { User, Shield, Search, Check, X, Clock, UserCog } from "lucide-react";
+import { PageSkeleton } from "@/components/ui/PageSkeleton";
 
 interface UserProfile {
   id: string;
@@ -168,11 +169,7 @@ export default function UsersManagementPage() {
   const approvedUsers = filteredUsers.filter(u => u.approved);
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-lg">Loading users...</div>
-      </div>
-    );
+    return <PageSkeleton variant="cards" />;
   }
 
   return (

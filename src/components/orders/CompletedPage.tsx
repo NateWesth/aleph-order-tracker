@@ -18,6 +18,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { format } from "date-fns";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { PageSkeleton } from "@/components/ui/PageSkeleton";
 
 interface Company {
   id: string;
@@ -280,7 +281,7 @@ export default function CompletedPage({
       </div>
 
       {loading ? (
-        <div className="text-center py-8 text-muted-foreground">Loading orders...</div>
+        <PageSkeleton variant="table" />
       ) : monthGroups.length === 0 ? (
         <div className="text-center py-16 text-muted-foreground">
           <p className="text-lg">No completed orders yet</p>
