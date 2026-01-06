@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -15,6 +15,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { format } from "date-fns";
+import { ChevronDown, ChevronRight } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 interface Company {
   id: string;
@@ -24,6 +27,13 @@ interface Company {
 interface CompletedPageProps {
   isAdmin: boolean;
   searchTerm?: string;
+}
+
+interface MonthGroup {
+  month: string;
+  monthKey: string;
+  orders: OrderWithCompany[];
+  isOpen: boolean;
 }
 
 export default function CompletedPage({
@@ -41,6 +51,7 @@ export default function CompletedPage({
   const [userRole, setUserRole] = useState<'admin' | 'user'>('user');
   const [userCompanyId, setUserCompanyId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [openMonths, setOpenMonths] = useState<Set<string>>(new Set());
 
   const fetchUserInfo = async () => {
     if (!user?.id) return;
@@ -113,6 +124,16 @@ export default function CompletedPage({
       }));
       
       setOrders(transformedOrders);
+      
+      // Auto-open the first month
+      if (transformedOrders.length > 0) {
+        const firstOrder = transformedOrders[0];
+        const dateToUse = firstOrder.completed_date || firstOrder.created_at;
+        if (dateToUse) {
+          const monthKey = format(new Date(dateToUse), 'yyyy-MM');
+          setOpenMonths(new Set([monthKey]));
+        }
+      }
     } catch (error) {
       console.error("Failed to fetch completed orders:", error);
     } finally {
@@ -183,6 +204,43 @@ export default function CompletedPage({
     return matchesSearch && matchesCompany;
   });
 
+  // Group orders by month
+  const monthGroups: MonthGroup[] = useMemo(() => {
+    const groups: Record<string, OrderWithCompany[]> = {};
+    
+    filteredOrders.forEach(order => {
+      const dateToUse = order.completed_date || order.created_at;
+      if (!dateToUse) return;
+      
+      const monthKey = format(new Date(dateToUse), 'yyyy-MM');
+      if (!groups[monthKey]) {
+        groups[monthKey] = [];
+      }
+      groups[monthKey].push(order);
+    });
+
+    return Object.entries(groups)
+      .sort(([a], [b]) => b.localeCompare(a))
+      .map(([monthKey, orders]) => ({
+        monthKey,
+        month: format(new Date(monthKey + '-01'), 'MMMM yyyy'),
+        orders,
+        isOpen: openMonths.has(monthKey)
+      }));
+  }, [filteredOrders, openMonths]);
+
+  const toggleMonth = (monthKey: string) => {
+    setOpenMonths(prev => {
+      const next = new Set(prev);
+      if (next.has(monthKey)) {
+        next.delete(monthKey);
+      } else {
+        next.add(monthKey);
+      }
+      return next;
+    });
+  };
+
   return (
     <div className="w-full">
       <div className={`flex flex-col gap-2 ${isMobile ? 'mb-3' : 'gap-4 mb-6'}`}>
@@ -223,14 +281,46 @@ export default function CompletedPage({
 
       {loading ? (
         <div className="text-center py-8 text-muted-foreground">Loading orders...</div>
+      ) : monthGroups.length === 0 ? (
+        <div className="text-center py-16 text-muted-foreground">
+          <p className="text-lg">No completed orders yet</p>
+          <p className="text-sm mt-1">Completed orders will appear here grouped by month</p>
+        </div>
       ) : (
-        <OrderTable
-          orders={filteredOrders}
-          isAdmin={false}
-          onReceiveOrder={() => {}}
-          onDeleteOrder={handleDeleteOrder}
-          compact
-        />
+        <div className="space-y-3">
+          {monthGroups.map(group => (
+            <Collapsible 
+              key={group.monthKey} 
+              open={group.isOpen}
+              onOpenChange={() => toggleMonth(group.monthKey)}
+            >
+              <CollapsibleTrigger className="w-full">
+                <div className="flex items-center justify-between p-3 bg-muted/50 hover:bg-muted rounded-lg transition-colors cursor-pointer">
+                  <div className="flex items-center gap-2">
+                    {group.isOpen ? (
+                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    )}
+                    <span className="font-medium text-foreground">{group.month}</span>
+                  </div>
+                  <span className="text-sm text-muted-foreground">
+                    {group.orders.length} order{group.orders.length !== 1 ? 's' : ''}
+                  </span>
+                </div>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="pt-2">
+                <OrderTable
+                  orders={group.orders}
+                  isAdmin={false}
+                  onReceiveOrder={() => {}}
+                  onDeleteOrder={handleDeleteOrder}
+                  compact
+                />
+              </CollapsibleContent>
+            </Collapsible>
+          ))}
+        </div>
       )}
     </div>
   );
