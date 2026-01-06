@@ -429,20 +429,18 @@ export default function OrdersPage({
       </div>
 
       {/* Kanban Board */}
-      <div className="overflow-x-auto pb-4 -mx-4 px-4">
-        <div className="bg-black/20 dark:bg-black/40 backdrop-blur-sm rounded-2xl p-5 shadow-inner">
-          <div className="flex gap-5 min-w-max">
-            {STATUS_COLUMNS.map((column) => (
-              <OrderStatusColumn
-                key={column.key}
-                config={column}
-                orders={getOrdersByStatus(column.key)}
-                onMoveOrder={handleMoveOrder}
-                onDeleteOrder={handleDeleteOrder}
-                onToggleItemStock={handleToggleItemStock}
-              />
-            ))}
-          </div>
+      <div className="overflow-x-auto pb-4">
+        <div className="flex gap-4 min-w-max">
+          {STATUS_COLUMNS.map((column) => (
+            <OrderStatusColumn
+              key={column.key}
+              config={column}
+              orders={getOrdersByStatus(column.key)}
+              onMoveOrder={handleMoveOrder}
+              onDeleteOrder={handleDeleteOrder}
+              onToggleItemStock={handleToggleItemStock}
+            />
+          ))}
         </div>
       </div>
     </div>
