@@ -32,10 +32,11 @@ const RegisterForm = () => {
       return;
     }
 
-    if (!formData.email.trim()) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!formData.email.trim() || !emailRegex.test(formData.email.trim())) {
       toast({
         title: "Error",
-        description: "Email is required",
+        description: "Please enter a valid email address",
         variant: "destructive",
       });
       return;
