@@ -230,7 +230,7 @@ const AdminDashboard = () => {
             {activeView === "history" && <CompletedPage isAdmin={true} searchTerm={searchTerm} />}
             {activeView === "clients" && <ClientCompaniesPage />}
             {activeView === "items" && <ItemsPage />}
-            {activeView === "users" && <UsersManagementPage />}
+            {activeView === "users" && isAdmin && <UsersManagementPage />}
             {activeView === "stats" && <StatsPage />}
           </div>
         </div>
