@@ -5,6 +5,7 @@ import { Plus, Filter } from "lucide-react";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -460,6 +461,9 @@ export default function OrdersPage({
             <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Create New Order</DialogTitle>
+                <DialogDescription>
+                  Fill in the order details below to create a new order.
+                </DialogDescription>
               </DialogHeader>
               <OrderForm onSubmit={handleCreateOrder} loading={submitting} />
             </DialogContent>

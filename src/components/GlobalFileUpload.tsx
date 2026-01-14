@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -125,6 +125,9 @@ export const GlobalFileUpload: React.FC<GlobalFileUploadProps> = ({ isOpen, onCl
             <FileText className="h-5 w-5" />
             Upload File
           </DialogTitle>
+          <DialogDescription>
+            Upload documents to the system. Supported formats include PDF, DOC, images, and archives.
+          </DialogDescription>
         </DialogHeader>
         
         <div className="space-y-4">

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -130,9 +131,14 @@ export const OrdersListDialog: React.FC<OrdersListDialogProps> = ({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
         <DialogHeader className="flex flex-row items-center justify-between">
-          <DialogTitle className="text-xl font-semibold">
-            Orders List - {companyName} (Current Month)
-          </DialogTitle>
+          <div>
+            <DialogTitle className="text-xl font-semibold">
+              Orders List - {companyName} (Current Month)
+            </DialogTitle>
+            <DialogDescription>
+              View all orders for this company in the current month
+            </DialogDescription>
+          </div>
           <Button
             variant="ghost"
             size="sm"
