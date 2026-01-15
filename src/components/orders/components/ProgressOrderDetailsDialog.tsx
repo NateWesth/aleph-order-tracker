@@ -317,7 +317,6 @@ export default function ProgressOrderDetailsDialog({
                             if (checked) updateStockStatus(item.name, 'ordered');
                             else updateStockStatus(item.name, 'awaiting');
                           }}
-                          disabled={!isAdmin}
                           className="data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-500"
                         />
                       </td>
@@ -328,41 +327,28 @@ export default function ProgressOrderDetailsDialog({
                             if (checked) updateStockStatus(item.name, 'in-stock');
                             else updateStockStatus(item.name, 'awaiting');
                           }}
-                          disabled={!isAdmin}
                           className="data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500"
                         />
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm">
-                        {isAdmin ? (
-                          <input
-                            type="number"
-                            value={deliveredQuantities[item.name] || 0}
-                            onChange={(e) =>
-                              updateDeliveredQuantity(item.name, parseInt(e.target.value) || 0)
-                            }
-                            className="w-20 px-2 py-1 text-sm border rounded-md bg-background border-input focus:ring-2 focus:ring-ring"
-                            min="0"
-                            max={item.quantity}
-                          />
-                        ) : (
-                          <span className="font-medium">
-                            {deliveredQuantities[item.name] || 0}
-                          </span>
-                        )}
+                        <input
+                          type="number"
+                          value={deliveredQuantities[item.name] || 0}
+                          onChange={(e) =>
+                            updateDeliveredQuantity(item.name, parseInt(e.target.value) || 0)
+                          }
+                          className="w-20 px-2 py-1 text-sm border rounded-md bg-background border-input focus:ring-2 focus:ring-ring"
+                          min="0"
+                          max={item.quantity}
+                        />
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-center">
-                        {isAdmin ? (
-                          <Checkbox
-                            checked={item.completed}
-                            onCheckedChange={(checked) =>
-                              toggleItemCompletion(item.name, checked as boolean)
-                            }
-                          />
-                        ) : (
-                          <Badge variant={item.completed ? "default" : "secondary"}>
-                            {item.completed ? "Done" : "Pending"}
-                          </Badge>
-                        )}
+                        <Checkbox
+                          checked={item.completed}
+                          onCheckedChange={(checked) =>
+                            toggleItemCompletion(item.name, checked as boolean)
+                          }
+                        />
                       </td>
                     </tr>
                   ))
@@ -386,13 +372,11 @@ export default function ProgressOrderDetailsDialog({
 
         <AlertDialogFooter>
           <AlertDialogCancel onClick={onClose} disabled={saving}>
-            {isAdmin ? "Cancel" : "Close"}
+            Cancel
           </AlertDialogCancel>
-          {isAdmin && (
-            <AlertDialogAction onClick={saveChanges} disabled={saving}>
-              {saving ? "Saving..." : "Save Changes"}
-            </AlertDialogAction>
-          )}
+          <AlertDialogAction onClick={saveChanges} disabled={saving}>
+            {saving ? "Saving..." : "Save Changes"}
+          </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

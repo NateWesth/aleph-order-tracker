@@ -509,7 +509,7 @@ export default function OrdersPage({
             onDeleteOrder={handleDeleteOrder}
             onSetItemStockStatus={handleSetItemStockStatus}
             onBulkSetItemsStatus={handleBulkSetItemsStatus}
-            canEditItems={isAdmin}
+            canEditItems={true}
             isExpanded={expandedColumns.has(column.key)}
             onToggleExpand={() => {
               setExpandedColumns(prev => {
