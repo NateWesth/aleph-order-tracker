@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, memo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Plus, Filter } from "lucide-react";
+import { Plus, Filter, ChevronDown, ChevronUp } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -124,6 +124,7 @@ export default function OrdersPage({
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>("all");
+  const [expandedColumns, setExpandedColumns] = useState<Set<string>>(new Set(["ordered", "in-stock", "in-progress", "ready"]));
   const { toast } = useToast();
   const { user } = useAuth();
   const { companies } = useCompanyData();
@@ -509,6 +510,18 @@ export default function OrdersPage({
             onSetItemStockStatus={handleSetItemStockStatus}
             onBulkSetItemsStatus={handleBulkSetItemsStatus}
             canEditItems={isAdmin}
+            isExpanded={expandedColumns.has(column.key)}
+            onToggleExpand={() => {
+              setExpandedColumns(prev => {
+                const next = new Set(prev);
+                if (next.has(column.key)) {
+                  next.delete(column.key);
+                } else {
+                  next.add(column.key);
+                }
+                return next;
+              });
+            }}
           />
         ))}
       </div>
