@@ -124,7 +124,7 @@ export default function OrdersPage({
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>("all");
-  const [expandedColumns, setExpandedColumns] = useState<Set<string>>(new Set(["ordered", "in-stock", "in-progress", "ready"]));
+  const [expandedColumns, setExpandedColumns] = useState<Set<string>>(new Set());
   const { toast } = useToast();
   const { user } = useAuth();
   const { companies } = useCompanyData();
