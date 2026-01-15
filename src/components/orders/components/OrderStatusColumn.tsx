@@ -9,6 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { useTheme } from "@/contexts/ThemeContext";
 interface OrderItem {
   id: string;
   name: string;
@@ -56,6 +57,7 @@ function OrderStatusColumn({
   onBulkSetItemsStatus,
   canEditItems = false
 }: OrderStatusColumnProps) {
+  const { stockStatusColors } = useTheme();
   const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
   const toggleExpanded = useCallback((orderId: string) => {
     setExpandedOrders(prev => {
@@ -162,8 +164,8 @@ function OrderStatusColumn({
                                 {/* Column Headers for Awaiting Stock */}
                                 {config.key === "ordered" && order.items && order.items.length > 0 && <div className="flex items-center gap-2 text-[10px] font-medium text-muted-foreground pb-1 border-b border-border/50 mb-1">
                                     <div className="flex items-center gap-2 shrink-0">
-                                      <span className="w-4 text-center text-blue-600 dark:text-blue-400">O</span>
-                                      <span className="w-4 text-center text-green-600 dark:text-green-400">R</span>
+                                      <span className="w-4 text-center" style={{ color: stockStatusColors.orderedColor }}>O</span>
+                                      <span className="w-4 text-center" style={{ color: stockStatusColors.receivedColor }}>R</span>
                                     </div>
                                     <span className="flex-1">Item</span>
                                   </div>}
@@ -177,7 +179,10 @@ function OrderStatusColumn({
                                                 <Checkbox id={`${item.id}-ordered`} checked={item.stock_status === "ordered" || item.stock_status === "in-stock"} onCheckedChange={checked => {
                                       if (!canEditItems) return;
                                       onSetItemStockStatus?.(item.id, checked ? "ordered" : "awaiting");
-                                    }} disabled={!canEditItems} className="h-4 w-4 data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-500" />
+                                    }} disabled={!canEditItems} className="h-4 w-4" style={{
+                                      '--checkbox-color': stockStatusColors.orderedColor,
+                                    } as React.CSSProperties}
+                                    data-custom-color="true" />
                                               </span>
                                             </TooltipTrigger>
                                             <TooltipContent side="top">
@@ -186,7 +191,7 @@ function OrderStatusColumn({
                                           </Tooltip>
                                         </TooltipProvider>
 
-                                        {/* Received - Green */}
+                                        {/* Received - Custom color */}
                                         <TooltipProvider>
                                           <Tooltip>
                                             <TooltipTrigger asChild>
@@ -198,7 +203,10 @@ function OrderStatusColumn({
                                       } else {
                                         onSetItemStockStatus?.(item.id, "ordered");
                                       }
-                                    }} disabled={!canEditItems} className="h-4 w-4 data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500" />
+                                    }} disabled={!canEditItems} className="h-4 w-4" style={{
+                                      '--checkbox-color': stockStatusColors.receivedColor,
+                                    } as React.CSSProperties}
+                                    data-custom-color="true" />
                                               </span>
                                             </TooltipTrigger>
                                             <TooltipContent side="top">
@@ -217,7 +225,11 @@ function OrderStatusColumn({
                                 {/* Bulk Actions & Legend */}
                                 {config.key === "ordered" && order.items && order.items.length > 0 && canEditItems && <div className="flex items-center justify-between pt-2 mt-1 border-t border-border/50">
                                     <div className="flex items-center gap-1">
-                                      <Button size="sm" variant="outline" className="h-6 text-[10px] px-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-950 dark:hover:bg-blue-900 dark:text-blue-300 dark:border-blue-800" onClick={() => {
+                                      <Button size="sm" variant="outline" className="h-6 text-[10px] px-2" style={{
+                                        backgroundColor: `${stockStatusColors.orderedColor}15`,
+                                        borderColor: `${stockStatusColors.orderedColor}40`,
+                                        color: stockStatusColors.orderedColor,
+                                      }} onClick={() => {
                               const itemIds = order.items?.map(i => i.id) || [];
                               onBulkSetItemsStatus?.(itemIds, "ordered");
                             }}>
@@ -227,11 +239,11 @@ function OrderStatusColumn({
                                     </div>
                                     <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
                                       <div className="flex items-center gap-1">
-                                        <div className="w-2 h-2 rounded-sm bg-blue-500"></div>
+                                        <div className="w-2 h-2 rounded-sm" style={{ backgroundColor: stockStatusColors.orderedColor }}></div>
                                         <span>O</span>
                                       </div>
                                       <div className="flex items-center gap-1">
-                                        <div className="w-2 h-2 rounded-sm bg-green-500"></div>
+                                        <div className="w-2 h-2 rounded-sm" style={{ backgroundColor: stockStatusColors.receivedColor }}></div>
                                         <span>R</span>
                                       </div>
                                     </div>
@@ -239,11 +251,11 @@ function OrderStatusColumn({
                                 {/* Legend only when not editable */}
                                 {config.key === "ordered" && order.items && order.items.length > 0 && !canEditItems && <div className="flex items-center gap-3 pt-2 mt-1 border-t border-border/50 text-[10px] text-muted-foreground">
                                     <div className="flex items-center gap-1">
-                                      <div className="w-2.5 h-2.5 rounded-sm bg-blue-500"></div>
+                                      <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: stockStatusColors.orderedColor }}></div>
                                       <span>Ordered</span>
                                     </div>
                                     <div className="flex items-center gap-1">
-                                      <div className="w-2.5 h-2.5 rounded-sm bg-green-500"></div>
+                                      <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: stockStatusColors.receivedColor }}></div>
                                       <span>Received</span>
                                     </div>
                                   </div>}

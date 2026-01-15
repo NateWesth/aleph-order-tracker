@@ -7,9 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { useTheme, colorThemes, boardSingleColors, colorfulPresets } from "@/contexts/ThemeContext";
+import { useTheme, colorThemes, boardSingleColors, colorfulPresets, stockStatusColorOptions, defaultStockStatusColors } from "@/contexts/ThemeContext";
 import { supabase } from "@/integrations/supabase/client";
-import { ArrowLeft, User, Building2, Moon, Sun, Palette, Check, LayoutGrid, RotateCcw } from "lucide-react";
+import { ArrowLeft, User, Building2, Moon, Sun, Palette, Check, LayoutGrid, RotateCcw, Package } from "lucide-react";
 
 type ColorTheme = keyof typeof colorThemes;
 type BoardSingleColor = keyof typeof boardSingleColors;
@@ -19,7 +19,7 @@ const Settings = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
-  const { theme, colorTheme, boardColorMode, boardSingleColor, colorfulPreset, customBoardColor, toggleTheme, setTheme, setColorTheme, setBoardColorMode, setBoardSingleColor, setColorfulPreset, setCustomBoardColor } = useTheme();
+  const { theme, colorTheme, boardColorMode, boardSingleColor, colorfulPreset, customBoardColor, stockStatusColors, toggleTheme, setTheme, setColorTheme, setBoardColorMode, setBoardSingleColor, setColorfulPreset, setCustomBoardColor, setStockStatusColors } = useTheme();
   const [userProfile, setUserProfile] = useState<any>(null);
   const [companyInfo, setCompanyInfo] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -82,6 +82,7 @@ const Settings = () => {
     setBoardSingleColor('primary');
     setColorfulPreset('default');
     setCustomBoardColor('#6366f1');
+    setStockStatusColors(defaultStockStatusColors);
     toast({
       title: "Settings Reset",
       description: "All theme preferences have been restored to defaults",
@@ -512,6 +513,147 @@ const Settings = () => {
                           </div>
                         );
                       })}
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Stock Status Checkbox Colors */}
+            <Card className="md:col-span-2">
+              <CardHeader>
+                <div className="flex items-center space-x-2">
+                  <Package className="h-5 w-5 text-primary" />
+                  <CardTitle>Stock Status Checkbox Colors</CardTitle>
+                </div>
+                <CardDescription>
+                  Customize the colors of the Ordered (O) and Received (R) checkboxes and their labels
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Ordered Color */}
+                <div className="space-y-3">
+                  <Label className="flex items-center gap-2">
+                    <div 
+                      className="w-4 h-4 rounded-sm" 
+                      style={{ backgroundColor: stockStatusColors.orderedColor }}
+                    />
+                    Ordered (O) Color
+                  </Label>
+                  <div className="grid grid-cols-5 sm:grid-cols-10 gap-2">
+                    {stockStatusColorOptions.map((colorOption) => {
+                      const isSelected = stockStatusColors.orderedColor === colorOption.value;
+                      return (
+                        <button
+                          key={colorOption.value}
+                          onClick={() => {
+                            setStockStatusColors({
+                              ...stockStatusColors,
+                              orderedColor: colorOption.value
+                            });
+                            toast({
+                              title: "Color Updated",
+                              description: `Ordered checkbox color changed to ${colorOption.name}`,
+                            });
+                          }}
+                          className={`
+                            relative w-10 h-10 rounded-lg transition-all duration-200 flex items-center justify-center
+                            ${isSelected 
+                              ? 'ring-2 ring-offset-2 ring-primary' 
+                              : 'hover:scale-110'
+                            }
+                          `}
+                          style={{ backgroundColor: colorOption.value }}
+                          title={colorOption.name}
+                        >
+                          {isSelected && (
+                            <Check className="h-4 w-4 text-white drop-shadow-md" />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Received Color */}
+                <div className="space-y-3">
+                  <Label className="flex items-center gap-2">
+                    <div 
+                      className="w-4 h-4 rounded-sm" 
+                      style={{ backgroundColor: stockStatusColors.receivedColor }}
+                    />
+                    Received (R) Color
+                  </Label>
+                  <div className="grid grid-cols-5 sm:grid-cols-10 gap-2">
+                    {stockStatusColorOptions.map((colorOption) => {
+                      const isSelected = stockStatusColors.receivedColor === colorOption.value;
+                      return (
+                        <button
+                          key={colorOption.value}
+                          onClick={() => {
+                            setStockStatusColors({
+                              ...stockStatusColors,
+                              receivedColor: colorOption.value
+                            });
+                            toast({
+                              title: "Color Updated",
+                              description: `Received checkbox color changed to ${colorOption.name}`,
+                            });
+                          }}
+                          className={`
+                            relative w-10 h-10 rounded-lg transition-all duration-200 flex items-center justify-center
+                            ${isSelected 
+                              ? 'ring-2 ring-offset-2 ring-primary' 
+                              : 'hover:scale-110'
+                            }
+                          `}
+                          style={{ backgroundColor: colorOption.value }}
+                          title={colorOption.name}
+                        >
+                          {isSelected && (
+                            <Check className="h-4 w-4 text-white drop-shadow-md" />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Preview */}
+                <div className="space-y-3 pt-4 border-t border-border">
+                  <Label>Preview</Label>
+                  <div className="p-4 rounded-xl bg-muted/30 border border-border">
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-2">
+                        <div 
+                          className="w-4 h-4 rounded-sm border-2" 
+                          style={{ 
+                            backgroundColor: stockStatusColors.orderedColor,
+                            borderColor: stockStatusColors.orderedColor 
+                          }}
+                        />
+                        <span 
+                          className="text-sm font-medium"
+                          style={{ color: stockStatusColors.orderedColor }}
+                        >
+                          O (Ordered)
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div 
+                          className="w-4 h-4 rounded-sm border-2" 
+                          style={{ 
+                            backgroundColor: stockStatusColors.receivedColor,
+                            borderColor: stockStatusColors.receivedColor 
+                          }}
+                        />
+                        <span 
+                          className="text-sm font-medium"
+                          style={{ color: stockStatusColors.receivedColor }}
+                        >
+                          R (Received)
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
