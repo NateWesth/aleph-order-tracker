@@ -60,7 +60,8 @@ interface OrderStatusColumnProps {
   orders: Order[];
   onMoveOrder: (order: Order, newStatus: string) => void;
   onDeleteOrder: (order: Order) => void;
-  onToggleItemStock?: (itemId: string, currentStatus: string) => void;
+  onSetItemStockStatus?: (itemId: string, newStatus: string) => void;
+  canEditItems?: boolean;
 }
 
 function OrderStatusColumn({
@@ -68,7 +69,8 @@ function OrderStatusColumn({
   orders,
   onMoveOrder,
   onDeleteOrder,
-  onToggleItemStock,
+  onSetItemStockStatus,
+  canEditItems = false,
 }: OrderStatusColumnProps) {
   const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
 
@@ -220,14 +222,39 @@ function OrderStatusColumn({
                                     className="flex items-center gap-2 text-xs py-1"
                                   >
                                     {config.key === "ordered" && (
-                                      <Checkbox
-                                        id={item.id}
-                                        checked={item.stock_status === "in-stock"}
-                                        onCheckedChange={() =>
-                                          onToggleItemStock?.(item.id, item.stock_status)
-                                        }
-                                        className="h-4 w-4 shrink-0"
-                                      />
+                                      <div className="flex items-center gap-2 shrink-0">
+                                        {/* Ordered */}
+                                        <Checkbox
+                                          id={`${item.id}-ordered`}
+                                          checked={item.stock_status === "ordered" || item.stock_status === "in-stock"}
+                                          onCheckedChange={(checked) => {
+                                            if (!canEditItems) return;
+                                            onSetItemStockStatus?.(
+                                              item.id,
+                                              checked ? "ordered" : "awaiting"
+                                            );
+                                          }}
+                                          disabled={!canEditItems}
+                                          className="h-4 w-4"
+                                        />
+
+                                        {/* Received */}
+                                        <Checkbox
+                                          id={`${item.id}-received`}
+                                          checked={item.stock_status === "in-stock"}
+                                          onCheckedChange={(checked) => {
+                                            if (!canEditItems) return;
+                                            if (checked) {
+                                              onSetItemStockStatus?.(item.id, "in-stock");
+                                            } else {
+                                              // If un-receiving, fall back to ordered (if ordered was set) else awaiting
+                                              onSetItemStockStatus?.(item.id, "ordered");
+                                            }
+                                          }}
+                                          disabled={!canEditItems}
+                                          className="h-4 w-4"
+                                        />
+                                      </div>
                                     )}
                                     <span className={cn(
                                       "flex-1",
