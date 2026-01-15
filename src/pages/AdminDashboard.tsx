@@ -16,6 +16,7 @@ import UsersManagementPage from "@/components/admin/UsersManagementPage";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useGlobalUnreadCount } from "@/hooks/useGlobalUnreadCount";
 import { cn } from "@/lib/utils";
+import { triggerHapticFeedback } from "@/utils/haptics";
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -244,12 +245,15 @@ const AdminDashboard = () => {
             return (
               <button
                 key={item.id}
-                onClick={() => setActiveView(item.id)}
+                onClick={() => {
+                  triggerHapticFeedback('light');
+                  setActiveView(item.id);
+                }}
                 className={cn(
                   "flex flex-col items-center justify-center gap-0.5 py-2 px-3 rounded-xl transition-all duration-200 min-w-[56px]",
                   isActive
                     ? "text-primary bg-primary/10"
-                    : "text-muted-foreground active:bg-muted"
+                    : "text-muted-foreground active:bg-muted active:scale-95"
                 )}
               >
                 <div className="relative">
