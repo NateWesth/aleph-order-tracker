@@ -54,7 +54,7 @@ function App() {
       <ThemeProvider>
         <AuthProvider>
           <Router>
-            <div className="min-h-screen bg-background text-foreground">
+            <div className="min-h-screen bg-background text-foreground safe-area-insets">
               <Suspense fallback={<PageFallback />}>
                 <Routes>
                   <Route path="/" element={<Auth />} />
