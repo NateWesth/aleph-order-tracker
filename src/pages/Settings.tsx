@@ -255,26 +255,38 @@ const Settings = () => {
                       <li>Tap "Add" to confirm</li>
                     </ol>
                   </div>
-                ) : deferredPrompt ? (
-                  <div className="space-y-3">
-                    <Button onClick={handleInstallApp} className="w-full sm:w-auto">
-                      <Download className="h-4 w-4 mr-2" />
-                      Install App
-                    </Button>
-                    <p className="text-xs text-muted-foreground">
-                      Works on desktop (Chrome, Edge) and mobile devices
-                    </p>
-                  </div>
                 ) : (
-                  <div className="space-y-3">
-                    <p className="text-sm text-muted-foreground">
-                      To install this app:
-                    </p>
-                    <ul className="text-sm text-muted-foreground space-y-2 list-disc list-inside">
-                      <li><strong>Chrome/Edge (Desktop):</strong> Click the install icon in the address bar, or go to Menu → "Install Aleph Orders"</li>
-                      <li><strong>Chrome (Android):</strong> Tap Menu → "Add to Home screen"</li>
-                      <li><strong>Safari (iOS):</strong> Tap Share → "Add to Home Screen"</li>
-                    </ul>
+                  <div className="space-y-4">
+                    {/* Android APK Download */}
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium">Android</p>
+                      <Button 
+                        asChild 
+                        className="w-full sm:w-auto"
+                      >
+                        <a href="/aleph-orders.apk" download="aleph-orders.apk">
+                          <Download className="h-4 w-4 mr-2" />
+                          Download Android App
+                        </a>
+                      </Button>
+                      <p className="text-xs text-muted-foreground">
+                        Download and install the APK for full features including biometric login
+                      </p>
+                    </div>
+                    
+                    {/* PWA Install fallback */}
+                    {deferredPrompt && (
+                      <div className="space-y-2 pt-3 border-t border-border">
+                        <p className="text-sm font-medium">Or install as Web App</p>
+                        <Button variant="outline" onClick={handleInstallApp} className="w-full sm:w-auto">
+                          <Download className="h-4 w-4 mr-2" />
+                          Install Web App
+                        </Button>
+                        <p className="text-xs text-muted-foreground">
+                          Lighter version without native features
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
               </CardContent>
