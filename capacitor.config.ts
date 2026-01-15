@@ -4,7 +4,11 @@ const config: CapacitorConfig = {
   appId: 'app.lovable.alephorders',
   appName: 'Aleph Orders',
   webDir: 'dist',
-  // Remove server config for production - app uses bundled assets
+  // Load from published URL for instant updates without new APK downloads
+  server: {
+    url: "https://aleph-order-tracker.lovable.app",
+    cleartext: true
+  },
   plugins: {
     CapacitorHttp: {
       enabled: true,
