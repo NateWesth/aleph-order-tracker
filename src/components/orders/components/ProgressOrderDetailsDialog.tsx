@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -14,15 +13,18 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface OrderItem {
+  id: string;
   name: string;
   quantity: number;
-  delivered?: number;
+  delivered: number;
   completed: boolean;
+  stock_status: 'awaiting' | 'ordered' | 'in-stock';
 }
 
 interface ProgressOrderDetailsDialogProps {
@@ -47,23 +49,23 @@ const formatSafeDate = (date: Date | string | number | null | undefined): string
   }
 };
 
-// Parse order items from description - enhanced to handle delivered quantities and completion status
+// Parse order items from description - enhanced to handle stock status
 const parseOrderItems = (description: string | null): OrderItem[] => {
   if (!description) {
     return [];
   }
 
-  // Parse the description to extract items, quantities, delivered amounts, and completion status
-  // Format: "Item Name (Qty: 2) [Delivered: 1] [Status: completed]"
-  const items = description.split('\n').map(line => {
-    // First try the enhanced format with delivered and status info
-    const enhancedMatch = line.match(/^(.+?)\s*\(Qty:\s*(\d+)\)(?:\s*\[Delivered:\s*(\d+)\])?(?:\s*\[Status:\s*(completed|pending)\])?/);
+  const items = description.split('\n').map((line, index) => {
+    // Try enhanced format with stock status: "Item Name (Qty: 2) [Delivered: 1] [Stock: ordered] [Status: completed]"
+    const enhancedMatch = line.match(/^(.+?)\s*\(Qty:\s*(\d+)\)(?:\s*\[Delivered:\s*(\d+)\])?(?:\s*\[Stock:\s*(awaiting|ordered|in-stock)\])?(?:\s*\[Status:\s*(completed|pending)\])?/);
     if (enhancedMatch) {
       return {
+        id: `item-${index}`,
         name: enhancedMatch[1].trim(),
         quantity: parseInt(enhancedMatch[2]),
         delivered: enhancedMatch[3] ? parseInt(enhancedMatch[3]) : 0,
-        completed: enhancedMatch[4] === 'completed'
+        stock_status: (enhancedMatch[4] as 'awaiting' | 'ordered' | 'in-stock') || 'awaiting',
+        completed: enhancedMatch[5] === 'completed'
       };
     }
     
@@ -71,21 +73,28 @@ const parseOrderItems = (description: string | null): OrderItem[] => {
     const basicMatch = line.match(/^(.+?)\s*\(Qty:\s*(\d+)\)$/);
     if (basicMatch) {
       return {
+        id: `item-${index}`,
         name: basicMatch[1].trim(),
         quantity: parseInt(basicMatch[2]),
         delivered: 0,
+        stock_status: 'awaiting' as const,
         completed: false
       };
     }
     
     // Fallback for items without quantity format
-    return {
-      name: line.trim(),
-      quantity: 1,
-      delivered: 0,
-      completed: false
-    };
-  }).filter(item => item.name);
+    if (line.trim()) {
+      return {
+        id: `item-${index}`,
+        name: line.trim(),
+        quantity: 1,
+        delivered: 0,
+        stock_status: 'awaiting' as const,
+        completed: false
+      };
+    }
+    return null;
+  }).filter((item): item is OrderItem => item !== null && item.name.length > 0);
 
   return items;
 };
@@ -101,21 +110,19 @@ export default function ProgressOrderDetailsDialog({
   const [items, setItems] = useState<OrderItem[]>([]);
   const [deliveredQuantities, setDeliveredQuantities] = useState<{ [key: string]: number }>({});
   const [allCompleted, setAllCompleted] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (order?.description) {
-      // Parse items from the order description
       const parsedItems = parseOrderItems(order.description);
       setItems(parsedItems);
 
-      // Initialize delivered quantities from parsed data
       const initialDeliveredQuantities: { [key: string]: number } = {};
       parsedItems.forEach(item => {
         initialDeliveredQuantities[item.name] = item.delivered || 0;
       });
       setDeliveredQuantities(initialDeliveredQuantities);
 
-      // Check if all items are completed
       setAllCompleted(parsedItems.every(item => item.completed));
     }
   }, [order]);
@@ -127,12 +134,33 @@ export default function ProgressOrderDetailsDialog({
     }));
   };
 
+  const updateStockStatus = (itemName: string, status: 'awaiting' | 'ordered' | 'in-stock') => {
+    setItems(prevItems =>
+      prevItems.map(item =>
+        item.name === itemName ? { ...item, stock_status: status } : item
+      )
+    );
+  };
+
   const toggleItemCompletion = (itemName: string, completed: boolean) => {
     setItems(prevItems =>
       prevItems.map(item =>
         item.name === itemName ? { ...item, completed } : item
       )
     );
+  };
+
+  const getStockStatusBadge = (status: 'awaiting' | 'ordered' | 'in-stock') => {
+    switch (status) {
+      case 'awaiting':
+        return <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">Awaiting</Badge>;
+      case 'ordered':
+        return <Badge variant="secondary" className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">Ordered</Badge>;
+      case 'in-stock':
+        return <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">In Stock</Badge>;
+      default:
+        return <Badge variant="secondary">Unknown</Badge>;
+    }
   };
 
   const saveChanges = async () => {
@@ -145,28 +173,27 @@ export default function ProgressOrderDetailsDialog({
       return;
     }
 
+    setSaving(true);
+
     try {
-      // Update items with current delivered quantities and completion status
       const updatedItems = items.map(item => ({
         ...item,
         delivered: deliveredQuantities[item.name] || 0,
-        completed: item.completed
       }));
 
-      // Convert items back to description format for storage, including delivered info
-      // We'll store this in a format that can be parsed later: "Item Name (Qty: 5) [Delivered: 3] [Status: completed/pending]"
+      // Convert items back to description format including stock status
       const description = updatedItems.map(item => {
         let itemString = `${item.name} (Qty: ${item.quantity})`;
         if (item.delivered !== undefined && item.delivered > 0) {
           itemString += ` [Delivered: ${item.delivered}]`;
         }
+        itemString += ` [Stock: ${item.stock_status}]`;
         if (item.completed) {
           itemString += ` [Status: completed]`;
         }
         return itemString;
       }).join('\n');
 
-      // Determine if order should be marked as completed
       const allItemsCompleted = updatedItems.every(item => item.completed);
       const newStatus = allItemsCompleted ? 'completed' : order.status;
       const updateData: any = {
@@ -175,7 +202,6 @@ export default function ProgressOrderDetailsDialog({
         updated_at: new Date().toISOString()
       };
 
-      // If marking as completed, set completion date
       if (allItemsCompleted && order.status !== 'completed') {
         updateData.completed_date = new Date().toISOString();
       }
@@ -207,77 +233,117 @@ export default function ProgressOrderDetailsDialog({
         description: "Unexpected error occurred.",
         variant: "destructive",
       });
+    } finally {
+      setSaving(false);
     }
   };
 
-  // Don't render if order is not available
   if (!order) {
     return null;
   }
 
   return (
     <AlertDialog open={isOpen} onOpenChange={onClose}>
-      <AlertDialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <AlertDialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
         <AlertDialogHeader>
           <AlertDialogTitle>Order #{order?.order_number || 'Unknown'} Details</AlertDialogTitle>
         </AlertDialogHeader>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <p className="text-sm text-gray-500">Order Number</p>
-            <p>{order?.order_number || 'Unknown'}</p>
+            <p className="text-sm text-muted-foreground">Order Number</p>
+            <p className="font-medium">{order?.order_number || 'Unknown'}</p>
           </div>
           <div>
-            <p className="text-sm text-gray-500">Company</p>
-            <p>{order?.companyName || 'Unknown Company'}</p>
+            <p className="text-sm text-muted-foreground">Company</p>
+            <p className="font-medium">{order?.companyName || 'Unknown Company'}</p>
           </div>
           <div>
-            <p className="text-sm text-gray-500">Created At</p>
-            <p>{formatSafeDate(order?.created_at)}</p>
+            <p className="text-sm text-muted-foreground">Created At</p>
+            <p className="font-medium">{formatSafeDate(order?.created_at)}</p>
           </div>
           <div>
-            <p className="text-sm text-gray-500">Status</p>
+            <p className="text-sm text-muted-foreground">Status</p>
             <Badge variant="secondary">{order?.status || 'Unknown'}</Badge>
           </div>
         </div>
 
         <div className="mt-6">
-          <h3 className="text-xl font-semibold mb-4">Items</h3>
+          <h3 className="text-xl font-semibold mb-4">Items & Stock Status</h3>
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+            <table className="min-w-full divide-y divide-border">
+              <thead className="bg-muted/50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Item
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Quantity
+                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    Qty
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    Awaiting
+                  </th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    Ordered
+                  </th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    Received
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Delivered
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Completed
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-card divide-y divide-border">
                 {items.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="px-6 py-4 text-center text-gray-500">
+                    <td colSpan={7} className="px-4 py-4 text-center text-muted-foreground">
                       No items found for this order
                     </td>
                   </tr>
                 ) : (
                   items.map((item) => (
-                    <tr key={item.name}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    <tr key={item.name} className="hover:bg-muted/30">
+                      <td className="px-4 py-3 whitespace-nowrap text-sm font-medium">
                         {item.name}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">
                         {item.quantity}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <td className="px-4 py-3 whitespace-nowrap text-center">
+                        <Checkbox
+                          checked={item.stock_status === 'awaiting'}
+                          onCheckedChange={(checked) => {
+                            if (checked) updateStockStatus(item.name, 'awaiting');
+                          }}
+                          disabled={!isAdmin}
+                          className="data-[state=checked]:bg-yellow-500 data-[state=checked]:border-yellow-500"
+                        />
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-center">
+                        <Checkbox
+                          checked={item.stock_status === 'ordered'}
+                          onCheckedChange={(checked) => {
+                            if (checked) updateStockStatus(item.name, 'ordered');
+                          }}
+                          disabled={!isAdmin}
+                          className="data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-500"
+                        />
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-center">
+                        <Checkbox
+                          checked={item.stock_status === 'in-stock'}
+                          onCheckedChange={(checked) => {
+                            if (checked) updateStockStatus(item.name, 'in-stock');
+                          }}
+                          disabled={!isAdmin}
+                          className="data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500"
+                        />
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm">
                         {isAdmin ? (
                           <input
                             type="number"
@@ -285,29 +351,27 @@ export default function ProgressOrderDetailsDialog({
                             onChange={(e) =>
                               updateDeliveredQuantity(item.name, parseInt(e.target.value) || 0)
                             }
-                            className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-24 sm:text-sm border-gray-300 rounded-md"
+                            className="w-20 px-2 py-1 text-sm border rounded-md bg-background border-input focus:ring-2 focus:ring-ring"
                             min="0"
                             max={item.quantity}
                           />
                         ) : (
-                          <span className="text-gray-900 font-medium">
+                          <span className="font-medium">
                             {deliveredQuantities[item.name] || 0}
                           </span>
                         )}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <td className="px-4 py-3 whitespace-nowrap text-center">
                         {isAdmin ? (
-                          <input
-                            type="checkbox"
+                          <Checkbox
                             checked={item.completed}
-                            onChange={(e) =>
-                              toggleItemCompletion(item.name, e.target.checked)
+                            onCheckedChange={(checked) =>
+                              toggleItemCompletion(item.name, checked as boolean)
                             }
-                            className="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300 rounded"
                           />
                         ) : (
                           <Badge variant={item.completed ? "default" : "secondary"}>
-                            {item.completed ? "Completed" : "Pending"}
+                            {item.completed ? "Done" : "Pending"}
                           </Badge>
                         )}
                       </td>
@@ -317,14 +381,32 @@ export default function ProgressOrderDetailsDialog({
               </tbody>
             </table>
           </div>
+          
+          {/* Stock Status Legend */}
+          <div className="mt-4 flex flex-wrap gap-4 text-sm text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded bg-yellow-500"></div>
+              <span>Awaiting Stock</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded bg-blue-500"></div>
+              <span>Ordered</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded bg-green-500"></div>
+              <span>Received/In Stock</span>
+            </div>
+          </div>
         </div>
 
         <AlertDialogFooter>
-          <AlertDialogCancel onClick={onClose}>
+          <AlertDialogCancel onClick={onClose} disabled={saving}>
             {isAdmin ? "Cancel" : "Close"}
           </AlertDialogCancel>
           {isAdmin && (
-            <AlertDialogAction onClick={saveChanges}>Save Changes</AlertDialogAction>
+            <AlertDialogAction onClick={saveChanges} disabled={saving}>
+              {saving ? "Saving..." : "Save Changes"}
+            </AlertDialogAction>
           )}
         </AlertDialogFooter>
       </AlertDialogContent>
