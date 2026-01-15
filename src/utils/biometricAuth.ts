@@ -1,5 +1,6 @@
 import { NativeBiometric, BiometryType } from "capacitor-native-biometric";
 import { Capacitor } from "@capacitor/core";
+import { triggerHapticFeedback, triggerNotificationHaptic } from "./haptics";
 
 // Re-export BiometryType for convenience
 export { BiometryType } from "capacitor-native-biometric";
@@ -65,6 +66,10 @@ export const saveCredentials = async (
       server: SERVER_ID,
     });
     console.log("Credentials saved for biometric login");
+    
+    // Trigger success haptic when credentials are saved
+    await triggerNotificationHaptic('success');
+    
     return true;
   } catch (error) {
     console.error("Error saving credentials:", error);
@@ -104,6 +109,10 @@ export const deleteCredentials = async (): Promise<boolean> => {
       server: SERVER_ID,
     });
     console.log("Credentials deleted");
+    
+    // Trigger medium haptic when credentials are deleted
+    await triggerHapticFeedback('medium');
+    
     return true;
   } catch (error) {
     console.error("Error deleting credentials:", error);
@@ -126,6 +135,9 @@ export const authenticateWithBiometric = async (
 
     const biometricName = getBiometricTypeName(availability.biometryType);
 
+    // Trigger light haptic when biometric prompt appears
+    await triggerHapticFeedback('light');
+
     await NativeBiometric.verifyIdentity({
       reason: reason,
       title: "Authentication Required",
@@ -136,9 +148,16 @@ export const authenticateWithBiometric = async (
       fallbackTitle: "Use Password",
     });
 
+    // Trigger success haptic on successful authentication
+    await triggerNotificationHaptic('success');
+
     return true;
   } catch (error) {
     console.error("Biometric authentication failed:", error);
+    
+    // Trigger error haptic on failed authentication
+    await triggerNotificationHaptic('error');
+    
     return false;
   }
 };
