@@ -165,50 +165,47 @@ const Settings = () => {
       {/* Main content */}
       <main className="max-w-7xl mx-auto py-4 px-3 sm:px-6 lg:px-8 overflow-x-hidden pb-24">
         <div className="space-y-4">
-          {/* Install App Section */}
-          <Card>
-            <CardHeader className="pb-3">
-              <div className="flex items-center space-x-2">
-                <Smartphone className="h-5 w-5 text-primary" />
-                <CardTitle className="text-base sm:text-lg">Install App</CardTitle>
-              </div>
-              <CardDescription className="text-xs sm:text-sm">
-                Install Aleph Orders on your device for quick access
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {isInstalled ? (
-                <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
-                  <Check className="h-5 w-5" />
-                  <span className="text-sm font-medium">App is installed on your device</span>
+          {/* Install App Section - Only show in browser, not when installed as PWA */}
+          {!isInstalled && (
+            <Card>
+              <CardHeader className="pb-3">
+                <div className="flex items-center space-x-2">
+                  <Smartphone className="h-5 w-5 text-primary" />
+                  <CardTitle className="text-base sm:text-lg">Install App</CardTitle>
                 </div>
-              ) : isIOS ? (
-                <div className="space-y-3">
+                <CardDescription className="text-xs sm:text-sm">
+                  Install Aleph Orders on your device for quick access
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isIOS ? (
+                  <div className="space-y-3">
+                    <p className="text-sm text-muted-foreground">
+                      To install on iOS:
+                    </p>
+                    <ol className="text-sm text-muted-foreground space-y-2 list-decimal list-inside">
+                      <li className="flex items-start gap-2">
+                        <span>Tap the</span>
+                        <Share className="h-4 w-4 inline shrink-0" />
+                        <span>Share button in Safari</span>
+                      </li>
+                      <li>Scroll down and tap "Add to Home Screen"</li>
+                      <li>Tap "Add" to confirm</li>
+                    </ol>
+                  </div>
+                ) : deferredPrompt ? (
+                  <Button onClick={handleInstallApp} className="w-full sm:w-auto">
+                    <Download className="h-4 w-4 mr-2" />
+                    Install App
+                  </Button>
+                ) : (
                   <p className="text-sm text-muted-foreground">
-                    To install on iOS:
+                    Open this page in Chrome or Edge on mobile to install the app.
                   </p>
-                  <ol className="text-sm text-muted-foreground space-y-2 list-decimal list-inside">
-                    <li className="flex items-start gap-2">
-                      <span>Tap the</span>
-                      <Share className="h-4 w-4 inline shrink-0" />
-                      <span>Share button in Safari</span>
-                    </li>
-                    <li>Scroll down and tap "Add to Home Screen"</li>
-                    <li>Tap "Add" to confirm</li>
-                  </ol>
-                </div>
-              ) : deferredPrompt ? (
-                <Button onClick={handleInstallApp} className="w-full sm:w-auto">
-                  <Download className="h-4 w-4 mr-2" />
-                  Install App
-                </Button>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  Open this page in Chrome or Edge on mobile to install the app.
-                </p>
-              )}
-            </CardContent>
-          </Card>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {/* Appearance Settings */}
           <Card>
