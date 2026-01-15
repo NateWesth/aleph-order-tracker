@@ -9,7 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme, colorThemes, boardSingleColors, colorfulPresets, stockStatusColorOptions, defaultStockStatusColors } from "@/contexts/ThemeContext";
 import { supabase } from "@/integrations/supabase/client";
-import { ArrowLeft, User, Building2, Moon, Sun, Palette, Check, LayoutGrid, RotateCcw, Package } from "lucide-react";
+import { ArrowLeft, User, Building2, Moon, Sun, Palette, Check, LayoutGrid, RotateCcw, Package, Download, Smartphone, Share } from "lucide-react";
 
 type ColorTheme = keyof typeof colorThemes;
 type BoardSingleColor = keyof typeof boardSingleColors;
@@ -26,6 +26,34 @@ const Settings = () => {
   const [previewTheme, setPreviewTheme] = useState<ColorTheme | null>(null);
   const [previewBoardColor, setPreviewBoardColor] = useState<BoardSingleColor | null>(null);
   const [previewColorfulPreset, setPreviewColorfulPreset] = useState<ColorfulPreset | null>(null);
+  
+  // PWA Install state
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isInstalled, setIsInstalled] = useState(false);
+  const [isIOS, setIsIOS] = useState(false);
+
+  useEffect(() => {
+    // Check if already installed
+    const isInStandaloneMode = window.matchMedia('(display-mode: standalone)').matches 
+      || (window.navigator as any).standalone === true;
+    setIsInstalled(isInStandaloneMode);
+
+    // Check if iOS
+    const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+    setIsIOS(isIOSDevice);
+
+    // Listen for beforeinstallprompt
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
 
   useEffect(() => {
     if (user) {
@@ -89,6 +117,22 @@ const Settings = () => {
     });
   };
 
+  const handleInstallApp = async () => {
+    if (!deferredPrompt) return;
+
+    await deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    
+    if (outcome === 'accepted') {
+      setIsInstalled(true);
+      toast({
+        title: "App Installed",
+        description: "Aleph Orders has been installed on your device",
+      });
+    }
+    setDeferredPrompt(null);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -119,11 +163,55 @@ const Settings = () => {
       </header>
 
       {/* Main content */}
-      <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 overflow-x-hidden">
-        <div className="py-6">
-          <div className="grid gap-6 md:grid-cols-2">
-            {/* Appearance Settings */}
-            <Card className="md:col-span-2">
+      <main className="max-w-7xl mx-auto py-4 px-3 sm:px-6 lg:px-8 overflow-x-hidden pb-24">
+        <div className="space-y-4">
+          {/* Install App Section */}
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center space-x-2">
+                <Smartphone className="h-5 w-5 text-primary" />
+                <CardTitle className="text-base sm:text-lg">Install App</CardTitle>
+              </div>
+              <CardDescription className="text-xs sm:text-sm">
+                Install Aleph Orders on your device for quick access
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isInstalled ? (
+                <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
+                  <Check className="h-5 w-5" />
+                  <span className="text-sm font-medium">App is installed on your device</span>
+                </div>
+              ) : isIOS ? (
+                <div className="space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    To install on iOS:
+                  </p>
+                  <ol className="text-sm text-muted-foreground space-y-2 list-decimal list-inside">
+                    <li className="flex items-start gap-2">
+                      <span>Tap the</span>
+                      <Share className="h-4 w-4 inline shrink-0" />
+                      <span>Share button in Safari</span>
+                    </li>
+                    <li>Scroll down and tap "Add to Home Screen"</li>
+                    <li>Tap "Add" to confirm</li>
+                  </ol>
+                </div>
+              ) : deferredPrompt ? (
+                <Button onClick={handleInstallApp} className="w-full sm:w-auto">
+                  <Download className="h-4 w-4 mr-2" />
+                  Install App
+                </Button>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Open this page in Chrome or Edge on mobile to install the app.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Appearance Settings */}
+          <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
@@ -169,7 +257,7 @@ const Settings = () => {
                   <p className="text-sm text-muted-foreground">
                     Choose a color theme for the app. Hover to preview.
                   </p>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                  <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-2">
                     {(Object.entries(colorThemes) as [ColorTheme, typeof colorThemes[ColorTheme]][]).map(([key, themeConfig]) => {
                       const isSelected = colorTheme === key;
                       const isPreview = previewTheme === key;
@@ -181,7 +269,7 @@ const Settings = () => {
                           onMouseEnter={() => setPreviewTheme(key)}
                           onMouseLeave={() => setPreviewTheme(null)}
                           className={`
-                            relative flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all duration-200
+                            relative flex flex-col items-center gap-1.5 p-2 sm:p-3 rounded-lg border-2 transition-all duration-200
                             ${isSelected 
                               ? 'border-primary bg-accent shadow-md' 
                               : 'border-border hover:border-primary/50 hover:bg-muted/50'
@@ -190,22 +278,22 @@ const Settings = () => {
                         >
                           {/* Color Preview Circle */}
                           <div
-                            className="w-10 h-10 rounded-full shadow-inner ring-2 ring-white/20"
+                            className="w-7 h-7 sm:w-9 sm:h-9 rounded-full shadow-inner ring-2 ring-white/20"
                             style={{ backgroundColor: themeConfig.preview }}
                           />
                           
                           {/* Theme Name */}
-                          <span className="text-xs font-medium text-foreground">
+                          <span className="text-[10px] sm:text-xs font-medium text-foreground truncate w-full text-center">
                             {themeConfig.name}
                           </span>
 
                           {/* Selected Indicator */}
                           {isSelected && (
                             <div 
-                              className="absolute top-2 right-2 w-5 h-5 rounded-full flex items-center justify-center"
+                              className="absolute top-1 right-1 w-4 h-4 rounded-full flex items-center justify-center"
                               style={{ backgroundColor: themeConfig.preview }}
                             >
-                              <Check className="h-3 w-3 text-white" />
+                              <Check className="h-2.5 w-2.5 text-white" />
                             </div>
                           )}
 
@@ -257,27 +345,27 @@ const Settings = () => {
                 {/* Color Mode Selection */}
                 <div className="space-y-3">
                   <Label>Header Style</Label>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-2 gap-2">
                     <button
                       onClick={() => setBoardColorMode('colorful')}
                       className={`
-                        relative flex flex-col items-center gap-3 p-4 rounded-xl border-2 transition-all duration-200
+                        relative flex flex-col items-center gap-2 p-3 rounded-lg border-2 transition-all duration-200
                         ${boardColorMode === 'colorful' 
                           ? 'border-primary bg-accent shadow-md' 
                           : 'border-border hover:border-primary/50 hover:bg-muted/50'
                         }
                       `}
                     >
-                      <div className="flex gap-1">
+                      <div className="flex gap-0.5">
                         {colorfulPresets[colorfulPreset].colors.map((color, i) => (
-                          <div key={i} className={`w-6 h-6 rounded ${color}`} />
+                          <div key={i} className={`w-4 h-4 sm:w-5 sm:h-5 rounded ${color}`} />
                         ))}
                       </div>
-                      <span className="text-sm font-medium">Colorful</span>
-                      <span className="text-xs text-muted-foreground">Each column has a unique color</span>
+                      <span className="text-xs sm:text-sm font-medium">Colorful</span>
+                      <span className="text-[10px] sm:text-xs text-muted-foreground text-center">Each column unique</span>
                       {boardColorMode === 'colorful' && (
-                        <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-primary flex items-center justify-center">
-                          <Check className="h-3 w-3 text-primary-foreground" />
+                        <div className="absolute top-1 right-1 w-4 h-4 rounded-full bg-primary flex items-center justify-center">
+                          <Check className="h-2.5 w-2.5 text-primary-foreground" />
                         </div>
                       )}
                     </button>
@@ -285,27 +373,27 @@ const Settings = () => {
                     <button
                       onClick={() => setBoardColorMode('single')}
                       className={`
-                        relative flex flex-col items-center gap-3 p-4 rounded-xl border-2 transition-all duration-200
+                        relative flex flex-col items-center gap-2 p-3 rounded-lg border-2 transition-all duration-200
                         ${boardColorMode === 'single' 
                           ? 'border-primary bg-accent shadow-md' 
                           : 'border-border hover:border-primary/50 hover:bg-muted/50'
                         }
                       `}
                     >
-                      <div className="flex gap-1">
+                      <div className="flex gap-0.5">
                         {[0, 1, 2, 3].map((i) => (
                           <div 
                             key={i} 
-                            className={`w-6 h-6 rounded ${boardSingleColor !== 'custom' ? boardSingleColors[boardSingleColor]?.bgClass : ''}`}
+                            className={`w-4 h-4 sm:w-5 sm:h-5 rounded ${boardSingleColor !== 'custom' ? boardSingleColors[boardSingleColor]?.bgClass : ''}`}
                             style={boardSingleColor === 'custom' ? { backgroundColor: customBoardColor } : undefined}
                           />
                         ))}
                       </div>
-                      <span className="text-sm font-medium">Single Color</span>
-                      <span className="text-xs text-muted-foreground">All columns use one color</span>
+                      <span className="text-xs sm:text-sm font-medium">Single Color</span>
+                      <span className="text-[10px] sm:text-xs text-muted-foreground text-center">All same color</span>
                       {boardColorMode === 'single' && (
-                        <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-primary flex items-center justify-center">
-                          <Check className="h-3 w-3 text-primary-foreground" />
+                        <div className="absolute top-1 right-1 w-4 h-4 rounded-full bg-primary flex items-center justify-center">
+                          <Check className="h-2.5 w-2.5 text-primary-foreground" />
                         </div>
                       )}
                     </button>
@@ -316,7 +404,7 @@ const Settings = () => {
                 {boardColorMode === 'colorful' && (
                   <div className="space-y-3">
                     <Label>Color Palette</Label>
-                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
                       {(Object.entries(colorfulPresets) as [ColorfulPreset, typeof colorfulPresets[ColorfulPreset]][]).map(([key, config]) => {
                         const isSelected = colorfulPreset === key;
                         const isPreview = previewColorfulPreset === key;
@@ -809,7 +897,6 @@ const Settings = () => {
                 )}
               </CardContent>
             </Card>
-          </div>
         </div>
       </main>
     </div>
