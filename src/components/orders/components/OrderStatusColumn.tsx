@@ -98,28 +98,28 @@ function OrderStatusColumn({
       allInStock: inStock === total
     };
   };
-  return <div className="flex flex-col w-full">
+  return <div className="flex flex-col w-full min-w-0">
       {/* Column Header */}
-      <div className={cn("px-4 py-3 rounded-t-xl", !config.customColor && config.bgColor)} style={config.customColor ? {
+      <div className={cn("px-3 sm:px-4 py-2.5 sm:py-3 rounded-t-xl", !config.customColor && config.bgColor)} style={config.customColor ? {
       backgroundColor: config.customColor
     } : undefined}>
         <div className="flex items-center justify-between">
-          <h3 className={cn("font-semibold text-sm uppercase tracking-wide", config.color)}>
+          <h3 className={cn("font-semibold text-xs sm:text-sm uppercase tracking-wide truncate", config.color)}>
             {config.label}
           </h3>
-          <Badge variant="secondary" className="bg-white/20 text-white border-0 font-semibold">
+          <Badge variant="secondary" className="bg-white/20 text-white border-0 font-semibold text-xs shrink-0 ml-2">
             {orders.length}
           </Badge>
         </div>
       </div>
 
       {/* Column Content */}
-      <div className="flex-1 bg-muted/30 dark:bg-muted/10 rounded-b-xl border border-t-0 border-border min-h-[400px]">
-        <ScrollArea className="h-[calc(100vh-320px)]">
-          <div className="p-3 space-y-2">
-            {orders.length === 0 ? <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-                <Package className="h-10 w-10 mb-3 opacity-30" />
-                <p className="text-sm font-medium">No orders</p>
+      <div className="flex-1 bg-muted/30 dark:bg-muted/10 rounded-b-xl border border-t-0 border-border min-h-[300px] sm:min-h-[400px]">
+        <ScrollArea className="h-[calc(100vh-380px)] sm:h-[calc(100vh-320px)]">
+          <div className="p-2 sm:p-3 space-y-2">
+            {orders.length === 0 ? <div className="flex flex-col items-center justify-center py-12 sm:py-16 text-muted-foreground">
+                <Package className="h-8 w-8 sm:h-10 sm:w-10 mb-3 opacity-30" />
+                <p className="text-xs sm:text-sm font-medium">No orders</p>
               </div> : orders.map((order, index) => {
             const stockSummary = getItemStockSummary(order.items);
             const isExpanded = expandedOrders.has(order.id);
@@ -127,15 +127,15 @@ function OrderStatusColumn({
             return <Card key={order.id} className={cn("bg-card border-border hover-lift overflow-hidden", "animate-fade-in")} style={{
               animationDelay: `${index * 30}ms`
             }}>
-                    <CardContent className="p-3">
-                      <div className="space-y-2.5">
+                    <CardContent className="p-2.5 sm:p-3">
+                      <div className="space-y-2 sm:space-y-2.5">
                         {/* Order Header */}
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
-                            <span className="font-semibold text-sm text-foreground block">
+                            <span className="font-semibold text-xs sm:text-sm text-foreground block truncate">
                               {order.order_number}
                             </span>
-                            <span className="text-xs text-muted-foreground truncate block mt-0.5">
+                            <span className="text-[10px] sm:text-xs text-muted-foreground truncate block mt-0.5">
                               {order.companyName}
                             </span>
                           </div>
@@ -146,13 +146,13 @@ function OrderStatusColumn({
                         {/* Collapsible Items Section */}
                         {hasItems && <Collapsible open={isExpanded} onOpenChange={() => toggleExpanded(order.id)}>
                             <CollapsibleTrigger asChild>
-                              <button className="flex items-center justify-between w-full text-xs bg-muted/50 hover:bg-muted px-2.5 py-2 rounded-lg transition-colors">
-                                <span className="flex items-center gap-1.5 text-muted-foreground font-medium">
-                                  <ChevronDown className={cn("h-3.5 w-3.5 transition-transform duration-200", isExpanded ? "rotate-0" : "-rotate-90")} />
+                              <button className="flex items-center justify-between w-full text-[10px] sm:text-xs bg-muted/50 hover:bg-muted px-2 sm:px-2.5 py-1.5 sm:py-2 rounded-lg transition-colors">
+                                <span className="flex items-center gap-1 sm:gap-1.5 text-muted-foreground font-medium">
+                                  <ChevronDown className={cn("h-3 w-3 sm:h-3.5 sm:w-3.5 transition-transform duration-200", isExpanded ? "rotate-0" : "-rotate-90")} />
                                   {order.items?.length} item{order.items?.length !== 1 ? 's' : ''}
                                 </span>
                                 {stockSummary && config.key === "ordered" && <span className={cn("flex items-center gap-1 font-medium", stockSummary.allInStock ? "text-primary" : "text-amber-600")}>
-                                    {stockSummary.allInStock ? <PackageCheck className="h-3.5 w-3.5" /> : <PackageX className="h-3.5 w-3.5" />}
+                                    {stockSummary.allInStock ? <PackageCheck className="h-3 w-3 sm:h-3.5 sm:w-3.5" /> : <PackageX className="h-3 w-3 sm:h-3.5 sm:w-3.5" />}
                                     {stockSummary.inStock}/{stockSummary.total}
                                   </span>}
                               </button>
@@ -262,20 +262,20 @@ function OrderStatusColumn({
                           </Collapsible>}
 
                         {/* Actions */}
-                        <div className="flex items-center gap-2 pt-1">
+                        <div className="flex items-center gap-1.5 sm:gap-2 pt-1">
                           {/* Back button for In Stock column */}
-                          {config.key === "in-stock" && <Button size="sm" variant="outline" className="h-8 text-xs font-medium rounded-lg" onClick={() => onMoveOrder(order, "ordered")}>
-                              <Undo2 className="h-3.5 w-3.5 mr-1" />
+                          {config.key === "in-stock" && <Button size="sm" variant="outline" className="h-7 sm:h-8 text-[10px] sm:text-xs font-medium rounded-lg px-2 sm:px-3" onClick={() => onMoveOrder(order, "ordered")}>
+                              <Undo2 className="h-3 w-3 sm:h-3.5 sm:w-3.5 mr-1" />
                               Back
                             </Button>}
-                          {config.nextStatus && <Button size="sm" className="flex-1 h-8 text-xs font-medium rounded-lg" onClick={() => onMoveOrder(order, config.nextStatus!)}>
-                              {config.nextLabel}
-                              <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
+                          {config.nextStatus && <Button size="sm" className="flex-1 h-7 sm:h-8 text-[10px] sm:text-xs font-medium rounded-lg" onClick={() => onMoveOrder(order, config.nextStatus!)}>
+                              <span className="truncate">{config.nextLabel}</span>
+                              <ArrowRight className="h-3 w-3 sm:h-3.5 sm:w-3.5 ml-1 shrink-0" />
                             </Button>}
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg">
-                                <Trash2 className="h-4 w-4" />
+                              <Button variant="ghost" size="icon" className="h-7 w-7 sm:h-8 sm:w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg shrink-0">
+                                <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                               </Button>
                             </AlertDialogTrigger>
                             <AlertDialogContent className="rounded-2xl">

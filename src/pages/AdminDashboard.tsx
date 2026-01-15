@@ -109,31 +109,31 @@ const AdminDashboard = () => {
   }
 
   return (
-    <div className="min-h-screen w-full flex flex-col bg-background">
+    <div className="min-h-screen w-full flex flex-col bg-background overflow-x-hidden">
       {/* Modern Top Navigation Bar */}
-      <header className="sticky top-0 z-50 bg-card/80 backdrop-blur-xl border-b border-border">
-        <div className="w-full px-2 sm:px-3 py-3">
+      <header className="sticky top-0 z-50 bg-card/80 backdrop-blur-xl border-b border-border w-full">
+        <div className="w-full px-2 sm:px-3 py-2 sm:py-3">
           {/* Top row: Logo/Home, Search, Actions */}
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4">
             {/* Home/Brand */}
             <Button
               variant={activeView === "home" ? "secondary" : "ghost"}
               size="icon"
               onClick={() => setActiveView("home")}
-              className="shrink-0 rounded-xl"
+              className="shrink-0 rounded-xl h-9 w-9 sm:h-10 sm:w-10"
             >
-              <Home className="h-5 w-5" />
+              <Home className="h-4 w-4 sm:h-5 sm:w-5" />
             </Button>
 
             {/* Search bar - grows to fill space */}
-            <div className="flex-1 max-w-lg">
+            <div className="flex-1 min-w-0">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                <Search className="absolute left-2 sm:left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                 <Input
-                  placeholder="Search orders..."
+                  placeholder="Search..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 h-10 bg-secondary/50 border-0 focus-visible:ring-1 focus-visible:ring-primary/50 rounded-xl"
+                  className="pl-8 sm:pl-10 h-9 sm:h-10 bg-secondary/50 border-0 focus-visible:ring-1 focus-visible:ring-primary/50 rounded-xl text-sm"
                 />
               </div>
             </div>
@@ -160,8 +160,8 @@ const AdminDashboard = () => {
             </div>
           </div>
 
-          {/* Navigation Tabs */}
-          <nav className="flex items-center gap-1 mt-3 -mb-3 overflow-x-auto scrollbar-none">
+          {/* Navigation Tabs - Scrollable on mobile */}
+          <nav className="flex items-center gap-0.5 sm:gap-1 mt-2 sm:mt-3 -mb-3 overflow-x-auto scrollbar-none pb-px"  style={{ WebkitOverflowScrolling: 'touch' }}>
             {navItems.map((item) => {
               const isActive = activeView === item.id;
               return (
@@ -169,7 +169,7 @@ const AdminDashboard = () => {
                   key={item.id}
                   onClick={() => setActiveView(item.id)}
                   className={cn(
-                    "relative flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-t-xl transition-all duration-200 whitespace-nowrap",
+                    "relative flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm font-medium rounded-t-xl transition-all duration-200 whitespace-nowrap",
                     "border-b-2 -mb-[2px]",
                     isActive
                       ? "bg-primary/10 border-primary text-primary"
@@ -193,10 +193,10 @@ const AdminDashboard = () => {
       </header>
 
       {/* Main content */}
-      <main className="flex-1 overflow-x-hidden">
+      <main className="flex-1 overflow-x-hidden w-full">
         <div
           className={cn(
-            "w-full px-2 sm:px-3 py-3",
+            "w-full px-1.5 sm:px-3 py-2 sm:py-3",
             activeView === "orders" || activeView === "history" ? "max-w-none" : "max-w-7xl mx-auto"
           )}
         >

@@ -440,63 +440,65 @@ export default function OrdersPage({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3 sm:space-y-4 w-full overflow-x-hidden">
       {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-2xl font-semibold text-foreground">Orders Board</h2>
-          <p className="text-sm text-muted-foreground">
-            {filteredOrders.length} order{filteredOrders.length !== 1 ? "s" : ""}
-            {selectedCompanyId !== "all" &&
-              companies.find((c) => c.id === selectedCompanyId) && (
-                <span>
-                  {" "}
-                  for {companies.find((c) => c.id === selectedCompanyId)?.name}
-                </span>
-              )}
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          {/* Company Filter */}
-          <div className="flex items-center gap-2">
-            <Filter className="h-4 w-4 text-muted-foreground" />
-            <Select value={selectedCompanyId} onValueChange={setSelectedCompanyId}>
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Filter by client" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Clients</SelectItem>
-                {companies.map((company) => (
-                  <SelectItem key={company.id} value={company.id}>
-                    {company.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+      <div className="flex flex-col gap-3 sm:gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <h2 className="text-xl sm:text-2xl font-semibold text-foreground">Orders Board</h2>
+            <p className="text-xs sm:text-sm text-muted-foreground">
+              {filteredOrders.length} order{filteredOrders.length !== 1 ? "s" : ""}
+              {selectedCompanyId !== "all" &&
+                companies.find((c) => c.id === selectedCompanyId) && (
+                  <span>
+                    {" "}
+                    for {companies.find((c) => c.id === selectedCompanyId)?.name}
+                  </span>
+                )}
+            </p>
           </div>
+          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+            {/* Company Filter */}
+            <div className="flex items-center gap-1.5 sm:gap-2 flex-1 sm:flex-none">
+              <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
+              <Select value={selectedCompanyId} onValueChange={setSelectedCompanyId}>
+                <SelectTrigger className="w-full sm:w-[200px] h-9 text-sm">
+                  <SelectValue placeholder="Filter by client" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Clients</SelectItem>
+                  {companies.map((company) => (
+                    <SelectItem key={company.id} value={company.id}>
+                      {company.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-          <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                New Order
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>Create New Order</DialogTitle>
-                <DialogDescription>
-                  Fill in the order details below to create a new order.
-                </DialogDescription>
-              </DialogHeader>
-              <OrderForm onSubmit={handleCreateOrder} loading={submitting} />
-            </DialogContent>
-          </Dialog>
+            <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+              <DialogTrigger asChild>
+                <Button size="sm" className="h-9 shrink-0">
+                  <Plus className="h-4 w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">New Order</span>
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto mx-2 sm:mx-auto">
+                <DialogHeader>
+                  <DialogTitle>Create New Order</DialogTitle>
+                  <DialogDescription>
+                    Fill in the order details below to create a new order.
+                  </DialogDescription>
+                </DialogHeader>
+                <OrderForm onSubmit={handleCreateOrder} loading={submitting} />
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
       </div>
 
-      {/* Kanban Board - Responsive grid with wider Awaiting Stock column */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1.5fr_1fr_1fr_1fr] gap-3 md:gap-4">
+      {/* Kanban Board - Stacked on mobile, responsive grid on larger screens */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1.5fr_1fr_1fr_1fr] gap-2 sm:gap-3 md:gap-4 w-full">
         {STATUS_COLUMNS.map((column) => (
           <OrderStatusColumn
             key={column.key}

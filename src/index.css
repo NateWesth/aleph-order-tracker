@@ -385,6 +385,12 @@
    MOBILE OPTIMIZATIONS
    ============================================ */
 
+/* Prevent horizontal scroll */
+html, body {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
 @media (max-width: 768px) {
   .order-row-hover:hover {
     @apply bg-transparent;
@@ -403,6 +409,17 @@
   
   .sidebar-mobile.open {
     transform: translateX(0);
+  }
+
+  /* Ensure all containers don't overflow */
+  .container, main, section, article, div {
+    max-width: 100%;
+  }
+  
+  /* Reduce padding on mobile */
+  .mobile-compact {
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
   }
 }
 
