@@ -301,11 +301,9 @@ export default function ProgressPage({
       return updated;
     });
 
-    // Save to database if admin
-    if (isAdmin) {
-      console.log('Admin user - saving to database...');
-      await saveDeliveryQuantitiesToDatabase(orderId, itemName, delivered);
-    }
+    // Save to database for all authenticated users
+    console.log('Saving to database...');
+    await saveDeliveryQuantitiesToDatabase(orderId, itemName, delivered);
   };
 
   // Parse delivery quantities from order description
@@ -471,7 +469,6 @@ export default function ProgressPage({
 
   // Update the progress stage of an order and sync to database
   const updateProgressStage = async (orderId: string, stage: string) => {
-    if (!isAdmin) return;
     const stageInfo = progressStages.find(s => s.id === stage);
     if (!stageInfo) return;
     const orderToUpdate = orders.find(o => o.id === orderId);
@@ -602,7 +599,6 @@ export default function ProgressPage({
 
   // Mark order as complete and move to processing
   const completeOrder = async (orderId: string) => {
-    if (!isAdmin) return;
     const orderToComplete = orders.find(order => order.id === orderId);
     if (!orderToComplete) return;
     const areAllItemsCompleted = orderToComplete.items.every(item => item.completed);
@@ -775,38 +771,36 @@ export default function ProgressPage({
                          <span className="hidden sm:inline">Files</span>
                        </Button>
                       
-                      {isAdmin ? <>
-                          {progressStages.map(stage => <Button key={stage.id} variant={order.progressStage === stage.id ? "default" : "outline"} size="sm" onClick={() => updateProgressStage(order.id, stage.id)} className={`text-xs h-7 md:h-9 px-2 md:px-4 md:min-w-[100px] ${stage.id === 'completed' ? "bg-green-600 hover:bg-green-700 text-white" : ""}`}>
-                              <span className="hidden md:inline">{stage.name}</span>
-                              <span className="md:hidden">{stage.name.substring(0, 4)}</span>
-                            </Button>)}
-                          
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive h-7 md:h-9 w-7 md:w-9 p-0">
-                                <Trash2 className="h-3 w-3 md:h-4 md:w-4" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent className="max-w-sm md:max-w-md">
-                              <AlertDialogHeader>
-                                <AlertDialogTitle className="text-sm md:text-base">Delete Order</AlertDialogTitle>
-                                <AlertDialogDescription className="text-xs md:text-sm">
-                                  Are you sure you want to delete order {order.orderNumber}? This action cannot be undone and will remove the order from all systems.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel className="text-xs md:text-sm">Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => deleteOrder(order.id, order.orderNumber)} className="bg-destructive hover:bg-destructive/90 text-xs md:text-sm">
-                                  Delete
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </> :
-                // For client users, show current progress stage as read-only badges
-                <>
-                          {progressStages.map(stage => {})}
-                        </>}
+                      {/* Progress stage buttons - available to all users */}
+                      {progressStages.map(stage => <Button key={stage.id} variant={order.progressStage === stage.id ? "default" : "outline"} size="sm" onClick={() => updateProgressStage(order.id, stage.id)} className={`text-xs h-7 md:h-9 px-2 md:px-4 md:min-w-[100px] ${stage.id === 'completed' ? "bg-green-600 hover:bg-green-700 text-white" : ""}`}>
+                          <span className="hidden md:inline">{stage.name}</span>
+                          <span className="md:hidden">{stage.name.substring(0, 4)}</span>
+                        </Button>)}
+                      
+                      {/* Delete button - admin only */}
+                      {isAdmin && (
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive h-7 md:h-9 w-7 md:w-9 p-0">
+                              <Trash2 className="h-3 w-3 md:h-4 md:w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent className="max-w-sm md:max-w-md">
+                            <AlertDialogHeader>
+                              <AlertDialogTitle className="text-sm md:text-base">Delete Order</AlertDialogTitle>
+                              <AlertDialogDescription className="text-xs md:text-sm">
+                                Are you sure you want to delete order {order.orderNumber}? This action cannot be undone and will remove the order from all systems.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel className="text-xs md:text-sm">Cancel</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => deleteOrder(order.id, order.orderNumber)} className="bg-destructive hover:bg-destructive/90 text-xs md:text-sm">
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      )}
                     </div>
                   </div>
 
@@ -834,9 +828,9 @@ export default function ProgressPage({
                     const isCompleted = delivered >= item.quantity;
                     return <TableRow key={item.id} className={isCompleted ? "opacity-50" : ""}>
                                   <TableCell className="font-medium text-card-foreground">{item.name}</TableCell>
-                                  <TableCell className="text-card-foreground">{item.quantity}</TableCell>
+                                   <TableCell className="text-card-foreground">{item.quantity}</TableCell>
                                    <TableCell>
-                                     {isAdmin ? <input 
+                                     <input 
                                        type="number" 
                                        min="0" 
                                        max={item.quantity} 
@@ -845,12 +839,10 @@ export default function ProgressPage({
                                        onBlur={(e) => {
                                          // Force a save when user leaves the input field
                                          const currentValue = parseInt(e.target.value) || 0;
-                                         if (isAdmin) {
-                                           saveDeliveryQuantitiesToDatabase(order.id, item.name, currentValue);
-                                         }
+                                         saveDeliveryQuantitiesToDatabase(order.id, item.name, currentValue);
                                        }} 
                                        className="w-20 px-2 py-1 border border-border rounded text-sm bg-background text-foreground" 
-                                     /> : <span className="text-card-foreground font-medium">{delivered}</span>}
+                                     />
                                    </TableCell>
                                   <TableCell>
                                     {isCompleted ? <Badge variant="outline" className="bg-green-100 text-green-800">
