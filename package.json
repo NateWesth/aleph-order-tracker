@@ -19,7 +19,7 @@
     "@capacitor/core": "^7.4.2",
     "@capacitor/device": "^7.0.2",
     "@capacitor/filesystem": "^7.1.4",
-    "@capacitor/haptics": "^7.0.3",
+    "@capacitor/haptics": "^7.0.1",
     "@capacitor/ios": "^7.4.2",
     "@hookform/resolvers": "^3.9.0",
     "@huggingface/transformers": "^3.7.0",
