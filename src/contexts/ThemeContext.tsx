@@ -6,6 +6,11 @@ type BoardColorMode = 'colorful' | 'single';
 type BoardSingleColor = 'amber' | 'sky' | 'violet' | 'emerald' | 'slate' | 'rose' | 'cyan' | 'lime' | 'orange' | 'indigo' | 'pink' | 'primary' | 'custom';
 type ColorfulPreset = 'default' | 'sunset' | 'ocean' | 'forest' | 'berry' | 'earth' | 'neon' | 'pastel' | 'mono' | 'candy';
 
+export interface StockStatusColors {
+  orderedColor: string;
+  receivedColor: string;
+}
+
 interface ThemeContextType {
   theme: Theme;
   colorTheme: ColorTheme;
@@ -13,12 +18,14 @@ interface ThemeContextType {
   boardSingleColor: BoardSingleColor;
   colorfulPreset: ColorfulPreset;
   customBoardColor: string;
+  stockStatusColors: StockStatusColors;
   setTheme: (theme: Theme) => void;
   setColorTheme: (colorTheme: ColorTheme) => void;
   setBoardColorMode: (mode: BoardColorMode) => void;
   setBoardSingleColor: (color: BoardSingleColor) => void;
   setColorfulPreset: (preset: ColorfulPreset) => void;
   setCustomBoardColor: (color: string) => void;
+  setStockStatusColors: (colors: StockStatusColors) => void;
   toggleTheme: () => void;
 }
 
@@ -30,6 +37,24 @@ export const useTheme = () => {
     throw new Error('useTheme must be used within a ThemeProvider');
   }
   return context;
+};
+
+export const stockStatusColorOptions = [
+  { name: 'Blue', value: '#3b82f6', bgClass: 'bg-blue-500', borderClass: 'border-blue-500' },
+  { name: 'Green', value: '#22c55e', bgClass: 'bg-green-500', borderClass: 'border-green-500' },
+  { name: 'Purple', value: '#a855f7', bgClass: 'bg-purple-500', borderClass: 'border-purple-500' },
+  { name: 'Orange', value: '#f97316', bgClass: 'bg-orange-500', borderClass: 'border-orange-500' },
+  { name: 'Red', value: '#ef4444', bgClass: 'bg-red-500', borderClass: 'border-red-500' },
+  { name: 'Cyan', value: '#06b6d4', bgClass: 'bg-cyan-500', borderClass: 'border-cyan-500' },
+  { name: 'Pink', value: '#ec4899', bgClass: 'bg-pink-500', borderClass: 'border-pink-500' },
+  { name: 'Yellow', value: '#eab308', bgClass: 'bg-yellow-500', borderClass: 'border-yellow-500' },
+  { name: 'Indigo', value: '#6366f1', bgClass: 'bg-indigo-500', borderClass: 'border-indigo-500' },
+  { name: 'Teal', value: '#14b8a6', bgClass: 'bg-teal-500', borderClass: 'border-teal-500' },
+];
+
+export const defaultStockStatusColors: StockStatusColors = {
+  orderedColor: '#3b82f6', // blue
+  receivedColor: '#22c55e', // green
 };
 
 export const colorThemes: Record<ColorTheme, { name: string; hue: number; saturation: number; lightness: number; preview: string }> = {
@@ -123,6 +148,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
   const [boardSingleColor, setBoardSingleColor] = useState<BoardSingleColor>('primary');
   const [colorfulPreset, setColorfulPreset] = useState<ColorfulPreset>('default');
   const [customBoardColor, setCustomBoardColor] = useState<string>('#6366f1');
+  const [stockStatusColors, setStockStatusColors] = useState<StockStatusColors>(defaultStockStatusColors);
 
   // Initialize theme from localStorage
   useEffect(() => {
@@ -150,6 +176,15 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
       const savedCustomColor = localStorage.getItem('customBoardColor');
       if (savedCustomColor) {
         setCustomBoardColor(savedCustomColor);
+      }
+      const savedStockStatusColors = localStorage.getItem('stockStatusColors');
+      if (savedStockStatusColors) {
+        try {
+          const parsed = JSON.parse(savedStockStatusColors);
+          setStockStatusColors(parsed);
+        } catch (e) {
+          // Invalid JSON, use defaults
+        }
       }
     } catch (error) {
       console.warn('Failed to read theme from localStorage:', error);
@@ -200,10 +235,11 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
       localStorage.setItem('boardSingleColor', boardSingleColor);
       localStorage.setItem('colorfulPreset', colorfulPreset);
       localStorage.setItem('customBoardColor', customBoardColor);
+      localStorage.setItem('stockStatusColors', JSON.stringify(stockStatusColors));
     } catch (error) {
       console.warn('Failed to save board color preferences:', error);
     }
-  }, [boardColorMode, boardSingleColor, colorfulPreset, customBoardColor]);
+  }, [boardColorMode, boardSingleColor, colorfulPreset, customBoardColor, stockStatusColors]);
 
   const toggleTheme = () => {
     setTheme(prev => prev === 'light' ? 'dark' : 'light');
@@ -217,12 +253,14 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
       boardSingleColor,
       colorfulPreset,
       customBoardColor,
+      stockStatusColors,
       setTheme, 
       setColorTheme, 
       setBoardColorMode, 
       setBoardSingleColor,
       setColorfulPreset,
       setCustomBoardColor,
+      setStockStatusColors,
       toggleTheme 
     }}>
       {children}
