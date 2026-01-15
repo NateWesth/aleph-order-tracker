@@ -215,7 +215,17 @@ function OrderStatusColumn({
                               </button>
                             </CollapsibleTrigger>
                             <CollapsibleContent className="mt-2">
-                              <div className="space-y-1 bg-muted/30 p-2.5 rounded-lg">
+                              <div className="space-y-1.5 bg-muted/30 p-2.5 rounded-lg">
+                                {/* Column Headers for Awaiting Stock */}
+                                {config.key === "ordered" && order.items && order.items.length > 0 && (
+                                  <div className="flex items-center gap-2 text-[10px] font-medium text-muted-foreground pb-1 border-b border-border/50 mb-1">
+                                    <div className="flex items-center gap-2 shrink-0">
+                                      <span className="w-4 text-center text-blue-600 dark:text-blue-400">O</span>
+                                      <span className="w-4 text-center text-green-600 dark:text-green-400">R</span>
+                                    </div>
+                                    <span className="flex-1">Item</span>
+                                  </div>
+                                )}
                                 {order.items?.map((item) => (
                                   <div
                                     key={item.id}
@@ -223,7 +233,7 @@ function OrderStatusColumn({
                                   >
                                     {config.key === "ordered" && (
                                       <div className="flex items-center gap-2 shrink-0">
-                                        {/* Ordered */}
+                                        {/* Ordered - Blue */}
                                         <Checkbox
                                           id={`${item.id}-ordered`}
                                           checked={item.stock_status === "ordered" || item.stock_status === "in-stock"}
@@ -235,10 +245,10 @@ function OrderStatusColumn({
                                             );
                                           }}
                                           disabled={!canEditItems}
-                                          className="h-4 w-4"
+                                          className="h-4 w-4 data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-500"
                                         />
 
-                                        {/* Received */}
+                                        {/* Received - Green */}
                                         <Checkbox
                                           id={`${item.id}-received`}
                                           checked={item.stock_status === "in-stock"}
@@ -247,12 +257,11 @@ function OrderStatusColumn({
                                             if (checked) {
                                               onSetItemStockStatus?.(item.id, "in-stock");
                                             } else {
-                                              // If un-receiving, fall back to ordered (if ordered was set) else awaiting
                                               onSetItemStockStatus?.(item.id, "ordered");
                                             }
                                           }}
                                           disabled={!canEditItems}
-                                          className="h-4 w-4"
+                                          className="h-4 w-4 data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500"
                                         />
                                       </div>
                                     )}
@@ -270,6 +279,20 @@ function OrderStatusColumn({
                                     </span>
                                   </div>
                                 ))}
+                                
+                                {/* Legend */}
+                                {config.key === "ordered" && order.items && order.items.length > 0 && (
+                                  <div className="flex items-center gap-3 pt-2 mt-1 border-t border-border/50 text-[10px] text-muted-foreground">
+                                    <div className="flex items-center gap-1">
+                                      <div className="w-2.5 h-2.5 rounded-sm bg-blue-500"></div>
+                                      <span>Ordered</span>
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                      <div className="w-2.5 h-2.5 rounded-sm bg-green-500"></div>
+                                      <span>Received</span>
+                                    </div>
+                                  </div>
+                                )}
                               </div>
                             </CollapsibleContent>
                           </Collapsible>
