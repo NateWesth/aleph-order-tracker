@@ -264,7 +264,11 @@ const Settings = () => {
                         asChild 
                         className="w-full sm:w-auto"
                       >
-                        <a href="/aleph-orders.apk" download="aleph-orders.apk">
+                        <a 
+                          href="https://github.com/alephbusinessmachines/aleph-order-tracker/releases/latest/download/aleph-orders.apk"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
                           <Download className="h-4 w-4 mr-2" />
                           Download Android App
                         </a>
