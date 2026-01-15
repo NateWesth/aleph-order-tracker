@@ -265,7 +265,7 @@ const Settings = () => {
                         className="w-full sm:w-auto"
                       >
                         <a 
-                          href="https://github.com/alephbusinessmachines/aleph-order-tracker/releases/latest/download/aleph-orders.apk"
+                          href="https://github.com/NateWesth/aleph-order-tracker/releases/latest/download/aleph-orders.apk"
                           target="_blank"
                           rel="noopener noreferrer"
                         >
