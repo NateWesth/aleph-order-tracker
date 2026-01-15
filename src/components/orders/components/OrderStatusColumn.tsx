@@ -47,6 +47,8 @@ interface OrderStatusColumnProps {
   onSetItemStockStatus?: (itemId: string, newStatus: string) => void;
   onBulkSetItemsStatus?: (itemIds: string[], newStatus: string) => void;
   canEditItems?: boolean;
+  isExpanded?: boolean;
+  onToggleExpand?: () => void;
 }
 function OrderStatusColumn({
   config,
@@ -55,7 +57,9 @@ function OrderStatusColumn({
   onDeleteOrder,
   onSetItemStockStatus,
   onBulkSetItemsStatus,
-  canEditItems = false
+  canEditItems = false,
+  isExpanded = true,
+  onToggleExpand
 }: OrderStatusColumnProps) {
   const { stockStatusColors } = useTheme();
   const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
@@ -99,25 +103,39 @@ function OrderStatusColumn({
     };
   };
   return <div className="flex flex-col w-full min-w-0">
-      {/* Column Header */}
-      <div className={cn("px-3 sm:px-4 py-2.5 sm:py-3 rounded-t-xl", !config.customColor && config.bgColor)} style={config.customColor ? {
-      backgroundColor: config.customColor
-    } : undefined}>
+      {/* Column Header - Clickable to toggle */}
+      <button 
+        onClick={onToggleExpand}
+        className={cn(
+          "px-3 sm:px-4 py-2.5 sm:py-3 rounded-t-xl w-full text-left transition-all duration-200 hover:opacity-90 active:scale-[0.99]",
+          !isExpanded && "rounded-b-xl",
+          !config.customColor && config.bgColor
+        )} 
+        style={config.customColor ? { backgroundColor: config.customColor } : undefined}
+      >
         <div className="flex items-center justify-between">
-          <h3 className={cn("font-semibold text-xs sm:text-sm uppercase tracking-wide truncate", config.color)}>
-            {config.label}
-          </h3>
+          <div className="flex items-center gap-2 min-w-0">
+            <ChevronDown className={cn(
+              "h-4 w-4 shrink-0 transition-transform duration-200",
+              config.color,
+              !isExpanded && "-rotate-90"
+            )} />
+            <h3 className={cn("font-semibold text-xs sm:text-sm uppercase tracking-wide truncate", config.color)}>
+              {config.label}
+            </h3>
+          </div>
           <Badge variant="secondary" className="bg-white/20 text-white border-0 font-semibold text-xs shrink-0 ml-2">
             {orders.length}
           </Badge>
         </div>
-      </div>
+      </button>
 
-      {/* Column Content */}
-      <div className="flex-1 bg-muted/30 dark:bg-muted/10 rounded-b-xl border border-t-0 border-border min-h-[300px] sm:min-h-[400px]">
-        <ScrollArea className="h-[calc(100vh-380px)] sm:h-[calc(100vh-320px)]">
-          <div className="p-2 sm:p-3 space-y-2">
-            {orders.length === 0 ? <div className="flex flex-col items-center justify-center py-12 sm:py-16 text-muted-foreground">
+      {/* Column Content - Collapsible */}
+      {isExpanded && (
+        <div className="flex-1 bg-muted/30 dark:bg-muted/10 rounded-b-xl border border-t-0 border-border min-h-[300px] sm:min-h-[400px] animate-fade-in">
+          <ScrollArea className="h-[calc(100vh-380px)] sm:h-[calc(100vh-320px)]">
+            <div className="p-2 sm:p-3 space-y-2">
+              {orders.length === 0 ? <div className="flex flex-col items-center justify-center py-12 sm:py-16 text-muted-foreground">
                 <Package className="h-8 w-8 sm:h-10 sm:w-10 mb-3 opacity-30" />
                 <p className="text-xs sm:text-sm font-medium">No orders</p>
               </div> : orders.map((order, index) => {
@@ -298,9 +316,10 @@ function OrderStatusColumn({
                     </CardContent>
                   </Card>;
           })}
-          </div>
-        </ScrollArea>
-      </div>
+            </div>
+          </ScrollArea>
+        </div>
+      )}
     </div>;
 }
 
