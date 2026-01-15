@@ -292,8 +292,7 @@ export default function OrdersPage({
     }
   };
 
-  const handleToggleItemStock = useCallback(async (itemId: string, currentStatus: string) => {
-    const newStatus = currentStatus === "awaiting" ? "in-stock" : "awaiting";
+  const handleSetItemStockStatus = useCallback(async (itemId: string, newStatus: string) => {
     try {
       const { error } = await supabase
         .from("order_items")
@@ -480,7 +479,8 @@ export default function OrdersPage({
             orders={ordersByStatus[column.key as keyof typeof ordersByStatus] || []}
             onMoveOrder={handleMoveOrder}
             onDeleteOrder={handleDeleteOrder}
-            onToggleItemStock={handleToggleItemStock}
+            onSetItemStockStatus={handleSetItemStockStatus}
+            canEditItems={isAdmin}
           />
         ))}
       </div>
