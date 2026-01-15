@@ -98,7 +98,7 @@ const Settings = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background overflow-x-hidden">
       {/* Header */}
       <header className="bg-card border-b border-border shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -108,19 +108,19 @@ const Settings = () => {
                 variant="ghost"
                 size="icon"
                 onClick={() => navigate(-1)}
-                className="mr-4"
+                className="mr-4 shrink-0"
               >
                 <ArrowLeft className="h-5 w-5" />
               </Button>
-              <h1 className="text-2xl font-bold text-foreground">Settings</h1>
+              <h1 className="text-2xl font-bold text-foreground truncate">Settings</h1>
             </div>
           </div>
         </div>
       </header>
 
       {/* Main content */}
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div className="px-4 py-6 sm:px-0">
+      <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 overflow-x-hidden">
+        <div className="py-6">
           <div className="grid gap-6 md:grid-cols-2">
             {/* Appearance Settings */}
             <Card className="md:col-span-2">
