@@ -3,7 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Trash2, ArrowRight, ArrowLeft, Package, PackageCheck, PackageX, ChevronDown, Undo2 } from "lucide-react";
+import { Trash2, ArrowRight, Package, PackageCheck, PackageX, ChevronDown, Undo2 } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,6 +21,12 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 interface OrderItem {
@@ -234,35 +240,57 @@ function OrderStatusColumn({
                                     {config.key === "ordered" && (
                                       <div className="flex items-center gap-2 shrink-0">
                                         {/* Ordered - Blue */}
-                                        <Checkbox
-                                          id={`${item.id}-ordered`}
-                                          checked={item.stock_status === "ordered" || item.stock_status === "in-stock"}
-                                          onCheckedChange={(checked) => {
-                                            if (!canEditItems) return;
-                                            onSetItemStockStatus?.(
-                                              item.id,
-                                              checked ? "ordered" : "awaiting"
-                                            );
-                                          }}
-                                          disabled={!canEditItems}
-                                          className="h-4 w-4 data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-500"
-                                        />
+                                        <TooltipProvider>
+                                          <Tooltip>
+                                            <TooltipTrigger asChild>
+                                              <span>
+                                                <Checkbox
+                                                  id={`${item.id}-ordered`}
+                                                  checked={item.stock_status === "ordered" || item.stock_status === "in-stock"}
+                                                  onCheckedChange={(checked) => {
+                                                    if (!canEditItems) return;
+                                                    onSetItemStockStatus?.(
+                                                      item.id,
+                                                      checked ? "ordered" : "awaiting"
+                                                    );
+                                                  }}
+                                                  disabled={!canEditItems}
+                                                  className="h-4 w-4 data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-500"
+                                                />
+                                              </span>
+                                            </TooltipTrigger>
+                                            <TooltipContent side="top">
+                                              <p>Ordered: Item has been ordered from supplier</p>
+                                            </TooltipContent>
+                                          </Tooltip>
+                                        </TooltipProvider>
 
                                         {/* Received - Green */}
-                                        <Checkbox
-                                          id={`${item.id}-received`}
-                                          checked={item.stock_status === "in-stock"}
-                                          onCheckedChange={(checked) => {
-                                            if (!canEditItems) return;
-                                            if (checked) {
-                                              onSetItemStockStatus?.(item.id, "in-stock");
-                                            } else {
-                                              onSetItemStockStatus?.(item.id, "ordered");
-                                            }
-                                          }}
-                                          disabled={!canEditItems}
-                                          className="h-4 w-4 data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500"
-                                        />
+                                        <TooltipProvider>
+                                          <Tooltip>
+                                            <TooltipTrigger asChild>
+                                              <span>
+                                                <Checkbox
+                                                  id={`${item.id}-received`}
+                                                  checked={item.stock_status === "in-stock"}
+                                                  onCheckedChange={(checked) => {
+                                                    if (!canEditItems) return;
+                                                    if (checked) {
+                                                      onSetItemStockStatus?.(item.id, "in-stock");
+                                                    } else {
+                                                      onSetItemStockStatus?.(item.id, "ordered");
+                                                    }
+                                                  }}
+                                                  disabled={!canEditItems}
+                                                  className="h-4 w-4 data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500"
+                                                />
+                                              </span>
+                                            </TooltipTrigger>
+                                            <TooltipContent side="top">
+                                              <p>Received: Item has arrived and is in stock</p>
+                                            </TooltipContent>
+                                          </Tooltip>
+                                        </TooltipProvider>
                                       </div>
                                     )}
                                     <span className={cn(
