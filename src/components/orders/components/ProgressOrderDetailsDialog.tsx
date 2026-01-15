@@ -281,9 +281,6 @@ export default function ProgressOrderDetailsDialog({
                     Qty
                   </th>
                   <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                    Awaiting
-                  </th>
-                  <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Ordered
                   </th>
                   <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground uppercase tracking-wider">
@@ -300,7 +297,7 @@ export default function ProgressOrderDetailsDialog({
               <tbody className="bg-card divide-y divide-border">
                 {items.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-4 py-4 text-center text-muted-foreground">
+                    <td colSpan={6} className="px-4 py-4 text-center text-muted-foreground">
                       No items found for this order
                     </td>
                   </tr>
@@ -315,19 +312,10 @@ export default function ProgressOrderDetailsDialog({
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-center">
                         <Checkbox
-                          checked={item.stock_status === 'awaiting'}
-                          onCheckedChange={(checked) => {
-                            if (checked) updateStockStatus(item.name, 'awaiting');
-                          }}
-                          disabled={!isAdmin}
-                          className="data-[state=checked]:bg-yellow-500 data-[state=checked]:border-yellow-500"
-                        />
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-center">
-                        <Checkbox
                           checked={item.stock_status === 'ordered'}
                           onCheckedChange={(checked) => {
                             if (checked) updateStockStatus(item.name, 'ordered');
+                            else updateStockStatus(item.name, 'awaiting');
                           }}
                           disabled={!isAdmin}
                           className="data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-500"
@@ -338,6 +326,7 @@ export default function ProgressOrderDetailsDialog({
                           checked={item.stock_status === 'in-stock'}
                           onCheckedChange={(checked) => {
                             if (checked) updateStockStatus(item.name, 'in-stock');
+                            else updateStockStatus(item.name, 'awaiting');
                           }}
                           disabled={!isAdmin}
                           className="data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500"
@@ -384,10 +373,6 @@ export default function ProgressOrderDetailsDialog({
           
           {/* Stock Status Legend */}
           <div className="mt-4 flex flex-wrap gap-4 text-sm text-muted-foreground">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded bg-yellow-500"></div>
-              <span>Awaiting Stock</span>
-            </div>
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded bg-blue-500"></div>
               <span>Ordered</span>

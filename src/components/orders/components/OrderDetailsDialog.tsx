@@ -282,6 +282,10 @@ export default function OrderDetailsDialog({
     setEditableItems([]);
   };
 
+  // Check if order is in awaiting stock stage (show stock status checkboxes)
+  const isAwaitingStock = order.status === 'received' || order.status === 'in-progress' || 
+    order.progress_stage === 'awaiting-stock';
+
   // Use fetched items from database, fallback to parsing description
   const displayItems = isEditing ? editableItems : (fetchedItems.length > 0 ? fetchedItems : parseItemsFromDescription(order.description));
 
@@ -378,38 +382,32 @@ export default function OrderDetailsDialog({
                       min="1"
                       className="w-20"
                     />
-                    <div className="flex flex-col gap-1">
-                      <label className="flex items-center gap-1 text-xs">
-                        <Checkbox
-                          checked={item.stock_status === 'awaiting'}
-                          onCheckedChange={(checked) => {
-                            if (checked) updateItemField(item.id, 'stock_status', 'awaiting');
-                          }}
-                          className="data-[state=checked]:bg-yellow-500 data-[state=checked]:border-yellow-500"
-                        />
-                        Awaiting
-                      </label>
-                      <label className="flex items-center gap-1 text-xs">
-                        <Checkbox
-                          checked={item.stock_status === 'ordered'}
-                          onCheckedChange={(checked) => {
-                            if (checked) updateItemField(item.id, 'stock_status', 'ordered');
-                          }}
-                          className="data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-500"
-                        />
-                        Ordered
-                      </label>
-                      <label className="flex items-center gap-1 text-xs">
-                        <Checkbox
-                          checked={item.stock_status === 'in-stock'}
-                          onCheckedChange={(checked) => {
-                            if (checked) updateItemField(item.id, 'stock_status', 'in-stock');
-                          }}
-                          className="data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500"
-                        />
-                        Received
-                      </label>
-                    </div>
+                    {isAwaitingStock && (
+                      <div className="flex flex-col gap-1">
+                        <label className="flex items-center gap-1 text-xs">
+                          <Checkbox
+                            checked={item.stock_status === 'ordered'}
+                            onCheckedChange={(checked) => {
+                              if (checked) updateItemField(item.id, 'stock_status', 'ordered');
+                              else updateItemField(item.id, 'stock_status', 'awaiting');
+                            }}
+                            className="data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-500"
+                          />
+                          Ordered
+                        </label>
+                        <label className="flex items-center gap-1 text-xs">
+                          <Checkbox
+                            checked={item.stock_status === 'in-stock'}
+                            onCheckedChange={(checked) => {
+                              if (checked) updateItemField(item.id, 'stock_status', 'in-stock');
+                              else updateItemField(item.id, 'stock_status', 'awaiting');
+                            }}
+                            className="data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500"
+                          />
+                          Received
+                        </label>
+                      </div>
+                    )}
                     <Button
                       type="button"
                       variant="outline"
@@ -430,9 +428,12 @@ export default function OrderDetailsDialog({
                       <tr>
                         <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Item</th>
                         <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground uppercase">Qty</th>
-                        <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground uppercase">Awaiting</th>
-                        <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground uppercase">Ordered</th>
-                        <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground uppercase">Received</th>
+                        {isAwaitingStock && (
+                          <>
+                            <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground uppercase">Ordered</th>
+                            <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground uppercase">Received</th>
+                          </>
+                        )}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
@@ -440,60 +441,54 @@ export default function OrderDetailsDialog({
                         <tr key={item.id} className="hover:bg-muted/30">
                           <td className="px-4 py-3 text-sm font-medium">{item.name}</td>
                           <td className="px-4 py-3 text-center text-sm text-muted-foreground">{item.quantity}</td>
-                          <td className="px-4 py-3 text-center">
-                            <Checkbox
-                              checked={item.stock_status === 'awaiting'}
-                              onCheckedChange={(checked) => {
-                                if (checked && isAdmin) updateStockStatus(item.id, 'awaiting');
-                              }}
-                              disabled={!isAdmin}
-                              className="data-[state=checked]:bg-yellow-500 data-[state=checked]:border-yellow-500"
-                            />
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            <Checkbox
-                              checked={item.stock_status === 'ordered'}
-                              onCheckedChange={(checked) => {
-                                if (checked && isAdmin) updateStockStatus(item.id, 'ordered');
-                              }}
-                              disabled={!isAdmin}
-                              className="data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-500"
-                            />
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            <Checkbox
-                              checked={item.stock_status === 'in-stock'}
-                              onCheckedChange={(checked) => {
-                                if (checked && isAdmin) updateStockStatus(item.id, 'in-stock');
-                              }}
-                              disabled={!isAdmin}
-                              className="data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500"
-                            />
-                          </td>
+                          {isAwaitingStock && (
+                            <>
+                              <td className="px-4 py-3 text-center">
+                                <Checkbox
+                                  checked={item.stock_status === 'ordered'}
+                                  onCheckedChange={(checked) => {
+                                    if (checked && isAdmin) updateStockStatus(item.id, 'ordered');
+                                    else if (!checked && isAdmin) updateStockStatus(item.id, 'awaiting');
+                                  }}
+                                  disabled={!isAdmin}
+                                  className="data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-500"
+                                />
+                              </td>
+                              <td className="px-4 py-3 text-center">
+                                <Checkbox
+                                  checked={item.stock_status === 'in-stock'}
+                                  onCheckedChange={(checked) => {
+                                    if (checked && isAdmin) updateStockStatus(item.id, 'in-stock');
+                                    else if (!checked && isAdmin) updateStockStatus(item.id, 'awaiting');
+                                  }}
+                                  disabled={!isAdmin}
+                                  className="data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500"
+                                />
+                              </td>
+                            </>
+                          )}
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
                 
-                {/* Stock Status Legend */}
-                <div className="mt-4 flex flex-wrap gap-4 text-sm text-muted-foreground">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded bg-yellow-500"></div>
-                    <span>Awaiting Stock</span>
+                {/* Stock Status Legend - only show when awaiting stock */}
+                {isAwaitingStock && (
+                  <div className="mt-4 flex flex-wrap gap-4 text-sm text-muted-foreground">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded bg-blue-500"></div>
+                      <span>Ordered</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded bg-green-500"></div>
+                      <span>Received/In Stock</span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded bg-blue-500"></div>
-                    <span>Ordered</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded bg-green-500"></div>
-                    <span>Received/In Stock</span>
-                  </div>
-                </div>
+                )}
 
-                {/* Save button for stock status changes (admins only) */}
-                {isAdmin && (
+                {/* Save button for stock status changes (admins only, only when awaiting stock) */}
+                {isAdmin && isAwaitingStock && (
                   <div className="mt-4 flex justify-end">
                     <Button onClick={handleSave} disabled={loading}>
                       {loading ? "Saving..." : "Save Stock Status"}
