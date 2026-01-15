@@ -223,12 +223,7 @@ function OrderStatusColumn({
                             }}>
                                         All Ordered
                                       </Button>
-                                      <Button size="sm" variant="outline" className="h-6 text-[10px] px-2 bg-green-50 hover:bg-green-100 text-green-700 border-green-200 dark:bg-green-950 dark:hover:bg-green-900 dark:text-green-300 dark:border-green-800" onClick={() => {
-                              const itemIds = order.items?.map(i => i.id) || [];
-                              onBulkSetItemsStatus?.(itemIds, "in-stock");
-                            }}>
-                                        All Received
-                                      </Button>
+                                      
                                     </div>
                                     <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
                                       <div className="flex items-center gap-1">
