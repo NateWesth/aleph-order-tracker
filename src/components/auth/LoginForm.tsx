@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,46 +6,54 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { Fingerprint, ScanFace } from "lucide-react";
 import ForgotPasswordForm from "./ForgotPasswordForm";
+import { 
+  isBiometricAvailable, 
+  getBiometricTypeName, 
+  authenticateWithBiometric, 
+  getCredentials, 
+  saveCredentials,
+  hasStoredCredentials,
+  BiometryType
+} from "@/utils/biometricAuth";
 
 const LoginForm = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [biometricLoading, setBiometricLoading] = useState(false);
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
+  const [biometricType, setBiometricType] = useState<BiometryType>(BiometryType.NONE);
+  const [hasSavedCredentials, setHasSavedCredentials] = useState(false);
   const [formData, setFormData] = useState({
     email: "",
     password: "",
   });
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Check biometric availability on mount
+  useEffect(() => {
+    checkBiometricAvailability();
+  }, []);
+
+  const checkBiometricAvailability = async () => {
+    const result = await isBiometricAvailable();
+    setBiometricAvailable(result.isAvailable);
+    setBiometricType(result.biometryType);
     
-    if (!formData.email.trim()) {
-      toast({
-        title: "Error",
-        description: "Email is required",
-        variant: "destructive",
-      });
-      return;
+    if (result.isAvailable) {
+      const hasCredentials = await hasStoredCredentials();
+      setHasSavedCredentials(hasCredentials);
     }
+  };
 
-    if (!formData.password.trim()) {
-      toast({
-        title: "Error",
-        description: "Password is required",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setLoading(true);
-
+  const performLogin = async (email: string, password: string, saveForBiometric: boolean = false) => {
     try {
-      console.log("Attempting to sign in user with email:", formData.email);
+      console.log("Attempting to sign in user with email:", email);
       
       const { data, error } = await supabase.auth.signInWithPassword({
-        email: formData.email,
-        password: formData.password,
+        email: email,
+        password: password,
       });
 
       if (error) {
@@ -74,7 +82,7 @@ const LoginForm = () => {
           description: "Unable to verify user profile. Please try again.",
           variant: "destructive",
         });
-        return;
+        return false;
       }
 
       if (!profile?.approved) {
@@ -84,7 +92,16 @@ const LoginForm = () => {
           description: "Your account is pending approval by an administrator. Please check back later.",
           variant: "destructive",
         });
-        return;
+        return false;
+      }
+
+      // Save credentials for biometric login if available and requested
+      if (saveForBiometric && biometricAvailable) {
+        const saved = await saveCredentials(email, password);
+        if (saved) {
+          setHasSavedCredentials(true);
+          console.log("Credentials saved for future biometric login");
+        }
       }
 
       toast({
@@ -93,6 +110,7 @@ const LoginForm = () => {
       });
 
       navigate("/admin-dashboard");
+      return true;
       
     } catch (error: any) {
       console.error("Login error:", error);
@@ -116,8 +134,78 @@ const LoginForm = () => {
         description: errorMessage,
         variant: "destructive",
       });
+      return false;
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!formData.email.trim()) {
+      toast({
+        title: "Error",
+        description: "Email is required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!formData.password.trim()) {
+      toast({
+        title: "Error",
+        description: "Password is required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setLoading(true);
+    await performLogin(formData.email, formData.password, true);
+    setLoading(false);
+  };
+
+  const handleBiometricLogin = async () => {
+    setBiometricLoading(true);
+    
+    try {
+      // First authenticate with biometric
+      const biometricName = getBiometricTypeName(biometricType);
+      const authenticated = await authenticateWithBiometric(`Use ${biometricName} to log in`);
+      
+      if (!authenticated) {
+        toast({
+          title: "Authentication Failed",
+          description: `${biometricName} authentication was cancelled or failed.`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Get stored credentials
+      const credentials = await getCredentials();
+      
+      if (!credentials) {
+        toast({
+          title: "No Saved Credentials",
+          description: "Please log in with your email and password first to enable biometric login.",
+          variant: "destructive",
+        });
+        setHasSavedCredentials(false);
+        return;
+      }
+
+      // Perform login with stored credentials
+      await performLogin(credentials.email, credentials.password, false);
+      
+    } catch (error) {
+      console.error("Biometric login error:", error);
+      toast({
+        title: "Biometric Login Failed",
+        description: "An error occurred during biometric authentication.",
+        variant: "destructive",
+      });
     } finally {
-      setLoading(false);
+      setBiometricLoading(false);
     }
   };
 
@@ -150,10 +238,37 @@ const LoginForm = () => {
       <Button 
         type="submit" 
         className="w-full bg-aleph-green hover:bg-green-500"
-        disabled={loading}
+        disabled={loading || biometricLoading}
       >
         {loading ? "Signing In..." : "Sign In"}
       </Button>
+
+      {/* Biometric Login Button - Only show on native platforms with saved credentials */}
+      {biometricAvailable && hasSavedCredentials && (
+        <Button 
+          type="button"
+          variant="outline"
+          className="w-full flex items-center justify-center gap-2"
+          onClick={handleBiometricLogin}
+          disabled={loading || biometricLoading}
+        >
+          {biometricType === BiometryType.FACE_ID || biometricType === BiometryType.FACE_AUTHENTICATION ? (
+            <ScanFace className="h-5 w-5" />
+          ) : (
+            <Fingerprint className="h-5 w-5" />
+          )}
+          {biometricLoading 
+            ? "Authenticating..." 
+            : `Sign in with ${getBiometricTypeName(biometricType)}`}
+        </Button>
+      )}
+
+      {/* Show hint for biometric setup if available but no saved credentials */}
+      {biometricAvailable && !hasSavedCredentials && (
+        <p className="text-xs text-center text-muted-foreground">
+          Sign in once to enable {getBiometricTypeName(biometricType)} login
+        </p>
+      )}
       
       <div className="text-center">
         <Dialog>

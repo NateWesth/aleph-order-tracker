@@ -10,6 +10,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useIsMobile } from "@/hooks/use-mobile";
 interface OrderItem {
   id: string;
   name: string;
@@ -62,7 +63,12 @@ function OrderStatusColumn({
   onToggleExpand
 }: OrderStatusColumnProps) {
   const { stockStatusColors } = useTheme();
+  const isMobile = useIsMobile();
   const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
+  
+  // On desktop/tablet, columns are always expanded and not collapsible
+  // On mobile, use the isExpanded prop for collapsible behavior
+  const effectiveIsExpanded = isMobile ? isExpanded : true;
   const toggleExpanded = useCallback((orderId: string) => {
     setExpandedOrders(prev => {
       const next = new Set(prev);
@@ -103,35 +109,54 @@ function OrderStatusColumn({
     };
   };
   return <div className="flex flex-col w-full min-w-0">
-      {/* Column Header - Clickable to toggle */}
-      <button 
-        onClick={onToggleExpand}
-        className={cn(
-          "px-3 sm:px-4 py-2.5 sm:py-3 rounded-t-xl w-full text-left transition-all duration-200 hover:opacity-90 active:scale-[0.99]",
-          !isExpanded && "rounded-b-xl",
-          !config.customColor && config.bgColor
-        )} 
-        style={config.customColor ? { backgroundColor: config.customColor } : undefined}
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 min-w-0">
-            <ChevronDown className={cn(
-              "h-4 w-4 shrink-0 transition-transform duration-200",
-              config.color,
-              !isExpanded && "-rotate-90"
-            )} />
+      {/* Column Header - Only clickable to toggle on mobile */}
+      {isMobile ? (
+        <button 
+          onClick={onToggleExpand}
+          className={cn(
+            "px-3 sm:px-4 py-2.5 sm:py-3 rounded-t-xl w-full text-left transition-all duration-200 hover:opacity-90 active:scale-[0.99]",
+            !effectiveIsExpanded && "rounded-b-xl",
+            !config.customColor && config.bgColor
+          )} 
+          style={config.customColor ? { backgroundColor: config.customColor } : undefined}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 min-w-0">
+              <ChevronDown className={cn(
+                "h-4 w-4 shrink-0 transition-transform duration-200",
+                config.color,
+                !effectiveIsExpanded && "-rotate-90"
+              )} />
+              <h3 className={cn("font-semibold text-xs sm:text-sm uppercase tracking-wide truncate", config.color)}>
+                {config.label}
+              </h3>
+            </div>
+            <Badge variant="secondary" className="bg-white/20 text-white border-0 font-semibold text-xs shrink-0 ml-2">
+              {orders.length}
+            </Badge>
+          </div>
+        </button>
+      ) : (
+        <div 
+          className={cn(
+            "px-3 sm:px-4 py-2.5 sm:py-3 rounded-t-xl w-full text-left",
+            !config.customColor && config.bgColor
+          )} 
+          style={config.customColor ? { backgroundColor: config.customColor } : undefined}
+        >
+          <div className="flex items-center justify-between">
             <h3 className={cn("font-semibold text-xs sm:text-sm uppercase tracking-wide truncate", config.color)}>
               {config.label}
             </h3>
+            <Badge variant="secondary" className="bg-white/20 text-white border-0 font-semibold text-xs shrink-0 ml-2">
+              {orders.length}
+            </Badge>
           </div>
-          <Badge variant="secondary" className="bg-white/20 text-white border-0 font-semibold text-xs shrink-0 ml-2">
-            {orders.length}
-          </Badge>
         </div>
-      </button>
+      )}
 
-      {/* Column Content - Collapsible */}
-      {isExpanded && (
+      {/* Column Content - Always visible on desktop, collapsible on mobile */}
+      {effectiveIsExpanded && (
         <div className="flex-1 bg-muted/30 dark:bg-muted/10 rounded-b-xl border border-t-0 border-border min-h-[300px] sm:min-h-[400px] animate-fade-in">
           <ScrollArea className="h-[calc(100vh-380px)] sm:h-[calc(100vh-320px)]">
             <div className="p-2 sm:p-3 space-y-2">

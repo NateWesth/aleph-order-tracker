@@ -124,6 +124,8 @@ export default function OrdersPage({
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>("all");
+  // On desktop/tablet, all columns are always expanded (not collapsible)
+  // On mobile, columns are collapsible and start collapsed
   const [expandedColumns, setExpandedColumns] = useState<Set<string>>(new Set());
   const { toast } = useToast();
   const { user } = useAuth();
