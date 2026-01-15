@@ -470,8 +470,8 @@ export default function OrdersPage({
         </div>
       </div>
 
-      {/* Kanban Board - Responsive grid that fills screen width */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+      {/* Kanban Board - Responsive grid with wider Awaiting Stock column */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1.5fr_1fr_1fr_1fr] gap-3 md:gap-4">
         {STATUS_COLUMNS.map((column) => (
           <OrderStatusColumn
             key={column.key}
