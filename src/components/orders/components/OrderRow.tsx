@@ -2,7 +2,7 @@
 import { TableCell, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Eye, MoreHorizontal } from "lucide-react";
+import { Eye, MoreHorizontal, Clock, ShoppingCart, Package } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import OrderExportActions from "./OrderExportActions";
 import { OrderUpdatesButton } from "./OrderUpdatesButton";
@@ -10,6 +10,7 @@ import { useState } from "react";
 import OrderDetailsDialog from "./OrderDetailsDialog";
 import { OrderWithCompany } from "../types/orderTypes";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface OrderRowProps {
   order: OrderWithCompany;
@@ -19,6 +20,98 @@ interface OrderRowProps {
   onOrderClick?: (order: OrderWithCompany) => void;
   compact?: boolean;
 }
+
+interface StockStatusCounts {
+  awaiting: number;
+  ordered: number;
+  inStock: number;
+  total: number;
+}
+
+// Parse stock status counts from order description
+const parseStockStatusCounts = (description: string | null): StockStatusCounts => {
+  if (!description) {
+    return { awaiting: 0, ordered: 0, inStock: 0, total: 0 };
+  }
+
+  const lines = description.split('\n').filter(line => line.trim());
+  let awaiting = 0;
+  let ordered = 0;
+  let inStock = 0;
+
+  lines.forEach(line => {
+    const stockMatch = line.match(/\[Stock:\s*(awaiting|ordered|in-stock)\]/);
+    if (stockMatch) {
+      switch (stockMatch[1]) {
+        case 'awaiting':
+          awaiting++;
+          break;
+        case 'ordered':
+          ordered++;
+          break;
+        case 'in-stock':
+          inStock++;
+          break;
+      }
+    } else {
+      // Default to awaiting if no stock status is specified
+      awaiting++;
+    }
+  });
+
+  return { awaiting, ordered, inStock, total: lines.length };
+};
+
+// Stock status indicator component
+const StockStatusIndicator = ({ counts }: { counts: StockStatusCounts }) => {
+  if (counts.total === 0) return null;
+
+  return (
+    <TooltipProvider>
+      <div className="flex items-center gap-1">
+        {counts.awaiting > 0 && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-yellow-100 dark:bg-yellow-900/50 text-yellow-700 dark:text-yellow-300 text-xs font-medium">
+                <Clock className="h-3 w-3" />
+                <span>{counts.awaiting}</span>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>{counts.awaiting} item{counts.awaiting > 1 ? 's' : ''} awaiting stock</p>
+            </TooltipContent>
+          </Tooltip>
+        )}
+        {counts.ordered > 0 && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-xs font-medium">
+                <ShoppingCart className="h-3 w-3" />
+                <span>{counts.ordered}</span>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>{counts.ordered} item{counts.ordered > 1 ? 's' : ''} ordered</p>
+            </TooltipContent>
+          </Tooltip>
+        )}
+        {counts.inStock > 0 && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300 text-xs font-medium">
+                <Package className="h-3 w-3" />
+                <span>{counts.inStock}</span>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>{counts.inStock} item{counts.inStock > 1 ? 's' : ''} received/in stock</p>
+            </TooltipContent>
+          </Tooltip>
+        )}
+      </div>
+    </TooltipProvider>
+  );
+};
 
 export default function OrderRow({ 
   order, 
@@ -30,6 +123,7 @@ export default function OrderRow({
 }: OrderRowProps) {
   const [showDetails, setShowDetails] = useState(false);
   const isMobile = useIsMobile();
+  const stockCounts = parseStockStatusCounts(order.description);
 
   const getStatusColor = (status: string | null) => {
     switch (status?.toLowerCase()) {
@@ -84,7 +178,8 @@ export default function OrderRow({
                   <div className="text-xs text-muted-foreground truncate">{order.reference}</div>
                 )}
               </div>
-              <div className="ml-2 flex-shrink-0">
+              <div className="ml-2 flex-shrink-0 flex items-center gap-2">
+                <StockStatusIndicator counts={stockCounts} />
                 {getStatusBadge(order.status)}
               </div>
             </div>
@@ -186,7 +281,10 @@ export default function OrderRow({
         </TableCell>
         <TableCell className={`text-sm ${compact ? 'py-2' : ''}`}>{order.companyName || 'No Company'}</TableCell>
         <TableCell className={compact ? 'py-2' : ''}>
-          {getStatusBadge(order.status)}
+          <div className="flex items-center gap-2">
+            {getStatusBadge(order.status)}
+            <StockStatusIndicator counts={stockCounts} />
+          </div>
         </TableCell>
         <TableCell className={`text-sm ${compact ? 'py-2' : ''}`}>{new Date(order.created_at).toLocaleDateString()}</TableCell>
         {!compact && <TableCell>
