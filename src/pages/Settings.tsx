@@ -384,18 +384,27 @@ const Settings = () => {
                     )}
                   </>
                 ) : (
-                  /* Show info message when biometric not available on native */
-                  <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 border border-border">
-                    <div className="flex gap-2 shrink-0">
-                      <ScanFace className="h-6 w-6 text-muted-foreground" />
-                      <Fingerprint className="h-6 w-6 text-muted-foreground" />
+                  /* Show toggle for non-native platforms */
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label htmlFor="biometric-toggle-mobile" className="flex items-center gap-2">
+                          <ScanFace className="h-4 w-4" />
+                          Enable Biometric Login
+                        </Label>
+                        <p className="text-sm text-muted-foreground">
+                          Use Face ID, Touch ID, or Fingerprint to sign in
+                        </p>
+                      </div>
+                      <Switch
+                        id="biometric-toggle-mobile"
+                        checked={false}
+                        disabled={true}
+                      />
                     </div>
-                    <div>
-                      <p className="text-sm font-medium">Native App Feature</p>
-                      <p className="text-xs text-muted-foreground">
-                        Biometric login (Face ID, Touch ID, Fingerprint) is available when using the native mobile app on iOS or Android devices.
-                      </p>
-                    </div>
+                    <p className="text-xs text-muted-foreground bg-muted/50 p-2 rounded-md">
+                      Available when using the native mobile app on iOS or Android devices.
+                    </p>
                   </div>
                 )}
               </CardContent>
