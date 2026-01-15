@@ -312,6 +312,31 @@ export default function OrdersPage({
     }
   }, [fetchOrders, toast]);
 
+  const handleBulkSetItemsStatus = useCallback(async (itemIds: string[], newStatus: string) => {
+    try {
+      const { error } = await supabase
+        .from("order_items")
+        .update({ stock_status: newStatus })
+        .in("id", itemIds);
+
+      if (error) throw error;
+
+      toast({
+        title: "Updated",
+        description: `All items marked as ${newStatus === "in-stock" ? "received" : "ordered"}`,
+      });
+      
+      // Refresh orders (the database trigger will auto-move the order if all items are in stock)
+      fetchOrders();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update items stock status",
+        variant: "destructive",
+      });
+    }
+  }, [fetchOrders, toast]);
+
   const handleMoveOrder = useCallback(async (order: Order, newStatus: string) => {
     try {
       const updateData: any = {
@@ -480,6 +505,7 @@ export default function OrdersPage({
             onMoveOrder={handleMoveOrder}
             onDeleteOrder={handleDeleteOrder}
             onSetItemStockStatus={handleSetItemStockStatus}
+            onBulkSetItemsStatus={handleBulkSetItemsStatus}
             canEditItems={isAdmin}
           />
         ))}
