@@ -142,8 +142,6 @@ function OrderStatusColumn({
                           {getUrgencyBadge(order.urgency)}
                         </div>
 
-                        {/* Description */}
-                        {order.description}
 
                         {/* Collapsible Items Section */}
                         {hasItems && <Collapsible open={isExpanded} onOpenChange={() => toggleExpanded(order.id)}>
