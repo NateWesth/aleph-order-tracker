@@ -61,19 +61,12 @@ export function useOrderFetch() {
     try {
       console.log("Fetching orders for user:", user.id);
       
-      let query = supabase
+      // All authenticated users can see all orders (no company filtering)
+      const { data, error } = await supabase
         .from('orders')
         .select('*')
-        .neq('status', 'completed') // Exclude completed orders from the main orders page
+        .neq('status', 'completed')
         .order('created_at', { ascending: false });
-
-      // Filter by company for non-admin users
-      if (userRole === 'user' && userCompanyId) {
-        console.log("Filtering orders by company:", userCompanyId);
-        query = query.eq('company_id', userCompanyId);
-      }
-
-      const { data, error } = await query;
 
       if (error) {
         console.error("Orders fetch error:", error);
@@ -102,10 +95,10 @@ export function useOrderFetch() {
   };
 
   useEffect(() => {
-    if (user?.id && userRole && (userRole === 'admin' || userCompanyId)) {
+    if (user?.id && userRole) {
       fetchOrders();
     }
-  }, [user?.id, userRole, userCompanyId]);
+  }, [user?.id, userRole]);
 
   return {
     orders,
