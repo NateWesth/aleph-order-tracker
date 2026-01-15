@@ -9,6 +9,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { OrderWithCompany } from "../types/orderTypes";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -18,8 +19,11 @@ interface OrderItem {
   id: string;
   name: string;
   quantity: number;
-  unit?: string;
-  notes?: string;
+  unit: string;
+  notes: string;
+  stock_status: 'awaiting' | 'ordered' | 'in-stock';
+  delivered: number;
+  completed: boolean;
 }
 
 interface OrderDetailsDialogProps {
@@ -29,6 +33,23 @@ interface OrderDetailsDialogProps {
   isAdmin?: boolean;
   onSave?: () => void;
 }
+
+// Parse stock status from description line
+const parseStockStatusFromLine = (line: string): 'awaiting' | 'ordered' | 'in-stock' => {
+  const stockMatch = line.match(/\[Stock:\s*(awaiting|ordered|in-stock)\]/);
+  return (stockMatch?.[1] as 'awaiting' | 'ordered' | 'in-stock') || 'awaiting';
+};
+
+// Parse delivered quantity from description line
+const parseDeliveredFromLine = (line: string): number => {
+  const deliveredMatch = line.match(/\[Delivered:\s*(\d+)\]/);
+  return deliveredMatch ? parseInt(deliveredMatch[1]) : 0;
+};
+
+// Parse completed status from description line
+const parseCompletedFromLine = (line: string): boolean => {
+  return line.includes('[Status: completed]');
+};
 
 export default function OrderDetailsDialog({
   open,
@@ -43,6 +64,40 @@ export default function OrderDetailsDialog({
   const [fetchedItems, setFetchedItems] = useState<OrderItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [fetchingItems, setFetchingItems] = useState(false);
+
+  // Parse items from description with stock status
+  const parseItemsFromDescription = (description: string | null): OrderItem[] => {
+    if (!description) return [];
+    
+    return description.split('\n').map((line, index) => {
+      const qtyMatch = line.match(/^(.+?)\s*\(Qty:\s*(\d+)\)/);
+      if (qtyMatch) {
+        return {
+          id: `item-${index}`,
+          name: qtyMatch[1].trim(),
+          quantity: parseInt(qtyMatch[2]),
+          unit: 'pcs',
+          notes: '',
+          stock_status: parseStockStatusFromLine(line),
+          delivered: parseDeliveredFromLine(line),
+          completed: parseCompletedFromLine(line)
+        };
+      }
+      if (line.trim()) {
+        return {
+          id: `item-${index}`,
+          name: line.trim(),
+          quantity: 1,
+          unit: 'pcs',
+          notes: '',
+          stock_status: 'awaiting' as const,
+          delivered: 0,
+          completed: false
+        };
+      }
+      return null;
+    }).filter((item): item is OrderItem => item !== null);
+  };
 
   // Fetch order items from database when dialog opens
   useEffect(() => {
@@ -65,22 +120,26 @@ export default function OrderDetailsDialog({
             name: item.name,
             quantity: item.quantity,
             unit: 'pcs',
-            notes: item.notes || ''
+            notes: item.notes || '',
+            stock_status: (item.stock_status as 'awaiting' | 'ordered' | 'in-stock') || 'awaiting',
+            delivered: 0,
+            completed: false
           })));
         } else {
           // Fallback to parsing description if no order_items exist
-          setFetchedItems(order.items || []);
+          setFetchedItems(parseItemsFromDescription(order.description));
         }
       } catch (error) {
         console.error('Error fetching order items:', error);
-        setFetchedItems(order.items || []);
+        setFetchedItems(parseItemsFromDescription(order.description));
       } finally {
         setFetchingItems(false);
       }
     };
 
     fetchOrderItems();
-  }, [open, order?.id]);
+  }, [open, order?.id, order?.description]);
+
   const getStatusColor = (status: string | null) => {
     switch (status?.toLowerCase()) {
       case 'completed':
@@ -109,68 +168,31 @@ export default function OrderDetailsDialog({
     }
   };
 
-  // Parse item data to extract name, quantity, and notes
-  const parseItemData = (item: any) => {
-    let fullName = item.name || '';
-    let itemQuantity = item.quantity || 0;
-    let itemNotes = item.notes || '';
-    
-    
-    
-    // Extract quantity from name if present and update the quantity
-    const qtyMatch = fullName.match(/\(Qty:\s*(\d+)\)/i);
-    if (qtyMatch) {
-      itemQuantity = parseInt(qtyMatch[1]);
-      // Remove the quantity part from the name
-      fullName = fullName.replace(/\s*\(Qty:\s*\d+\)\s*/, '');
-    }
-    
-    // For complex item names, extract the main product name and move details to notes
-    // Pattern: Main product name, then details separated by " - "
-    let itemName = fullName;
-    let extractedNotes = '';
-    
-    // Split by " - " to separate main item from details
-    const parts = fullName.split(' - ');
-    if (parts.length > 1) {
-      // Take the first part as the main item name
-      itemName = parts[0].trim();
-      // Join the rest as notes
-      extractedNotes = parts.slice(1).join(' - ').trim();
-    }
-    
-    // Combine existing notes with extracted notes
-    let finalNotes = '';
-    if (itemNotes && extractedNotes) {
-      finalNotes = `${itemNotes}; ${extractedNotes}`;
-    } else if (itemNotes) {
-      finalNotes = itemNotes;
-    } else if (extractedNotes) {
-      finalNotes = extractedNotes;
-    }
-    
-    
-    return {
-      name: itemName,
-      quantity: itemQuantity,
-      notes: finalNotes,
-      unit: item.unit || 'pcs'
-    };
+  // Update stock status for an item
+  const updateStockStatus = (itemId: string, status: 'awaiting' | 'ordered' | 'in-stock') => {
+    const items = isEditing ? editableItems : fetchedItems;
+    const setItems = isEditing ? setEditableItems : setFetchedItems;
+    setItems(items.map(item =>
+      item.id === itemId ? { ...item, stock_status: status } : item
+    ));
   };
 
   // Initialize editable items when entering edit mode
   useEffect(() => {
     if (isEditing) {
-      const itemsToEdit = fetchedItems.length > 0 ? fetchedItems : (order.items || []);
+      const itemsToEdit = fetchedItems.length > 0 ? fetchedItems : parseItemsFromDescription(order.description);
       setEditableItems(itemsToEdit.map((item, idx) => ({
         id: item.id || `item-${idx}`,
         name: item.name,
         quantity: item.quantity,
         unit: item.unit,
-        notes: item.notes
+        notes: item.notes,
+        stock_status: item.stock_status || 'awaiting',
+        delivered: item.delivered || 0,
+        completed: item.completed || false
       })));
     }
-  }, [isEditing, fetchedItems, order.items]);
+  }, [isEditing, fetchedItems, order.description]);
 
   const addItem = () => {
     const newItem: OrderItem = {
@@ -178,7 +200,10 @@ export default function OrderDetailsDialog({
       name: '',
       quantity: 1,
       unit: 'pcs',
-      notes: ''
+      notes: '',
+      stock_status: 'awaiting',
+      delivered: 0,
+      completed: false
     };
     setEditableItems(prev => [...prev, newItem]);
   };
@@ -196,8 +221,9 @@ export default function OrderDetailsDialog({
   };
 
   const handleSave = async () => {
-    // Validate items
-    const validItems = editableItems.filter(item => item.name.trim() !== '');
+    const itemsToSave = isEditing ? editableItems : fetchedItems;
+    const validItems = itemsToSave.filter(item => item.name.trim() !== '');
+    
     if (validItems.length === 0) {
       toast({
         title: "Error",
@@ -209,10 +235,18 @@ export default function OrderDetailsDialog({
 
     setLoading(true);
     try {
-      // Convert items to description format for storage
-      const description = validItems.map(item => 
-        `${item.name.trim()} (Qty: ${item.quantity})`
-      ).join('\n');
+      // Convert items to description format with stock status
+      const description = validItems.map(item => {
+        let line = `${item.name.trim()} (Qty: ${item.quantity})`;
+        if (item.delivered > 0) {
+          line += ` [Delivered: ${item.delivered}]`;
+        }
+        line += ` [Stock: ${item.stock_status}]`;
+        if (item.completed) {
+          line += ` [Status: completed]`;
+        }
+        return line;
+      }).join('\n');
 
       const { error } = await supabase
         .from('orders')
@@ -226,7 +260,7 @@ export default function OrderDetailsDialog({
 
       toast({
         title: "Success",
-        description: "Order items updated successfully.",
+        description: "Order updated successfully.",
       });
       
       setIsEditing(false);
@@ -235,7 +269,7 @@ export default function OrderDetailsDialog({
       console.error("Error updating order:", error);
       toast({
         title: "Error",
-        description: "Failed to update order items: " + error.message,
+        description: "Failed to update order: " + error.message,
         variant: "destructive",
       });
     } finally {
@@ -248,13 +282,12 @@ export default function OrderDetailsDialog({
     setEditableItems([]);
   };
 
-  // Use fetched items from database, fallback to order.items
-  const displayItems = isEditing ? editableItems : (fetchedItems.length > 0 ? fetchedItems : (order.items || []));
-
+  // Use fetched items from database, fallback to parsing description
+  const displayItems = isEditing ? editableItems : (fetchedItems.length > 0 ? fetchedItems : parseItemsFromDescription(order.description));
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+      <DialogContent className="max-w-5xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <div className="flex items-center justify-between">
             <DialogTitle>Order Details - {order.order_number}</DialogTitle>
@@ -274,21 +307,21 @@ export default function OrderDetailsDialog({
         <div className="space-y-6">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <p className="text-sm text-gray-500">Company</p>
+              <p className="text-sm text-muted-foreground">Company</p>
               <p className="font-medium">{order.companyName || 'No Company'}</p>
             </div>
             <div>
-              <p className="text-sm text-gray-500">Order Date</p>
+              <p className="text-sm text-muted-foreground">Order Date</p>
               <p>{new Date(order.created_at).toLocaleDateString()}</p>
             </div>
             <div>
-              <p className="text-sm text-gray-500">Status</p>
+              <p className="text-sm text-muted-foreground">Status</p>
               <Badge className={getStatusColor(order.status)}>
                 {order.status || 'pending'}
               </Badge>
             </div>
             <div>
-              <p className="text-sm text-gray-500">Urgency</p>
+              <p className="text-sm text-muted-foreground">Urgency</p>
               <Badge className={getUrgencyColor(order.urgency)}>
                 {order.urgency || 'normal'}
               </Badge>
@@ -297,8 +330,8 @@ export default function OrderDetailsDialog({
 
           {order.notes && (
             <div>
-              <p className="text-sm text-gray-500 mb-2">Order Notes</p>
-              <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-md">
+              <p className="text-sm text-muted-foreground mb-2">Order Notes</p>
+              <div className="bg-muted/50 p-3 rounded-md">
                 <p className="text-sm whitespace-pre-wrap">{order.notes}</p>
               </div>
             </div>
@@ -306,7 +339,7 @@ export default function OrderDetailsDialog({
           
           <div>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-medium text-lg">Order Items</h3>
+              <h3 className="font-medium text-lg">Order Items & Stock Status</h3>
               {isEditing && (
                 <Button type="button" variant="outline" size="sm" onClick={addItem}>
                   <Plus className="h-4 w-4 mr-2" />
@@ -317,7 +350,7 @@ export default function OrderDetailsDialog({
             
             {displayItems.length === 0 ? (
               <div className="text-center p-8 border rounded-md border-dashed">
-                <p className="text-gray-500">
+                <p className="text-muted-foreground">
                   {isEditing ? 'No items. Click "Add Item" to create one.' : 'No items found in this order.'}
                 </p>
               </div>
@@ -343,14 +376,40 @@ export default function OrderDetailsDialog({
                       value={item.quantity}
                       onChange={(e) => updateItemField(item.id, 'quantity', Math.max(1, parseInt(e.target.value) || 1))}
                       min="1"
-                      className="w-24"
+                      className="w-20"
                     />
-                    <Input
-                      placeholder="Unit"
-                      value={item.unit || 'pcs'}
-                      onChange={(e) => updateItemField(item.id, 'unit', e.target.value)}
-                      className="w-24"
-                    />
+                    <div className="flex flex-col gap-1">
+                      <label className="flex items-center gap-1 text-xs">
+                        <Checkbox
+                          checked={item.stock_status === 'awaiting'}
+                          onCheckedChange={(checked) => {
+                            if (checked) updateItemField(item.id, 'stock_status', 'awaiting');
+                          }}
+                          className="data-[state=checked]:bg-yellow-500 data-[state=checked]:border-yellow-500"
+                        />
+                        Awaiting
+                      </label>
+                      <label className="flex items-center gap-1 text-xs">
+                        <Checkbox
+                          checked={item.stock_status === 'ordered'}
+                          onCheckedChange={(checked) => {
+                            if (checked) updateItemField(item.id, 'stock_status', 'ordered');
+                          }}
+                          className="data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-500"
+                        />
+                        Ordered
+                      </label>
+                      <label className="flex items-center gap-1 text-xs">
+                        <Checkbox
+                          checked={item.stock_status === 'in-stock'}
+                          onCheckedChange={(checked) => {
+                            if (checked) updateItemField(item.id, 'stock_status', 'in-stock');
+                          }}
+                          className="data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500"
+                        />
+                        Received
+                      </label>
+                    </div>
                     <Button
                       type="button"
                       variant="outline"
@@ -364,42 +423,84 @@ export default function OrderDetailsDialog({
                 ))}
               </div>
             ) : (
-              <div className="border rounded-lg divide-y">
-                <div className="grid grid-cols-12 gap-4 p-4 bg-gray-50 font-medium text-sm text-gray-700">
-                  <div className="col-span-4">Item Name</div>
-                  <div className="col-span-2 text-center">Quantity</div>
-                  <div className="col-span-1 text-center">Unit</div>
-                  <div className="col-span-5">Notes</div>
+              <>
+                <div className="border rounded-lg overflow-hidden">
+                  <table className="w-full">
+                    <thead className="bg-muted/50">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Item</th>
+                        <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground uppercase">Qty</th>
+                        <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground uppercase">Awaiting</th>
+                        <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground uppercase">Ordered</th>
+                        <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground uppercase">Received</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {displayItems.map((item) => (
+                        <tr key={item.id} className="hover:bg-muted/30">
+                          <td className="px-4 py-3 text-sm font-medium">{item.name}</td>
+                          <td className="px-4 py-3 text-center text-sm text-muted-foreground">{item.quantity}</td>
+                          <td className="px-4 py-3 text-center">
+                            <Checkbox
+                              checked={item.stock_status === 'awaiting'}
+                              onCheckedChange={(checked) => {
+                                if (checked && isAdmin) updateStockStatus(item.id, 'awaiting');
+                              }}
+                              disabled={!isAdmin}
+                              className="data-[state=checked]:bg-yellow-500 data-[state=checked]:border-yellow-500"
+                            />
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <Checkbox
+                              checked={item.stock_status === 'ordered'}
+                              onCheckedChange={(checked) => {
+                                if (checked && isAdmin) updateStockStatus(item.id, 'ordered');
+                              }}
+                              disabled={!isAdmin}
+                              className="data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-500"
+                            />
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <Checkbox
+                              checked={item.stock_status === 'in-stock'}
+                              onCheckedChange={(checked) => {
+                                if (checked && isAdmin) updateStockStatus(item.id, 'in-stock');
+                              }}
+                              disabled={!isAdmin}
+                              className="data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500"
+                            />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-                {displayItems.map((item, index) => {
-                  const parsedItem = parseItemData(item);
-                  
-                  return (
-                    <div key={`item-${index}`} className="grid grid-cols-12 gap-4 p-4 items-start hover:bg-gray-50">
-                      <div className="col-span-4">
-                        <p className="font-medium text-gray-900 break-words">
-                          {parsedItem.name}
-                        </p>
-                      </div>
-                      <div className="col-span-2 text-center">
-                        <span className="text-gray-600 font-semibold">
-                          {parsedItem.quantity}
-                        </span>
-                      </div>
-                      <div className="col-span-1 text-center">
-                        <span className="text-gray-600">
-                          {parsedItem.unit}
-                        </span>
-                      </div>
-                      <div className="col-span-5">
-                        <p className="text-sm text-gray-600 break-words">
-                          {parsedItem.notes || '-'}
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+                
+                {/* Stock Status Legend */}
+                <div className="mt-4 flex flex-wrap gap-4 text-sm text-muted-foreground">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded bg-yellow-500"></div>
+                    <span>Awaiting Stock</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded bg-blue-500"></div>
+                    <span>Ordered</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded bg-green-500"></div>
+                    <span>Received/In Stock</span>
+                  </div>
+                </div>
+
+                {/* Save button for stock status changes (admins only) */}
+                {isAdmin && (
+                  <div className="mt-4 flex justify-end">
+                    <Button onClick={handleSave} disabled={loading}>
+                      {loading ? "Saving..." : "Save Stock Status"}
+                    </Button>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>
