@@ -286,54 +286,90 @@ const Settings = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {hasSavedCredentials ? (
-                  <>
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label className="flex items-center gap-2">
-                          {getBiometricTypeName(biometricType)} Enabled
-                        </Label>
-                        <p className="text-sm text-muted-foreground">
-                          Your login credentials are saved for biometric authentication
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Check className="h-5 w-5 text-green-500" />
-                        <span className="text-sm font-medium text-green-600">Active</span>
-                      </div>
-                    </div>
-                    
-                    <div className="pt-2 border-t border-border">
-                      <Button 
-                        variant="destructive" 
-                        size="sm"
-                        onClick={handleClearBiometricCredentials}
-                        disabled={clearingCredentials}
-                        className="w-full sm:w-auto"
-                      >
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        {clearingCredentials ? "Clearing..." : "Clear Saved Credentials"}
-                      </Button>
-                      <p className="text-xs text-muted-foreground mt-2">
-                        This will disable {getBiometricTypeName(biometricType)} login. You'll need to log in with your email and password again to re-enable it.
+                {/* Toggle for enabling/disabling biometric login */}
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="biometric-toggle" className="flex items-center gap-2">
+                      {biometricType === BiometryType.FACE_ID || biometricType === BiometryType.FACE_AUTHENTICATION ? (
+                        <ScanFace className="h-4 w-4" />
+                      ) : (
+                        <Fingerprint className="h-4 w-4" />
+                      )}
+                      Enable {getBiometricTypeName(biometricType)}
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      {hasSavedCredentials 
+                        ? "Quick sign-in using biometric authentication" 
+                        : "Log out and sign in to enable biometric login"
+                      }
+                    </p>
+                  </div>
+                  <Switch
+                    id="biometric-toggle"
+                    checked={biometricEnabled}
+                    onCheckedChange={async (checked) => {
+                      if (!checked && hasSavedCredentials) {
+                        // Disable biometric - clear credentials
+                        await handleClearBiometricCredentials();
+                      } else if (checked && !hasSavedCredentials) {
+                        // Can't enable without credentials - inform user
+                        toast({
+                          title: "Setup Required",
+                          description: `Log out and sign in with your email and password to set up ${getBiometricTypeName(biometricType)} login.`,
+                        });
+                      }
+                    }}
+                    disabled={clearingCredentials || (!hasSavedCredentials && !biometricEnabled)}
+                  />
+                </div>
+
+                {/* Status indicator */}
+                {hasSavedCredentials && (
+                  <div className="flex items-center gap-2 p-3 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
+                    <Check className="h-5 w-5 text-green-600 dark:text-green-400" />
+                    <div>
+                      <p className="text-sm font-medium text-green-700 dark:text-green-300">
+                        {getBiometricTypeName(biometricType)} Active
+                      </p>
+                      <p className="text-xs text-green-600 dark:text-green-400">
+                        Your credentials are securely stored for biometric authentication
                       </p>
                     </div>
-                  </>
-                ) : (
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
-                      {biometricType === BiometryType.FACE_ID || biometricType === BiometryType.FACE_AUTHENTICATION ? (
-                        <ScanFace className="h-8 w-8 text-muted-foreground" />
-                      ) : (
-                        <Fingerprint className="h-8 w-8 text-muted-foreground" />
-                      )}
-                      <div>
-                        <p className="text-sm font-medium">Not Set Up</p>
-                        <p className="text-xs text-muted-foreground">
-                          Log out and sign in again with your email and password to enable {getBiometricTypeName(biometricType)} login.
-                        </p>
-                      </div>
+                  </div>
+                )}
+
+                {/* Setup instructions when not enabled */}
+                {!hasSavedCredentials && (
+                  <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 border border-border">
+                    {biometricType === BiometryType.FACE_ID || biometricType === BiometryType.FACE_AUTHENTICATION ? (
+                      <ScanFace className="h-8 w-8 text-muted-foreground shrink-0" />
+                    ) : (
+                      <Fingerprint className="h-8 w-8 text-muted-foreground shrink-0" />
+                    )}
+                    <div>
+                      <p className="text-sm font-medium">How to Enable</p>
+                      <p className="text-xs text-muted-foreground">
+                        1. Log out of the app{"\n"}
+                        2. Sign in with your email and password{"\n"}
+                        3. When prompted, allow {getBiometricTypeName(biometricType)} access
+                      </p>
                     </div>
+                  </div>
+                )}
+
+                {/* Clear credentials button when enabled */}
+                {hasSavedCredentials && (
+                  <div className="pt-2 border-t border-border">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={handleClearBiometricCredentials}
+                      disabled={clearingCredentials}
+                      className="w-full sm:w-auto text-destructive hover:text-destructive hover:bg-destructive/10"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      {clearingCredentials ? "Clearing..." : "Remove Saved Credentials"}
+                    </Button>
                   </div>
                 )}
               </CardContent>
