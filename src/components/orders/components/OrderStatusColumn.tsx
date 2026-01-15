@@ -67,6 +67,7 @@ interface OrderStatusColumnProps {
   onMoveOrder: (order: Order, newStatus: string) => void;
   onDeleteOrder: (order: Order) => void;
   onSetItemStockStatus?: (itemId: string, newStatus: string) => void;
+  onBulkSetItemsStatus?: (itemIds: string[], newStatus: string) => void;
   canEditItems?: boolean;
 }
 
@@ -76,6 +77,7 @@ function OrderStatusColumn({
   onMoveOrder,
   onDeleteOrder,
   onSetItemStockStatus,
+  onBulkSetItemsStatus,
   canEditItems = false,
 }: OrderStatusColumnProps) {
   const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
@@ -308,8 +310,47 @@ function OrderStatusColumn({
                                   </div>
                                 ))}
                                 
-                                {/* Legend */}
-                                {config.key === "ordered" && order.items && order.items.length > 0 && (
+                                {/* Bulk Actions & Legend */}
+                                {config.key === "ordered" && order.items && order.items.length > 0 && canEditItems && (
+                                  <div className="flex items-center justify-between pt-2 mt-1 border-t border-border/50">
+                                    <div className="flex items-center gap-1">
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="h-6 text-[10px] px-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-950 dark:hover:bg-blue-900 dark:text-blue-300 dark:border-blue-800"
+                                        onClick={() => {
+                                          const itemIds = order.items?.map(i => i.id) || [];
+                                          onBulkSetItemsStatus?.(itemIds, "ordered");
+                                        }}
+                                      >
+                                        All Ordered
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="h-6 text-[10px] px-2 bg-green-50 hover:bg-green-100 text-green-700 border-green-200 dark:bg-green-950 dark:hover:bg-green-900 dark:text-green-300 dark:border-green-800"
+                                        onClick={() => {
+                                          const itemIds = order.items?.map(i => i.id) || [];
+                                          onBulkSetItemsStatus?.(itemIds, "in-stock");
+                                        }}
+                                      >
+                                        All Received
+                                      </Button>
+                                    </div>
+                                    <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                                      <div className="flex items-center gap-1">
+                                        <div className="w-2 h-2 rounded-sm bg-blue-500"></div>
+                                        <span>O</span>
+                                      </div>
+                                      <div className="flex items-center gap-1">
+                                        <div className="w-2 h-2 rounded-sm bg-green-500"></div>
+                                        <span>R</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+                                {/* Legend only when not editable */}
+                                {config.key === "ordered" && order.items && order.items.length > 0 && !canEditItems && (
                                   <div className="flex items-center gap-3 pt-2 mt-1 border-t border-border/50 text-[10px] text-muted-foreground">
                                     <div className="flex items-center gap-1">
                                       <div className="w-2.5 h-2.5 rounded-sm bg-blue-500"></div>
