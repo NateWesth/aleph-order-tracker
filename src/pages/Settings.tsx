@@ -281,27 +281,13 @@ const Settings = () => {
                   <div className="space-y-4">
                     {/* Windows/Desktop PWA Install */}
                     <div className="space-y-2">
-                      {deferredPrompt ? (
-                        <>
-                          <Button onClick={handleInstallApp} className="w-full sm:w-auto">
-                            <Download className="h-4 w-4 mr-2" />
-                            Download for Windows
-                          </Button>
-                          <p className="text-xs text-muted-foreground">
-                            Install Aleph Orders as a desktop application
-                          </p>
-                        </>
-                      ) : (
-                        <>
-                          <p className="text-sm text-muted-foreground">
-                            To install on Windows:
-                          </p>
-                          <ol className="text-sm text-muted-foreground space-y-2 list-decimal list-inside">
-                            <li>Click the install icon in your browser's address bar</li>
-                            <li>Or open browser menu and select "Install Aleph Orders"</li>
-                          </ol>
-                        </>
-                      )}
+                      <Button onClick={handleInstallApp} className="w-full sm:w-auto">
+                        <Download className="h-4 w-4 mr-2" />
+                        Download for Windows
+                      </Button>
+                      <p className="text-xs text-muted-foreground">
+                        Install Aleph Orders as a desktop application
+                      </p>
                     </div>
                   </div>
                 )}
