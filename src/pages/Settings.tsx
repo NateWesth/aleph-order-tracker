@@ -255,11 +255,10 @@ const Settings = () => {
                       <li>Tap "Add" to confirm</li>
                     </ol>
                   </div>
-                ) : (
+                ) : isMobile ? (
                   <div className="space-y-4">
-                    {/* Android APK Download */}
+                    {/* Android APK Download - Mobile only */}
                     <div className="space-y-2">
-                      <p className="text-sm font-medium">Android</p>
                       <Button 
                         asChild 
                         className="w-full sm:w-auto"
@@ -277,20 +276,33 @@ const Settings = () => {
                         Download and install the APK for full features including biometric login
                       </p>
                     </div>
-                    
-                    {/* PWA Install fallback */}
-                    {deferredPrompt && (
-                      <div className="space-y-2 pt-3 border-t border-border">
-                        <p className="text-sm font-medium">Or install as Web App</p>
-                        <Button variant="outline" onClick={handleInstallApp} className="w-full sm:w-auto">
-                          <Download className="h-4 w-4 mr-2" />
-                          Install Web App
-                        </Button>
-                        <p className="text-xs text-muted-foreground">
-                          Lighter version without native features
-                        </p>
-                      </div>
-                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {/* Windows/Desktop PWA Install */}
+                    <div className="space-y-2">
+                      {deferredPrompt ? (
+                        <>
+                          <Button onClick={handleInstallApp} className="w-full sm:w-auto">
+                            <Download className="h-4 w-4 mr-2" />
+                            Download for Windows
+                          </Button>
+                          <p className="text-xs text-muted-foreground">
+                            Install Aleph Orders as a desktop application
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-sm text-muted-foreground">
+                            To install on Windows:
+                          </p>
+                          <ol className="text-sm text-muted-foreground space-y-2 list-decimal list-inside">
+                            <li>Click the install icon in your browser's address bar</li>
+                            <li>Or open browser menu and select "Install Aleph Orders"</li>
+                          </ol>
+                        </>
+                      )}
+                    </div>
                   </div>
                 )}
               </CardContent>
