@@ -143,7 +143,7 @@ interface ThemeProviderProps {
 
 export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
   const [theme, setTheme] = useState<Theme>('light');
-  const [colorTheme, setColorTheme] = useState<ColorTheme>('purple');
+  const [colorTheme, setColorTheme] = useState<ColorTheme>('black');
   const [boardColorMode, setBoardColorMode] = useState<BoardColorMode>('colorful');
   const [boardSingleColor, setBoardSingleColor] = useState<BoardSingleColor>('primary');
   const [colorfulPreset, setColorfulPreset] = useState<ColorfulPreset>('default');
