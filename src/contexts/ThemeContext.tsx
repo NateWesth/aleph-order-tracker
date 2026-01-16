@@ -197,6 +197,23 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     root.classList.remove('light', 'dark');
     root.classList.add(theme);
     
+    // Update theme-color meta tag to match status bar
+    // Light theme = white background (dark status bar icons)
+    // Dark theme = dark background (white status bar icons)
+    const themeColor = theme === 'dark' ? '#141619' : '#fafafa';
+    const themeColorMeta = document.querySelector('meta[name="theme-color"]:not([media])') 
+      || document.querySelector('meta[name="theme-color"]');
+    if (themeColorMeta) {
+      themeColorMeta.setAttribute('content', themeColor);
+    }
+    
+    // Update apple-mobile-web-app-status-bar-style
+    const appleStatusBarMeta = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
+    if (appleStatusBarMeta) {
+      // 'default' = black text on white bg, 'black-translucent' = white text on dark bg
+      appleStatusBarMeta.setAttribute('content', theme === 'dark' ? 'black-translucent' : 'default');
+    }
+    
     // Save theme preference
     try {
       localStorage.setItem('theme', theme);
