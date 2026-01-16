@@ -17,7 +17,10 @@ import * as z from "zod";
 const companySchema = z.object({
   name: z.string().min(1, "Company name is required"),
   contact_person: z.string().min(1, "Contact person name is required"),
-  email: z.string().email("Invalid email address").optional().or(z.literal("")),
+  email: z.string().optional().refine(
+    (val) => !val || val === "" || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val),
+    { message: "Please enter a valid email address" }
+  ),
   phone: z.string().min(1, "Phone number is required"),
   address: z.string().min(1, "Company address is required"),
   vat_number: z.string().min(1, "VAT number is required"),
