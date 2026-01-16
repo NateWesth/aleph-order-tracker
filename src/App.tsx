@@ -8,6 +8,7 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { Toaster } from "@/components/ui/toaster";
 import { FloatingUploadButton } from './components/FloatingUploadButton';
 import { PWAInstallPrompt } from './components/PWAInstallPrompt';
+import { PWAUpdatePrompt } from './components/PWAUpdatePrompt';
 import AdminDashboard from './pages/AdminDashboard';
 
 // Lazy load heavy components for better Speed Index
@@ -77,6 +78,7 @@ function App() {
               </Suspense>
               <FloatingUploadButton />
               <PWAInstallPrompt />
+              <PWAUpdatePrompt />
               <Toaster />
             </div>
           </Router>
