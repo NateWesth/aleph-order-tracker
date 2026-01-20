@@ -38,6 +38,8 @@ export default function CreateOrderDialog({
     urgency: string;
     notes?: string;
     items: any[];
+    supplierId?: string;
+    purchaseOrderNumber?: string;
   }) => {
     if (!user?.id) {
       console.error("❌ CreateOrderDialog: No user ID available");
@@ -68,7 +70,7 @@ export default function CreateOrderDialog({
       }).join('\n');
       console.log("📝 CreateOrderDialog: Generated description with notes:", itemsDescription);
 
-      // Prepare order data for database insertion - NOW INCLUDING urgency and reference fields
+      // Prepare order data for database insertion - NOW INCLUDING urgency, reference, supplier and PO fields
       const orderInsertData = {
         order_number: orderData.orderNumber,
         reference: orderData.reference || null,
@@ -79,7 +81,8 @@ export default function CreateOrderDialog({
         user_id: user.id,
         status: 'pending',
         urgency: orderData.urgency,
-        // Store urgency in database
+        supplier_id: orderData.supplierId || null,
+        purchase_order_number: orderData.purchaseOrderNumber || null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };

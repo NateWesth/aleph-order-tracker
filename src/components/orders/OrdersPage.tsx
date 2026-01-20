@@ -141,7 +141,7 @@ export default function OrdersPage({
       // Fetch all orders except delivered (those go to history)
       const { data, error } = await supabase
         .from("orders")
-        .select("id, order_number, description, status, urgency, company_id, created_at")
+        .select("id, order_number, description, status, urgency, company_id, created_at, supplier_id, purchase_order_number")
         .neq("status", "delivered")
         .order("created_at", { ascending: false });
 
@@ -157,6 +157,18 @@ export default function OrdersPage({
           .select("id, name")
           .in("id", companyIds);
         companyMap = new Map(companiesData?.map((c) => [c.id, c.name]) || []);
+      }
+
+      // Fetch supplier names
+      const supplierIds = [...new Set(data?.map((o) => o.supplier_id).filter(Boolean))];
+      let supplierMap = new Map<string, string>();
+
+      if (supplierIds.length > 0) {
+        const { data: suppliersData } = await supabase
+          .from("suppliers")
+          .select("id, name")
+          .in("id", supplierIds);
+        supplierMap = new Map(suppliersData?.map((s) => [s.id, s.name]) || []);
       }
 
       // Fetch order items for all orders
@@ -189,8 +201,13 @@ export default function OrdersPage({
         companyName: order.company_id
           ? companyMap.get(order.company_id) || "Unknown"
           : "No Client",
+        supplierName: order.supplier_id
+          ? supplierMap.get(order.supplier_id) || null
+          : null,
         items: orderItemsMap.get(order.id) || [],
       }));
+
+      setOrders(ordersWithData);
 
       setOrders(ordersWithData);
     } catch (error) {

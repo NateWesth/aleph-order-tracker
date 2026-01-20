@@ -16,4 +16,7 @@ export interface OrderWithCompany {
   urgency?: string;
   items?: Array<{id: string, name: string, quantity: number, unit?: string, notes?: string}>;
   companyName: string;
+  supplier_id?: string | null;
+  purchase_order_number?: string | null;
+  supplierName?: string | null;
 }

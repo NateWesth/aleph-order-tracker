@@ -39,6 +39,12 @@ interface Company {
   code: string;
 }
 
+interface Supplier {
+  id: string;
+  name: string;
+  code: string;
+}
+
 interface OrderFormProps {
   onSubmit: (orderData: {
     orderNumber: string;
@@ -46,6 +52,8 @@ interface OrderFormProps {
     totalAmount: number;
     urgency: string;
     items: OrderItem[];
+    supplierId?: string;
+    purchaseOrderNumber?: string;
   }) => void;
   loading?: boolean;
 }
@@ -54,10 +62,13 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
   const [orderNumber, setOrderNumber] = useState("");
   const [companyId, setCompanyId] = useState("");
   const [urgency, setUrgency] = useState("normal");
+  const [supplierId, setSupplierId] = useState("");
+  const [purchaseOrderNumber, setPurchaseOrderNumber] = useState("");
   const [items, setItems] = useState<OrderItem[]>([
     { id: crypto.randomUUID(), name: "", code: "", quantity: 1 },
   ]);
   const [companies, setCompanies] = useState<Company[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loadingData, setLoadingData] = useState(true);
   const [openPopovers, setOpenPopovers] = useState<Record<string, boolean>>({});
   const [searchQueries, setSearchQueries] = useState<Record<string, string>>({});
@@ -67,21 +78,23 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
   useEffect(() => {
     setOrderNumber(generateOrderNumber());
 
-    const fetchCompanies = async () => {
+    const fetchData = async () => {
       try {
-        const { data } = await supabase
-          .from("companies")
-          .select("id, name, code")
-          .order("name");
-        if (data) setCompanies(data);
+        const [companiesRes, suppliersRes] = await Promise.all([
+          supabase.from("companies").select("id, name, code").order("name"),
+          supabase.from("suppliers").select("id, name, code").order("name"),
+        ]);
+        
+        if (companiesRes.data) setCompanies(companiesRes.data);
+        if (suppliersRes.data) setSuppliers(suppliersRes.data);
       } catch (error) {
-        console.error("Error fetching companies:", error);
+        console.error("Error fetching data:", error);
       } finally {
         setLoadingData(false);
       }
     };
 
-    fetchCompanies();
+    fetchData();
   }, []);
 
   // Debounced search function
@@ -198,6 +211,8 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
       totalAmount: 0,
       urgency,
       items: validItems,
+      supplierId: supplierId || undefined,
+      purchaseOrderNumber: purchaseOrderNumber || undefined,
     });
   };
 
@@ -256,6 +271,40 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
             <SelectItem value="urgent">Urgent</SelectItem>
           </SelectContent>
         </Select>
+      </div>
+
+      {/* Supplier & Purchase Order (Optional) */}
+      <div className="p-4 bg-muted/50 rounded-lg border border-border space-y-4">
+        <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+          <span>🔗 Link to Supplier Purchase Order (Optional)</span>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="supplier">Supplier</Label>
+            <Select value={supplierId} onValueChange={setSupplierId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select a supplier (optional)" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">No supplier</SelectItem>
+                {suppliers.map((supplier) => (
+                  <SelectItem key={supplier.id} value={supplier.id}>
+                    {supplier.name} ({supplier.code})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="purchaseOrderNumber">Purchase Order Number</Label>
+            <Input
+              id="purchaseOrderNumber"
+              value={purchaseOrderNumber}
+              onChange={(e) => setPurchaseOrderNumber(e.target.value)}
+              placeholder="e.g., PO-2024-001"
+            />
+          </div>
+        </div>
       </div>
 
       {/* Note */}
