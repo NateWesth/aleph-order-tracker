@@ -139,6 +139,7 @@ export type Database = {
           name: string
           notes: string | null
           order_id: string
+          progress_stage: string
           quantity: number
           stock_status: string
           updated_at: string
@@ -150,6 +151,7 @@ export type Database = {
           name: string
           notes?: string | null
           order_id: string
+          progress_stage?: string
           quantity?: number
           stock_status?: string
           updated_at?: string
@@ -161,6 +163,7 @@ export type Database = {
           name?: string
           notes?: string | null
           order_id?: string
+          progress_stage?: string
           quantity?: number
           stock_status?: string
           updated_at?: string
