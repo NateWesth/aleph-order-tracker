@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Package, History, BarChart3, Settings, LogOut, Building2, Home, Search, Box, Users, Menu, Truck } from "lucide-react";
+import { Package, History, BarChart3, Settings, LogOut, Building2, Home, Search, Box, Users, Truck, FileText } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import OrdersPage from "@/components/orders/OrdersPage";
@@ -14,6 +14,7 @@ import StatsPage from "@/components/admin/StatsPage";
 import ItemsPage from "@/components/admin/ItemsPage";
 import UsersManagementPage from "@/components/admin/UsersManagementPage";
 import SuppliersPage from "@/components/admin/SuppliersPage";
+import POTrackingPage from "@/components/admin/POTrackingPage";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useGlobalUnreadCount } from "@/hooks/useGlobalUnreadCount";
 import { cn } from "@/lib/utils";
@@ -95,6 +96,7 @@ const AdminDashboard = () => {
     { id: "history", label: "History", icon: History, badge: unreadOrderUpdates },
     { id: "clients", label: "Clients", icon: Building2, badge: 0 },
     { id: "suppliers", label: "Suppliers", icon: Truck, badge: 0 },
+    { id: "po-tracking", label: "PO Tracking", icon: FileText, badge: 0 },
     { id: "items", label: "Items", icon: Box, badge: 0 },
     ...(isAdmin ? [{ id: "users", label: "Users", icon: Users, badge: 0 }] : []),
     { id: "stats", label: "Stats", icon: BarChart3, badge: 0 },
@@ -233,6 +235,7 @@ const AdminDashboard = () => {
             {activeView === "history" && <CompletedPage isAdmin={true} searchTerm={searchTerm} />}
             {activeView === "clients" && <ClientCompaniesPage />}
             {activeView === "suppliers" && <SuppliersPage />}
+            {activeView === "po-tracking" && <POTrackingPage />}
             {activeView === "items" && <ItemsPage />}
             {activeView === "users" && isAdmin && <UsersManagementPage />}
             {activeView === "stats" && <StatsPage />}
