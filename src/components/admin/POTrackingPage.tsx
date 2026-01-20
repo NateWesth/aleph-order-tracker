@@ -31,6 +31,8 @@ import {
 import { format } from "date-fns";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
+import { OrderWithCompany } from "@/components/orders/types/orderTypes";
+import OrderDetailsDialog from "@/components/orders/components/OrderDetailsDialog";
 
 interface Supplier {
   id: string;
@@ -49,7 +51,9 @@ interface OrderWithPO {
   urgency: string | null;
   created_at: string;
   company_id: string | null;
+  supplier_id: string | null;
   companyName: string;
+  supplierName?: string | null;
   description: string | null;
 }
 
@@ -65,6 +69,8 @@ export default function POTrackingPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [openSuppliers, setOpenSuppliers] = useState<Set<string>>(new Set());
+  const [selectedOrder, setSelectedOrder] = useState<OrderWithCompany | null>(null);
+  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
   const { toast } = useToast();
   const isMobile = useIsMobile();
 
@@ -213,6 +219,25 @@ export default function POTrackingPage() {
     });
   };
 
+  const handleOrderClick = (order: OrderWithPO, supplierName: string) => {
+    // Convert OrderWithPO to OrderWithCompany for the dialog
+    const orderForDialog: OrderWithCompany = {
+      id: order.id,
+      order_number: order.order_number,
+      description: order.description,
+      status: order.status,
+      urgency: order.urgency,
+      company_id: order.company_id,
+      created_at: order.created_at,
+      companyName: order.companyName,
+      supplier_id: order.supplier_id,
+      purchase_order_number: order.purchase_order_number,
+      supplierName: supplierName
+    };
+    setSelectedOrder(orderForDialog);
+    setDetailsDialogOpen(true);
+  };
+
   // Calculate totals
   const totalLinkedOrders = orders.length;
   const suppliersWithOrders = new Set(orders.map(o => (o as any).supplier_id)).size;
@@ -313,7 +338,8 @@ export default function POTrackingPage() {
                         {group.orders.map(order => (
                           <div 
                             key={order.id} 
-                            className="p-3 bg-muted/30 rounded-lg space-y-2"
+                            className="p-3 bg-muted/30 rounded-lg space-y-2 cursor-pointer hover:bg-muted/50 transition-colors"
+                            onClick={() => handleOrderClick(order, group.supplier.name)}
                           >
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-2">
@@ -364,7 +390,11 @@ export default function POTrackingPage() {
                         </TableHeader>
                         <TableBody>
                           {group.orders.map(order => (
-                            <TableRow key={order.id}>
+                            <TableRow 
+                              key={order.id} 
+                              className="cursor-pointer hover:bg-muted/50"
+                              onClick={() => handleOrderClick(order, group.supplier.name)}
+                            >
                               <TableCell className="font-medium">
                                 {order.order_number}
                               </TableCell>
@@ -405,6 +435,17 @@ export default function POTrackingPage() {
             </Card>
           ))}
         </div>
+      )}
+
+      {/* Order Details Dialog */}
+      {selectedOrder && (
+        <OrderDetailsDialog
+          open={detailsDialogOpen}
+          onOpenChange={setDetailsDialogOpen}
+          order={selectedOrder}
+          isAdmin={true}
+          onSave={fetchData}
+        />
       )}
     </div>
   );
