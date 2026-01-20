@@ -9,11 +9,25 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { OrderWithCompany } from "../types/orderTypes";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Plus, Trash2, Edit2, X } from "lucide-react";
+import { Plus, Trash2, Edit2, X, Truck } from "lucide-react";
+
+interface Supplier {
+  id: string;
+  name: string;
+  code: string;
+}
 
 interface OrderItem {
   id: string;
@@ -64,6 +78,36 @@ export default function OrderDetailsDialog({
   const [fetchedItems, setFetchedItems] = useState<OrderItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [fetchingItems, setFetchingItems] = useState(false);
+  
+  // Supplier/PO editing state
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [editableSupplierId, setEditableSupplierId] = useState<string>("");
+  const [editablePurchaseOrderNumber, setEditablePurchaseOrderNumber] = useState<string>("");
+
+  // Fetch suppliers when dialog opens
+  useEffect(() => {
+    const fetchSuppliers = async () => {
+      if (!open) return;
+      try {
+        const { data } = await supabase
+          .from("suppliers")
+          .select("id, name, code")
+          .order("name");
+        if (data) setSuppliers(data);
+      } catch (error) {
+        console.error("Error fetching suppliers:", error);
+      }
+    };
+    fetchSuppliers();
+  }, [open]);
+
+  // Initialize supplier/PO fields when entering edit mode
+  useEffect(() => {
+    if (isEditing) {
+      setEditableSupplierId(order.supplier_id || "");
+      setEditablePurchaseOrderNumber(order.purchase_order_number || "");
+    }
+  }, [isEditing, order.supplier_id, order.purchase_order_number]);
 
   // Parse items from description with stock status
   const parseItemsFromDescription = (description: string | null): OrderItem[] => {
@@ -252,6 +296,8 @@ export default function OrderDetailsDialog({
         .from('orders')
         .update({
           description,
+          supplier_id: editableSupplierId || null,
+          purchase_order_number: editablePurchaseOrderNumber || null,
           updated_at: new Date().toISOString()
         })
         .eq('id', order.id);
@@ -333,7 +379,44 @@ export default function OrderDetailsDialog({
           </div>
 
           {/* Supplier & Purchase Order Info */}
-          {(order.supplierName || order.purchase_order_number) && (
+          {isEditing ? (
+            <div className="p-4 bg-muted/50 rounded-lg border border-border space-y-4">
+              <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                <Truck className="h-4 w-4" />
+                <span>Link to Supplier Purchase Order (Optional)</span>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-supplier">Supplier</Label>
+                  <Select 
+                    value={editableSupplierId || "none"} 
+                    onValueChange={(val) => setEditableSupplierId(val === "none" ? "" : val)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a supplier (optional)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No supplier</SelectItem>
+                      {suppliers.map((supplier) => (
+                        <SelectItem key={supplier.id} value={supplier.id}>
+                          {supplier.name} ({supplier.code})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-po-number">Purchase Order Number</Label>
+                  <Input
+                    id="edit-po-number"
+                    value={editablePurchaseOrderNumber}
+                    onChange={(e) => setEditablePurchaseOrderNumber(e.target.value)}
+                    placeholder="e.g., PO-2024-001"
+                  />
+                </div>
+              </div>
+            </div>
+          ) : (order.supplierName || order.purchase_order_number) ? (
             <div className="p-4 bg-muted/50 rounded-lg border border-border">
               <p className="text-sm font-medium text-muted-foreground mb-2">🔗 Linked Purchase Order</p>
               <div className="grid grid-cols-2 gap-4">
@@ -351,7 +434,7 @@ export default function OrderDetailsDialog({
                 )}
               </div>
             </div>
-          )}
+          ) : null}
 
           {order.notes && (
             <div>
