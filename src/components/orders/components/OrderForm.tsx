@@ -281,12 +281,12 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="supplier">Supplier</Label>
-            <Select value={supplierId} onValueChange={setSupplierId}>
+            <Select value={supplierId} onValueChange={(val) => setSupplierId(val === "none" ? "" : val)}>
               <SelectTrigger>
                 <SelectValue placeholder="Select a supplier (optional)" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">No supplier</SelectItem>
+                <SelectItem value="none">No supplier</SelectItem>
                 {suppliers.map((supplier) => (
                   <SelectItem key={supplier.id} value={supplier.id}>
                     {supplier.name} ({supplier.code})
