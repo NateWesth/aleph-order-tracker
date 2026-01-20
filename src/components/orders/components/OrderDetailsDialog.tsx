@@ -29,6 +29,14 @@ interface Supplier {
   code: string;
 }
 
+interface PurchaseOrder {
+  id?: string;
+  supplier_id: string;
+  purchase_order_number: string;
+  notes?: string;
+  supplierName?: string;
+}
+
 interface OrderItem {
   id: string;
   name: string;
@@ -79,35 +87,59 @@ export default function OrderDetailsDialog({
   const [loading, setLoading] = useState(false);
   const [fetchingItems, setFetchingItems] = useState(false);
   
-  // Supplier/PO editing state
+  // Supplier/PO editing state - now supports multiple POs
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [editableSupplierId, setEditableSupplierId] = useState<string>("");
-  const [editablePurchaseOrderNumber, setEditablePurchaseOrderNumber] = useState<string>("");
+  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
+  const [editablePurchaseOrders, setEditablePurchaseOrders] = useState<PurchaseOrder[]>([]);
 
-  // Fetch suppliers when dialog opens
+  // Fetch suppliers and purchase orders when dialog opens
   useEffect(() => {
-    const fetchSuppliers = async () => {
-      if (!open) return;
+    const fetchData = async () => {
+      if (!open || !order?.id) return;
       try {
-        const { data } = await supabase
+        // Fetch suppliers
+        const { data: suppliersData } = await supabase
           .from("suppliers")
           .select("id, name, code")
           .order("name");
-        if (data) setSuppliers(data);
+        if (suppliersData) setSuppliers(suppliersData);
+
+        // Fetch purchase orders from junction table
+        const { data: posData } = await supabase
+          .from("order_purchase_orders")
+          .select("id, supplier_id, purchase_order_number, notes")
+          .eq("order_id", order.id);
+        
+        if (posData && posData.length > 0) {
+          // Map supplier names to POs
+          const posWithNames = posData.map(po => ({
+            ...po,
+            supplierName: suppliersData?.find(s => s.id === po.supplier_id)?.name || 'Unknown'
+          }));
+          setPurchaseOrders(posWithNames);
+        } else if (order.supplier_id && order.purchase_order_number) {
+          // Fallback to legacy single PO fields
+          setPurchaseOrders([{
+            supplier_id: order.supplier_id,
+            purchase_order_number: order.purchase_order_number,
+            supplierName: order.supplierName || 'Unknown'
+          }]);
+        } else {
+          setPurchaseOrders([]);
+        }
       } catch (error) {
-        console.error("Error fetching suppliers:", error);
+        console.error("Error fetching data:", error);
       }
     };
-    fetchSuppliers();
-  }, [open]);
+    fetchData();
+  }, [open, order?.id, order?.supplier_id, order?.purchase_order_number, order?.supplierName]);
 
-  // Initialize supplier/PO fields when entering edit mode
+  // Initialize editable POs when entering edit mode
   useEffect(() => {
     if (isEditing) {
-      setEditableSupplierId(order.supplier_id || "");
-      setEditablePurchaseOrderNumber(order.purchase_order_number || "");
+      setEditablePurchaseOrders([...purchaseOrders]);
     }
-  }, [isEditing, order.supplier_id, order.purchase_order_number]);
+  }, [isEditing, purchaseOrders]);
 
   // Parse items from description with stock status
   const parseItemsFromDescription = (description: string | null): OrderItem[] => {
@@ -264,6 +296,25 @@ export default function OrderDetailsDialog({
     );
   };
 
+  // PO management functions
+  const addPurchaseOrder = () => {
+    setEditablePurchaseOrders(prev => [...prev, {
+      supplier_id: '',
+      purchase_order_number: '',
+      notes: ''
+    }]);
+  };
+
+  const removePurchaseOrder = (index: number) => {
+    setEditablePurchaseOrders(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const updatePurchaseOrder = (index: number, field: keyof PurchaseOrder, value: string) => {
+    setEditablePurchaseOrders(prev => prev.map((po, i) => 
+      i === index ? { ...po, [field]: value } : po
+    ));
+  };
+
   const handleSave = async () => {
     const itemsToSave = isEditing ? editableItems : fetchedItems;
     const validItems = itemsToSave.filter(item => item.name.trim() !== '');
@@ -292,22 +343,52 @@ export default function OrderDetailsDialog({
         return line;
       }).join('\n');
 
-      const { error } = await supabase
+      // Update order description
+      const { error: orderError } = await supabase
         .from('orders')
         .update({
           description,
-          supplier_id: editableSupplierId || null,
-          purchase_order_number: editablePurchaseOrderNumber || null,
           updated_at: new Date().toISOString()
         })
         .eq('id', order.id);
 
-      if (error) throw error;
+      if (orderError) throw orderError;
+
+      // Handle purchase orders - delete existing and insert new
+      const validPOs = editablePurchaseOrders.filter(po => 
+        po.supplier_id && po.purchase_order_number.trim()
+      );
+
+      // Delete existing POs
+      await supabase
+        .from('order_purchase_orders')
+        .delete()
+        .eq('order_id', order.id);
+
+      // Insert new POs
+      if (validPOs.length > 0) {
+        const { error: poError } = await supabase
+          .from('order_purchase_orders')
+          .insert(validPOs.map(po => ({
+            order_id: order.id,
+            supplier_id: po.supplier_id,
+            purchase_order_number: po.purchase_order_number.trim(),
+            notes: po.notes || null
+          })));
+        
+        if (poError) throw poError;
+      }
 
       toast({
         title: "Success",
         description: "Order updated successfully.",
       });
+      
+      // Update local state
+      setPurchaseOrders(validPOs.map(po => ({
+        ...po,
+        supplierName: suppliers.find(s => s.id === po.supplier_id)?.name || 'Unknown'
+      })));
       
       setIsEditing(false);
       if (onSave) onSave();
@@ -381,57 +462,88 @@ export default function OrderDetailsDialog({
           {/* Supplier & Purchase Order Info */}
           {isEditing ? (
             <div className="p-4 bg-muted/50 rounded-lg border border-border space-y-4">
-              <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                <Truck className="h-4 w-4" />
-                <span>Link to Supplier Purchase Order (Optional)</span>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="edit-supplier">Supplier</Label>
-                  <Select 
-                    value={editableSupplierId || "none"} 
-                    onValueChange={(val) => setEditableSupplierId(val === "none" ? "" : val)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a supplier (optional)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">No supplier</SelectItem>
-                      {suppliers.map((supplier) => (
-                        <SelectItem key={supplier.id} value={supplier.id}>
-                          {supplier.name} ({supplier.code})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                  <Truck className="h-4 w-4" />
+                  <span>Linked Purchase Orders</span>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="edit-po-number">Purchase Order Number</Label>
-                  <Input
-                    id="edit-po-number"
-                    value={editablePurchaseOrderNumber}
-                    onChange={(e) => setEditablePurchaseOrderNumber(e.target.value)}
-                    placeholder="e.g., PO-2024-001"
-                  />
-                </div>
+                <Button type="button" variant="outline" size="sm" onClick={addPurchaseOrder}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add PO
+                </Button>
               </div>
+              
+              {editablePurchaseOrders.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  No purchase orders linked. Click "Add PO" to link one.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {editablePurchaseOrders.map((po, index) => (
+                    <div key={index} className="flex items-start gap-3 p-3 border rounded-lg bg-background">
+                      <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <Label className="text-xs">Supplier</Label>
+                          <Select 
+                            value={po.supplier_id || "none"} 
+                            onValueChange={(val) => updatePurchaseOrder(index, 'supplier_id', val === "none" ? "" : val)}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select supplier" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">Select a supplier</SelectItem>
+                              {suppliers.map((supplier) => (
+                                <SelectItem key={supplier.id} value={supplier.id}>
+                                  {supplier.name} ({supplier.code})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">PO Number</Label>
+                          <Input
+                            value={po.purchase_order_number}
+                            onChange={(e) => updatePurchaseOrder(index, 'purchase_order_number', e.target.value)}
+                            placeholder="e.g., PO-2024-001"
+                          />
+                        </div>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        onClick={() => removePurchaseOrder(index)}
+                        className="text-red-600 hover:text-red-700 shrink-0 mt-5"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-          ) : (order.supplierName || order.purchase_order_number) ? (
+          ) : purchaseOrders.length > 0 ? (
             <div className="p-4 bg-muted/50 rounded-lg border border-border">
-              <p className="text-sm font-medium text-muted-foreground mb-2">🔗 Linked Purchase Order</p>
-              <div className="grid grid-cols-2 gap-4">
-                {order.supplierName && (
-                  <div>
-                    <p className="text-xs text-muted-foreground">Supplier</p>
-                    <p className="font-medium">{order.supplierName}</p>
+              <p className="text-sm font-medium text-muted-foreground mb-3">
+                🔗 Linked Purchase Orders ({purchaseOrders.length})
+              </p>
+              <div className="space-y-2">
+                {purchaseOrders.map((po, index) => (
+                  <div key={index} className="flex items-center justify-between p-2 bg-background rounded border">
+                    <div className="flex items-center gap-4">
+                      <div>
+                        <p className="text-xs text-muted-foreground">Supplier</p>
+                        <p className="font-medium">{po.supplierName}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">PO Number</p>
+                        <p className="font-medium font-mono">{po.purchase_order_number}</p>
+                      </div>
+                    </div>
                   </div>
-                )}
-                {order.purchase_order_number && (
-                  <div>
-                    <p className="text-xs text-muted-foreground">PO Number</p>
-                    <p className="font-medium font-mono">{order.purchase_order_number}</p>
-                  </div>
-                )}
+                ))}
               </div>
             </div>
           ) : null}

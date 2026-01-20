@@ -43,10 +43,18 @@ interface Supplier {
   email: string | null;
 }
 
+interface OrderPurchaseOrder {
+  id: string;
+  order_id: string;
+  supplier_id: string;
+  purchase_order_number: string;
+  notes: string | null;
+}
+
 interface OrderWithPO {
   id: string;
   order_number: string;
-  purchase_order_number: string | null;
+  purchase_order_numbers: string[];
   status: string | null;
   urgency: string | null;
   created_at: string;
@@ -90,11 +98,27 @@ export default function POTrackingPage() {
       if (suppliersError) throw suppliersError;
       setSuppliers(suppliersData || []);
 
-      // Fetch all orders that have a supplier_id
+      // Fetch all order-PO relationships from the junction table
+      const { data: orderPOsData, error: orderPOsError } = await supabase
+        .from("order_purchase_orders")
+        .select("id, order_id, supplier_id, purchase_order_number, notes");
+
+      if (orderPOsError) throw orderPOsError;
+
+      // Get unique order IDs that have PO relationships
+      const orderIds = [...new Set(orderPOsData?.map(po => po.order_id) || [])];
+
+      if (orderIds.length === 0) {
+        setOrders([]);
+        setLoading(false);
+        return;
+      }
+
+      // Fetch orders that have PO relationships
       const { data: ordersData, error: ordersError } = await supabase
         .from("orders")
-        .select("id, order_number, purchase_order_number, status, urgency, created_at, company_id, supplier_id, description")
-        .not("supplier_id", "is", null)
+        .select("id, order_number, status, urgency, created_at, company_id, description")
+        .in("id", orderIds)
         .order("created_at", { ascending: false });
 
       if (ordersError) throw ordersError;
@@ -111,16 +135,40 @@ export default function POTrackingPage() {
         companyMap = new Map(companiesData?.map(c => [c.id, c.name]) || []);
       }
 
-      // Transform orders with company names
-      const ordersWithCompany: OrderWithPO[] = (ordersData || []).map(order => ({
-        ...order,
-        companyName: order.company_id ? companyMap.get(order.company_id) || "Unknown" : "No Client"
-      }));
+      // Group POs by supplier and order
+      const posBySupplierAndOrder = new Map<string, Map<string, OrderPurchaseOrder[]>>();
+      orderPOsData?.forEach(po => {
+        if (!posBySupplierAndOrder.has(po.supplier_id)) {
+          posBySupplierAndOrder.set(po.supplier_id, new Map());
+        }
+        const supplierPOs = posBySupplierAndOrder.get(po.supplier_id)!;
+        if (!supplierPOs.has(po.order_id)) {
+          supplierPOs.set(po.order_id, []);
+        }
+        supplierPOs.get(po.order_id)!.push(po);
+      });
 
-      setOrders(ordersWithCompany);
+      // Build orders grouped by supplier
+      const ordersWithPOs: OrderWithPO[] = [];
+      
+      posBySupplierAndOrder.forEach((orderMap, supplierId) => {
+        orderMap.forEach((pos, orderId) => {
+          const order = ordersData?.find(o => o.id === orderId);
+          if (order) {
+            ordersWithPOs.push({
+              ...order,
+              supplier_id: supplierId,
+              purchase_order_numbers: pos.map(p => p.purchase_order_number),
+              companyName: order.company_id ? companyMap.get(order.company_id) || "Unknown" : "No Client"
+            });
+          }
+        });
+      });
+
+      setOrders(ordersWithPOs);
 
       // Auto-open suppliers that have orders
-      const suppliersWithOrders = new Set(ordersData?.map(o => o.supplier_id).filter(Boolean));
+      const suppliersWithOrders = new Set(ordersWithPOs.map(o => o.supplier_id).filter(Boolean));
       setOpenSuppliers(suppliersWithOrders as Set<string>);
 
     } catch (error: any) {
@@ -173,7 +221,7 @@ export default function POTrackingPage() {
       const searchLower = searchTerm.toLowerCase();
       return (
         order.order_number.toLowerCase().includes(searchLower) ||
-        order.purchase_order_number?.toLowerCase().includes(searchLower) ||
+        order.purchase_order_numbers?.some(po => po.toLowerCase().includes(searchLower)) ||
         order.companyName.toLowerCase().includes(searchLower)
       );
     });
@@ -231,7 +279,7 @@ export default function POTrackingPage() {
       created_at: order.created_at,
       companyName: order.companyName,
       supplier_id: order.supplier_id,
-      purchase_order_number: order.purchase_order_number,
+      purchase_order_number: order.purchase_order_numbers?.[0] || null,
       supplierName: supplierName
     };
     setSelectedOrder(orderForDialog);
@@ -359,9 +407,9 @@ export default function POTrackingPage() {
                                 </p>
                               </div>
                               <div>
-                                <p className="text-xs text-muted-foreground">PO Number</p>
+                                <p className="text-xs text-muted-foreground">PO Number(s)</p>
                                 <p className="font-mono text-xs">
-                                  {order.purchase_order_number || '-'}
+                                  {order.purchase_order_numbers?.join(', ') || '-'}
                                 </p>
                               </div>
                             </div>
@@ -381,7 +429,7 @@ export default function POTrackingPage() {
                         <TableHeader>
                           <TableRow>
                             <TableHead>Order #</TableHead>
-                            <TableHead>PO Number</TableHead>
+                            <TableHead>PO Number(s)</TableHead>
                             <TableHead>Client</TableHead>
                             <TableHead>Status</TableHead>
                             <TableHead>Urgency</TableHead>
@@ -399,7 +447,7 @@ export default function POTrackingPage() {
                                 {order.order_number}
                               </TableCell>
                               <TableCell className="font-mono text-sm">
-                                {order.purchase_order_number || '-'}
+                                {order.purchase_order_numbers?.join(', ') || '-'}
                               </TableCell>
                               <TableCell>
                                 <div className="flex items-center gap-1.5">
