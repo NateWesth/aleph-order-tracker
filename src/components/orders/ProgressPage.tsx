@@ -6,8 +6,9 @@ import { Progress } from "@/components/ui/progress";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
-import { Trash2, Eye, ChevronDown, ChevronRight, FileText } from "lucide-react";
+import { Trash2, Eye, ChevronDown, ChevronRight, FileText, LayoutList, Kanban } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserData } from "@/hooks/useUserData";
@@ -16,6 +17,7 @@ import ProgressOrderDetailsDialog from "./components/ProgressOrderDetailsDialog"
 import ProcessingOrderFilesDialog from "./components/ProcessingOrderFilesDialog";
 import OrderExportActions from "./components/OrderExportActions";
 import { sendOrderNotification } from "@/utils/emailNotifications";
+import ItemProgressBoard from "./ItemProgressBoard";
 
 // Define the order item interface
 interface OrderItem {
@@ -714,10 +716,27 @@ export default function ProgressPage({
         </div>
       </div>
 
-      <div className="bg-card rounded-lg shadow w-full max-w-full overflow-x-hidden">
-        <div className="p-2 md:p-4 border-b border-border">
-          <h2 className="text-base md:text-lg font-semibold text-card-foreground">Orders In Progress</h2>
-        </div>
+      <Tabs defaultValue="items" className="w-full">
+        <TabsList className="mb-4">
+          <TabsTrigger value="items" className="gap-2">
+            <Kanban className="h-4 w-4" />
+            <span className="hidden sm:inline">Item Board</span>
+          </TabsTrigger>
+          <TabsTrigger value="orders" className="gap-2">
+            <LayoutList className="h-4 w-4" />
+            <span className="hidden sm:inline">Order View</span>
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="items">
+          <ItemProgressBoard isAdmin={isAdmin} />
+        </TabsContent>
+
+        <TabsContent value="orders">
+          <div className="bg-card rounded-lg shadow w-full max-w-full overflow-x-hidden">
+            <div className="p-2 md:p-4 border-b border-border">
+              <h2 className="text-base md:text-lg font-semibold text-card-foreground">Orders In Progress</h2>
+            </div>
         
         {orders.length === 0 ? <div className="p-4 text-center text-muted-foreground text-sm md:text-base">
             No orders in progress. Orders marked as "received" should appear here automatically.
@@ -859,7 +878,9 @@ export default function ProgressPage({
                 </div>;
         })}
           </div>}
-      </div>
+          </div>
+        </TabsContent>
+      </Tabs>
 
       <ProgressOrderDetailsDialog order={selectedOrder} isOpen={!!selectedOrder} onClose={closeOrderDetails} isAdmin={isAdmin} />
       
