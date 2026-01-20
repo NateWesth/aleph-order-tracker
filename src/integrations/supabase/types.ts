@@ -244,8 +244,10 @@ export type Database = {
           notes: string | null
           order_number: string
           progress_stage: string | null
+          purchase_order_number: string | null
           reference: string | null
           status: string | null
+          supplier_id: string | null
           total_amount: number | null
           updated_at: string | null
           urgency: string | null
@@ -260,8 +262,10 @@ export type Database = {
           notes?: string | null
           order_number: string
           progress_stage?: string | null
+          purchase_order_number?: string | null
           reference?: string | null
           status?: string | null
+          supplier_id?: string | null
           total_amount?: number | null
           updated_at?: string | null
           urgency?: string | null
@@ -276,8 +280,10 @@ export type Database = {
           notes?: string | null
           order_number?: string
           progress_stage?: string | null
+          purchase_order_number?: string | null
           reference?: string | null
           status?: string | null
+          supplier_id?: string | null
           total_amount?: number | null
           updated_at?: string | null
           urgency?: string | null
@@ -289,6 +295,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
             referencedColumns: ["id"]
           },
         ]
@@ -367,6 +380,45 @@ export type Database = {
           p256dh?: string
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      suppliers: {
+        Row: {
+          address: string | null
+          code: string
+          contact_person: string | null
+          created_at: string
+          email: string | null
+          id: string
+          name: string
+          notes: string | null
+          phone: string | null
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          code: string
+          contact_person?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          phone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          code?: string
+          contact_person?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          updated_at?: string
         }
         Relationships: []
       }

@@ -89,7 +89,7 @@ export default function CompletedPage({
       
       let query = supabase
         .from('orders')
-        .select(`*, companies (id, name, code)`)
+        .select(`*, companies (id, name, code), suppliers (id, name)`)
         .eq('status', 'delivered')
         .order('completed_date', { ascending: false });
 
@@ -121,7 +121,10 @@ export default function CompletedPage({
         user_id: order.user_id,
         completed_date: order.completed_date,
         progress_stage: order.progress_stage,
-        updated_at: order.updated_at
+        updated_at: order.updated_at,
+        supplier_id: order.supplier_id,
+        purchase_order_number: order.purchase_order_number,
+        supplierName: order.suppliers?.name || null
       }));
       
       setOrders(transformedOrders);

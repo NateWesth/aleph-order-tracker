@@ -332,6 +332,27 @@ export default function OrderDetailsDialog({
             </div>
           </div>
 
+          {/* Supplier & Purchase Order Info */}
+          {(order.supplierName || order.purchase_order_number) && (
+            <div className="p-4 bg-muted/50 rounded-lg border border-border">
+              <p className="text-sm font-medium text-muted-foreground mb-2">🔗 Linked Purchase Order</p>
+              <div className="grid grid-cols-2 gap-4">
+                {order.supplierName && (
+                  <div>
+                    <p className="text-xs text-muted-foreground">Supplier</p>
+                    <p className="font-medium">{order.supplierName}</p>
+                  </div>
+                )}
+                {order.purchase_order_number && (
+                  <div>
+                    <p className="text-xs text-muted-foreground">PO Number</p>
+                    <p className="font-medium font-mono">{order.purchase_order_number}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {order.notes && (
             <div>
               <p className="text-sm text-muted-foreground mb-2">Order Notes</p>
