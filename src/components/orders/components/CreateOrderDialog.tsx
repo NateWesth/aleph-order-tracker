@@ -38,8 +38,7 @@ export default function CreateOrderDialog({
     urgency: string;
     notes?: string;
     items: any[];
-    supplierId?: string;
-    purchaseOrderNumber?: string;
+    purchaseOrders: Array<{ id: string; supplierId: string; purchaseOrderNumber: string }>;
   }) => {
     if (!user?.id) {
       console.error("❌ CreateOrderDialog: No user ID available");
@@ -70,7 +69,7 @@ export default function CreateOrderDialog({
       }).join('\n');
       console.log("📝 CreateOrderDialog: Generated description with notes:", itemsDescription);
 
-      // Prepare order data for database insertion - NOW INCLUDING urgency, reference, supplier and PO fields
+      // Prepare order data for database insertion
       const orderInsertData = {
         order_number: orderData.orderNumber,
         reference: orderData.reference || null,
@@ -81,8 +80,6 @@ export default function CreateOrderDialog({
         user_id: user.id,
         status: 'pending',
         urgency: orderData.urgency,
-        supplier_id: orderData.supplierId || null,
-        purchase_order_number: orderData.purchaseOrderNumber || null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
@@ -125,7 +122,28 @@ export default function CreateOrderDialog({
       console.log("🔍 CreateOrderDialog: Created order company_id:", createdOrder.company_id);
       console.log("🔍 CreateOrderDialog: Created order user_id:", createdOrder.user_id);
       console.log("🎯 CreateOrderDialog: Created order urgency:", createdOrder.urgency);
-      console.log("📝 CreateOrderDialog: Created order description with notes:", createdOrder.description);
+
+      // Insert purchase orders into the junction table
+      if (orderData.purchaseOrders && orderData.purchaseOrders.length > 0) {
+        console.log("📦 CreateOrderDialog: Inserting purchase orders:", orderData.purchaseOrders);
+        
+        const poInsertData = orderData.purchaseOrders.map(po => ({
+          order_id: createdOrder.id,
+          supplier_id: po.supplierId,
+          purchase_order_number: po.purchaseOrderNumber,
+        }));
+
+        const { error: poError } = await supabase
+          .from('order_purchase_orders')
+          .insert(poInsertData);
+
+        if (poError) {
+          console.error("❌ CreateOrderDialog: Failed to insert purchase orders:", poError);
+          // Don't fail the order creation, just log the error
+        } else {
+          console.log("✅ CreateOrderDialog: Purchase orders inserted successfully");
+        }
+      }
 
       // Verify the order was saved with correct data
       const {
@@ -138,7 +156,6 @@ export default function CreateOrderDialog({
         console.log("✅ CreateOrderDialog: Order verification successful:", verificationOrder);
         console.log("🏢 CreateOrderDialog: Verified company_id in database:", verificationOrder.company_id);
         console.log("🎯 CreateOrderDialog: Verified urgency in database:", verificationOrder.urgency);
-        console.log("📝 CreateOrderDialog: Verified description in database:", verificationOrder.description);
       }
 
       // Send email notification for new order

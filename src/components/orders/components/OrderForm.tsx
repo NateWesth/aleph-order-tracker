@@ -45,6 +45,12 @@ interface Supplier {
   code: string;
 }
 
+interface PurchaseOrderEntry {
+  id: string;
+  supplierId: string;
+  purchaseOrderNumber: string;
+}
+
 interface OrderFormProps {
   onSubmit: (orderData: {
     orderNumber: string;
@@ -52,8 +58,7 @@ interface OrderFormProps {
     totalAmount: number;
     urgency: string;
     items: OrderItem[];
-    supplierId?: string;
-    purchaseOrderNumber?: string;
+    purchaseOrders: PurchaseOrderEntry[];
   }) => void;
   loading?: boolean;
 }
@@ -62,8 +67,7 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
   const [orderNumber, setOrderNumber] = useState("");
   const [companyId, setCompanyId] = useState("");
   const [urgency, setUrgency] = useState("normal");
-  const [supplierId, setSupplierId] = useState("");
-  const [purchaseOrderNumber, setPurchaseOrderNumber] = useState("");
+  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrderEntry[]>([]);
   const [items, setItems] = useState<OrderItem[]>([
     { id: crypto.randomUUID(), name: "", code: "", quantity: 1 },
   ]);
@@ -190,6 +194,26 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
     setSearchQueries(prev => ({ ...prev, [itemId]: value }));
   };
 
+  // Purchase order management
+  const addPurchaseOrder = () => {
+    setPurchaseOrders([
+      ...purchaseOrders,
+      { id: crypto.randomUUID(), supplierId: "", purchaseOrderNumber: "" },
+    ]);
+  };
+
+  const removePurchaseOrder = (id: string) => {
+    setPurchaseOrders(purchaseOrders.filter((po) => po.id !== id));
+  };
+
+  const updatePurchaseOrder = (id: string, field: keyof PurchaseOrderEntry, value: string) => {
+    setPurchaseOrders(
+      purchaseOrders.map((po) =>
+        po.id === id ? { ...po, [field]: value } : po
+      )
+    );
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -205,14 +229,18 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
       return;
     }
 
+    // Filter valid purchase orders (both supplier and PO number required)
+    const validPurchaseOrders = purchaseOrders.filter(
+      (po) => po.supplierId && po.purchaseOrderNumber.trim()
+    );
+
     onSubmit({
       orderNumber: orderNumber || generateOrderNumber(),
       companyId,
       totalAmount: 0,
       urgency,
       items: validItems,
-      supplierId: supplierId || undefined,
-      purchaseOrderNumber: purchaseOrderNumber || undefined,
+      purchaseOrders: validPurchaseOrders,
     });
   };
 
@@ -273,38 +301,73 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
         </Select>
       </div>
 
-      {/* Supplier & Purchase Order (Optional) */}
+      {/* Supplier Purchase Orders (Optional) */}
       <div className="p-4 bg-muted/50 rounded-lg border border-border space-y-4">
-        <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-          <span>🔗 Link to Supplier Purchase Order (Optional)</span>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="supplier">Supplier</Label>
-            <Select value={supplierId} onValueChange={(val) => setSupplierId(val === "none" ? "" : val)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select a supplier (optional)" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">No supplier</SelectItem>
-                {suppliers.map((supplier) => (
-                  <SelectItem key={supplier.id} value={supplier.id}>
-                    {supplier.name} ({supplier.code})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+            <span>🔗 Link to Supplier Purchase Orders (Optional)</span>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="purchaseOrderNumber">Purchase Order Number</Label>
-            <Input
-              id="purchaseOrderNumber"
-              value={purchaseOrderNumber}
-              onChange={(e) => setPurchaseOrderNumber(e.target.value)}
-              placeholder="e.g., PO-2024-001"
-            />
-          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={addPurchaseOrder}
+          >
+            <Plus className="h-4 w-4 mr-1" />
+            Add PO
+          </Button>
         </div>
+        
+        {purchaseOrders.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-2">
+            No purchase orders linked. Click "Add PO" to link supplier purchase orders.
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {purchaseOrders.map((po, index) => (
+              <div key={po.id} className="flex items-end gap-2 p-3 bg-background rounded-lg border">
+                <span className="text-sm text-muted-foreground pb-2">
+                  {index + 1}.
+                </span>
+                <div className="flex-1 space-y-2">
+                  <Label className="text-xs">Supplier</Label>
+                  <Select 
+                    value={po.supplierId} 
+                    onValueChange={(val) => updatePurchaseOrder(po.id, "supplierId", val)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select supplier" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {suppliers.map((supplier) => (
+                        <SelectItem key={supplier.id} value={supplier.id}>
+                          {supplier.name} ({supplier.code})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex-1 space-y-2">
+                  <Label className="text-xs">PO Number</Label>
+                  <Input
+                    value={po.purchaseOrderNumber}
+                    onChange={(e) => updatePurchaseOrder(po.id, "purchaseOrderNumber", e.target.value)}
+                    placeholder="e.g., PO-2024-001"
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => removePurchaseOrder(po.id)}
+                  className="shrink-0"
+                >
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Note */}
