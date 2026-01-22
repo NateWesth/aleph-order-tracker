@@ -2,13 +2,13 @@
 import { TableCell, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Eye, MoreHorizontal, Clock, ShoppingCart, Package } from "lucide-react";
+import { Eye, MoreHorizontal, Clock, ShoppingCart, Package, Truck } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import OrderExportActions from "./OrderExportActions";
 import { OrderUpdatesButton } from "./OrderUpdatesButton";
 import { useState } from "react";
 import OrderDetailsDialog from "./OrderDetailsDialog";
-import { OrderWithCompany } from "../types/orderTypes";
+import { OrderWithCompany, PurchaseOrderInfo } from "../types/orderTypes";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -113,6 +113,34 @@ const StockStatusIndicator = ({ counts }: { counts: StockStatusCounts }) => {
   );
 };
 
+// Purchase Orders indicator component
+const PurchaseOrdersIndicator = ({ purchaseOrders }: { purchaseOrders?: PurchaseOrderInfo[] }) => {
+  if (!purchaseOrders || purchaseOrders.length === 0) return null;
+
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 text-xs font-medium cursor-help">
+            <Truck className="h-3 w-3" />
+            <span>{purchaseOrders.length}</span>
+          </div>
+        </TooltipTrigger>
+        <TooltipContent className="max-w-xs">
+          <div className="space-y-1">
+            <p className="font-medium text-xs">Linked Purchase Orders:</p>
+            {purchaseOrders.map((po, idx) => (
+              <p key={idx} className="text-xs">
+                {po.supplierName}: <span className="font-mono">{po.purchase_order_number}</span>
+              </p>
+            ))}
+          </div>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+};
+
 export default function OrderRow({ 
   order, 
   isAdmin,
@@ -178,11 +206,23 @@ export default function OrderRow({
                   <div className="text-xs text-muted-foreground truncate">{order.reference}</div>
                 )}
               </div>
-              <div className="ml-2 flex-shrink-0 flex items-center gap-2">
+              <div className="ml-2 flex-shrink-0 flex items-center gap-1">
+                <PurchaseOrdersIndicator purchaseOrders={order.purchaseOrders} />
                 <StockStatusIndicator counts={stockCounts} />
                 {getStatusBadge(order.status)}
               </div>
             </div>
+
+            {/* Purchase Orders display */}
+            {order.purchaseOrders && order.purchaseOrders.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {order.purchaseOrders.map((po, idx) => (
+                  <Badge key={idx} variant="outline" className="text-[10px] px-1 py-0">
+                    {po.supplierName}: {po.purchase_order_number}
+                  </Badge>
+                ))}
+              </div>
+            )}
             
             {/* Company and date */}
             <div className="flex justify-between items-center text-xs text-muted-foreground">
@@ -281,9 +321,24 @@ export default function OrderRow({
         </TableCell>
         <TableCell className={`text-sm ${compact ? 'py-2' : ''}`}>{order.companyName || 'No Company'}</TableCell>
         <TableCell className={compact ? 'py-2' : ''}>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             {getStatusBadge(order.status)}
             <StockStatusIndicator counts={stockCounts} />
+            <PurchaseOrdersIndicator purchaseOrders={order.purchaseOrders} />
+            {order.purchaseOrders && order.purchaseOrders.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {order.purchaseOrders.slice(0, 2).map((po, idx) => (
+                  <Badge key={idx} variant="outline" className="text-[10px] px-1.5 py-0 font-normal">
+                    {po.supplierName}: {po.purchase_order_number}
+                  </Badge>
+                ))}
+                {order.purchaseOrders.length > 2 && (
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-normal">
+                    +{order.purchaseOrders.length - 2} more
+                  </Badge>
+                )}
+              </div>
+            )}
           </div>
         </TableCell>
         <TableCell className={`text-sm ${compact ? 'py-2' : ''}`}>{new Date(order.created_at).toLocaleDateString()}</TableCell>

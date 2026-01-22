@@ -1,4 +1,11 @@
 
+export interface PurchaseOrderInfo {
+  id: string;
+  supplier_id: string;
+  purchase_order_number: string;
+  supplierName?: string;
+}
+
 export interface OrderWithCompany {
   id: string;
   order_number: string;
@@ -19,4 +26,5 @@ export interface OrderWithCompany {
   supplier_id?: string | null;
   purchase_order_number?: string | null;
   supplierName?: string | null;
+  purchaseOrders?: PurchaseOrderInfo[];
 }
