@@ -39,6 +39,13 @@ interface OrderItem {
   stock_status: string;
 }
 
+interface PurchaseOrderInfo {
+  id: string;
+  supplier_id: string;
+  purchase_order_number: string;
+  supplierName?: string;
+}
+
 interface Order {
   id: string;
   order_number: string;
@@ -49,6 +56,7 @@ interface Order {
   created_at: string | null;
   companyName?: string;
   items?: OrderItem[];
+  purchaseOrders?: PurchaseOrderInfo[];
 }
 
 // Default status column configurations
@@ -159,23 +167,13 @@ export default function OrdersPage({
         companyMap = new Map(companiesData?.map((c) => [c.id, c.name]) || []);
       }
 
-      // Fetch supplier names
-      const supplierIds = [...new Set(data?.map((o) => o.supplier_id).filter(Boolean))];
-      let supplierMap = new Map<string, string>();
-
-      if (supplierIds.length > 0) {
-        const { data: suppliersData } = await supabase
-          .from("suppliers")
-          .select("id, name")
-          .in("id", supplierIds);
-        supplierMap = new Map(suppliersData?.map((s) => [s.id, s.name]) || []);
-      }
-
       // Fetch order items for all orders
       const orderIds = data?.map((o) => o.id) || [];
       let orderItemsMap = new Map<string, OrderItem[]>();
+      let orderPOsMap = new Map<string, PurchaseOrderInfo[]>();
 
       if (orderIds.length > 0) {
+        // Fetch order items
         const { data: itemsData } = await supabase
           .from("order_items")
           .select("id, order_id, name, code, quantity, stock_status")
@@ -194,6 +192,37 @@ export default function OrdersPage({
             orderItemsMap.set(item.order_id, existing);
           });
         }
+
+        // Fetch purchase orders from junction table
+        const { data: posData } = await supabase
+          .from("order_purchase_orders")
+          .select("id, order_id, supplier_id, purchase_order_number")
+          .in("order_id", orderIds);
+
+        if (posData && posData.length > 0) {
+          // Get unique supplier IDs from POs
+          const poSupplierIds = [...new Set(posData.map(po => po.supplier_id))];
+          let supplierMap = new Map<string, string>();
+          
+          if (poSupplierIds.length > 0) {
+            const { data: suppliersData } = await supabase
+              .from("suppliers")
+              .select("id, name")
+              .in("id", poSupplierIds);
+            supplierMap = new Map(suppliersData?.map((s) => [s.id, s.name]) || []);
+          }
+
+          posData.forEach((po) => {
+            const existing = orderPOsMap.get(po.order_id) || [];
+            existing.push({
+              id: po.id,
+              supplier_id: po.supplier_id,
+              purchase_order_number: po.purchase_order_number,
+              supplierName: supplierMap.get(po.supplier_id) || 'Unknown',
+            });
+            orderPOsMap.set(po.order_id, existing);
+          });
+        }
       }
 
       const ordersWithData = (data || []).map((order) => ({
@@ -201,13 +230,9 @@ export default function OrdersPage({
         companyName: order.company_id
           ? companyMap.get(order.company_id) || "Unknown"
           : "No Client",
-        supplierName: order.supplier_id
-          ? supplierMap.get(order.supplier_id) || null
-          : null,
         items: orderItemsMap.get(order.id) || [],
+        purchaseOrders: orderPOsMap.get(order.id) || [],
       }));
-
-      setOrders(ordersWithData);
 
       setOrders(ordersWithData);
     } catch (error) {
