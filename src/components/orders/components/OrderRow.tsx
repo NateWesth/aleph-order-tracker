@@ -8,6 +8,7 @@ import OrderExportActions from "./OrderExportActions";
 import { OrderUpdatesButton } from "./OrderUpdatesButton";
 import { useState } from "react";
 import OrderDetailsDialog from "./OrderDetailsDialog";
+import ManagePOsDialog from "./ManagePOsDialog";
 import { OrderWithCompany, PurchaseOrderInfo } from "../types/orderTypes";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -150,6 +151,7 @@ export default function OrderRow({
   compact = false
 }: OrderRowProps) {
   const [showDetails, setShowDetails] = useState(false);
+  const [showManagePOs, setShowManagePOs] = useState(false);
   const isMobile = useIsMobile();
   const stockCounts = parseStockStatusCounts(order.description);
 
@@ -254,6 +256,18 @@ export default function OrderRow({
                       variant="ghost"
                     />
                   </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowManagePOs(true);
+                    }}
+                    className="h-8 text-xs"
+                  >
+                    <Truck className="h-3 w-3 mr-1" />
+                    POs
+                  </Button>
                 </div>
                 {isAdmin && (
                   <DropdownMenu>
@@ -355,6 +369,17 @@ export default function OrderRow({
               <Eye className="h-4 w-4" />
               <span className="ml-1">View</span>
             </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowManagePOs(true);
+              }}
+            >
+              <Truck className="h-4 w-4" />
+              <span className="ml-1">POs</span>
+            </Button>
             <div onClick={(e) => e.stopPropagation()}>
               <OrderUpdatesButton
                 orderId={order.id}
@@ -403,6 +428,13 @@ export default function OrderRow({
         onOpenChange={setShowDetails}
         order={order}
         isAdmin={isAdmin}
+      />
+
+      <ManagePOsDialog
+        open={showManagePOs}
+        onOpenChange={setShowManagePOs}
+        orderId={order.id}
+        orderNumber={order.order_number}
       />
     </>
   );
