@@ -322,38 +322,66 @@ export default function ProgressPage({
   const updateItemProgressStage = async (orderId: string, itemName: string, newStage: string) => {
     try {
       console.log(`Updating item progress stage: Order ${orderId}, Item "${itemName}" -> ${newStage}`);
-      
-      // Find the item in order_items by order_id and name
-      const { data: items, error: fetchError } = await supabase
+
+      // Important: item names coming from the order "description" may have subtle whitespace/case differences
+      // compared to the canonical `order_items.name`. We try a strict match first, then a fallback match.
+      const trimmedName = (itemName || "").trim();
+
+      const strictMatch = await supabase
         .from('order_items')
         .select('id')
         .eq('order_id', orderId)
-        .eq('name', itemName)
-        .limit(1);
+        .eq('name', trimmedName);
 
-      if (fetchError) throw fetchError;
+      if (strictMatch.error) throw strictMatch.error;
 
-      if (items && items.length > 0) {
-        const { error: updateError } = await supabase
+      let itemIds = (strictMatch.data || []).map(i => i.id);
+
+      if (itemIds.length === 0) {
+        const fallbackMatch = await supabase
           .from('order_items')
-          .update({ 
-            progress_stage: newStage,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', items[0].id);
+          .select('id')
+          .eq('order_id', orderId)
+          .ilike('name', trimmedName);
 
-        if (updateError) throw updateError;
-
-        console.log(`Successfully moved item "${itemName}" to ${newStage}`);
-        toast({
-          title: "Item Moved",
-          description: `"${itemName}" moved to ${newStage.replace('-', ' ')}`,
-        });
-      } else {
-        console.log(`Item "${itemName}" not found in order_items table, may be legacy order`);
+        if (fallbackMatch.error) throw fallbackMatch.error;
+        itemIds = (fallbackMatch.data || []).map(i => i.id);
       }
+
+      if (itemIds.length === 0) {
+        console.log(`Item "${itemName}" not found in order_items table (order_id=${orderId}).`);
+        toast({
+          title: "Item Not Found",
+          description: `Couldn't find "${itemName}" in the item table for this order, so it couldn't be moved.`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Update ALL matching rows (covers duplicates / formatting differences)
+      const { error: updateError } = await supabase
+        .from('order_items')
+        .update({
+          progress_stage: newStage,
+          updated_at: new Date().toISOString(),
+        })
+        .in('id', itemIds);
+
+      if (updateError) throw updateError;
+
+      console.log(`Successfully moved item "${itemName}" to ${newStage} (rows=${itemIds.length})`);
+      toast({
+        title: "Item Moved",
+        description: `"${itemName}" moved to ${newStage.replace('-', ' ')}`,
+      });
     } catch (error) {
       console.error('Error updating item progress stage:', error);
+      const message = error instanceof Error ? error.message : String(error);
+      toast({
+        title: "Couldn't Move Item",
+        description: message,
+        variant: "destructive",
+      });
     }
   };
 
