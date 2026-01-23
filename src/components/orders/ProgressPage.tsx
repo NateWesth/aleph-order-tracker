@@ -278,6 +278,7 @@ export default function ProgressPage({
   };
 
   // Update delivery quantity for an item with database persistence
+  // When quantity delivered matches quantity ordered, move item to 'in-stock' stage
   const updateDeliveryQuantity = async (orderId: string, itemName: string, delivered: number) => {
     console.log(`Updating delivery quantity: Order ${orderId}, Item "${itemName}", Delivered: ${delivered}`);
     
@@ -306,6 +307,54 @@ export default function ProgressPage({
     // Save to database for all authenticated users
     console.log('Saving to database...');
     await saveDeliveryQuantitiesToDatabase(orderId, itemName, delivered);
+
+    // Find the order and item to check if delivery is complete
+    const order = orders.find(o => o.id === orderId);
+    const item = order?.items.find(i => i.name === itemName);
+    
+    if (item && delivered >= item.quantity) {
+      // Item is fully delivered - update its progress_stage to 'in-stock' in order_items table
+      await updateItemProgressStage(orderId, itemName, 'in-stock');
+    }
+  };
+
+  // Update an individual item's progress_stage in the order_items table
+  const updateItemProgressStage = async (orderId: string, itemName: string, newStage: string) => {
+    try {
+      console.log(`Updating item progress stage: Order ${orderId}, Item "${itemName}" -> ${newStage}`);
+      
+      // Find the item in order_items by order_id and name
+      const { data: items, error: fetchError } = await supabase
+        .from('order_items')
+        .select('id')
+        .eq('order_id', orderId)
+        .eq('name', itemName)
+        .limit(1);
+
+      if (fetchError) throw fetchError;
+
+      if (items && items.length > 0) {
+        const { error: updateError } = await supabase
+          .from('order_items')
+          .update({ 
+            progress_stage: newStage,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', items[0].id);
+
+        if (updateError) throw updateError;
+
+        console.log(`Successfully moved item "${itemName}" to ${newStage}`);
+        toast({
+          title: "Item Moved",
+          description: `"${itemName}" moved to ${newStage.replace('-', ' ')}`,
+        });
+      } else {
+        console.log(`Item "${itemName}" not found in order_items table, may be legacy order`);
+      }
+    } catch (error) {
+      console.error('Error updating item progress stage:', error);
+    }
   };
 
   // Parse delivery quantities from order description
@@ -823,14 +872,15 @@ export default function ProgressPage({
                     </div>
                   </div>
 
-                  {isExpanded && <div className="mt-4 border-t border-border pt-4">
+                  {isExpanded && <div className="mt-4 border-t border-border pt-4 overflow-x-auto">
                       <Table>
                         <TableHeader>
                           <TableRow>
                             <TableHead className="text-card-foreground">Item</TableHead>
-                            <TableHead className="text-card-foreground">Quantity Ordered</TableHead>
-                            <TableHead className="text-card-foreground">Quantity Delivered</TableHead>
+                            <TableHead className="text-card-foreground">Qty Ordered</TableHead>
+                            <TableHead className="text-card-foreground">Qty Delivered</TableHead>
                             <TableHead className="text-card-foreground">Status</TableHead>
+                            <TableHead className="text-card-foreground">Actions</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -860,15 +910,35 @@ export default function ProgressPage({
                                          const currentValue = parseInt(e.target.value) || 0;
                                          saveDeliveryQuantitiesToDatabase(order.id, item.name, currentValue);
                                        }} 
-                                       className="w-20 px-2 py-1 border border-border rounded text-sm bg-background text-foreground" 
+                                       className="w-16 md:w-20 px-2 py-1 border border-border rounded text-sm bg-background text-foreground" 
                                      />
                                    </TableCell>
                                   <TableCell>
-                                    {isCompleted ? <Badge variant="outline" className="bg-green-100 text-green-800">
+                                    {isCompleted ? <Badge variant="secondary" className="bg-primary/10 text-primary">
                                         Complete
                                       </Badge> : <Badge variant="outline">
                                         Pending
                                       </Badge>}
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="flex flex-wrap gap-1">
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-7 text-xs"
+                                        onClick={() => updateItemProgressStage(order.id, item.name, 'in-stock')}
+                                      >
+                                        In Stock
+                                      </Button>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-7 text-xs"
+                                        onClick={() => updateItemProgressStage(order.id, item.name, 'packing')}
+                                      >
+                                        Packing
+                                      </Button>
+                                    </div>
                                   </TableCell>
                                 </TableRow>;
                   })}

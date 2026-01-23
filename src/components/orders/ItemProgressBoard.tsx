@@ -18,8 +18,10 @@ import {
   useDroppable,
   DragStartEvent,
   DragEndEvent,
-  closestCenter,
+  closestCorners,
   PointerSensor,
+  TouchSensor,
+  KeyboardSensor,
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
@@ -153,8 +155,8 @@ function DroppableColumn({
   return (
     <div 
       ref={setNodeRef}
-      className={`flex-1 transition-colors rounded-lg ${
-        isOver ? 'bg-primary/10 ring-2 ring-primary/50' : ''
+      className={`flex-1 min-h-full transition-all duration-200 rounded-lg ${
+        isOver ? 'bg-primary/10 ring-2 ring-primary ring-offset-2' : ''
       }`}
     >
       {children}
@@ -179,9 +181,16 @@ export default function ItemProgressBoard({ isAdmin }: ItemProgressBoardProps) {
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 8,
+        distance: 5,
       },
-    })
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 200,
+        tolerance: 5,
+      },
+    }),
+    useSensor(KeyboardSensor)
   );
 
   // Fetch orders with their items
@@ -416,7 +425,7 @@ export default function ItemProgressBoard({ isAdmin }: ItemProgressBoardProps) {
   return (
     <DndContext
       sensors={sensors}
-      collisionDetection={closestCenter}
+      collisionDetection={closestCorners}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
