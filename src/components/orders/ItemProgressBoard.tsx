@@ -84,26 +84,22 @@ function DraggableItem({
 
   const style = transform ? {
     transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+    zIndex: 1000,
   } : undefined;
 
   return (
     <div
       ref={setNodeRef}
       style={style}
-      className={`p-2 bg-muted/50 rounded text-xs space-y-1 transition-opacity ${
-        isDragging ? 'opacity-50' : ''
+      {...attributes}
+      {...listeners}
+      className={`p-2 bg-muted/50 rounded text-xs space-y-1 cursor-grab active:cursor-grabbing hover:bg-muted hover:ring-2 hover:ring-primary/30 transition-all touch-none ${
+        isDragging ? 'opacity-50 ring-2 ring-primary' : ''
       } ${isUpdating ? 'opacity-50 pointer-events-none' : ''}`}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-1.5 min-w-0">
-          <button
-            {...attributes}
-            {...listeners}
-            className="shrink-0 cursor-grab active:cursor-grabbing touch-none"
-            disabled={isUpdating}
-          >
-            <GripVertical className="h-3.5 w-3.5 text-muted-foreground" />
-          </button>
+          <GripVertical className="h-4 w-4 text-muted-foreground shrink-0" />
           <span className="font-medium truncate">{item.name}</span>
         </div>
         <Badge variant="secondary" className="text-[10px] shrink-0">
