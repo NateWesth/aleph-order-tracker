@@ -366,33 +366,50 @@
 .card-elevated {
   @apply bg-card border border-border rounded-xl;
   box-shadow: 
-    0 1px 2px 0 rgb(0 0 0 / 0.03),
-    0 1px 6px -1px rgb(0 0 0 / 0.02),
-    0 2px 4px 0 rgb(0 0 0 / 0.02);
+    0 4px 16px -2px rgb(0 0 0 / 0.08),
+    0 2px 8px -2px rgb(0 0 0 / 0.04),
+    0 0 0 1px rgb(0 0 0 / 0.02);
 }
 
 .dark .card-elevated {
   box-shadow: 
-    0 1px 2px 0 rgb(0 0 0 / 0.2),
-    0 2px 8px -2px rgb(0 0 0 / 0.3);
+    0 4px 20px -2px rgb(0 0 0 / 0.5),
+    0 2px 10px -2px rgb(0 0 0 / 0.4),
+    0 0 0 1px rgb(255 255 255 / 0.03);
 }
 
 /* Hover lift effect */
 .hover-lift {
-  @apply transition-all duration-200 ease-out;
+  @apply transition-all duration-300 ease-out;
 }
 
 .hover-lift:hover {
-  transform: translateY(-2px);
+  transform: translateY(-3px);
   box-shadow: 
-    0 4px 12px -2px rgb(0 0 0 / 0.08),
-    0 2px 6px -2px rgb(0 0 0 / 0.04);
+    0 8px 25px -4px rgb(0 0 0 / 0.12),
+    0 4px 10px -4px rgb(0 0 0 / 0.06);
 }
 
 .dark .hover-lift:hover {
   box-shadow: 
-    0 4px 12px -2px rgb(0 0 0 / 0.4),
-    0 2px 6px -2px rgb(0 0 0 / 0.3);
+    0 8px 30px -4px rgb(0 0 0 / 0.6),
+    0 4px 12px -4px rgb(0 0 0 / 0.4);
+}
+
+/* Floating surface - makes elements appear to float above the page */
+.float-surface {
+  @apply bg-card border border-border/50 rounded-xl;
+  box-shadow: 
+    0 8px 30px -6px rgb(0 0 0 / 0.1),
+    0 4px 12px -4px rgb(0 0 0 / 0.05),
+    0 0 0 1px rgb(0 0 0 / 0.02);
+}
+
+.dark .float-surface {
+  box-shadow: 
+    0 8px 40px -6px rgb(0 0 0 / 0.6),
+    0 4px 16px -4px rgb(0 0 0 / 0.4),
+    0 0 0 1px rgb(255 255 255 / 0.04);
 }
 
 /* ============================================
@@ -509,19 +526,21 @@ html, body {
   @apply bg-card/60;
 }
 
-/* Glassmorphism card */
+/* Glassmorphism card - floating */
 .glass-card {
-  @apply bg-card/70 backdrop-blur-xl border border-border/40;
+  @apply bg-card/80 backdrop-blur-xl border border-border/40 rounded-xl;
   box-shadow:
-    0 4px 24px -4px rgb(0 0 0 / 0.06),
-    inset 0 1px 0 0 rgb(255 255 255 / 0.06);
+    0 8px 32px -6px rgb(0 0 0 / 0.1),
+    0 4px 16px -4px rgb(0 0 0 / 0.06),
+    inset 0 1px 0 0 rgb(255 255 255 / 0.08);
 }
 
 .dark .glass-card {
-  @apply bg-card/50 border-border/20;
+  @apply bg-card/60 border-border/20;
   box-shadow:
-    0 4px 24px -4px rgb(0 0 0 / 0.3),
-    inset 0 1px 0 0 rgb(255 255 255 / 0.04);
+    0 8px 40px -6px rgb(0 0 0 / 0.5),
+    0 4px 20px -4px rgb(0 0 0 / 0.35),
+    inset 0 1px 0 0 rgb(255 255 255 / 0.05);
 }
 
 /* Dark mode neon glow border */
