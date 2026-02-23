@@ -154,12 +154,24 @@ export default function ActivityFeedSidebar() {
   return (
     <div
       className={cn(
-        "hidden lg:flex flex-col border-l border-border/20 bg-card/15 backdrop-blur-2xl transition-all duration-300 shrink-0",
+        "hidden lg:flex flex-col border-l border-border/20 transition-all duration-300 shrink-0 relative overflow-hidden",
         collapsed ? "w-12" : "w-72 xl:w-80"
       )}
+      style={{
+        background: 'linear-gradient(135deg, hsl(var(--card) / 0.12) 0%, hsl(var(--primary) / 0.04) 50%, hsl(var(--card) / 0.1) 100%)',
+        backdropFilter: 'blur(40px)',
+        WebkitBackdropFilter: 'blur(40px)',
+      }}
     >
+      {/* Decorative blur blobs for frosted glass effect */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        <div className="absolute -top-20 -right-20 w-48 h-48 rounded-full bg-primary/8 blur-3xl" />
+        <div className="absolute top-1/3 -left-10 w-32 h-32 rounded-full bg-primary/5 blur-2xl" />
+        <div className="absolute bottom-20 right-0 w-40 h-40 rounded-full bg-accent/10 blur-3xl" />
+      </div>
+
       {/* Header */}
-      <div className="flex items-center justify-between p-2 border-b border-border shrink-0">
+      <div className="flex items-center justify-between p-2 border-b border-border/30 shrink-0 relative z-10">
         {!collapsed && (
           <div className="flex items-center gap-2 px-1">
             <Activity className="h-4 w-4 text-primary" />
