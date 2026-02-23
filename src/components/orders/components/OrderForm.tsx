@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,6 +18,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useAutoSaveDraft } from "@/hooks/useAutoSaveDraft";
 
 interface OrderItem {
   id: string;
@@ -64,6 +65,7 @@ interface OrderFormProps {
 }
 
 const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
+  const { loadDraft, saveDraft, clearDraft } = useAutoSaveDraft();
   const [orderNumber, setOrderNumber] = useState("");
   const [companyId, setCompanyId] = useState("");
   const [urgency, setUrgency] = useState("normal");
@@ -78,6 +80,31 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
   const [searchQueries, setSearchQueries] = useState<Record<string, string>>({});
   const [searchResults, setSearchResults] = useState<Record<string, CatalogItem[]>>({});
   const [searchLoading, setSearchLoading] = useState<Record<string, boolean>>({});
+  const [draftRestored, setDraftRestored] = useState(false);
+  const initialized = useRef(false);
+
+  // Restore draft on mount
+  useEffect(() => {
+    if (initialized.current) return;
+    initialized.current = true;
+    const draft = loadDraft();
+    if (draft) {
+      setCompanyId(draft.companyId || "");
+      setUrgency(draft.urgency || "normal");
+      if (draft.items?.length > 0) setItems(draft.items);
+      if (draft.purchaseOrders?.length > 0) setPurchaseOrders(draft.purchaseOrders);
+      setDraftRestored(true);
+    }
+  }, [loadDraft]);
+
+  // Auto-save draft on field changes
+  useEffect(() => {
+    if (!initialized.current) return;
+    const hasContent = companyId || urgency !== "normal" || items.some(i => i.name.trim()) || purchaseOrders.length > 0;
+    if (hasContent) {
+      saveDraft({ companyId, urgency, items, purchaseOrders });
+    }
+  }, [companyId, urgency, items, purchaseOrders, saveDraft]);
 
   useEffect(() => {
     setOrderNumber(generateOrderNumber());
@@ -234,6 +261,8 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
       (po) => po.supplierId && po.purchaseOrderNumber.trim()
     );
 
+    clearDraft();
+
     onSubmit({
       orderNumber: orderNumber || generateOrderNumber(),
       companyId,
@@ -254,6 +283,29 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      {/* Draft restored banner */}
+      {draftRestored && (
+        <div className="flex items-center justify-between p-3 bg-primary/5 rounded-lg border border-primary/20">
+          <span className="text-sm text-primary font-medium">📝 Draft restored from your last session</span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              clearDraft();
+              setDraftRestored(false);
+              setCompanyId("");
+              setUrgency("normal");
+              setItems([{ id: crypto.randomUUID(), name: "", code: "", quantity: 1 }]);
+              setPurchaseOrders([]);
+            }}
+            className="text-xs text-muted-foreground hover:text-destructive"
+          >
+            Clear Draft
+          </Button>
+        </div>
+      )}
+
       {/* Order Number */}
       <div className="space-y-2">
         <Label htmlFor="orderNumber">Order Number</Label>

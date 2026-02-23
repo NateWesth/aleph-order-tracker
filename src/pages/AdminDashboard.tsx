@@ -20,7 +20,7 @@ import CompletedPage from "@/components/orders/CompletedPage";
 import ClientCompaniesPage from "@/components/admin/ClientCompaniesPage";
 import StatsPage from "@/components/admin/StatsPage";
 import ItemsPage from "@/components/admin/ItemsPage";
-import DashboardHome from "@/components/admin/DashboardHome";
+import CustomizableDashboard from "@/components/admin/CustomizableDashboard";
 import UsersManagementPage from "@/components/admin/UsersManagementPage";
 import SuppliersPage from "@/components/admin/SuppliersPage";
 import POTrackingPage from "@/components/admin/POTrackingPage";
@@ -270,7 +270,7 @@ const AdminDashboard = () => {
           >
             <PageTransition viewKey={activeView}>
               {activeView === "home" && (
-                <DashboardHome
+                <CustomizableDashboard
                   userName={userProfile?.full_name}
                   onNavigate={(view) => setActiveView(view)}
                 />
