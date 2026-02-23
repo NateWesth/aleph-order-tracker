@@ -155,15 +155,15 @@ export default function ActivityFeedSidebar() {
   return (
     <div
       className={cn(
-        "hidden lg:flex flex-col border-l border-white/10 dark:border-white/5 transition-all duration-300 shrink-0 relative overflow-hidden",
+        "hidden lg:flex flex-col border-l border-white/10 dark:border-white/5 transition-all duration-300 shrink-0 relative overflow-hidden min-h-full",
         collapsed ? "w-12" : "w-72 xl:w-80"
       )}
     >
       {/* Background image + frosted overlay */}
       <div className="absolute inset-0 pointer-events-none">
-        <img src={sidebarBg} alt="" className="absolute inset-0 w-full h-full object-cover opacity-50 dark:opacity-40" />
-        <div className="absolute inset-0 bg-background/40 dark:bg-background/30 backdrop-blur-md" />
-        <div className="absolute inset-0 bg-gradient-to-b from-card/30 via-transparent to-card/40" />
+        <img src={sidebarBg} alt="" className="absolute inset-0 w-full h-full object-cover opacity-60 dark:opacity-50" />
+        <div className="absolute inset-0 bg-background/25 dark:bg-background/20 backdrop-blur-sm" />
+        <div className="absolute inset-0 bg-gradient-to-b from-card/20 via-transparent to-card/20" />
       </div>
 
       {/* Header */}
