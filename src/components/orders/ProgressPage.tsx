@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { PullToRefresh } from "@/components/ui/PullToRefresh";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
@@ -776,7 +777,7 @@ export default function ProgressPage({
         </div>
       </div>;
   }
-  return <div className="w-full max-w-full p-2 md:p-4 bg-background overflow-x-hidden">
+  return <PullToRefresh onRefresh={fetchProgressOrders} className="w-full max-w-full p-2 md:p-4 bg-background overflow-x-hidden">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 md:mb-6 gap-3 md:gap-0">
         <h1 className="text-lg md:text-2xl font-bold text-foreground">Order Progress Tracking</h1>
         <div className="w-full md:w-auto">
@@ -988,5 +989,5 @@ export default function ProgressPage({
         onClose={closeFilesDialog} 
         isAdmin={isAdmin} 
       />
-    </div>;
+    </PullToRefresh>;
 }

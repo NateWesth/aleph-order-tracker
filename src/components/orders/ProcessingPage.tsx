@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { PullToRefresh } from "@/components/ui/PullToRefresh";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
@@ -388,7 +389,7 @@ export default function ProcessingPage({
   }
 
   return (
-    <div className={`${isMobile ? 'p-2' : 'container mx-auto p-4'} bg-background`}>
+    <PullToRefresh onRefresh={fetchProcessingOrders} className={`${isMobile ? 'p-2' : 'container mx-auto p-4'} bg-background`}>
       <div className="flex justify-between items-center mb-4">
         <h1 className={`${isMobile ? 'text-lg' : 'text-2xl'} font-bold text-foreground`}>Processing Orders</h1>
       </div>
@@ -602,6 +603,6 @@ export default function ProcessingPage({
       </div>
 
       <ProcessingOrderFilesDialog order={selectedOrder} isOpen={!!selectedOrder} onClose={closeOrderDetails} isAdmin={isAdmin} />
-    </div>
+    </PullToRefresh>
   );
 }

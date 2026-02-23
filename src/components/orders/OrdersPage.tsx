@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, memo } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { PullToRefresh } from "@/components/ui/PullToRefresh";
 import { Button } from "@/components/ui/button";
 import { Plus, Filter, ChevronDown, ChevronUp } from "lucide-react";
 import {
@@ -485,7 +486,7 @@ export default function OrdersPage({
   }
 
   return (
-    <div className="space-y-3 sm:space-y-4 w-full overflow-x-hidden">
+    <PullToRefresh onRefresh={fetchOrders} className="space-y-3 sm:space-y-4 w-full overflow-x-hidden">
       {/* Header */}
       <div className="flex flex-col gap-3 sm:gap-4">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -569,6 +570,6 @@ export default function OrdersPage({
           />
         ))}
       </div>
-    </div>
+    </PullToRefresh>
   );
 }

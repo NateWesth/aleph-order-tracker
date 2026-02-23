@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { PullToRefresh } from "@/components/ui/PullToRefresh";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -246,7 +247,7 @@ export default function CompletedPage({
   };
 
   return (
-    <div className="w-full">
+    <PullToRefresh onRefresh={fetchCompletedOrders} className="w-full">
       <div className={`flex flex-col gap-2 ${isMobile ? 'mb-3' : 'gap-4 mb-6'}`}>
         <div className="flex items-center justify-between">
           <h1 className={`font-bold text-foreground ${isMobile ? 'text-base' : 'text-lg md:text-xl'}`}>
@@ -326,6 +327,6 @@ export default function CompletedPage({
           ))}
         </div>
       )}
-    </div>
+    </PullToRefresh>
   );
 }
