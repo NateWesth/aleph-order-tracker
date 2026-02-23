@@ -74,16 +74,22 @@ export default function PredictiveInsights() {
       }
 
       // 3. Popular items trend
+      // 3. Popular items trend (exclude fasteners — they sell in bulk and skew results)
+      const fastenerKeywords = ["screw", "bolt", "nut", "washer", "rivet", "anchor", "self-tapper", "coach screw", "threaded rod", "fastener", "nail", "rawl"];
+      const isFastener = (name: string) => fastenerKeywords.some(kw => name.toLowerCase().includes(kw));
+
       const itemCounts = new Map<string, number>();
       allItems.forEach(i => {
-        itemCounts.set(i.name, (itemCounts.get(i.name) || 0) + i.quantity);
+        if (!isFastener(i.name)) {
+          itemCounts.set(i.name, (itemCounts.get(i.name) || 0) + i.quantity);
+        }
       });
       const topItems = [...itemCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3);
 
       if (topItems.length > 0) {
         localPredictions.push({
           type: "trend",
-          title: "Most ordered items",
+          title: "Most ordered items (excl. fasteners)",
           description: `Top items: ${topItems.map(([name, qty]) => `${name} (${qty} units)`).join(", ")}. Consider pre-stocking these.`,
           confidence: "medium",
           urgency: "informational",

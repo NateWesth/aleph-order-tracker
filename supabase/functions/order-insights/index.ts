@@ -111,6 +111,9 @@ RESPONSE RULES:
 - Currency is South African Rand (R).
 - Talk like a knowledgeable colleague, not a formal report.
 
+IMPORTANT — FASTENER CONTEXT:
+Fasteners (screws, nuts, bolts, washers, rivets, anchors, threaded rod, self-tappers, coach screws, etc.) are sold in bulk quantities (thousands or tens of thousands per order). Their high unit counts do NOT mean they are the most significant or most popular products. When analyzing top items, most ordered products, or trends, weight fasteners much lower — treat them as commodity bulk items. Focus insights on non-fastener products (welding consumables, tools, steel, fittings, PPE, abrasives, etc.) as meaningful volume indicators unless the user specifically asks about fasteners.
+
 ${dataContext}`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
