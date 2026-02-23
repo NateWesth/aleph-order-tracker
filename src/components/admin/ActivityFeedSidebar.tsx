@@ -155,7 +155,7 @@ export default function ActivityFeedSidebar() {
   return (
     <div
       className={cn(
-        "hidden lg:flex flex-col border-l border-white/10 dark:border-white/5 transition-all duration-300 shrink-0 relative overflow-hidden min-h-full",
+        "hidden lg:flex flex-col border-l border-white/10 dark:border-white/5 transition-all duration-300 shrink-0 relative overflow-hidden h-full self-stretch",
         collapsed ? "w-12" : "w-72 xl:w-80"
       )}
     >
