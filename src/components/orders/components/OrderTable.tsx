@@ -40,7 +40,7 @@ export default function OrderTable({
           </div>
         ) : (
           orders.map((order) => (
-            <div key={order.id} className={`bg-card rounded-lg shadow-sm border ${compact ? 'p-2' : 'p-3'}`}>
+            <div key={order.id} className={`glass-card glow-border rounded-lg shadow-sm ${compact ? 'p-2' : 'p-3'}`}>
               <OrderRow
                 order={order}
                 isAdmin={isAdmin}
@@ -58,7 +58,7 @@ export default function OrderTable({
 
   // Desktop table layout
   return (
-    <div className="bg-card rounded-lg shadow overflow-hidden">
+    <div className="glass-card glow-border rounded-lg shadow overflow-hidden">
       <div className="overflow-x-auto">
         <Table>
           <TableHeader>

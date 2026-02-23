@@ -410,7 +410,7 @@ export default function StatsPage() {
       {/* Charts Grid */}
       <div className="grid lg:grid-cols-2 gap-6">
         {/* Orders Trend - Comparison */}
-        <div className="bg-card border border-border rounded-xl p-6">
+        <div className="glass-card glow-border rounded-xl p-6">
           <h3 className="text-sm font-medium text-muted-foreground mb-6">Orders Trend</h3>
           <div className="h-48">
             <ResponsiveContainer width="100%" height="100%">
@@ -462,7 +462,7 @@ export default function StatsPage() {
         </div>
 
         {/* Status Distribution - Side by Side in Comparison Mode */}
-        <div className="bg-card border border-border rounded-xl p-6">
+        <div className="glass-card glow-border rounded-xl p-6">
           <h3 className="text-sm font-medium text-muted-foreground mb-6">Status Distribution</h3>
           {comparisonMode ? (
             <div className="grid grid-cols-2 gap-4">
@@ -501,7 +501,7 @@ export default function StatsPage() {
         </div>
 
         {/* Top Items - Comparison */}
-        <div className="bg-card border border-border rounded-xl p-6">
+        <div className="glass-card glow-border rounded-xl p-6">
           <h3 className="text-sm font-medium text-muted-foreground mb-6">Top Items</h3>
           {comparisonMode ? (
             <div className="grid grid-cols-2 gap-4">
@@ -548,7 +548,7 @@ export default function StatsPage() {
         </div>
 
         {/* Top Clients - Comparison */}
-        <div className="bg-card border border-border rounded-xl p-6">
+        <div className="glass-card glow-border rounded-xl p-6">
           <h3 className="text-sm font-medium text-muted-foreground mb-6">Top Clients</h3>
           {comparisonMode ? (
             <div className="grid grid-cols-2 gap-4">
@@ -750,7 +750,7 @@ interface MetricCardProps {
 
 function MetricCard({ label, value, comparisonValue, icon, showComparison }: MetricCardProps) {
   return (
-    <div className="bg-card border border-border rounded-xl p-5 transition-all hover:shadow-sm">
+    <div className="glass-card glow-border rounded-xl p-5 transition-all hover:shadow-glow">
       <div className="flex items-start justify-between">
         <div className="p-2 rounded-lg bg-primary/10 text-primary">
           {icon}
