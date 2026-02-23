@@ -433,7 +433,7 @@ export default function SuppliersPage() {
           )}
         </div>
       ) : (
-        <div className="glass-card glow-border rounded-lg">
+        <div className="float-surface glass-card glow-border rounded-xl">
           <Table>
             <TableHeader>
               <TableRow>
