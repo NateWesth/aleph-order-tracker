@@ -244,6 +244,30 @@ export const useGlobalRealtimeOrders = ({
         },
         handleOrderDelete
       )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'order_items'
+        },
+        (payload) => {
+          console.log(`Order item changed (${pageType}):`, payload);
+          debouncedRefresh();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'order_purchase_orders'
+        },
+        (payload) => {
+          console.log(`Order PO changed (${pageType}):`, payload);
+          debouncedRefresh();
+        }
+      )
       .subscribe((status) => {
         console.log(`Enhanced real-time subscription status for ${pageType}:`, status);
         if (status === 'SUBSCRIBED') {
