@@ -199,7 +199,7 @@ export default function OrderRow({
     // Mobile card layout
     return (
       <>
-        <div className={`cursor-pointer ${compact ? 'p-2' : ''}`} onClick={handleRowClick}>
+        <div className={`cursor-pointer order-row-hover rounded-lg transition-all duration-200 ${compact ? 'p-2' : ''}`} onClick={handleRowClick}>
           <div className={compact ? 'space-y-1' : 'space-y-2'}>
             {/* Order header */}
             <div className="flex justify-between items-start gap-2">

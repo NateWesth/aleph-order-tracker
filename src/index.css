@@ -432,7 +432,8 @@
 }
 
 .order-row-hover:hover {
-  @apply bg-muted/50;
+  @apply bg-accent/50;
+  box-shadow: inset 3px 0 0 0 hsl(var(--primary));
 }
 
 /* ============================================

@@ -40,7 +40,7 @@ export default function OrderTable({
           </div>
         ) : (
           orders.map((order) => (
-            <div key={order.id} className={`glass-card glow-border rounded-lg shadow-sm ${compact ? 'p-2' : 'p-3'}`}>
+            <div key={order.id} className={`glass-card glow-border rounded-lg shadow-sm hover-lift ${compact ? 'p-2' : 'p-3'}`}>
               <OrderRow
                 order={order}
                 isAdmin={isAdmin}
