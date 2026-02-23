@@ -154,7 +154,8 @@ export default function ActivityFeedSidebar() {
   return (
     <div
       className={cn(
-        "hidden lg:flex flex-col border-l border-border/30 bg-card/20 backdrop-blur-xl transition-all duration-300 shrink-0",
+        "hidden lg:flex flex-col border-l border-border/20 bg-card/15 backdrop-blur-2xl transition-all duration-300",
+        "fixed top-0 right-0 h-full z-40",
         collapsed ? "w-12" : "w-72 xl:w-80"
       )}
     >
