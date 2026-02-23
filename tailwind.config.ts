@@ -134,6 +134,21 @@ export default {
 				'page-enter': {
 					'0%': { opacity: '0', transform: 'translateY(8px) scale(0.995)' },
 					'100%': { opacity: '1', transform: 'translateY(0) scale(1)' }
+				},
+				'aurora-1': {
+					'0%, 100%': { transform: 'translate(0%, 0%) scale(1)' },
+					'33%': { transform: 'translate(15%, 10%) scale(1.1)' },
+					'66%': { transform: 'translate(-10%, 15%) scale(0.95)' }
+				},
+				'aurora-2': {
+					'0%, 100%': { transform: 'translate(0%, 0%) scale(1)' },
+					'33%': { transform: 'translate(-12%, -8%) scale(1.05)' },
+					'66%': { transform: 'translate(10%, -12%) scale(1.1)' }
+				},
+				'aurora-3': {
+					'0%, 100%': { transform: 'translate(-50%, 0%) scale(1)' },
+					'33%': { transform: 'translate(-40%, 8%) scale(1.15)' },
+					'66%': { transform: 'translate(-60%, -5%) scale(0.9)' }
 				}
 			},
 			animation: {
@@ -145,7 +160,10 @@ export default {
 				'scale-in': 'scale-in 0.2s ease-out forwards',
 				'shimmer': 'shimmer 2s linear infinite',
 				'glow-pulse': 'glow-pulse 3s ease-in-out infinite',
-				'page-enter': 'page-enter 0.3s ease-out forwards'
+				'page-enter': 'page-enter 0.3s ease-out forwards',
+				'aurora-1': 'aurora-1 20s ease-in-out infinite',
+				'aurora-2': 'aurora-2 25s ease-in-out infinite',
+				'aurora-3': 'aurora-3 22s ease-in-out infinite'
 			}
 		}
 	},

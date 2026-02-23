@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { PageTransition } from "@/components/ui/PageTransition";
+import AuroraBackground from "@/components/ui/AuroraBackground";
 import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -159,7 +160,8 @@ const AdminDashboard = () => {
   }
 
   return (
-    <div className="min-h-screen w-full flex flex-col bg-background overflow-x-hidden">
+    <div className="min-h-screen w-full flex flex-col bg-background overflow-x-hidden relative">
+      <AuroraBackground />
       {/* Modern Top Navigation Bar */}
       <header className="sticky top-0 z-50 bg-card/80 backdrop-blur-xl border-b border-border w-full">
         <div className="w-full px-2 sm:px-3 py-2 sm:py-3">
