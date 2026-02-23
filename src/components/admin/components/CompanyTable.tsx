@@ -24,7 +24,7 @@ interface CompanyTableProps {
 
 export default function CompanyTable({ companies, onCopyCode, onEditCompany, onDeleteCompany }: CompanyTableProps) {
   return (
-    <div className="rounded-md border border-border overflow-hidden">
+    <div className="float-surface glass-card glow-border overflow-hidden">
       <table className="w-full text-sm">
         <thead className="bg-muted/50">
           <tr className="border-b border-border">
