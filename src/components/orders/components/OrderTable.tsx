@@ -67,13 +67,14 @@ export default function OrderTable({
               <TableHead className="whitespace-nowrap">Company</TableHead>
               <TableHead className="whitespace-nowrap">Status</TableHead>
               <TableHead className="whitespace-nowrap">Created</TableHead>
+              {!compact && <TableHead className="whitespace-nowrap">Notes</TableHead>}
               {!compact && <TableHead className="whitespace-nowrap">Actions</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
             {orders.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={compact ? 4 : 5} className="text-center py-8">
+                <TableCell colSpan={compact ? 4 : 6} className="text-center py-8">
                   No orders found.
                 </TableCell>
               </TableRow>

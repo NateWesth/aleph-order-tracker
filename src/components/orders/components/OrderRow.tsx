@@ -12,6 +12,7 @@ import ManagePOsDialog from "./ManagePOsDialog";
 import { OrderWithCompany, PurchaseOrderInfo } from "../types/orderTypes";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { InlineStatusEdit, InlineUrgencyEdit, InlineNotesEdit } from "./InlineQuickEdit";
 
 interface OrderRowProps {
   order: OrderWithCompany;
@@ -208,8 +209,13 @@ export default function OrderRow({
                   <div className="text-xs text-muted-foreground truncate">{order.reference}</div>
                 )}
               </div>
-              <div className="flex-shrink-0">
-                {getStatusBadge(order.status)}
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {isAdmin && <InlineUrgencyEdit orderId={order.id} currentValue={order.urgency || null} />}
+                {isAdmin ? (
+                  <InlineStatusEdit orderId={order.id} currentValue={order.status} />
+                ) : (
+                  getStatusBadge(order.status)
+                )}
               </div>
             </div>
 
@@ -233,11 +239,18 @@ export default function OrderRow({
             )}
             
             {/* Company and date */}
-            <div className="flex justify-between items-center text-xs text-muted-foreground">
-              <span className="truncate mr-2">{order.companyName || 'No Company'}</span>
-              <span className="flex-shrink-0">{new Date(order.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+            <div className="flex justify-between items-center gap-2">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground min-w-0">
+                <span className="truncate mr-2">{order.companyName || 'No Company'}</span>
+                <span className="flex-shrink-0">{new Date(order.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+              </div>
             </div>
-            
+            {isAdmin && (
+              <div className="mt-1">
+                <InlineNotesEdit orderId={order.id} currentValue={order.notes || null} />
+              </div>
+            )}
+
             {/* Actions - hidden in compact mode */}
             {!compact && (
               <div className="flex items-center justify-between gap-2 pt-2 border-t">
@@ -342,7 +355,12 @@ export default function OrderRow({
         <TableCell className={`text-sm ${compact ? 'py-2' : ''}`}>{order.companyName || 'No Company'}</TableCell>
         <TableCell className={compact ? 'py-2' : ''}>
           <div className="flex items-center gap-2 flex-wrap">
-            {getStatusBadge(order.status)}
+            {isAdmin ? (
+              <InlineStatusEdit orderId={order.id} currentValue={order.status} />
+            ) : (
+              getStatusBadge(order.status)
+            )}
+            {isAdmin && <InlineUrgencyEdit orderId={order.id} currentValue={order.urgency || null} />}
             <StockStatusIndicator counts={stockCounts} />
             <PurchaseOrdersIndicator purchaseOrders={order.purchaseOrders} />
             {order.purchaseOrders && order.purchaseOrders.length > 0 && (
@@ -362,6 +380,15 @@ export default function OrderRow({
           </div>
         </TableCell>
         <TableCell className={`text-sm ${compact ? 'py-2' : ''}`}>{new Date(order.created_at).toLocaleDateString()}</TableCell>
+        {!compact && (
+          <TableCell className="py-2">
+            {isAdmin ? (
+              <InlineNotesEdit orderId={order.id} currentValue={order.notes || null} />
+            ) : (
+              <span className="text-xs text-muted-foreground truncate max-w-[200px] block">{order.notes || '-'}</span>
+            )}
+          </TableCell>
+        )}
         {!compact && <TableCell>
           <div className="flex items-center gap-2">
             <Button
