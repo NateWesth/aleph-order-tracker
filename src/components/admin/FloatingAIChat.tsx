@@ -11,17 +11,18 @@ export default function FloatingAIChat() {
     <>
       {/* Chat Panel */}
       {open && (
-        <div className="fixed bottom-20 right-4 z-50 w-[min(400px,calc(100vw-2rem))] animate-in slide-in-from-bottom-4 fade-in duration-200">
+        <div className="fixed bottom-[calc(env(safe-area-inset-bottom,0px)+8rem)] right-4 sm:bottom-20 sm:right-6 z-[60] w-[min(400px,calc(100vw-2rem))] animate-in slide-in-from-bottom-4 fade-in duration-200">
           <AIInsightsPanel />
         </div>
       )}
 
-      {/* Floating Bubble */}
+      {/* Floating Bubble - fixed to bottom-right, above mobile nav */}
       <Button
         onClick={() => setOpen(!open)}
         size="icon"
         className={cn(
-          "fixed bottom-4 right-4 z-50 h-12 w-12 rounded-full shadow-lg transition-all duration-200",
+          "fixed z-[60] h-12 w-12 rounded-full shadow-lg transition-all duration-200",
+          "bottom-[calc(env(safe-area-inset-bottom,0px)+4.5rem)] right-4",
           "sm:bottom-6 sm:right-6 sm:h-14 sm:w-14",
           open && "bg-muted text-muted-foreground hover:bg-muted/80"
         )}

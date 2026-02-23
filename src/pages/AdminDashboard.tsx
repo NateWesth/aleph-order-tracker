@@ -144,10 +144,10 @@ const AdminDashboard = () => {
     { id: "history", label: "History", icon: History, badge: unreadOrderUpdates },
     { id: "clients", label: "Clients", icon: Building2, badge: 0 },
     { id: "suppliers", label: "Suppliers", icon: Truck, badge: 0 },
+    { id: "stats", label: "Stats", icon: BarChart3, badge: 0 },
     { id: "po-tracking", label: "PO Tracking", icon: FileText, badge: 0 },
     { id: "items", label: "Items", icon: Box, badge: 0 },
     ...(isAdmin ? [{ id: "users", label: "Users", icon: Users, badge: 0 }] : []),
-    { id: "stats", label: "Stats", icon: BarChart3, badge: 0 },
   ];
 
   if (loading) {
@@ -294,7 +294,7 @@ const AdminDashboard = () => {
       {/* Mobile Bottom Navigation */}
       <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card/95 backdrop-blur-xl border-t border-border sm:hidden safe-area-bottom">
         <div className="flex items-center justify-around px-1 py-1">
-          {navItems.slice(0, 5).map((item) => {
+          {navItems.slice(0, 6).map((item) => {
             const isActive = activeView === item.id;
             return (
               <button
