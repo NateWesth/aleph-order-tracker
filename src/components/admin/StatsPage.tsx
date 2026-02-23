@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
+import AIInsightsPanel from "./AIInsightsPanel";
 
 type PresetKey = "7d" | "30d" | "90d" | "year" | "all";
 
@@ -584,6 +585,9 @@ export default function StatsPage() {
           )}
         </div>
       </div>
+
+      {/* AI Insights */}
+      <AIInsightsPanel />
 
       {/* Period Summary */}
       {comparisonMode ? (

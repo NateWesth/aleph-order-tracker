@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.send-order-notifications]
 verify_jwt = false
+
+[functions.order-insights]
+verify_jwt = false
