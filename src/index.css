@@ -270,6 +270,58 @@
 }
 
 /* ============================================
+   RIPPLE & MICRO-INTERACTIONS
+   ============================================ */
+
+/* Button ripple effect */
+.ripple-container {
+  position: relative;
+  overflow: hidden;
+}
+
+.ripple-container::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at var(--ripple-x, 50%) var(--ripple-y, 50%), hsl(var(--primary-foreground) / 0.25) 0%, transparent 60%);
+  opacity: 0;
+  transform: scale(0);
+  transition: none;
+}
+
+.ripple-container:active::after {
+  opacity: 1;
+  transform: scale(2.5);
+  transition: transform 0.5s ease-out, opacity 0.4s ease-out;
+}
+
+/* Interactive hover scale */
+.interactive-scale {
+  @apply transition-transform duration-200 ease-out;
+}
+
+.interactive-scale:hover {
+  transform: scale(1.02);
+}
+
+.interactive-scale:active {
+  transform: scale(0.98);
+}
+
+/* Icon button bounce */
+.icon-bounce {
+  @apply transition-transform duration-200;
+}
+
+.icon-bounce:hover {
+  transform: scale(1.1);
+}
+
+.icon-bounce:active {
+  transform: scale(0.9);
+}
+
+/* ============================================
    BUTTON STYLES
    ============================================ */
 
