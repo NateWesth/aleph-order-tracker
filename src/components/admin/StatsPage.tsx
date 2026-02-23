@@ -19,6 +19,7 @@ import { PageSkeleton } from "@/components/ui/PageSkeleton";
 
 import ReportGenerator from "./ReportGenerator";
 import SupplierScorecard from "./SupplierScorecard";
+import OrderActivityHeatmap from "./OrderActivityHeatmap";
 
 type PresetKey = "7d" | "30d" | "90d" | "year" | "all";
 
@@ -593,6 +594,9 @@ export default function StatsPage() {
         </div>
       </div>
 
+
+      {/* Order Activity Heatmap */}
+      <OrderActivityHeatmap />
 
       {/* Supplier Scorecard */}
       <SupplierScorecard />

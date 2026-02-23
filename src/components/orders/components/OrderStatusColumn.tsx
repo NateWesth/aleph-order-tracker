@@ -11,6 +11,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useIsMobile } from "@/hooks/use-mobile";
+import SwipeableCard from "@/components/ui/SwipeableCard";
 interface OrderItem {
   id: string;
   name: string;
@@ -170,7 +171,7 @@ function OrderStatusColumn({
             const stockSummary = getItemStockSummary(order.items);
             const isExpanded = expandedOrders.has(order.id);
             const hasItems = order.items && order.items.length > 0;
-            return <Card key={order.id} className={cn("bg-card border-border hover-lift overflow-hidden", "animate-fade-in")} style={{
+            const cardContent = <Card className={cn("bg-card border-border hover-lift overflow-hidden", "animate-fade-in")} style={{
               animationDelay: `${index * 30}ms`
             }}>
                     <CardContent className="p-2.5 sm:p-3">
@@ -343,6 +344,22 @@ function OrderStatusColumn({
                       </div>
                     </CardContent>
                   </Card>;
+            
+            // Wrap with swipeable on mobile
+            return isMobile ? (
+              <SwipeableCard
+                key={order.id}
+                onSwipeLeft={() => onDeleteOrder(order)}
+                onSwipeRight={config.nextStatus ? () => onMoveOrder(order, config.nextStatus!) : undefined}
+                leftLabel="Delete"
+                rightLabel={config.nextLabel || "Next"}
+                rightIcon={<ArrowRight className="h-4 w-4" />}
+              >
+                {cardContent}
+              </SwipeableCard>
+            ) : (
+              <div key={order.id}>{cardContent}</div>
+            );
           })}
             </div>
           </ScrollArea>

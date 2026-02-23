@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, memo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { PullToRefresh } from "@/components/ui/PullToRefresh";
+import { useOrderCelebration, ConfettiOverlay } from "@/components/ui/OrderCelebration";
 import { Button } from "@/components/ui/button";
 import { Plus, Filter, ChevronDown, ChevronUp } from "lucide-react";
 import OverdueAlerts from "./components/OverdueAlerts";
@@ -141,6 +142,7 @@ export default function OrdersPage({
   const { user } = useAuth();
   const { companies } = useCompanyData();
   const { boardColorMode, boardSingleColor, colorfulPreset, customBoardColor } = useTheme();
+  const { showConfetti, streak, celebrate } = useOrderCelebration();
 
   const STATUS_COLUMNS = useMemo(() => 
     getStatusColumns(boardColorMode, boardSingleColor, colorfulPreset, customBoardColor), 
@@ -394,6 +396,7 @@ export default function OrdersPage({
       // Set completed_date when marking as delivered
       if (newStatus === "delivered") {
         updateData.completed_date = new Date().toISOString();
+        celebrate();
       }
 
       const { error } = await supabase
@@ -487,6 +490,8 @@ export default function OrdersPage({
   }
 
   return (
+    <>
+    <ConfettiOverlay show={showConfetti} streak={streak} />
     <PullToRefresh onRefresh={fetchOrders} className="space-y-3 sm:space-y-4 w-full overflow-x-hidden">
       {/* Header */}
       <div className="flex flex-col gap-3 sm:gap-4">
@@ -573,5 +578,6 @@ export default function OrdersPage({
         ))}
       </div>
     </PullToRefresh>
+    </>
   );
 }
