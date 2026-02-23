@@ -6,7 +6,8 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
-import { Download, Printer, FileText, Sheet } from "lucide-react";
+import { Download, Printer, FileText, Sheet, Loader2 } from "lucide-react";
+import ExportProgress from "@/components/ui/ExportProgress";
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
@@ -813,10 +814,12 @@ export default function OrderExportActions({
 
   // Bulk orders export
   return (
+    <>
+    <ExportProgress isExporting={loading} label="Generating report…" />
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="outline" disabled={loading || !orders || orders.length === 0}>
-          <Download className="h-4 w-4 mr-2" />
+          {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
           Export ({orders?.length || 0})
         </Button>
       </DropdownMenuTrigger>
@@ -835,5 +838,6 @@ export default function OrderExportActions({
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
+    </>
   );
 }
