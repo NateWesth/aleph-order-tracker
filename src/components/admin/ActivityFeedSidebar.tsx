@@ -161,7 +161,7 @@ export default function ActivityFeedSidebar() {
     >
       {/* Background image + frosted overlay */}
       <div className="absolute inset-0 pointer-events-none">
-        <img src={sidebarBg} alt="" className="absolute inset-0 w-full h-full object-cover opacity-15 dark:opacity-10" />
+        <img src={sidebarBg} alt="" className="absolute inset-0 w-full h-full object-cover opacity-30 dark:opacity-25" />
         <div className="absolute inset-0 bg-background/25 dark:bg-background/20 backdrop-blur-sm" />
         <div className="absolute inset-0 bg-gradient-to-b from-card/20 via-transparent to-card/20" />
       </div>
