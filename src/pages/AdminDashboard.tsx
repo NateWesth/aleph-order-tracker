@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { PageTransition } from "@/components/ui/PageTransition";
 import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -267,14 +268,13 @@ const AdminDashboard = () => {
             activeView === "orders" || activeView === "history" ? "max-w-none" : "max-w-7xl mx-auto"
           )}
         >
-          {activeView === "home" && (
-            <DashboardHome
-              userName={userProfile?.full_name}
-              onNavigate={(view) => setActiveView(view)}
-            />
-          )}
-          
-          <div className={cn(activeView !== "home" && "animate-fade-in")}>
+          <PageTransition viewKey={activeView}>
+            {activeView === "home" && (
+              <DashboardHome
+                userName={userProfile?.full_name}
+                onNavigate={(view) => setActiveView(view)}
+              />
+            )}
             {activeView === "orders" && <OrdersPage isAdmin={true} searchTerm={searchTerm} />}
             {activeView === "history" && <CompletedPage isAdmin={true} searchTerm={searchTerm} />}
             {activeView === "clients" && <ClientCompaniesPage />}
@@ -283,7 +283,7 @@ const AdminDashboard = () => {
             {activeView === "items" && <ItemsPage />}
             {activeView === "users" && isAdmin && <UsersManagementPage />}
             {activeView === "stats" && <StatsPage />}
-          </div>
+          </PageTransition>
         </div>
       </main>
 
