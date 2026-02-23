@@ -139,7 +139,7 @@ export default function DashboardHome({ userName, onNavigate }: DashboardHomePro
         {statCards.map((stat, i) => (
           <Card
             key={stat.label}
-            className="cursor-pointer glass-card glow-border hover:shadow-glow transition-all duration-300 border-border/50"
+            className="cursor-pointer glass-card glow-border interactive-scale hover:shadow-glow transition-all duration-300 border-border/50"
             style={{ animationDelay: `${i * 80}ms` }}
             onClick={stat.onClick}
           >
@@ -162,7 +162,7 @@ export default function DashboardHome({ userName, onNavigate }: DashboardHomePro
       {/* Second row: Quick stats + Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Quick Actions & Stats */}
-        <Card className="glass-card glow-border border-border/50">
+        <Card className="glass-card glow-border border-border/50 interactive-scale">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-muted-foreground">Quick Stats</CardTitle>
           </CardHeader>
@@ -197,7 +197,7 @@ export default function DashboardHome({ userName, onNavigate }: DashboardHomePro
         </Card>
 
         {/* Recent Activity Feed */}
-        <Card className="lg:col-span-2 glass-card glow-border border-border/50">
+        <Card className="lg:col-span-2 glass-card glow-border border-border/50 interactive-scale">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-muted-foreground">Recent Activity</CardTitle>
           </CardHeader>

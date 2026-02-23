@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { PageTransition } from "@/components/ui/PageTransition";
 import AuroraBackground from "@/components/ui/AuroraBackground";
+import OnboardingTour from "@/components/ui/OnboardingTour";
 import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -173,12 +174,13 @@ const AdminDashboard = () => {
               size="icon"
               onClick={() => setActiveView("home")}
               className="shrink-0 rounded-xl h-9 w-9 sm:h-10 sm:w-10"
+              data-tour="home"
             >
               <Home className="h-4 w-4 sm:h-5 sm:w-5" />
             </Button>
 
             {/* Search bar - grows to fill space */}
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0" data-tour="search">
               <div className="relative">
                 <Search className="absolute left-2 sm:left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                 <Input
@@ -209,6 +211,7 @@ const AdminDashboard = () => {
                 onNavigateToOrder={(orderId) => {
                   setActiveView("orders");
                 }}
+                data-tour="notifications"
               />
               <Button
                 variant="ghost"
@@ -238,6 +241,7 @@ const AdminDashboard = () => {
                 <button
                   key={item.id}
                   onClick={() => setActiveView(item.id)}
+                  data-tour={`nav-${item.id}`}
                   className={cn(
                     "relative flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm font-medium rounded-t-xl transition-all duration-200 whitespace-nowrap",
                     "border-b-2 -mb-[2px]",
@@ -339,6 +343,9 @@ const AdminDashboard = () => {
 
       {/* Floating AI Chat */}
       <FloatingAIChat />
+
+      {/* Onboarding Tour */}
+      <OnboardingTour />
     </div>
   );
 };

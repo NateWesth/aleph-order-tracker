@@ -1,4 +1,5 @@
 import { useState, useCallback, memo } from "react";
+import { useDroppable, useDraggable } from "@dnd-kit/core";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -52,6 +53,19 @@ interface OrderStatusColumnProps {
   isExpanded?: boolean;
   onToggleExpand?: () => void;
 }
+// Draggable wrapper for order cards (desktop only)
+function DraggableCard({ id, children, disabled }: { id: string; children: React.ReactNode; disabled?: boolean }) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id, disabled });
+  const style: React.CSSProperties = transform
+    ? { transform: `translate(${transform.x}px, ${transform.y}px)`, opacity: isDragging ? 0.5 : 1, zIndex: isDragging ? 50 : undefined }
+    : {};
+  return (
+    <div ref={setNodeRef} style={style} {...listeners} {...attributes}>
+      {children}
+    </div>
+  );
+}
+
 function OrderStatusColumn({
   config,
   orders,
@@ -63,6 +77,7 @@ function OrderStatusColumn({
   isExpanded = true,
   onToggleExpand
 }: OrderStatusColumnProps) {
+  const { setNodeRef, isOver } = useDroppable({ id: config.key });
   const { stockStatusColors } = useTheme();
   const isMobile = useIsMobile();
   const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
@@ -109,7 +124,7 @@ function OrderStatusColumn({
       allInStock: inStock === total
     };
   };
-  return <div className="flex flex-col w-full min-w-0">
+  return <div ref={setNodeRef} className={cn("flex flex-col w-full min-w-0", isOver && "ring-2 ring-primary/50 rounded-xl transition-all")}>
       {/* Column Header - Only clickable to toggle on mobile */}
       {isMobile ? (
         <button 
@@ -171,7 +186,7 @@ function OrderStatusColumn({
             const stockSummary = getItemStockSummary(order.items);
             const isExpanded = expandedOrders.has(order.id);
             const hasItems = order.items && order.items.length > 0;
-            const cardContent = <Card className={cn("glass-card glow-border hover-lift overflow-hidden", "animate-fade-in")} style={{
+            const cardContent = <Card className={cn("glass-card glow-border hover-lift interactive-scale overflow-hidden", "animate-fade-in")} style={{
               animationDelay: `${index * 30}ms`
             }}>
                     <CardContent className="p-2.5 sm:p-3">
@@ -358,7 +373,9 @@ function OrderStatusColumn({
                 {cardContent}
               </SwipeableCard>
             ) : (
-              <div key={order.id}>{cardContent}</div>
+              <DraggableCard key={order.id} id={order.id}>
+                {cardContent}
+              </DraggableCard>
             );
           })}
             </div>

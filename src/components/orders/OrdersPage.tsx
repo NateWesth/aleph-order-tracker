@@ -5,6 +5,7 @@ import { useOrderCelebration, ConfettiOverlay } from "@/components/ui/OrderCeleb
 import { Button } from "@/components/ui/button";
 import { Plus, Filter, ChevronDown, ChevronUp } from "lucide-react";
 import OverdueAlerts from "./components/OverdueAlerts";
+import { DndContext, DragOverlay, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent, type DragStartEvent } from "@dnd-kit/core";
 import {
   Dialog,
   DialogContent,
@@ -135,6 +136,7 @@ export default function OrdersPage({
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>("all");
+  const [activeOrderId, setActiveOrderId] = useState<string | null>(null);
   // On desktop/tablet, all columns are always expanded (not collapsible)
   // On mobile, columns are collapsible and start collapsed
   const [expandedColumns, setExpandedColumns] = useState<Set<string>>(new Set());
@@ -148,6 +150,15 @@ export default function OrdersPage({
     getStatusColumns(boardColorMode, boardSingleColor, colorfulPreset, customBoardColor), 
     [boardColorMode, boardSingleColor, colorfulPreset, customBoardColor]
   );
+
+  // Drag-and-drop sensors (require 8px movement to start dragging)
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
+  );
+
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    setActiveOrderId(event.active.id as string);
+  }, []);
   const fetchOrders = useCallback(async () => {
     try {
       // Fetch all orders except delivered (those go to history)
@@ -418,7 +429,24 @@ export default function OrdersPage({
         variant: "destructive",
       });
     }
-  }, [fetchOrders, toast]);
+  }, [fetchOrders, toast, celebrate]);
+
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    setActiveOrderId(null);
+    const { active, over } = event;
+    if (!over) return;
+    
+    const orderId = active.id as string;
+    const newStatus = over.id as string;
+    
+    const order = orders.find(o => o.id === orderId);
+    if (!order || order.status === newStatus) return;
+    
+    const validStatuses = ["ordered", "in-stock", "in-progress", "ready", "delivered"];
+    if (!validStatuses.includes(newStatus)) return;
+    
+    handleMoveOrder(order, newStatus);
+  }, [orders, handleMoveOrder]);
 
   const handleDeleteOrder = useCallback(async (order: Order) => {
     try {
@@ -551,6 +579,7 @@ export default function OrdersPage({
       </div>
 
       {/* Kanban Board - Stacked on mobile, responsive grid on larger screens */}
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1.5fr_1fr_1fr_1fr] gap-2 sm:gap-3 md:gap-4 w-full overflow-hidden">
         {STATUS_COLUMNS.map((column) => (
           <OrderStatusColumn
@@ -577,6 +606,7 @@ export default function OrdersPage({
           />
         ))}
       </div>
+      </DndContext>
     </PullToRefresh>
     </>
   );
