@@ -901,15 +901,15 @@ export default function ProgressPage({
                     </div>
                   </div>
 
-                  {isExpanded && <div className="mt-4 border-t border-border pt-4 overflow-x-auto">
-                      <Table>
+                  {isExpanded && <div className="mt-4 border-t border-border pt-4 overflow-x-auto -mx-2 px-2">
+                      <Table className="min-w-0 w-full table-fixed sm:table-auto">
                         <TableHeader>
                           <TableRow>
-                            <TableHead className="text-card-foreground">Item</TableHead>
-                            <TableHead className="text-card-foreground">Qty Ordered</TableHead>
-                            <TableHead className="text-card-foreground">Qty Delivered</TableHead>
-                            <TableHead className="text-card-foreground">Status</TableHead>
-                            <TableHead className="text-card-foreground">Actions</TableHead>
+                            <TableHead className="text-card-foreground w-[30%] sm:w-auto">Item</TableHead>
+                            <TableHead className="text-card-foreground w-[15%] sm:w-auto text-center">Ord</TableHead>
+                            <TableHead className="text-card-foreground w-[20%] sm:w-auto text-center">Del</TableHead>
+                            <TableHead className="text-card-foreground w-[15%] sm:w-auto">Status</TableHead>
+                            <TableHead className="text-card-foreground w-[20%] sm:w-auto">Actions</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -925,8 +925,8 @@ export default function ProgressPage({
                     const delivered = orderDeliveries[item.name] || 0;
                     const isCompleted = delivered >= item.quantity;
                     return <TableRow key={item.id} className={isCompleted ? "opacity-50" : ""}>
-                                  <TableCell className="font-medium text-card-foreground">{item.name}</TableCell>
-                                   <TableCell className="text-card-foreground">{item.quantity}</TableCell>
+                                  <TableCell className="font-medium text-card-foreground text-xs sm:text-sm truncate max-w-0 sm:max-w-none">{item.name}</TableCell>
+                                   <TableCell className="text-card-foreground text-xs sm:text-sm text-center">{item.quantity}</TableCell>
                                    <TableCell>
                                      <input 
                                        type="number" 
@@ -935,17 +935,16 @@ export default function ProgressPage({
                                        value={delivered} 
                                        onChange={e => updateDeliveryQuantity(order.id, item.name, parseInt(e.target.value) || 0)} 
                                        onBlur={(e) => {
-                                         // Force a save when user leaves the input field
                                          const currentValue = parseInt(e.target.value) || 0;
                                          saveDeliveryQuantitiesToDatabase(order.id, item.name, currentValue);
                                        }} 
-                                       className="w-16 md:w-20 px-2 py-1 border border-border rounded text-sm bg-background text-foreground" 
+                                       className="w-12 sm:w-20 px-1 sm:px-2 py-1 border border-border rounded text-xs sm:text-sm bg-background text-foreground" 
                                      />
                                    </TableCell>
                                   <TableCell>
-                                    {isCompleted ? <Badge variant="secondary" className="bg-primary/10 text-primary">
-                                        Complete
-                                      </Badge> : <Badge variant="outline">
+                                    {isCompleted ? <Badge variant="secondary" className="bg-primary/10 text-primary text-[10px] sm:text-xs px-1 sm:px-2">
+                                        Done
+                                      </Badge> : <Badge variant="outline" className="text-[10px] sm:text-xs px-1 sm:px-2">
                                         Pending
                                       </Badge>}
                                   </TableCell>
@@ -954,18 +953,18 @@ export default function ProgressPage({
                                       <Button
                                         variant="outline"
                                         size="sm"
-                                        className="h-7 text-xs"
+                                        className="h-6 sm:h-7 text-[10px] sm:text-xs px-1.5 sm:px-2"
                                         onClick={() => updateItemProgressStage(order.id, item.name, 'in-stock')}
                                       >
-                                        In Stock
+                                        Stock
                                       </Button>
                                       <Button
                                         variant="outline"
                                         size="sm"
-                                        className="h-7 text-xs"
+                                        className="h-6 sm:h-7 text-[10px] sm:text-xs px-1.5 sm:px-2"
                                         onClick={() => updateItemProgressStage(order.id, item.name, 'packing')}
                                       >
-                                        Packing
+                                        Pack
                                       </Button>
                                     </div>
                                   </TableCell>
