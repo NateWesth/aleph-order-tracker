@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
-import AIInsightsPanel from "./AIInsightsPanel";
+
 import ReportGenerator from "./ReportGenerator";
 import SupplierScorecard from "./SupplierScorecard";
 
@@ -593,8 +593,6 @@ export default function StatsPage() {
         </div>
       </div>
 
-      {/* AI Insights */}
-      <AIInsightsPanel />
 
       {/* Supplier Scorecard */}
       <SupplierScorecard />
