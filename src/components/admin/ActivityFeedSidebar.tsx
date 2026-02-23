@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import sidebarBg from "@/assets/sidebar-bg.jpg";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
@@ -163,11 +164,10 @@ export default function ActivityFeedSidebar() {
         WebkitBackdropFilter: 'blur(40px)',
       }}
     >
-      {/* Decorative blur blobs for frosted glass effect */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute -top-20 -right-20 w-48 h-48 rounded-full bg-primary/8 blur-3xl" />
-        <div className="absolute top-1/3 -left-10 w-32 h-32 rounded-full bg-primary/5 blur-2xl" />
-        <div className="absolute bottom-20 right-0 w-40 h-40 rounded-full bg-accent/10 blur-3xl" />
+      {/* Background image + frosted overlay */}
+      <div className="absolute inset-0 pointer-events-none">
+        <img src={sidebarBg} alt="" className="absolute inset-0 w-full h-full object-cover opacity-30 dark:opacity-20" />
+        <div className="absolute inset-0 bg-card/70 dark:bg-card/60 backdrop-blur-2xl" />
       </div>
 
       {/* Header */}
