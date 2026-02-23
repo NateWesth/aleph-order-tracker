@@ -99,7 +99,7 @@ export default function NotificationCenter({ onNavigateToOrder }: NotificationCe
 
       {/* Dropdown Panel */}
       {isOpen && (
-        <div className="absolute right-0 sm:right-0 top-full mt-2 w-[360px] max-w-[calc(100vw-2rem)] bg-card border border-border rounded-xl shadow-lg z-[100] animate-in slide-in-from-top-2 fade-in-0 duration-200">
+        <div className="fixed sm:absolute right-2 sm:right-0 left-2 sm:left-auto top-14 sm:top-full sm:mt-2 sm:w-[360px] bg-card border border-border rounded-xl shadow-lg z-[100] animate-in slide-in-from-top-2 fade-in-0 duration-200">
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-border">
             <div className="flex items-center gap-2">

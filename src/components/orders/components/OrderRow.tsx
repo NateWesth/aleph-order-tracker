@@ -201,19 +201,25 @@ export default function OrderRow({
         <div className={`cursor-pointer ${compact ? 'p-2' : ''}`} onClick={handleRowClick}>
           <div className={compact ? 'space-y-1' : 'space-y-2'}>
             {/* Order header */}
-            <div className="flex justify-between items-start">
+            <div className="flex justify-between items-start gap-2">
               <div className="min-w-0 flex-1">
                 <div className={`font-medium truncate ${compact ? 'text-xs' : 'text-sm'}`}>{order.order_number}</div>
                 {order.reference && (
                   <div className="text-xs text-muted-foreground truncate">{order.reference}</div>
                 )}
               </div>
-              <div className="ml-2 flex-shrink-0 flex items-center gap-1">
-                <PurchaseOrdersIndicator purchaseOrders={order.purchaseOrders} />
-                <StockStatusIndicator counts={stockCounts} />
+              <div className="flex-shrink-0">
                 {getStatusBadge(order.status)}
               </div>
             </div>
+
+            {/* Stock & PO indicators on their own row */}
+            {(stockCounts.total > 0 || (order.purchaseOrders && order.purchaseOrders.length > 0)) && (
+              <div className="flex items-center gap-1 flex-wrap">
+                <StockStatusIndicator counts={stockCounts} />
+                <PurchaseOrdersIndicator purchaseOrders={order.purchaseOrders} />
+              </div>
+            )}
 
             {/* Purchase Orders display */}
             {order.purchaseOrders && order.purchaseOrders.length > 0 && (
