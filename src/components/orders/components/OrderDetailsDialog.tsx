@@ -18,10 +18,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { OrderWithCompany } from "../types/orderTypes";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Plus, Trash2, Edit2, X, Truck } from "lucide-react";
+import { Plus, Trash2, Edit2, X, Truck, Activity } from "lucide-react";
+import OrderActivityTimeline from "./OrderActivityTimeline";
 
 interface Supplier {
   id: string;
@@ -435,9 +437,19 @@ export default function OrderDetailsDialog({
           </div>
         </DialogHeader>
         
-        <div className="space-y-6">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
+        <Tabs defaultValue="details" className="w-full">
+          <TabsList className="w-full grid grid-cols-2">
+            <TabsTrigger value="details">Order Details</TabsTrigger>
+            <TabsTrigger value="activity" className="gap-1.5">
+              <Activity className="h-3.5 w-3.5" />
+              Activity
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="details" className="mt-4">
+            <div className="space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
               <p className="text-sm text-muted-foreground">Company</p>
               <p className="font-medium">{order.companyName || 'No Company'}</p>
             </div>
@@ -714,7 +726,13 @@ export default function OrderDetailsDialog({
               </>
             )}
           </div>
-        </div>
+          </div>
+          </TabsContent>
+
+          <TabsContent value="activity" className="mt-4">
+            <OrderActivityTimeline orderId={order.id} />
+          </TabsContent>
+        </Tabs>
 
         {isEditing && (
           <DialogFooter>

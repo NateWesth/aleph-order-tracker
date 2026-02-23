@@ -17,6 +17,8 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import AIInsightsPanel from "./AIInsightsPanel";
+import ReportGenerator from "./ReportGenerator";
+import SupplierScorecard from "./SupplierScorecard";
 
 type PresetKey = "7d" | "30d" | "90d" | "year" | "all";
 
@@ -267,6 +269,11 @@ export default function StatsPage() {
     <div className="space-y-6 pb-8">
       {/* Controls */}
       <div className="space-y-4">
+        {/* Top controls row */}
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <ReportGenerator />
+        </div>
+
         {/* Comparison Toggle */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -588,6 +595,9 @@ export default function StatsPage() {
 
       {/* AI Insights */}
       <AIInsightsPanel />
+
+      {/* Supplier Scorecard */}
+      <SupplierScorecard />
 
       {/* Period Summary */}
       {comparisonMode ? (

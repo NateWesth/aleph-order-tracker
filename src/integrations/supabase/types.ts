@@ -136,6 +136,47 @@ export type Database = {
           },
         ]
       }
+      order_activity_log: {
+        Row: {
+          activity_type: string
+          created_at: string
+          description: string | null
+          id: string
+          metadata: Json | null
+          order_id: string
+          title: string
+          user_id: string | null
+        }
+        Insert: {
+          activity_type: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          metadata?: Json | null
+          order_id: string
+          title: string
+          user_id?: string | null
+        }
+        Update: {
+          activity_type?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          metadata?: Json | null
+          order_id?: string
+          title?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_activity_log_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_files: {
         Row: {
           created_at: string

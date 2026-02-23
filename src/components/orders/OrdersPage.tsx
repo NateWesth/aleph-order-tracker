@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { PullToRefresh } from "@/components/ui/PullToRefresh";
 import { Button } from "@/components/ui/button";
 import { Plus, Filter, ChevronDown, ChevronUp } from "lucide-react";
+import OverdueAlerts from "./components/OverdueAlerts";
 import {
   Dialog,
   DialogContent,
@@ -504,6 +505,7 @@ export default function OrdersPage({
             </p>
           </div>
           <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+            <OverdueAlerts />
             {/* Company Filter */}
             <div className="flex items-center gap-1.5 sm:gap-2 flex-1 sm:flex-none">
               <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
