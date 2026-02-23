@@ -461,6 +461,12 @@ html, body {
   --tw-ring-color: hsl(316 100% 50%);
 }
 
+/* Prevent horizontal scroll on mobile */
+html, body {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
 /* Safe area insets for mobile devices (status bar, notch, home indicator) */
 .safe-area-insets {
   /* Fallback padding for Android devices where env() returns 0 */

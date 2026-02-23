@@ -157,9 +157,12 @@ function OrderStatusColumn({
 
       {/* Column Content - Always visible on desktop, collapsible on mobile */}
       {effectiveIsExpanded && (
-        <div className="flex-1 bg-muted/30 dark:bg-muted/10 rounded-b-xl border border-t-0 border-border min-h-[300px] sm:min-h-[400px] animate-fade-in">
-          <ScrollArea className="h-[calc(100vh-380px)] sm:h-[calc(100vh-320px)]">
-            <div className="p-2 sm:p-3 space-y-2">
+        <div className="flex-1 bg-muted/30 dark:bg-muted/10 rounded-b-xl border border-t-0 border-border min-h-[200px] sm:min-h-[400px] animate-fade-in">
+          <ScrollArea className={cn(
+            "sm:h-[calc(100vh-320px)]",
+            isMobile ? "max-h-[50vh]" : ""
+          )}>
+            <div className="p-2 space-y-2">
               {orders.length === 0 ? <div className="flex flex-col items-center justify-center py-12 sm:py-16 text-muted-foreground">
                 <Package className="h-8 w-8 sm:h-10 sm:w-10 mb-3 opacity-30" />
                 <p className="text-xs sm:text-sm font-medium">No orders</p>
@@ -256,10 +259,10 @@ function OrderStatusColumn({
                                           </Tooltip>
                                         </TooltipProvider>
                                       </div>}
-                                    <span className={cn("flex-1", config.key === "ordered" && item.stock_status === "in-stock" ? "line-through text-muted-foreground" : "text-foreground")}>
+                                    <span className={cn("flex-1 min-w-0 break-words", config.key === "ordered" && item.stock_status === "in-stock" ? "line-through text-muted-foreground" : "text-foreground")}>
                                       <span className="font-semibold text-primary">×{item.quantity}</span>
-                                      {item.code && <span className="font-mono text-muted-foreground ml-1.5">[{item.code}]</span>}
-                                      <span className="ml-1.5">{item.name}</span>
+                                      {item.code && <span className="font-mono text-muted-foreground ml-1">[{item.code}]</span>}
+                                      <span className="ml-1">{item.name}</span>
                                     </span>
                                   </div>)}
                                 

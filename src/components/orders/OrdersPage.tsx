@@ -544,7 +544,7 @@ export default function OrdersPage({
       </div>
 
       {/* Kanban Board - Stacked on mobile, responsive grid on larger screens */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1.5fr_1fr_1fr_1fr] gap-2 sm:gap-3 md:gap-4 w-full">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1.5fr_1fr_1fr_1fr] gap-2 sm:gap-3 md:gap-4 w-full overflow-hidden">
         {STATUS_COLUMNS.map((column) => (
           <OrderStatusColumn
             key={column.key}
