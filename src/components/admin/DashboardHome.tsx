@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatDistanceToNow } from "date-fns";
+import { AnimatedCounter } from "@/components/ui/AnimatedCounter";
 import PredictiveInsights from "./PredictiveInsights";
 
 interface DashboardHomeProps {
@@ -88,8 +89,30 @@ export default function DashboardHome({ userName, onNavigate }: DashboardHomePro
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[40vh]">
-        <div className="h-8 w-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      <div className="space-y-6">
+        <div>
+          <div className="shimmer h-8 w-64 mb-2" />
+          <div className="shimmer h-4 w-96" />
+        </div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {[1, 2, 3, 4].map(i => (
+            <div key={i} className="glass-card glow-border rounded-xl p-4">
+              <div className="shimmer h-5 w-5 rounded mb-3" />
+              <div className="shimmer h-8 w-16 mb-1" />
+              <div className="shimmer h-3 w-20" />
+            </div>
+          ))}
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="glass-card glow-border rounded-xl p-6">
+            <div className="shimmer h-4 w-24 mb-4" />
+            {[1, 2, 3].map(i => <div key={i} className="shimmer h-12 w-full mb-3 rounded-xl" />)}
+          </div>
+          <div className="glass-card glow-border rounded-xl p-6 lg:col-span-2">
+            <div className="shimmer h-4 w-28 mb-4" />
+            {[1, 2, 3, 4].map(i => <div key={i} className="shimmer h-10 w-full mb-2 rounded-lg" />)}
+          </div>
+        </div>
       </div>
     );
   }
@@ -111,12 +134,13 @@ export default function DashboardHome({ userName, onNavigate }: DashboardHomePro
         <p className="text-muted-foreground mt-1">Here's what's happening with your orders today.</p>
       </div>
 
-      {/* Stat Cards */}
+      {/* Stat Cards — Glass + Glow + Animated Counters */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {statCards.map((stat) => (
+        {statCards.map((stat, i) => (
           <Card
             key={stat.label}
-            className="cursor-pointer hover:shadow-md transition-shadow border-border/50"
+            className="cursor-pointer glass-card glow-border hover:shadow-glow transition-all duration-300 border-border/50"
+            style={{ animationDelay: `${i * 80}ms` }}
             onClick={stat.onClick}
           >
             <CardContent className="p-4">
@@ -128,7 +152,7 @@ export default function DashboardHome({ userName, onNavigate }: DashboardHomePro
                   </Badge>
                 )}
               </div>
-              <div className="text-2xl font-bold text-foreground">{stat.value}</div>
+              <AnimatedCounter value={stat.value} className="text-2xl font-bold text-foreground" />
               <p className="text-xs text-muted-foreground mt-0.5">{stat.label}</p>
             </CardContent>
           </Card>
@@ -138,7 +162,7 @@ export default function DashboardHome({ userName, onNavigate }: DashboardHomePro
       {/* Second row: Quick stats + Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Quick Actions & Stats */}
-        <Card className="border-border/50">
+        <Card className="glass-card glow-border border-border/50">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-muted-foreground">Quick Stats</CardTitle>
           </CardHeader>
@@ -148,21 +172,21 @@ export default function DashboardHome({ userName, onNavigate }: DashboardHomePro
                 <CheckCircle2 className="h-4 w-4 text-emerald-500" />
                 <span className="text-sm font-medium text-foreground">Completed this month</span>
               </div>
-              <span className="text-lg font-bold text-foreground">{stats.completedThisMonth}</span>
+              <AnimatedCounter value={stats.completedThisMonth} className="text-lg font-bold text-foreground" />
             </button>
             <button onClick={() => onNavigate("clients")} className="flex items-center justify-between w-full p-3 rounded-xl bg-secondary/50 hover:bg-secondary transition-colors">
               <div className="flex items-center gap-3">
                 <Building2 className="h-4 w-4 text-primary" />
                 <span className="text-sm font-medium text-foreground">Clients</span>
               </div>
-              <span className="text-lg font-bold text-foreground">{stats.totalClients}</span>
+              <AnimatedCounter value={stats.totalClients} className="text-lg font-bold text-foreground" />
             </button>
             <button onClick={() => onNavigate("suppliers")} className="flex items-center justify-between w-full p-3 rounded-xl bg-secondary/50 hover:bg-secondary transition-colors">
               <div className="flex items-center gap-3">
                 <Truck className="h-4 w-4 text-violet-500" />
                 <span className="text-sm font-medium text-foreground">Suppliers</span>
               </div>
-              <span className="text-lg font-bold text-foreground">{stats.totalSuppliers}</span>
+              <AnimatedCounter value={stats.totalSuppliers} className="text-lg font-bold text-foreground" />
             </button>
 
             <Button onClick={() => onNavigate("orders")} variant="outline" className="w-full mt-2 rounded-xl">
@@ -173,7 +197,7 @@ export default function DashboardHome({ userName, onNavigate }: DashboardHomePro
         </Card>
 
         {/* Recent Activity Feed */}
-        <Card className="lg:col-span-2 border-border/50">
+        <Card className="lg:col-span-2 glass-card glow-border border-border/50">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-muted-foreground">Recent Activity</CardTitle>
           </CardHeader>

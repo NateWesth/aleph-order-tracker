@@ -441,6 +441,61 @@ html, body {
   @apply bg-card/60;
 }
 
+/* Glassmorphism card */
+.glass-card {
+  @apply bg-card/70 backdrop-blur-xl border border-border/40;
+  box-shadow:
+    0 4px 24px -4px rgb(0 0 0 / 0.06),
+    inset 0 1px 0 0 rgb(255 255 255 / 0.06);
+}
+
+.dark .glass-card {
+  @apply bg-card/50 border-border/20;
+  box-shadow:
+    0 4px 24px -4px rgb(0 0 0 / 0.3),
+    inset 0 1px 0 0 rgb(255 255 255 / 0.04);
+}
+
+/* Dark mode neon glow border */
+.dark .glow-border {
+  border-color: hsl(var(--primary) / 0.3);
+  box-shadow:
+    0 0 6px hsl(var(--primary) / 0.15),
+    0 0 20px hsl(var(--primary) / 0.06),
+    inset 0 0 8px hsl(var(--primary) / 0.03);
+}
+
+.dark .glow-border:hover {
+  border-color: hsl(var(--primary) / 0.5);
+  box-shadow:
+    0 0 8px hsl(var(--primary) / 0.25),
+    0 0 30px hsl(var(--primary) / 0.1),
+    inset 0 0 12px hsl(var(--primary) / 0.05);
+}
+
+/* Shimmer skeleton loading */
+.shimmer {
+  @apply rounded;
+  background: linear-gradient(
+    90deg,
+    hsl(var(--muted)) 25%,
+    hsl(var(--muted-foreground) / 0.08) 50%,
+    hsl(var(--muted)) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2s linear infinite;
+}
+
+.dark .shimmer {
+  background: linear-gradient(
+    90deg,
+    hsl(var(--muted)) 25%,
+    hsl(var(--muted-foreground) / 0.12) 50%,
+    hsl(var(--muted)) 75%
+  );
+  background-size: 200% 100%;
+}
+
 /* Skeleton loading */
 .skeleton {
   @apply bg-muted animate-pulse rounded;
