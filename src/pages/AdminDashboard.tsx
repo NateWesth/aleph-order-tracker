@@ -5,6 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Package, History, BarChart3, Settings, LogOut, Building2, Home, Search, Box, Users, Truck, FileText } from "lucide-react";
+import NotificationCenter from "@/components/NotificationCenter";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import OrdersPage from "@/components/orders/OrdersPage";
@@ -145,6 +146,12 @@ const AdminDashboard = () => {
 
             {/* Right side actions */}
             <div className="flex items-center gap-1">
+              <NotificationCenter
+                onNavigateToOrder={(orderId) => {
+                  // Navigate to orders view - the user can find the order there
+                  setActiveView("orders");
+                }}
+              />
               <Button
                 variant="ghost"
                 size="icon"
