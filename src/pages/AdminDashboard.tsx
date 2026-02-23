@@ -14,6 +14,7 @@ import CompletedPage from "@/components/orders/CompletedPage";
 import ClientCompaniesPage from "@/components/admin/ClientCompaniesPage";
 import StatsPage from "@/components/admin/StatsPage";
 import ItemsPage from "@/components/admin/ItemsPage";
+import DashboardHome from "@/components/admin/DashboardHome";
 import UsersManagementPage from "@/components/admin/UsersManagementPage";
 import SuppliersPage from "@/components/admin/SuppliersPage";
 import POTrackingPage from "@/components/admin/POTrackingPage";
@@ -214,28 +215,10 @@ const AdminDashboard = () => {
           )}
         >
           {activeView === "home" && (
-            <div className="flex items-center justify-center min-h-[60vh]">
-              <div className="text-center space-y-4 animate-fade-in">
-                <div className="inline-flex items-center justify-center h-16 w-16 rounded-2xl bg-primary/10 mb-2">
-                  <Package className="h-8 w-8 text-primary" />
-                </div>
-                <h1 className="text-3xl font-bold tracking-tight">
-                  Welcome{userProfile?.full_name ? `, ${userProfile.full_name}` : ''}
-                </h1>
-                <p className="text-muted-foreground text-lg">
-                  Aleph Engineering and Supplies
-                </p>
-                <div className="pt-4">
-                  <Button 
-                    onClick={() => setActiveView("orders")}
-                    className="rounded-xl h-11 px-6"
-                  >
-                    <Package className="h-4 w-4 mr-2" />
-                    View Orders
-                  </Button>
-                </div>
-              </div>
-            </div>
+            <DashboardHome
+              userName={userProfile?.full_name}
+              onNavigate={(view) => setActiveView(view)}
+            />
           )}
           
           <div className={cn(activeView !== "home" && "animate-fade-in")}>
