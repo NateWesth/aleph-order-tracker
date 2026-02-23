@@ -158,7 +158,7 @@ function OrderStatusColumn({
 
       {/* Column Content - Always visible on desktop, collapsible on mobile */}
       {effectiveIsExpanded && (
-        <div className="flex-1 bg-muted/30 dark:bg-muted/10 rounded-b-xl border border-t-0 border-border min-h-[200px] sm:min-h-[400px] animate-fade-in">
+        <div className="flex-1 bg-muted/30 dark:bg-muted/10 rounded-b-xl border border-t-0 border-border glass-card !rounded-t-none min-h-[200px] sm:min-h-[400px] animate-fade-in">
           <ScrollArea className={cn(
             "sm:h-[calc(100vh-320px)]",
             isMobile ? "max-h-[50vh]" : ""
@@ -171,7 +171,7 @@ function OrderStatusColumn({
             const stockSummary = getItemStockSummary(order.items);
             const isExpanded = expandedOrders.has(order.id);
             const hasItems = order.items && order.items.length > 0;
-            const cardContent = <Card className={cn("bg-card border-border hover-lift overflow-hidden", "animate-fade-in")} style={{
+            const cardContent = <Card className={cn("glass-card glow-border hover-lift overflow-hidden", "animate-fade-in")} style={{
               animationDelay: `${index * 30}ms`
             }}>
                     <CardContent className="p-2.5 sm:p-3">
