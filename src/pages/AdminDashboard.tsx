@@ -1,12 +1,14 @@
 import { useNavigate } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Package, History, BarChart3, Settings, LogOut, Building2, Home, Search, Box, Users, Truck, FileText } from "lucide-react";
+import { Package, History, BarChart3, Settings, LogOut, Building2, Home, Search, Box, Users, Truck, FileText, Command } from "lucide-react";
 import NotificationCenter from "@/components/NotificationCenter";
 import FloatingAIChat from "@/components/admin/FloatingAIChat";
+import CommandPalette from "@/components/admin/CommandPalette";
+import VoiceCommandButton from "@/components/admin/VoiceCommandButton";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import OrdersPage from "@/components/orders/OrdersPage";
@@ -32,6 +34,7 @@ const AdminDashboard = () => {
   const [userProfile, setUserProfile] = useState<any>(null);
   const [userRole, setUserRole] = useState<'admin' | 'user'>('user');
   const [loading, setLoading] = useState(true);
+  const [commandOpen, setCommandOpen] = useState(false);
   const isMobile = useIsMobile();
   const { unreadOrderUpdates, pendingOrdersCount } = useGlobalUnreadCount();
   useEffect(() => {
@@ -92,6 +95,44 @@ const AdminDashboard = () => {
     navigate("/auth");
   };
 
+  // Keyboard shortcut for Cmd+K
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setCommandOpen(prev => !prev);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  const handleCommandAction = useCallback((action: string) => {
+    switch (action) {
+      case "create-order":
+        setActiveView("orders");
+        break;
+      case "settings":
+        navigate("/settings");
+        break;
+      case "logout":
+        handleLogout();
+        break;
+      case "toggle-voice":
+        // Voice toggle handled by the button itself
+        break;
+    }
+  }, [navigate]);
+
+  const handleVoiceCommand = useCallback((command: string) => {
+    const [type, target] = command.split(":");
+    if (type === "navigate") {
+      setActiveView(target);
+    } else if (type === "action") {
+      handleCommandAction(target);
+    }
+  }, [handleCommandAction]);
+
   const isAdmin = userRole === 'admin';
 
   const navItems = [
@@ -138,9 +179,12 @@ const AdminDashboard = () => {
               <div className="relative">
                 <Search className="absolute left-2 sm:left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                 <Input
-                  placeholder="Search..."
+                  placeholder="Search... (⌘K)"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
+                  onFocus={() => {
+                    if (!searchTerm) setCommandOpen(true);
+                  }}
                   className="pl-8 sm:pl-10 h-9 sm:h-10 bg-secondary/50 border-0 focus-visible:ring-1 focus-visible:ring-primary/50 rounded-xl text-sm"
                 />
               </div>
@@ -148,9 +192,18 @@ const AdminDashboard = () => {
 
             {/* Right side actions */}
             <div className="flex items-center gap-1">
+              <VoiceCommandButton onCommand={handleVoiceCommand} />
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setCommandOpen(true)}
+                className="hidden sm:flex rounded-xl text-muted-foreground hover:text-foreground"
+                title="Command Palette (⌘K)"
+              >
+                <Command className="h-[18px] w-[18px]" />
+              </Button>
               <NotificationCenter
                 onNavigateToOrder={(orderId) => {
-                  // Navigate to orders view - the user can find the order there
                   setActiveView("orders");
                 }}
               />
@@ -272,6 +325,15 @@ const AdminDashboard = () => {
           })}
         </div>
       </nav>
+
+      {/* Command Palette */}
+      <CommandPalette
+        open={commandOpen}
+        onOpenChange={setCommandOpen}
+        onNavigate={(view) => setActiveView(view)}
+        onAction={handleCommandAction}
+        isAdmin={isAdmin}
+      />
 
       {/* Floating AI Chat */}
       <FloatingAIChat />

@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatDistanceToNow } from "date-fns";
+import PredictiveInsights from "./PredictiveInsights";
 
 interface DashboardHomeProps {
   userName?: string;
@@ -200,6 +201,9 @@ export default function DashboardHome({ userName, onNavigate }: DashboardHomePro
           </CardContent>
         </Card>
       </div>
+
+      {/* Predictive Intelligence */}
+      <PredictiveInsights />
     </div>
   );
 }
