@@ -13,6 +13,7 @@ import FloatingAIChat from "@/components/admin/FloatingAIChat";
 import CommandPalette from "@/components/admin/CommandPalette";
 import VoiceCommandButton from "@/components/admin/VoiceCommandButton";
 import SmartSearch from "@/components/admin/SmartSearch";
+import ActivityFeedSidebar from "@/components/admin/ActivityFeedSidebar";
 import { Badge } from "@/components/ui/badge";
 import OrdersPage from "@/components/orders/OrdersPage";
 import CompletedPage from "@/components/orders/CompletedPage";
@@ -257,32 +258,38 @@ const AdminDashboard = () => {
         </div>
       </header>
 
-      {/* Main content - Add bottom padding on mobile for bottom nav */}
-      <main className="flex-1 overflow-x-hidden w-full pb-16 sm:pb-0">
-        <div
-          className={cn(
-            "w-full px-1.5 sm:px-3 py-2 sm:py-3",
-            activeView === "orders" || activeView === "history" ? "max-w-none" : "max-w-7xl mx-auto"
-          )}
-        >
-          <PageTransition viewKey={activeView}>
-            {activeView === "home" && (
-              <DashboardHome
-                userName={userProfile?.full_name}
-                onNavigate={(view) => setActiveView(view)}
-              />
+      {/* Main content area with activity sidebar */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Main content - Add bottom padding on mobile for bottom nav */}
+        <main className="flex-1 overflow-x-hidden overflow-y-auto w-full pb-16 sm:pb-0">
+          <div
+            className={cn(
+              "w-full px-1.5 sm:px-3 py-2 sm:py-3",
+              activeView === "orders" || activeView === "history" ? "max-w-none" : "max-w-7xl mx-auto"
             )}
-            {activeView === "orders" && <OrdersPage isAdmin={true} searchTerm={searchTerm} />}
-            {activeView === "history" && <CompletedPage isAdmin={true} searchTerm={searchTerm} />}
-            {activeView === "clients" && <ClientCompaniesPage />}
-            {activeView === "suppliers" && <SuppliersPage />}
-            {activeView === "po-tracking" && <POTrackingPage />}
-            {activeView === "items" && <ItemsPage />}
-            {activeView === "users" && isAdmin && <UsersManagementPage />}
-            {activeView === "stats" && <StatsPage />}
-          </PageTransition>
-        </div>
-      </main>
+          >
+            <PageTransition viewKey={activeView}>
+              {activeView === "home" && (
+                <DashboardHome
+                  userName={userProfile?.full_name}
+                  onNavigate={(view) => setActiveView(view)}
+                />
+              )}
+              {activeView === "orders" && <OrdersPage isAdmin={true} searchTerm={searchTerm} />}
+              {activeView === "history" && <CompletedPage isAdmin={true} searchTerm={searchTerm} />}
+              {activeView === "clients" && <ClientCompaniesPage />}
+              {activeView === "suppliers" && <SuppliersPage />}
+              {activeView === "po-tracking" && <POTrackingPage />}
+              {activeView === "items" && <ItemsPage />}
+              {activeView === "users" && isAdmin && <UsersManagementPage />}
+              {activeView === "stats" && <StatsPage />}
+            </PageTransition>
+          </div>
+        </main>
+
+        {/* Activity Feed Sidebar - desktop only */}
+        <ActivityFeedSidebar />
+      </div>
 
       {/* Mobile Bottom Navigation */}
       <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card/95 backdrop-blur-xl border-t border-border sm:hidden safe-area-bottom">
