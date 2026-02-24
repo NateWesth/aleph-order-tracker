@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo, memo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { PullToRefresh } from "@/components/ui/PullToRefresh";
 import { useOrderCelebration, ConfettiOverlay } from "@/components/ui/OrderCelebration";
+import { playClick, playSuccess } from "@/utils/ambientSounds";
 import { Button } from "@/components/ui/button";
 import { Plus, Filter, ChevronDown, ChevronUp, Users } from "lucide-react";
 import OrderTemplatesDialog from "./components/OrderTemplatesDialog";
@@ -193,6 +194,7 @@ export default function OrdersPage({
   );
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
+    playClick();
     setActiveOrderId(event.active.id as string);
   }, []);
   const fetchOrders = useCallback(async () => {
@@ -503,6 +505,8 @@ export default function OrdersPage({
     const validStatuses = ["ordered", "in-stock", "in-progress", "ready", "delivered"];
     if (!validStatuses.includes(newStatus)) return;
     
+    // Play a satisfying drop/success sound
+    playSuccess();
     handleMoveOrder(order, newStatus);
   }, [orders, handleMoveOrder]);
 
