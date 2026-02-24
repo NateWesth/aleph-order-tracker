@@ -1,7 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-const ZOHO_AUTH_URL = 'https://accounts.zoho.eu/oauth/v2'
-const ZOHO_API_URL = 'https://www.zohoapis.eu'
+const ZOHO_AUTH_URL = 'https://accounts.zoho.com/oauth/v2'
+const ZOHO_API_URL = 'https://www.zohoapis.com'
 
 Deno.serve(async (req) => {
   const supabase = createClient(
