@@ -48,45 +48,45 @@
   }
 
   .dark {
-    /* Deep, elegant dark theme */
-    --background: 220 16% 8%;
-    --foreground: 220 13% 93%;
+    /* Deep, refined dark theme with richer contrast */
+    --background: 225 18% 7%;
+    --foreground: 210 20% 95%;
 
-    --card: 220 16% 11%;
-    --card-foreground: 220 13% 93%;
+    --card: 225 16% 10%;
+    --card-foreground: 210 20% 95%;
 
-    --popover: 220 16% 11%;
-    --popover-foreground: 220 13% 93%;
+    --popover: 225 16% 10%;
+    --popover-foreground: 210 20% 95%;
 
-    /* Vibrant purple for dark mode */
-    --primary: 270 76% 62%;
-    --primary-foreground: 220 16% 8%;
+    /* Vibrant purple for dark mode - slightly brighter */
+    --primary: 270 76% 65%;
+    --primary-foreground: 225 18% 7%;
 
-    --secondary: 220 14% 16%;
-    --secondary-foreground: 220 13% 93%;
+    --secondary: 225 14% 14%;
+    --secondary-foreground: 210 20% 92%;
 
-    --muted: 220 14% 16%;
-    --muted-foreground: 220 9% 56%;
+    --muted: 225 14% 14%;
+    --muted-foreground: 215 12% 58%;
 
-    --accent: 270 76% 20%;
-    --accent-foreground: 270 76% 75%;
+    --accent: 270 50% 18%;
+    --accent-foreground: 270 80% 78%;
 
-    --destructive: 0 62% 50%;
+    --destructive: 0 72% 55%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 220 14% 18%;
-    --input: 220 14% 16%;
-    --ring: 270 76% 62%;
+    --border: 225 14% 16%;
+    --input: 225 14% 14%;
+    --ring: 270 76% 65%;
 
     /* Sidebar */
-    --sidebar-background: 220 16% 10%;
-    --sidebar-foreground: 220 13% 93%;
-    --sidebar-primary: 270 76% 62%;
-    --sidebar-primary-foreground: 220 16% 8%;
-    --sidebar-accent: 220 14% 14%;
-    --sidebar-accent-foreground: 220 13% 93%;
-    --sidebar-border: 220 14% 16%;
-    --sidebar-ring: 270 76% 62%;
+    --sidebar-background: 225 18% 9%;
+    --sidebar-foreground: 210 20% 95%;
+    --sidebar-primary: 270 76% 65%;
+    --sidebar-primary-foreground: 225 18% 7%;
+    --sidebar-accent: 225 14% 13%;
+    --sidebar-accent-foreground: 210 20% 92%;
+    --sidebar-border: 225 14% 14%;
+    --sidebar-ring: 270 76% 65%;
   }
 }
 
@@ -99,6 +99,15 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
+  }
+
+  /* Smooth theme transition - applies to all color changes */
+  html.theme-transition,
+  html.theme-transition *,
+  html.theme-transition *::before,
+  html.theme-transition *::after {
+    transition: background-color 0.4s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.4s ease, fill 0.3s ease, stroke 0.3s ease !important;
+    transition-delay: 0s !important;
   }
 
   body {
@@ -545,19 +554,44 @@ html, body {
 
 /* Dark mode neon glow border */
 .dark .glow-border {
-  border-color: hsl(var(--primary) / 0.3);
+  border-color: hsl(var(--primary) / 0.25);
   box-shadow:
-    0 0 6px hsl(var(--primary) / 0.15),
-    0 0 20px hsl(var(--primary) / 0.06),
-    inset 0 0 8px hsl(var(--primary) / 0.03);
+    0 0 8px hsl(var(--primary) / 0.12),
+    0 0 24px hsl(var(--primary) / 0.06),
+    inset 0 1px 0 hsl(var(--primary) / 0.08);
 }
 
 .dark .glow-border:hover {
-  border-color: hsl(var(--primary) / 0.5);
+  border-color: hsl(var(--primary) / 0.45);
   box-shadow:
-    0 0 8px hsl(var(--primary) / 0.25),
-    0 0 30px hsl(var(--primary) / 0.1),
-    inset 0 0 12px hsl(var(--primary) / 0.05);
+    0 0 12px hsl(var(--primary) / 0.2),
+    0 0 36px hsl(var(--primary) / 0.08),
+    inset 0 1px 0 hsl(var(--primary) / 0.12);
+}
+
+/* Dark mode subtle surface gradient for cards */
+.dark .surface-gradient {
+  background: linear-gradient(
+    145deg,
+    hsl(var(--card)) 0%,
+    hsl(var(--primary) / 0.04) 50%,
+    hsl(var(--card)) 100%
+  );
+}
+
+/* Enhanced dark mode interactive elements */
+.dark .interactive-glow:hover {
+  box-shadow: 0 0 0 1px hsl(var(--primary) / 0.2), 0 4px 16px hsl(var(--primary) / 0.1);
+}
+
+/* Theme-aware text gradient */
+.text-gradient-theme {
+  @apply bg-clip-text text-transparent;
+  background-image: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary) / 0.6));
+}
+
+.dark .text-gradient-theme {
+  background-image: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary) / 0.75));
 }
 
 /* Shimmer skeleton loading */

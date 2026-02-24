@@ -192,15 +192,21 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
   }, []);
 
   useEffect(() => {
-    // Apply dark/light theme to document
     const root = window.document.documentElement;
+    
+    // Add transition class for smooth theme switching
+    root.classList.add('theme-transition');
+    
     root.classList.remove('light', 'dark');
     root.classList.add(theme);
     
+    // Remove transition class after animation completes to avoid interfering with other transitions
+    const timeout = setTimeout(() => {
+      root.classList.remove('theme-transition');
+    }, 500);
+    
     // Update theme-color meta tag to match status bar
-    // Light theme = white background (dark status bar icons)
-    // Dark theme = dark background (white status bar icons)
-    const themeColor = theme === 'dark' ? '#141619' : '#fafafa';
+    const themeColor = theme === 'dark' ? '#0e1117' : '#fafafa';
     const themeColorMeta = document.querySelector('meta[name="theme-color"]:not([media])') 
       || document.querySelector('meta[name="theme-color"]');
     if (themeColorMeta) {
@@ -210,7 +216,6 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     // Update apple-mobile-web-app-status-bar-style
     const appleStatusBarMeta = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
     if (appleStatusBarMeta) {
-      // 'default' = black text on white bg, 'black-translucent' = white text on dark bg
       appleStatusBarMeta.setAttribute('content', theme === 'dark' ? 'black-translucent' : 'default');
     }
     
@@ -220,6 +225,8 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     } catch (error) {
       console.warn('Failed to save theme to localStorage:', error);
     }
+    
+    return () => clearTimeout(timeout);
   }, [theme]);
 
   useEffect(() => {
