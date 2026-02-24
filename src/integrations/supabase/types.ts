@@ -311,6 +311,69 @@ export type Database = {
           },
         ]
       }
+      order_tag_assignments: {
+        Row: {
+          assigned_by: string
+          created_at: string
+          id: string
+          order_id: string
+          tag_id: string
+        }
+        Insert: {
+          assigned_by: string
+          created_at?: string
+          id?: string
+          order_id: string
+          tag_id: string
+        }
+        Update: {
+          assigned_by?: string
+          created_at?: string
+          id?: string
+          order_id?: string
+          tag_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_tag_assignments_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_tag_assignments_tag_id_fkey"
+            columns: ["tag_id"]
+            isOneToOne: false
+            referencedRelation: "order_tags"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      order_tags: {
+        Row: {
+          color: string
+          created_at: string
+          created_by: string
+          id: string
+          name: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          created_by: string
+          id?: string
+          name: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       order_templates: {
         Row: {
           company_id: string | null
