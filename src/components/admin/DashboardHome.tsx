@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { formatDistanceToNow } from "date-fns";
 import { AnimatedCounter } from "@/components/ui/AnimatedCounter";
 import PredictiveInsights from "./PredictiveInsights";
+import { PageSkeleton } from "@/components/ui/PageSkeleton";
 
 interface DashboardHomeProps {
   userName?: string;
@@ -88,33 +89,7 @@ export default function DashboardHome({ userName, onNavigate }: DashboardHomePro
   };
 
   if (loading) {
-    return (
-      <div className="space-y-6">
-        <div>
-          <div className="shimmer h-8 w-64 mb-2" />
-          <div className="shimmer h-4 w-96" />
-        </div>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          {[1, 2, 3, 4].map(i => (
-            <div key={i} className="glass-card glow-border rounded-xl p-4">
-              <div className="shimmer h-5 w-5 rounded mb-3" />
-              <div className="shimmer h-8 w-16 mb-1" />
-              <div className="shimmer h-3 w-20" />
-            </div>
-          ))}
-        </div>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <div className="glass-card glow-border rounded-xl p-6">
-            <div className="shimmer h-4 w-24 mb-4" />
-            {[1, 2, 3].map(i => <div key={i} className="shimmer h-12 w-full mb-3 rounded-xl" />)}
-          </div>
-          <div className="glass-card glow-border rounded-xl p-6 lg:col-span-2">
-            <div className="shimmer h-4 w-28 mb-4" />
-            {[1, 2, 3, 4].map(i => <div key={i} className="shimmer h-10 w-full mb-2 rounded-lg" />)}
-          </div>
-        </div>
-      </div>
-    );
+    return <PageSkeleton variant="dashboard" />;
   }
 
   const statCards = [

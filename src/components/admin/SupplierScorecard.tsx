@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, TrendingUp, TrendingDown, Clock, Package, Truck } from "lucide-react";
 import { differenceInDays } from "date-fns";
+import { PageSkeleton } from "@/components/ui/PageSkeleton";
 
 interface SupplierScore {
   id: string;
@@ -83,11 +84,7 @@ export default function SupplierScorecard() {
   }, []);
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <PageSkeleton variant="scorecard" />;
   }
 
   if (scores.length === 0) {

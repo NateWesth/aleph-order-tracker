@@ -251,6 +251,27 @@
 .stagger-2 { animation-delay: 0.1s; }
 .stagger-3 { animation-delay: 0.15s; }
 .stagger-4 { animation-delay: 0.2s; }
+.stagger-5 { animation-delay: 0.25s; }
+.stagger-6 { animation-delay: 0.3s; }
+.stagger-7 { animation-delay: 0.35s; }
+.stagger-8 { animation-delay: 0.4s; }
+
+/* Staggered reveal - elements start invisible and fade in */
+.stagger-reveal {
+  opacity: 0;
+  animation: fadeIn 0.4s ease-out forwards;
+}
+
+.stagger-reveal:nth-child(1) { animation-delay: 0.04s; }
+.stagger-reveal:nth-child(2) { animation-delay: 0.08s; }
+.stagger-reveal:nth-child(3) { animation-delay: 0.12s; }
+.stagger-reveal:nth-child(4) { animation-delay: 0.16s; }
+.stagger-reveal:nth-child(5) { animation-delay: 0.2s; }
+.stagger-reveal:nth-child(6) { animation-delay: 0.24s; }
+.stagger-reveal:nth-child(7) { animation-delay: 0.28s; }
+.stagger-reveal:nth-child(8) { animation-delay: 0.32s; }
+.stagger-reveal:nth-child(9) { animation-delay: 0.36s; }
+.stagger-reveal:nth-child(10) { animation-delay: 0.4s; }
 
 /* ============================================
    LEGACY COLOR CLASSES (kept for compatibility)
