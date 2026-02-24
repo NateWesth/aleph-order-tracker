@@ -9,7 +9,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme, colorThemes, boardSingleColors, colorfulPresets, stockStatusColorOptions, defaultStockStatusColors } from "@/contexts/ThemeContext";
 import { supabase } from "@/integrations/supabase/client";
-import { ArrowLeft, User, Building2, Moon, Sun, Palette, Check, LayoutGrid, RotateCcw, Package, Download, Smartphone, Share, Fingerprint, ScanFace, Trash2 } from "lucide-react";
+import { ArrowLeft, User, Building2, Moon, Sun, Palette, Check, LayoutGrid, RotateCcw, Package, Download, Smartphone, Share, Fingerprint, ScanFace, Trash2, Volume2 } from "lucide-react";
+import { isSoundEnabled, setSoundEnabled } from "@/utils/ambientSounds";
 import NotificationPreferences from "@/components/settings/NotificationPreferences";
 import { 
   isBiometricAvailable, 
@@ -428,6 +429,39 @@ const Settings = () => {
 
           {/* Notification Preferences */}
           <NotificationPreferences />
+
+          {/* Ambient Sounds */}
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center space-x-2">
+                <Volume2 className="h-5 w-5 text-primary" />
+                <CardTitle className="text-base sm:text-lg">Ambient Sounds</CardTitle>
+              </div>
+              <CardDescription className="text-xs sm:text-sm">
+                Play subtle UI sounds on tab switches and actions
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="sound-toggle">Enable UI sounds</Label>
+                  <p className="text-sm text-muted-foreground">Soft clicks and chimes on interactions</p>
+                </div>
+                <Switch
+                  id="sound-toggle"
+                  checked={isSoundEnabled()}
+                  onCheckedChange={(checked) => {
+                    setSoundEnabled(checked);
+                    // Force re-render
+                    toast({
+                      title: checked ? "Sounds Enabled" : "Sounds Disabled",
+                      description: checked ? "You'll hear subtle UI feedback sounds" : "UI sounds have been turned off",
+                    });
+                  }}
+                />
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Appearance Settings */}
           <Card>

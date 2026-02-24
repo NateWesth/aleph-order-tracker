@@ -211,12 +211,14 @@ export default function AIInsightsPanel() {
               </div>
             ))}
             {isLoading && !messages.some(m => m.role === "assistant" && m === messages[messages.length - 1]) && (
-              <div className="flex gap-2">
+              <div className="flex gap-2 items-start">
                 <div className="h-6 w-6 rounded-md bg-primary/10 flex items-center justify-center flex-shrink-0">
-                  <Loader2 className="h-3 w-3 text-primary animate-spin" />
+                  <Bot className="h-3 w-3 text-primary" />
                 </div>
-                <div className="bg-secondary/50 rounded-xl px-3 py-2 text-sm text-muted-foreground">
-                  Analyzing your data...
+                <div className="bg-secondary/50 rounded-xl px-4 py-3 flex items-center gap-1">
+                  <span className="h-2 w-2 rounded-full bg-primary/60 animate-bounce [animation-delay:0ms]" />
+                  <span className="h-2 w-2 rounded-full bg-primary/60 animate-bounce [animation-delay:150ms]" />
+                  <span className="h-2 w-2 rounded-full bg-primary/60 animate-bounce [animation-delay:300ms]" />
                 </div>
               </div>
             )}

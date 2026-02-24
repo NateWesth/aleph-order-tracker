@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useParallax } from "@/hooks/useParallax";
 import {
   Package, CheckCircle2, Clock, TrendingUp, Building2, Truck,
   AlertTriangle, ArrowRight, GripVertical, RotateCcw, LayoutGrid,
@@ -107,6 +108,34 @@ function SortableWidget({ id, children, isEditing }: { id: string; children: Rea
         </div>
       )}
       {children}
+    </div>
+  );
+}
+
+// ─── Parallax Wrapper ───
+function ParallaxWrapper({ children, speed = 0.03 }: { children: React.ReactNode; speed?: number }) {
+  const { ref, style } = useParallax(speed);
+  return <div ref={ref} style={style}>{children}</div>;
+}
+
+function ParallaxStatCards({ statCards, stats }: { statCards: any[]; stats: Stats }) {
+  const { ref, style } = useParallax(0.03);
+  return (
+    <div ref={ref} style={style} className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      {statCards.map((stat) => (
+        <Card key={stat.label} className="cursor-pointer glass-card glow-border interactive-scale hover:shadow-glow transition-all duration-300 border-border/50" onClick={stat.onClick}>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-2">
+              <stat.icon className={`h-5 w-5 ${stat.color}`} />
+              {stat.label === "Active Orders" && stats.urgentOrders > 0 && (
+                <Badge variant="destructive" className="text-[10px] px-1.5 py-0">{stats.urgentOrders} urgent</Badge>
+              )}
+            </div>
+            <AnimatedCounter value={stat.value} className="text-2xl font-bold text-foreground" />
+            <p className="text-xs text-muted-foreground mt-0.5">{stat.label}</p>
+          </CardContent>
+        </Card>
+      ))}
     </div>
   );
 }
@@ -238,138 +267,127 @@ export default function CustomizableDashboard({ userName, onNavigate }: Customiz
     if (!widget.visible) return null;
     switch (widget.id) {
       case "stats":
-        return (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            {statCards.map((stat, i) => (
-              <Card key={stat.label} className="cursor-pointer glass-card glow-border interactive-scale hover:shadow-glow transition-all duration-300 border-border/50" onClick={stat.onClick}>
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <stat.icon className={`h-5 w-5 ${stat.color}`} />
-                    {stat.label === "Active Orders" && stats.urgentOrders > 0 && (
-                      <Badge variant="destructive" className="text-[10px] px-1.5 py-0">{stats.urgentOrders} urgent</Badge>
-                    )}
-                  </div>
-                  <AnimatedCounter value={stat.value} className="text-2xl font-bold text-foreground" />
-                  <p className="text-xs text-muted-foreground mt-0.5">{stat.label}</p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        );
+        return <ParallaxStatCards statCards={statCards} stats={stats} />;
 
       case "urgentAlerts":
         return (
-          <Card className="glass-card glow-border border-border/50">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 text-destructive" />
-                Urgent & High Priority
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {urgentOrders.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-4">No urgent orders 🎉</p>
-              ) : (
-                <div className="space-y-2">
-                  {urgentOrders.map(order => (
-                    <button
-                      key={order.id}
-                      onClick={() => onNavigate("orders")}
-                      className="flex items-center justify-between w-full p-3 rounded-xl bg-destructive/5 hover:bg-destructive/10 transition-colors border border-destructive/10"
-                    >
-                      <div className="flex items-center gap-3">
-                        <AlertTriangle className="h-4 w-4 text-destructive" />
-                        <span className="text-sm font-medium text-foreground">{order.order_number}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="text-[10px] border-destructive/30 text-destructive">
-                          {order.urgency}
-                        </Badge>
-                        <span className="text-[11px] text-muted-foreground">
-                          {formatDistanceToNow(new Date(order.created_at), { addSuffix: true })}
-                        </span>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <ParallaxWrapper speed={0.02}>
+            <Card className="glass-card glow-border border-border/50">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-destructive" />
+                  Urgent & High Priority
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {urgentOrders.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">No urgent orders 🎉</p>
+                ) : (
+                  <div className="space-y-2">
+                    {urgentOrders.map(order => (
+                      <button
+                        key={order.id}
+                        onClick={() => onNavigate("orders")}
+                        className="flex items-center justify-between w-full p-3 rounded-xl bg-destructive/5 hover:bg-destructive/10 transition-colors border border-destructive/10"
+                      >
+                        <div className="flex items-center gap-3">
+                          <AlertTriangle className="h-4 w-4 text-destructive" />
+                          <span className="text-sm font-medium text-foreground">{order.order_number}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="text-[10px] border-destructive/30 text-destructive">
+                            {order.urgency}
+                          </Badge>
+                          <span className="text-[11px] text-muted-foreground">
+                            {formatDistanceToNow(new Date(order.created_at), { addSuffix: true })}
+                          </span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </ParallaxWrapper>
         );
 
       case "quickStats":
         return (
-          <Card className="glass-card glow-border border-border/50">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Quick Stats</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <button onClick={() => onNavigate("history")} className="flex items-center justify-between w-full p-3 rounded-xl bg-secondary/50 hover:bg-secondary transition-colors">
-                <div className="flex items-center gap-3">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                  <span className="text-sm font-medium text-foreground">Completed this month</span>
-                </div>
-                <AnimatedCounter value={stats.completedThisMonth} className="text-lg font-bold text-foreground" />
-              </button>
-              <button onClick={() => onNavigate("clients")} className="flex items-center justify-between w-full p-3 rounded-xl bg-secondary/50 hover:bg-secondary transition-colors">
-                <div className="flex items-center gap-3">
-                  <Building2 className="h-4 w-4 text-primary" />
-                  <span className="text-sm font-medium text-foreground">Clients</span>
-                </div>
-                <AnimatedCounter value={stats.totalClients} className="text-lg font-bold text-foreground" />
-              </button>
-              <button onClick={() => onNavigate("suppliers")} className="flex items-center justify-between w-full p-3 rounded-xl bg-secondary/50 hover:bg-secondary transition-colors">
-                <div className="flex items-center gap-3">
-                  <Truck className="h-4 w-4 text-violet-500" />
-                  <span className="text-sm font-medium text-foreground">Suppliers</span>
-                </div>
-                <AnimatedCounter value={stats.totalSuppliers} className="text-lg font-bold text-foreground" />
-              </button>
-              <Button onClick={() => onNavigate("orders")} variant="outline" className="w-full mt-2 rounded-xl">
-                <Package className="h-4 w-4 mr-2" />
-                Go to Orders Board
-              </Button>
-            </CardContent>
-          </Card>
+          <ParallaxWrapper speed={0.025}>
+            <Card className="glass-card glow-border border-border/50">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Quick Stats</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <button onClick={() => onNavigate("history")} className="flex items-center justify-between w-full p-3 rounded-xl bg-secondary/50 hover:bg-secondary transition-colors">
+                  <div className="flex items-center gap-3">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                    <span className="text-sm font-medium text-foreground">Completed this month</span>
+                  </div>
+                  <AnimatedCounter value={stats.completedThisMonth} className="text-lg font-bold text-foreground" />
+                </button>
+                <button onClick={() => onNavigate("clients")} className="flex items-center justify-between w-full p-3 rounded-xl bg-secondary/50 hover:bg-secondary transition-colors">
+                  <div className="flex items-center gap-3">
+                    <Building2 className="h-4 w-4 text-primary" />
+                    <span className="text-sm font-medium text-foreground">Clients</span>
+                  </div>
+                  <AnimatedCounter value={stats.totalClients} className="text-lg font-bold text-foreground" />
+                </button>
+                <button onClick={() => onNavigate("suppliers")} className="flex items-center justify-between w-full p-3 rounded-xl bg-secondary/50 hover:bg-secondary transition-colors">
+                  <div className="flex items-center gap-3">
+                    <Truck className="h-4 w-4 text-violet-500" />
+                    <span className="text-sm font-medium text-foreground">Suppliers</span>
+                  </div>
+                  <AnimatedCounter value={stats.totalSuppliers} className="text-lg font-bold text-foreground" />
+                </button>
+                <Button onClick={() => onNavigate("orders")} variant="outline" className="w-full mt-2 rounded-xl">
+                  <Package className="h-4 w-4 mr-2" />
+                  Go to Orders Board
+                </Button>
+              </CardContent>
+            </Card>
+          </ParallaxWrapper>
         );
 
       case "recentActivity":
         return (
-          <Card className="glass-card glow-border border-border/50">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Recent Activity</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {recentActivity.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-8">No recent activity yet.</p>
-              ) : (
-                <div className="space-y-1">
-                  {recentActivity.map(activity => (
-                    <div key={activity.id} className="flex items-start gap-3 p-2.5 rounded-lg hover:bg-secondary/30 transition-colors">
-                      <div className="mt-0.5 shrink-0">{activityIcon(activity.activity_type)}</div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-foreground truncate">{activity.title}</p>
-                        {activity.description && <p className="text-xs text-muted-foreground truncate">{activity.description}</p>}
+          <ParallaxWrapper speed={0.02}>
+            <Card className="glass-card glow-border border-border/50">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Recent Activity</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {recentActivity.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">No recent activity yet.</p>
+                ) : (
+                  <div className="space-y-1">
+                    {recentActivity.map(activity => (
+                      <div key={activity.id} className="flex items-start gap-3 p-2.5 rounded-lg hover:bg-secondary/30 transition-colors">
+                        <div className="mt-0.5 shrink-0">{activityIcon(activity.activity_type)}</div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-foreground truncate">{activity.title}</p>
+                          {activity.description && <p className="text-xs text-muted-foreground truncate">{activity.description}</p>}
+                        </div>
+                        <span className="text-[11px] text-muted-foreground whitespace-nowrap shrink-0">
+                          {formatDistanceToNow(new Date(activity.created_at), { addSuffix: true })}
+                        </span>
                       </div>
-                      <span className="text-[11px] text-muted-foreground whitespace-nowrap shrink-0">
-                        {formatDistanceToNow(new Date(activity.created_at), { addSuffix: true })}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </ParallaxWrapper>
         );
 
       case "predictive":
-        return <PredictiveInsights />;
+        return <ParallaxWrapper speed={0.015}><PredictiveInsights /></ParallaxWrapper>;
 
       case "analytics":
-        return <AnalyticsWidgets />;
+        return <ParallaxWrapper speed={0.02}><AnalyticsWidgets /></ParallaxWrapper>;
 
       case "leaderboard":
-        return <LeaderboardWidget />;
+        return <ParallaxWrapper speed={0.018}><LeaderboardWidget /></ParallaxWrapper>;
 
       default:
         return null;

@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Package, History, BarChart3, Settings, LogOut, Building2, Home, Box, Users, Truck, FileText, Command } from "lucide-react";
+import { playClick, playWhoosh } from "@/utils/ambientSounds";
 import NotificationCenter from "@/components/NotificationCenter";
 import FloatingAIChat from "@/components/admin/FloatingAIChat";
 import CommandPalette from "@/components/admin/CommandPalette";
@@ -234,7 +235,10 @@ const AdminDashboard = () => {
               return (
                 <button
                   key={item.id}
-                  onClick={() => setActiveView(item.id)}
+                  onClick={() => {
+                    playClick();
+                    setActiveView(item.id);
+                  }}
                   data-tour={`nav-${item.id}`}
                   className={cn(
                     "relative flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm font-medium rounded-t-xl transition-all duration-200 whitespace-nowrap",
@@ -303,6 +307,8 @@ const AdminDashboard = () => {
                 key={item.id}
                 onClick={() => {
                   triggerHapticFeedback('light');
+                  playClick();
+                  setActiveView(item.id);
                   setActiveView(item.id);
                 }}
                 className={cn(
