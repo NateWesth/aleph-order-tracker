@@ -5,8 +5,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const ZOHO_AUTH_URL = 'https://accounts.zoho.eu/oauth/v2'
-const ZOHO_API_URL = 'https://www.zohoapis.eu'
+const ZOHO_AUTH_URL = 'https://accounts.zoho.com/oauth/v2'
+const ZOHO_API_URL = 'https://www.zohoapis.com'
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
