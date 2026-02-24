@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { PullToRefresh } from "@/components/ui/PullToRefresh";
 import { useOrderCelebration, ConfettiOverlay } from "@/components/ui/OrderCelebration";
 import { Button } from "@/components/ui/button";
-import { Plus, Filter, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, Filter, ChevronDown, ChevronUp, Users } from "lucide-react";
 import OverdueAlerts from "./components/OverdueAlerts";
 import SavedFiltersBar, { type OrderFilter } from "./components/SavedFiltersBar";
 import { DndContext, DragOverlay, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent, type DragStartEvent } from "@dnd-kit/core";
@@ -147,6 +147,7 @@ export default function OrdersPage({
   const { user } = useAuth();
   const { companies } = useCompanyData();
   const { boardColorMode, boardSingleColor, colorfulPreset, customBoardColor } = useTheme();
+  const [groupByClient, setGroupByClient] = useState(false);
   const { showConfetti, streak, celebrate } = useOrderCelebration();
   const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
 
@@ -627,6 +628,17 @@ export default function OrdersPage({
               </Select>
             </div>
 
+            {/* Group by Client Toggle */}
+            <Button
+              size="sm"
+              variant={groupByClient ? "default" : "outline"}
+              className="h-9 shrink-0 gap-1.5"
+              onClick={() => setGroupByClient(!groupByClient)}
+            >
+              <Users className="h-4 w-4" />
+              <span className="hidden sm:inline">Group</span>
+            </Button>
+
             <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
               <DialogTrigger asChild>
                 <Button size="sm" className="h-9 shrink-0">
@@ -663,6 +675,7 @@ export default function OrdersPage({
             canEditItems={true}
             selectedOrderIds={selectedOrderIds}
             onToggleOrderSelection={toggleOrderSelection}
+            groupByClient={groupByClient}
             isExpanded={expandedColumns.has(column.key)}
             onToggleExpand={() => {
               setExpandedColumns(prev => {
