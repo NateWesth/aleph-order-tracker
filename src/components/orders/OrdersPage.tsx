@@ -152,6 +152,8 @@ export default function OrdersPage({
   const [groupByClient, setGroupByClient] = useState(false);
   const { showConfetti, streak, celebrate } = useOrderCelebration();
   const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
+  const [allTags, setAllTags] = useState<{ id: string; name: string; color: string }[]>([]);
+  const [tagAssignments, setTagAssignments] = useState<Map<string, string[]>>(new Map());
 
   const toggleOrderSelection = useCallback((orderId: string) => {
     setSelectedOrderIds(prev => {
@@ -298,7 +300,29 @@ export default function OrdersPage({
 
   useEffect(() => {
     fetchOrders();
+    fetchTags();
   }, [fetchOrders]);
+
+  const fetchTags = useCallback(async () => {
+    try {
+      const [tagsRes, assignmentsRes] = await Promise.all([
+        supabase.from("order_tags").select("id, name, color").order("name"),
+        supabase.from("order_tag_assignments").select("order_id, tag_id"),
+      ]);
+      if (tagsRes.data) setAllTags(tagsRes.data);
+      if (assignmentsRes.data) {
+        const map = new Map<string, string[]>();
+        assignmentsRes.data.forEach((a: any) => {
+          const existing = map.get(a.order_id) || [];
+          existing.push(a.tag_id);
+          map.set(a.order_id, existing);
+        });
+        setTagAssignments(map);
+      }
+    } catch (error) {
+      console.error("Error fetching tags:", error);
+    }
+  }, []);
 
   useGlobalRealtimeOrders({
     onOrdersChange: fetchOrders,
@@ -690,6 +714,9 @@ export default function OrdersPage({
             selectedOrderIds={selectedOrderIds}
             onToggleOrderSelection={toggleOrderSelection}
             groupByClient={groupByClient}
+            allTags={allTags}
+            tagAssignments={tagAssignments}
+            onTagsChanged={fetchTags}
             isExpanded={expandedColumns.has(column.key)}
             onToggleExpand={() => {
               setExpandedColumns(prev => {

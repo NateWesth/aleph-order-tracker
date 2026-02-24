@@ -15,6 +15,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { useIsMobile } from "@/hooks/use-mobile";
 import SwipeableCard from "@/components/ui/SwipeableCard";
 import OrderQuickPeek from "./OrderQuickPeek";
+import OrderTags from "./OrderTags";
 interface OrderItem {
   id: string;
   name: string;
@@ -57,6 +58,9 @@ interface OrderStatusColumnProps {
   selectedOrderIds?: Set<string>;
   onToggleOrderSelection?: (orderId: string) => void;
   groupByClient?: boolean;
+  allTags?: { id: string; name: string; color: string }[];
+  tagAssignments?: Map<string, string[]>;
+  onTagsChanged?: () => void;
 }
 // Draggable wrapper for order cards (desktop only)
 function DraggableCard({ id, children, disabled }: { id: string; children: React.ReactNode; disabled?: boolean }) {
@@ -84,6 +88,9 @@ function OrderStatusColumn({
   selectedOrderIds,
   onToggleOrderSelection,
   groupByClient = false,
+  allTags = [],
+  tagAssignments,
+  onTagsChanged,
 }: OrderStatusColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: config.key });
   const { stockStatusColors } = useTheme();
@@ -284,6 +291,17 @@ function OrderStatusColumn({
               </div>
               {getUrgencyBadge(order.urgency)}
             </div>
+
+            {/* Order Tags */}
+            {allTags.length > 0 && onTagsChanged && (
+              <OrderTags
+                orderId={order.id}
+                assignedTagIds={tagAssignments?.get(order.id) || []}
+                allTags={allTags}
+                onTagsChanged={onTagsChanged}
+                compact
+              />
+            )}
 
             {/* Collapsible Items Section */}
             {hasItems && (
