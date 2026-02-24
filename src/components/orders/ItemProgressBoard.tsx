@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { playClick, playSuccess } from "@/utils/ambientSounds";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
@@ -337,6 +338,7 @@ export default function ItemProgressBoard({ isAdmin }: ItemProgressBoardProps) {
     const { active } = event;
     const data = active.data.current as { item: OrderItem; order: Order } | undefined;
     if (data) {
+      playClick();
       setActiveItem(data);
     }
   };
@@ -356,6 +358,7 @@ export default function ItemProgressBoard({ isAdmin }: ItemProgressBoardProps) {
     if (!currentItem || currentItem.progress_stage === newStage) return;
 
     // Move the item
+    playSuccess();
     moveItemToStage(itemId, newStage);
   };
 
