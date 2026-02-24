@@ -155,19 +155,23 @@ export default function ActivityFeedSidebar() {
   return (
     <div
       className={cn(
-        "hidden lg:flex flex-col border-l border-white/10 dark:border-white/5 transition-all duration-300 shrink-0 relative overflow-hidden h-full self-stretch",
+        "hidden lg:flex flex-col transition-all duration-300 shrink-0 relative overflow-hidden h-full self-stretch",
+        "border-l border-white/10 dark:border-white/[0.06]",
         collapsed ? "w-12" : "w-72 xl:w-80"
       )}
     >
       {/* Background image + frosted overlay */}
       <div className="absolute inset-0 pointer-events-none">
-        <img src={sidebarBg} alt="" className="absolute inset-0 w-full h-full object-cover opacity-30 dark:opacity-25" />
-        <div className="absolute inset-0 bg-background/25 dark:bg-background/20 backdrop-blur-sm" />
-        <div className="absolute inset-0 bg-gradient-to-b from-card/20 via-transparent to-card/20" />
+        <img src={sidebarBg} alt="" className="absolute inset-0 w-full h-full object-cover opacity-20 dark:opacity-15" />
+        <div className="absolute inset-0 bg-card/60 dark:bg-card/70 backdrop-blur-xl" />
+        <div className="absolute inset-0 bg-gradient-to-b from-primary/[0.03] via-transparent to-primary/[0.02]" />
       </div>
 
+      {/* Glow border accent (dark mode) */}
+      <div className="absolute top-0 left-0 bottom-0 w-px pointer-events-none bg-gradient-to-b from-primary/30 via-primary/10 to-transparent dark:from-primary/40 dark:via-primary/15 dark:to-transparent" />
+
       {/* Header */}
-      <div className="flex items-center justify-between p-2 border-b border-border/30 shrink-0 relative z-10">
+      <div className="flex items-center justify-between p-2 border-b border-border/20 dark:border-white/[0.06] shrink-0 relative z-10 backdrop-blur-sm">
         {!collapsed && (
           <div className="flex items-center gap-2 px-1">
             <Activity className="h-4 w-4 text-primary" />
@@ -262,7 +266,7 @@ export default function ActivityFeedSidebar() {
                 <div
                   key={activity.id}
                   className={cn(
-                    "group flex gap-2.5 p-2 rounded-lg transition-colors hover:bg-accent/50 cursor-default",
+                    "group flex gap-2.5 p-2 rounded-lg transition-all duration-200 hover:bg-accent/40 dark:hover:bg-white/[0.04] cursor-default hover:shadow-soft",
                     isNew && "bg-primary/5 animate-fade-in"
                   )}
                 >
