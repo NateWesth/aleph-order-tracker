@@ -15,7 +15,6 @@ export function PageTransition({ viewKey, children, className }: PageTransitionP
 
   useEffect(() => {
     if (viewKey !== displayedKey) {
-      // Start exit
       setPhase("exit");
 
       timeoutRef.current = setTimeout(() => {
@@ -25,8 +24,8 @@ export function PageTransition({ viewKey, children, className }: PageTransitionP
 
         timeoutRef.current = setTimeout(() => {
           setPhase("idle");
-        }, 300);
-      }, 150);
+        }, 350);
+      }, 180);
     } else {
       setDisplayedChildren(children);
     }
@@ -39,9 +38,9 @@ export function PageTransition({ viewKey, children, className }: PageTransitionP
   return (
     <div
       className={cn(
-        "transition-all duration-200 ease-out",
-        phase === "exit" && "opacity-0 translate-y-2 scale-[0.995]",
-        phase === "enter" && "opacity-0 translate-y-2 scale-[0.995] animate-page-enter",
+        "transition-all ease-out will-change-[transform,opacity]",
+        phase === "exit" && "duration-150 opacity-0 translate-y-3 scale-[0.99]",
+        phase === "enter" && "duration-300 animate-page-enter-smooth",
         phase === "idle" && "opacity-100 translate-y-0 scale-100",
         className
       )}

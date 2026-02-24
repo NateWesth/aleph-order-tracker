@@ -10,6 +10,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useTheme, colorThemes, boardSingleColors, colorfulPresets, stockStatusColorOptions, defaultStockStatusColors } from "@/contexts/ThemeContext";
 import { supabase } from "@/integrations/supabase/client";
 import { ArrowLeft, User, Building2, Moon, Sun, Palette, Check, LayoutGrid, RotateCcw, Package, Download, Smartphone, Share, Fingerprint, ScanFace, Trash2 } from "lucide-react";
+import NotificationPreferences from "@/components/settings/NotificationPreferences";
 import { 
   isBiometricAvailable, 
   getBiometricTypeName, 
@@ -424,6 +425,9 @@ const Settings = () => {
               </CardContent>
             </Card>
           )}
+
+          {/* Notification Preferences */}
+          <NotificationPreferences />
 
           {/* Appearance Settings */}
           <Card>

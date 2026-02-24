@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { formatDistanceToNow } from "date-fns";
 import { AnimatedCounter } from "@/components/ui/AnimatedCounter";
 import PredictiveInsights from "./PredictiveInsights";
+import AnalyticsWidgets from "./AnalyticsWidgets";
 import {
   DndContext,
   closestCenter,
@@ -31,7 +32,7 @@ import { cn } from "@/lib/utils";
 
 const LAYOUT_KEY = "dashboard-widget-layout";
 
-type WidgetId = "stats" | "quickStats" | "recentActivity" | "urgentAlerts" | "predictive";
+type WidgetId = "stats" | "quickStats" | "recentActivity" | "urgentAlerts" | "predictive" | "analytics";
 
 interface WidgetConfig {
   id: WidgetId;
@@ -41,6 +42,7 @@ interface WidgetConfig {
 
 const DEFAULT_LAYOUT: WidgetConfig[] = [
   { id: "stats", label: "Stat Cards", visible: true },
+  { id: "analytics", label: "Analytics Charts", visible: true },
   { id: "urgentAlerts", label: "Urgent Alerts", visible: true },
   { id: "quickStats", label: "Quick Stats", visible: true },
   { id: "recentActivity", label: "Recent Activity", visible: true },
@@ -360,6 +362,9 @@ export default function CustomizableDashboard({ userName, onNavigate }: Customiz
 
       case "predictive":
         return <PredictiveInsights />;
+
+      case "analytics":
+        return <AnalyticsWidgets />;
 
       default:
         return null;
