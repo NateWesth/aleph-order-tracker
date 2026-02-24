@@ -106,18 +106,21 @@ Deno.serve(async (req) => {
       companyId = await matchOrCreateCompany(supabase, salesOrder)
     }
 
-    // 2. Generate order number from Zoho's SO number
-    const orderNumber = salesOrder.salesorder_number || `SO-${salesOrderId}`
+    // 2. Map Zoho fields:
+    //    - Zoho "Reference#" → our order_number (the main identifier in our app)
+    //    - Zoho "Sales Order Number" → our reference field (displayed as a small SO# label)
+    const zohoSONumber = salesOrder.salesorder_number || `SO-${salesOrderId}`
+    const orderNumber = salesOrder.reference_number || zohoSONumber
 
-    // Check if this order already exists (prevent duplicates)
+    // Check if this order already exists by SO number in reference (prevent duplicates)
     const { data: existingOrder } = await supabase
       .from('orders')
       .select('id')
-      .eq('order_number', orderNumber)
+      .eq('reference', zohoSONumber)
       .maybeSingle()
 
     if (existingOrder) {
-      console.log('Order already exists:', orderNumber)
+      console.log('Order already exists for SO:', zohoSONumber)
       return new Response(JSON.stringify({ 
         success: true, 
         message: 'Order already exists', 
@@ -140,7 +143,7 @@ Deno.serve(async (req) => {
         status: 'ordered',
         total_amount: salesOrder.total || null,
         company_id: companyId,
-        reference: salesOrder.reference_number || null,
+        reference: zohoSONumber,
         notes: salesOrder.notes || null,
         urgency: 'normal',
       })
