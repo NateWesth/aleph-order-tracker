@@ -16,6 +16,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import SwipeableCard from "@/components/ui/SwipeableCard";
 import OrderQuickPeek from "./OrderQuickPeek";
 import OrderTags from "./OrderTags";
+import CircularProgress from "@/components/ui/CircularProgress";
 interface OrderItem {
   id: string;
   name: string;
@@ -141,6 +142,23 @@ function OrderStatusColumn({
       default:
         return null;
     }
+  };
+
+  const getOrderProgress = (order: Order) => {
+    const statusProgress: Record<string, number> = {
+      ordered: 25,
+      "in-stock": 50,
+      "in-progress": 75,
+      ready: 100,
+    };
+    const baseProgress = statusProgress[order.status || "ordered"] || 25;
+    // For "ordered" column, factor in item stock completion
+    if (config.key === "ordered" && order.items && order.items.length > 0) {
+      const inStock = order.items.filter(i => i.stock_status === "in-stock").length;
+      const itemProgress = (inStock / order.items.length) * 25; // 0-25% based on items
+      return Math.round(itemProgress);
+    }
+    return baseProgress;
   };
   const getItemStockSummary = (items: OrderItem[] | undefined) => {
     if (!items || items.length === 0) return null;
@@ -289,6 +307,7 @@ function OrderStatusColumn({
                   {order.companyName}
                 </span>
               </div>
+              <CircularProgress value={getOrderProgress(order)} size={24} strokeWidth={2.5} />
               {getUrgencyBadge(order.urgency)}
             </div>
 
