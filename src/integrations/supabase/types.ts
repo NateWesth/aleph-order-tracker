@@ -311,6 +311,53 @@ export type Database = {
           },
         ]
       }
+      order_templates: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          created_by: string
+          default_items: Json | null
+          default_notes: string | null
+          default_urgency: string | null
+          description: string | null
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          created_by: string
+          default_items?: Json | null
+          default_notes?: string | null
+          default_urgency?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          created_by?: string
+          default_items?: Json | null
+          default_notes?: string | null
+          default_urgency?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_templates_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_update_reads: {
         Row: {
           id: string

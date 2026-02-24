@@ -4,6 +4,7 @@ import { PullToRefresh } from "@/components/ui/PullToRefresh";
 import { useOrderCelebration, ConfettiOverlay } from "@/components/ui/OrderCelebration";
 import { Button } from "@/components/ui/button";
 import { Plus, Filter, ChevronDown, ChevronUp, Users } from "lucide-react";
+import OrderTemplatesDialog from "./components/OrderTemplatesDialog";
 import OverdueAlerts from "./components/OverdueAlerts";
 import SavedFiltersBar, { type OrderFilter } from "./components/SavedFiltersBar";
 import { DndContext, DragOverlay, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent, type DragStartEvent } from "@dnd-kit/core";
@@ -136,6 +137,7 @@ export default function OrdersPage({
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [templatePrefill, setTemplatePrefill] = useState<any>(null);
   const [submitting, setSubmitting] = useState(false);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>("all");
   const [activeFilter, setActiveFilter] = useState<OrderFilter | null>(null);
@@ -639,7 +641,19 @@ export default function OrdersPage({
               <span className="hidden sm:inline">Group</span>
             </Button>
 
-            <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+            {/* Order Templates */}
+            <OrderTemplatesDialog
+              companies={companies}
+              onUseTemplate={(template) => {
+                setTemplatePrefill(template);
+                setCreateDialogOpen(true);
+              }}
+            />
+
+            <Dialog open={createDialogOpen} onOpenChange={(v) => {
+              setCreateDialogOpen(v);
+              if (!v) setTemplatePrefill(null);
+            }}>
               <DialogTrigger asChild>
                 <Button size="sm" className="h-9 shrink-0">
                   <Plus className="h-4 w-4 sm:mr-2" />
@@ -653,7 +667,7 @@ export default function OrdersPage({
                     Fill in the order details below to create a new order.
                   </DialogDescription>
                 </DialogHeader>
-                <OrderForm onSubmit={handleCreateOrder} loading={submitting} />
+                <OrderForm onSubmit={handleCreateOrder} loading={submitting} templatePrefill={templatePrefill} />
               </DialogContent>
             </Dialog>
           </div>
