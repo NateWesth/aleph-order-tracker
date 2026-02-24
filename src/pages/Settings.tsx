@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { ArrowLeft, User, Building2, Moon, Sun, Palette, Check, LayoutGrid, RotateCcw, Package, Download, Smartphone, Share, Fingerprint, ScanFace, Trash2, Volume2 } from "lucide-react";
 import { isSoundEnabled, setSoundEnabled } from "@/utils/ambientSounds";
 import NotificationPreferences from "@/components/settings/NotificationPreferences";
+import ZohoIntegrationSettings from "@/components/settings/ZohoIntegrationSettings";
 import { 
   isBiometricAvailable, 
   getBiometricTypeName, 
@@ -462,6 +463,10 @@ const Settings = () => {
               </div>
             </CardContent>
           </Card>
+
+
+          {/* Zoho Books Integration */}
+          <ZohoIntegrationSettings />
 
           {/* Appearance Settings */}
           <Card>
