@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Flame } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { PageSkeleton } from "@/components/ui/PageSkeleton";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
@@ -116,13 +117,7 @@ export default function OrderActivityHeatmap() {
   const displayHours = [0, 3, 6, 9, 12, 15, 18, 21];
 
   if (loading) {
-    return (
-      <Card className="border-border/50">
-        <CardContent className="flex items-center justify-center py-12">
-          <div className="h-6 w-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-        </CardContent>
-      </Card>
-    );
+    return <PageSkeleton variant="heatmap" />;
   }
 
   return (

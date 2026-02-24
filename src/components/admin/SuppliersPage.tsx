@@ -35,6 +35,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PageSkeleton } from "@/components/ui/PageSkeleton";
 
 interface Supplier {
   id: string;
@@ -216,11 +217,7 @@ export default function SuppliersPage() {
   );
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <PageSkeleton variant="suppliers" />;
   }
 
   return (
