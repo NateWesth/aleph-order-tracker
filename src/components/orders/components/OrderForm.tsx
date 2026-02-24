@@ -52,6 +52,13 @@ interface PurchaseOrderEntry {
   purchaseOrderNumber: string;
 }
 
+interface TemplatePrefill {
+  companyId: string | null;
+  urgency: string;
+  notes: string;
+  items: { name: string; code: string; quantity: number }[];
+}
+
 interface OrderFormProps {
   onSubmit: (orderData: {
     orderNumber: string;
@@ -62,9 +69,10 @@ interface OrderFormProps {
     purchaseOrders: PurchaseOrderEntry[];
   }) => void;
   loading?: boolean;
+  templatePrefill?: TemplatePrefill | null;
 }
 
-const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
+const OrderForm = ({ onSubmit, loading = false, templatePrefill }: OrderFormProps) => {
   const { loadDraft, saveDraft, clearDraft } = useAutoSaveDraft();
   const [orderNumber, setOrderNumber] = useState("");
   const [companyId, setCompanyId] = useState("");
@@ -96,6 +104,22 @@ const OrderForm = ({ onSubmit, loading = false }: OrderFormProps) => {
       setDraftRestored(true);
     }
   }, [loadDraft]);
+
+  // Apply template prefill
+  useEffect(() => {
+    if (templatePrefill) {
+      if (templatePrefill.companyId) setCompanyId(templatePrefill.companyId);
+      if (templatePrefill.urgency) setUrgency(templatePrefill.urgency);
+      if (templatePrefill.items?.length > 0) {
+        setItems(templatePrefill.items.map(i => ({
+          id: crypto.randomUUID(),
+          name: i.name,
+          code: i.code || "",
+          quantity: i.quantity || 1,
+        })));
+      }
+    }
+  }, [templatePrefill]);
 
   // Auto-save draft on field changes
   useEffect(() => {
