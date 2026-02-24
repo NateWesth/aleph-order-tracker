@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Button } from "@/components/ui/button";
 import { 
   CirclePlus, ArrowRightLeft, FileUp, Link2, MessageSquare, 
-  Package, Loader2 
+  Package, Loader2, Filter
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -29,13 +30,22 @@ const ACTIVITY_ICONS: Record<string, React.ReactNode> = {
 };
 
 const ACTIVITY_COLORS: Record<string, string> = {
-  created: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
-  status_change: "bg-blue-500/10 text-blue-600 border-blue-500/20",
-  file_upload: "bg-purple-500/10 text-purple-600 border-purple-500/20",
-  po_added: "bg-amber-500/10 text-amber-600 border-amber-500/20",
-  message: "bg-cyan-500/10 text-cyan-600 border-cyan-500/20",
-  item_updated: "bg-orange-500/10 text-orange-600 border-orange-500/20",
+  created: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
+  status_change: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20",
+  file_upload: "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20",
+  po_added: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20",
+  message: "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/20",
+  item_updated: "bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20",
 };
+
+const FILTER_OPTIONS = [
+  { key: "all", label: "All" },
+  { key: "status_change", label: "Status" },
+  { key: "file_upload", label: "Files" },
+  { key: "po_added", label: "POs" },
+  { key: "message", label: "Messages" },
+  { key: "created", label: "Created" },
+];
 
 interface OrderActivityTimelineProps {
   orderId: string;
@@ -44,12 +54,12 @@ interface OrderActivityTimelineProps {
 export default function OrderActivityTimeline({ orderId }: OrderActivityTimelineProps) {
   const [activities, setActivities] = useState<ActivityEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [filterType, setFilterType] = useState("all");
 
   useEffect(() => {
     const fetchActivities = async () => {
       setLoading(true);
       try {
-        // Fetch activity logs
         const { data: logs, error } = await supabase
           .from("order_activity_log")
           .select("*")
@@ -59,7 +69,6 @@ export default function OrderActivityTimeline({ orderId }: OrderActivityTimeline
 
         if (error) throw error;
 
-        // Also fetch order_updates (messages) to include in timeline
         const { data: updates } = await supabase
           .from("order_updates")
           .select("id, message, user_id, created_at")
@@ -67,12 +76,10 @@ export default function OrderActivityTimeline({ orderId }: OrderActivityTimeline
           .order("created_at", { ascending: false })
           .limit(20);
 
-        // Collect unique user IDs
         const userIds = new Set<string>();
         logs?.forEach(l => l.user_id && userIds.add(l.user_id));
         updates?.forEach(u => u.user_id && userIds.add(u.user_id));
 
-        // Fetch user names
         let userMap: Record<string, string> = {};
         if (userIds.size > 0) {
           const { data: profiles } = await supabase
@@ -84,7 +91,6 @@ export default function OrderActivityTimeline({ orderId }: OrderActivityTimeline
           });
         }
 
-        // Combine logs and messages
         const combinedActivities: ActivityEvent[] = [
           ...(logs || []).map(l => ({
             ...l,
@@ -102,7 +108,6 @@ export default function OrderActivityTimeline({ orderId }: OrderActivityTimeline
           })),
         ];
 
-        // Sort by date descending
         combinedActivities.sort((a, b) => 
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         );
@@ -117,6 +122,10 @@ export default function OrderActivityTimeline({ orderId }: OrderActivityTimeline
 
     fetchActivities();
   }, [orderId]);
+
+  const filteredActivities = filterType === "all" 
+    ? activities 
+    : activities.filter(a => a.activity_type === filterType);
 
   if (loading) {
     return (
@@ -135,49 +144,87 @@ export default function OrderActivityTimeline({ orderId }: OrderActivityTimeline
   }
 
   return (
-    <ScrollArea className="h-[400px] pr-4">
-      <div className="relative">
-        {/* Timeline line */}
-        <div className="absolute left-[19px] top-6 bottom-6 w-px bg-border" />
+    <div className="space-y-3">
+      {/* Filter chips */}
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <Filter className="h-3.5 w-3.5 text-muted-foreground" />
+        {FILTER_OPTIONS.map(opt => (
+          <Button
+            key={opt.key}
+            size="sm"
+            variant={filterType === opt.key ? "default" : "outline"}
+            className="h-7 text-xs rounded-full px-3"
+            onClick={() => setFilterType(opt.key)}
+          >
+            {opt.label}
+            {opt.key !== "all" && (
+              <span className="ml-1 opacity-60">
+                {activities.filter(a => opt.key === "all" || a.activity_type === opt.key).length}
+              </span>
+            )}
+          </Button>
+        ))}
+      </div>
 
-        <div className="space-y-1">
-          {activities.map((activity, i) => {
-            const iconColor = ACTIVITY_COLORS[activity.activity_type] || ACTIVITY_COLORS.item_updated;
-            const icon = ACTIVITY_ICONS[activity.activity_type] || <Package className="h-4 w-4" />;
-            const isFirst = i === 0;
+      <ScrollArea className="h-[400px] pr-4">
+        <div className="relative">
+          {/* Timeline line */}
+          <div className="absolute left-[19px] top-6 bottom-6 w-px bg-border" />
 
-            return (
-              <div key={activity.id} className="relative flex gap-3 py-2">
-                {/* Icon */}
-                <div className={cn(
-                  "relative z-10 flex items-center justify-center h-10 w-10 rounded-full border shrink-0",
-                  iconColor,
-                  isFirst && "ring-2 ring-primary/20"
+          <div className="space-y-1">
+            {filteredActivities.map((activity, i) => {
+              const iconColor = ACTIVITY_COLORS[activity.activity_type] || ACTIVITY_COLORS.item_updated;
+              const icon = ACTIVITY_ICONS[activity.activity_type] || <Package className="h-4 w-4" />;
+              const isFirst = i === 0;
+
+              return (
+                <div key={activity.id} className={cn(
+                  "relative flex gap-3 py-2.5 px-2 rounded-lg transition-colors",
+                  isFirst && "bg-muted/30"
                 )}>
-                  {icon}
-                </div>
+                  {/* Icon */}
+                  <div className={cn(
+                    "relative z-10 flex items-center justify-center h-10 w-10 rounded-full border shrink-0",
+                    iconColor,
+                    isFirst && "ring-2 ring-primary/20"
+                  )}>
+                    {icon}
+                  </div>
 
-                {/* Content */}
-                <div className="flex-1 min-w-0 pt-1">
-                  <p className="text-sm font-medium leading-tight">{activity.title}</p>
-                  {activity.description && (
-                    <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
-                      {activity.description}
-                    </p>
-                  )}
-                  <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-                    {activity.userName && <span>{activity.userName}</span>}
-                    {activity.userName && <span>•</span>}
-                    <span title={format(new Date(activity.created_at), "PPpp")}>
-                      {formatDistanceToNow(new Date(activity.created_at), { addSuffix: true })}
-                    </span>
+                  {/* Content */}
+                  <div className="flex-1 min-w-0 pt-1">
+                    <p className="text-sm font-medium leading-tight">{activity.title}</p>
+                    {activity.description && (
+                      <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
+                        {activity.description}
+                      </p>
+                    )}
+                    {/* Status change metadata */}
+                    {activity.activity_type === "status_change" && activity.metadata?.old_status && (
+                      <div className="flex items-center gap-1.5 mt-1">
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">
+                          {activity.metadata.old_status}
+                        </span>
+                        <ArrowRightLeft className="h-3 w-3 text-muted-foreground" />
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-medium">
+                          {activity.metadata.new_status}
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2 mt-1.5 text-xs text-muted-foreground">
+                      {activity.userName && <span className="font-medium">{activity.userName}</span>}
+                      {activity.userName && <span>•</span>}
+                      <span title={format(new Date(activity.created_at), "PPpp")}>
+                        {formatDistanceToNow(new Date(activity.created_at), { addSuffix: true })}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
-      </div>
-    </ScrollArea>
+      </ScrollArea>
+    </div>
   );
 }

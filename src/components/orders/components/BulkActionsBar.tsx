@@ -16,11 +16,10 @@ interface BulkActionsBarProps {
 }
 
 const STATUS_OPTIONS = [
-  { value: "pending", label: "Pending" },
-  { value: "ordered", label: "Ordered" },
+  { value: "ordered", label: "Awaiting Stock" },
   { value: "in-stock", label: "In Stock" },
-  { value: "processing", label: "Processing" },
-  { value: "completed", label: "Completed" },
+  { value: "in-progress", label: "In Progress" },
+  { value: "ready", label: "Ready for Delivery" },
   { value: "delivered", label: "Delivered" },
 ];
 
@@ -72,15 +71,29 @@ export default function BulkActionsBar({ selectedOrders, onClearSelection, onAct
     }
   };
 
+  const handleBulkDelete = async () => {
+    setLoading(true);
+    try {
+      const ids = selectedOrders.map(o => o.id);
+      const { error } = await supabase.from("orders").delete().in("id", ids);
+      if (error) throw error;
+      toast({ title: "Deleted", description: `${ids.length} orders deleted.` });
+      onClearSelection();
+      onActionComplete();
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleBulkExport = () => {
-    // Generate CSV
-    const headers = ["Order Number", "Company", "Status", "Urgency", "Amount", "Created"];
+    const headers = ["Order Number", "Company", "Status", "Urgency", "Created"];
     const rows = selectedOrders.map(o => [
       o.order_number,
-      o.companyName,
+      o.companyName || "",
       o.status || "pending",
       o.urgency || "normal",
-      o.total_amount?.toString() || "",
       o.created_at ? new Date(o.created_at).toLocaleDateString() : "",
     ]);
 
@@ -109,6 +122,9 @@ export default function BulkActionsBar({ selectedOrders, onClearSelection, onAct
           </Button>
           <Button size="sm" onClick={() => setShowStatusDialog(true)}>
             Update Status
+          </Button>
+          <Button size="sm" variant="destructive" onClick={handleBulkDelete} disabled={loading}>
+            Delete
           </Button>
           <Button size="sm" variant="ghost" onClick={onClearSelection}>
             Clear
