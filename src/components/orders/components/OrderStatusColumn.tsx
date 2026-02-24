@@ -52,6 +52,8 @@ interface OrderStatusColumnProps {
   canEditItems?: boolean;
   isExpanded?: boolean;
   onToggleExpand?: () => void;
+  selectedOrderIds?: Set<string>;
+  onToggleOrderSelection?: (orderId: string) => void;
 }
 // Draggable wrapper for order cards (desktop only)
 function DraggableCard({ id, children, disabled }: { id: string; children: React.ReactNode; disabled?: boolean }) {
@@ -75,7 +77,9 @@ function OrderStatusColumn({
   onBulkSetItemsStatus,
   canEditItems = false,
   isExpanded = true,
-  onToggleExpand
+  onToggleExpand,
+  selectedOrderIds,
+  onToggleOrderSelection
 }: OrderStatusColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: config.key });
   const { stockStatusColors } = useTheme();
@@ -186,13 +190,22 @@ function OrderStatusColumn({
             const stockSummary = getItemStockSummary(order.items);
             const isExpanded = expandedOrders.has(order.id);
             const hasItems = order.items && order.items.length > 0;
-            const cardContent = <Card className={cn("glass-card glow-border hover-lift interactive-scale overflow-hidden", "animate-fade-in")} style={{
+            const isSelected = selectedOrderIds?.has(order.id) || false;
+            const cardContent = <Card className={cn("glass-card glow-border hover-lift interactive-scale overflow-hidden", "animate-fade-in", isSelected && "ring-2 ring-primary bg-primary/5")} style={{
               animationDelay: `${index * 30}ms`
             }}>
                     <CardContent className="p-2.5 sm:p-3">
                       <div className="space-y-2 sm:space-y-2.5">
                         {/* Order Header */}
                         <div className="flex items-start justify-between gap-2">
+                          {onToggleOrderSelection && (
+                            <Checkbox
+                              checked={isSelected}
+                              onCheckedChange={() => onToggleOrderSelection(order.id)}
+                              className="h-4 w-4 mt-0.5 shrink-0"
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                          )}
                           <div className="flex-1 min-w-0">
                             <span className="font-semibold text-xs sm:text-sm text-foreground block truncate">
                               {order.order_number}

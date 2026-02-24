@@ -29,6 +29,7 @@ import { useGlobalRealtimeOrders } from "./hooks/useGlobalRealtimeOrders";
 import { useCompanyData } from "@/components/admin/hooks/useCompanyData";
 import OrderForm from "./components/OrderForm";
 import OrderStatusColumn from "./components/OrderStatusColumn";
+import BulkActionsBar from "./components/BulkActionsBar";
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
 
 interface OrdersPageProps {
@@ -147,6 +148,34 @@ export default function OrdersPage({
   const { companies } = useCompanyData();
   const { boardColorMode, boardSingleColor, colorfulPreset, customBoardColor } = useTheme();
   const { showConfetti, streak, celebrate } = useOrderCelebration();
+  const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
+
+  const toggleOrderSelection = useCallback((orderId: string) => {
+    setSelectedOrderIds(prev => {
+      const next = new Set(prev);
+      if (next.has(orderId)) {
+        next.delete(orderId);
+      } else {
+        next.add(orderId);
+      }
+      return next;
+    });
+  }, []);
+
+  const selectedOrders = useMemo(() => 
+    orders.filter(o => selectedOrderIds.has(o.id)).map(o => ({
+      ...o,
+      total_amount: null,
+      notes: null,
+      reference: null,
+      supplier_id: null,
+      purchase_order_number: null,
+      progress_stage: null,
+      completed_date: null,
+      updated_at: null,
+    })) as any[],
+    [orders, selectedOrderIds]
+  );
 
   const STATUS_COLUMNS = useMemo(() => 
     getStatusColumns(boardColorMode, boardSingleColor, colorfulPreset, customBoardColor), 
@@ -543,6 +572,14 @@ export default function OrdersPage({
     <>
     <ConfettiOverlay show={showConfetti} streak={streak} />
     <PullToRefresh onRefresh={fetchOrders} className="space-y-3 sm:space-y-4 w-full overflow-x-hidden">
+      {/* Bulk Actions Bar */}
+      {selectedOrders.length > 0 && (
+        <BulkActionsBar
+          selectedOrders={selectedOrders}
+          onClearSelection={() => setSelectedOrderIds(new Set())}
+          onActionComplete={fetchOrders}
+        />
+      )}
       {/* Header */}
       <div className="flex flex-col gap-3 sm:gap-4">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -624,6 +661,8 @@ export default function OrdersPage({
             onSetItemStockStatus={handleSetItemStockStatus}
             onBulkSetItemsStatus={handleBulkSetItemsStatus}
             canEditItems={true}
+            selectedOrderIds={selectedOrderIds}
+            onToggleOrderSelection={toggleOrderSelection}
             isExpanded={expandedColumns.has(column.key)}
             onToggleExpand={() => {
               setExpandedColumns(prev => {
