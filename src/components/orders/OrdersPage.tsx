@@ -5,6 +5,7 @@ import { useOrderCelebration, ConfettiOverlay } from "@/components/ui/OrderCeleb
 import { Button } from "@/components/ui/button";
 import { Plus, Filter, ChevronDown, ChevronUp } from "lucide-react";
 import OverdueAlerts from "./components/OverdueAlerts";
+import SavedFiltersBar, { type OrderFilter } from "./components/SavedFiltersBar";
 import { DndContext, DragOverlay, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent, type DragStartEvent } from "@dnd-kit/core";
 import {
   Dialog,
@@ -136,6 +137,7 @@ export default function OrdersPage({
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>("all");
+  const [activeFilter, setActiveFilter] = useState<OrderFilter | null>(null);
   const [activeOrderId, setActiveOrderId] = useState<string | null>(null);
   // On desktop/tablet, all columns are always expanded (not collapsible)
   // On mobile, columns are collapsible and start collapsed
@@ -471,14 +473,34 @@ export default function OrdersPage({
   const filteredOrders = useMemo(() => {
     const searchLower = searchTerm.toLowerCase();
     return orders.filter((order) => {
+      const effectiveCompanyId = activeFilter?.companyId || selectedCompanyId;
       const matchesCompany =
-        selectedCompanyId === "all" || order.company_id === selectedCompanyId;
+        effectiveCompanyId === "all" || order.company_id === effectiveCompanyId;
       const matchesSearch =
         order.order_number.toLowerCase().includes(searchLower) ||
         order.companyName?.toLowerCase().includes(searchLower);
-      return matchesCompany && matchesSearch;
+      
+      // Urgency filter from saved filter
+      const matchesUrgency = !activeFilter?.urgency || activeFilter.urgency === "all" || order.urgency === activeFilter.urgency;
+      
+      // Date range filter
+      let matchesDate = true;
+      if (activeFilter?.dateRange && activeFilter.dateRange !== "all" && order.created_at) {
+        const orderDate = new Date(order.created_at);
+        const now = new Date();
+        if (activeFilter.dateRange === "today") {
+          matchesDate = orderDate.toDateString() === now.toDateString();
+        } else if (activeFilter.dateRange === "week") {
+          const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          matchesDate = orderDate >= weekAgo;
+        } else if (activeFilter.dateRange === "month") {
+          matchesDate = orderDate.getMonth() === now.getMonth() && orderDate.getFullYear() === now.getFullYear();
+        }
+      }
+      
+      return matchesCompany && matchesSearch && matchesUrgency && matchesDate;
     });
-  }, [orders, selectedCompanyId, searchTerm]);
+  }, [orders, selectedCompanyId, searchTerm, activeFilter]);
 
   // Priority order for urgency sorting (lower = higher priority)
   const urgencyPriority: Record<string, number> = useMemo(() => ({
@@ -539,6 +561,17 @@ export default function OrdersPage({
           </div>
           <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
             <OverdueAlerts />
+            {/* Saved Filters */}
+            <SavedFiltersBar
+              activeFilter={activeFilter}
+              onApplyFilter={(filter) => {
+                setActiveFilter(filter);
+                if (filter?.companyId && filter.companyId !== "all") {
+                  setSelectedCompanyId(filter.companyId);
+                }
+              }}
+              companies={companies}
+            />
             {/* Company Filter */}
             <div className="flex items-center gap-1.5 sm:gap-2 flex-1 sm:flex-none">
               <Filter className="h-4 w-4 text-muted-foreground shrink-0" />

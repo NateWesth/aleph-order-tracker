@@ -14,6 +14,7 @@ import CommandPalette from "@/components/admin/CommandPalette";
 import VoiceCommandButton from "@/components/admin/VoiceCommandButton";
 import SmartSearch from "@/components/admin/SmartSearch";
 import ActivityFeedSidebar from "@/components/admin/ActivityFeedSidebar";
+import OnlinePresenceIndicator from "@/components/admin/OnlinePresenceIndicator";
 import { Badge } from "@/components/ui/badge";
 import OrdersPage from "@/components/orders/OrdersPage";
 import CompletedPage from "@/components/orders/CompletedPage";
@@ -189,6 +190,7 @@ const AdminDashboard = () => {
 
             {/* Right side actions */}
             <div className="flex items-center gap-1">
+              <OnlinePresenceIndicator currentView={activeView} />
               <VoiceCommandButton onCommand={handleVoiceCommand} />
               <Button
                 variant="ghost"

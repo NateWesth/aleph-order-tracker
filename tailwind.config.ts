@@ -135,6 +135,11 @@ export default {
 					'0%': { opacity: '0', transform: 'translateY(8px) scale(0.995)' },
 					'100%': { opacity: '1', transform: 'translateY(0) scale(1)' }
 				},
+				'page-enter-smooth': {
+					'0%': { opacity: '0', transform: 'translateY(12px) scale(0.99)' },
+					'40%': { opacity: '0.6', transform: 'translateY(4px) scale(0.997)' },
+					'100%': { opacity: '1', transform: 'translateY(0) scale(1)' }
+				},
 				'aurora-1': {
 					'0%, 100%': { transform: 'translate(0%, 0%) scale(1)' },
 					'33%': { transform: 'translate(15%, 10%) scale(1.1)' },
@@ -161,6 +166,7 @@ export default {
 				'shimmer': 'shimmer 2s linear infinite',
 				'glow-pulse': 'glow-pulse 3s ease-in-out infinite',
 				'page-enter': 'page-enter 0.3s ease-out forwards',
+				'page-enter-smooth': 'page-enter-smooth 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards',
 				'aurora-1': 'aurora-1 20s ease-in-out infinite',
 				'aurora-2': 'aurora-2 25s ease-in-out infinite',
 				'aurora-3': 'aurora-3 22s ease-in-out infinite'
