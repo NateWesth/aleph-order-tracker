@@ -20,15 +20,26 @@ export default function ZohoIntegrationSettings() {
     fetchSyncLog();
   }, []);
 
+  const getAuthHeaders = async () => {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData?.session?.access_token;
+    return {
+      'Authorization': `Bearer ${token}`,
+      'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+    };
+  };
+
   const checkConnection = async () => {
     try {
       const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+      const headers = await getAuthHeaders();
       const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/zoho-auth?action=status`
+        `https://${projectId}.supabase.co/functions/v1/zoho-auth?action=status`,
+        { headers }
       );
-      const data = await response.json();
-      setConnected(data.connected);
-      setConnectionInfo(data);
+      const result = await response.json();
+      setConnected(result.connected);
+      setConnectionInfo(result);
     } catch (error) {
       console.error("Failed to check Zoho connection:", error);
     } finally {
@@ -45,19 +56,23 @@ export default function ZohoIntegrationSettings() {
     setSyncLog(data || []);
   };
 
+
   const handleConnect = async () => {
     try {
       const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+      const headers = await getAuthHeaders();
       const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/zoho-auth?action=authorize`
+        `https://${projectId}.supabase.co/functions/v1/zoho-auth?action=authorize`,
+        { headers }
       );
       const data = await response.json();
       if (data.auth_url) {
         window.open(data.auth_url, "_blank", "width=600,height=700");
-        // Poll for connection status
         const interval = setInterval(async () => {
+          const hdrs = await getAuthHeaders();
           const statusRes = await fetch(
-            `https://${projectId}.supabase.co/functions/v1/zoho-auth?action=status`
+            `https://${projectId}.supabase.co/functions/v1/zoho-auth?action=status`,
+            { headers: hdrs }
           );
           const statusData = await statusRes.json();
           if (statusData.connected) {
@@ -67,7 +82,6 @@ export default function ZohoIntegrationSettings() {
             toast({ title: "Connected!", description: "Zoho Books connected successfully." });
           }
         }, 3000);
-        // Stop polling after 5 minutes
         setTimeout(() => clearInterval(interval), 5 * 60 * 1000);
       }
     } catch (error) {
@@ -79,11 +93,12 @@ export default function ZohoIntegrationSettings() {
     setSyncing(true);
     try {
       const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+      const headers = await getAuthHeaders();
       const response = await fetch(
         `https://${projectId}.supabase.co/functions/v1/zoho-sync`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { ...headers, "Content-Type": "application/json" },
           body: JSON.stringify({ sync_type: "full" }),
         }
       );
