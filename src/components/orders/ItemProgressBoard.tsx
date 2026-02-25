@@ -44,6 +44,7 @@ interface Order {
   reference: string | null;
   company_id: string | null;
   companyName: string;
+  creatorName?: string;
   created_at: string;
   urgency: string | null;
 }
@@ -200,7 +201,7 @@ export default function ItemProgressBoard({ isAdmin }: ItemProgressBoardProps) {
       let ordersQuery = supabase
         .from('orders')
         .select(`
-          id, order_number, reference, company_id, created_at, urgency,
+          id, order_number, reference, company_id, user_id, created_at, urgency,
           companies (name)
         `)
         .in('status', ['received', 'in-progress', 'processing'])
@@ -231,6 +232,17 @@ export default function ItemProgressBoard({ isAdmin }: ItemProgressBoardProps) {
 
       if (itemsError) throw itemsError;
 
+      // Fetch creator profile names
+      const userIds = [...new Set(ordersData.map(o => (o as any).user_id).filter(Boolean))] as string[];
+      let userMap = new Map<string, string>();
+      if (userIds.length > 0) {
+        const { data: profilesData } = await supabase
+          .from('profiles')
+          .select('id, full_name')
+          .in('id', userIds);
+        userMap = new Map(profilesData?.map(p => [p.id, p.full_name || 'Unknown']) || []);
+      }
+
       // Combine orders with their items
       const ordersWithItems: OrderWithItems[] = ordersData.map(order => ({
         id: order.id,
@@ -238,6 +250,7 @@ export default function ItemProgressBoard({ isAdmin }: ItemProgressBoardProps) {
         reference: order.reference,
         company_id: order.company_id,
         companyName: (order.companies as any)?.name || 'Unknown Company',
+        creatorName: (order as any).user_id ? userMap.get((order as any).user_id) || undefined : undefined,
         created_at: order.created_at,
         urgency: order.urgency,
         items: (itemsData || [])
@@ -483,8 +496,9 @@ export default function ItemProgressBoard({ isAdmin }: ItemProgressBoardProps) {
                                       )}
                                     </div>
                                     <p className="text-xs text-muted-foreground truncate">{order.companyName}</p>
-                                    <p className="text-[8px] text-muted-foreground/30 font-light">
+                                    <p className="text-[8px] text-muted-foreground/40 font-light">
                                       {new Date(order.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} · {new Date(order.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                                      {order.creatorName && <> · {order.creatorName}</>}
                                     </p>
                                   </div>
                                   <div className="flex items-center gap-1 shrink-0">
@@ -564,8 +578,9 @@ export default function ItemProgressBoard({ isAdmin }: ItemProgressBoardProps) {
                                 )}
                               </div>
                               <p className="text-xs text-muted-foreground">{order.companyName}</p>
-                              <p className="text-[8px] text-muted-foreground/30 font-light">
+                              <p className="text-[8px] text-muted-foreground/40 font-light">
                                 {new Date(order.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} · {new Date(order.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                                {order.creatorName && <> · {order.creatorName}</>}
                               </p>
                             </div>
                             <div className="flex items-center gap-2 shrink-0">

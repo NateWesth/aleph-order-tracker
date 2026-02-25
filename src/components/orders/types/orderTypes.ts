@@ -27,4 +27,5 @@ export interface OrderWithCompany {
   purchase_order_number?: string | null;
   supplierName?: string | null;
   purchaseOrders?: PurchaseOrderInfo[];
+  creatorName?: string | null;
 }
