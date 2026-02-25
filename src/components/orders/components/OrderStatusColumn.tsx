@@ -312,6 +312,10 @@ function OrderStatusColumn({
                 <span className="text-[10px] sm:text-xs text-muted-foreground truncate block mt-0.5">
                   {order.companyName}
                 </span>
+                {/* Watermark timestamp */}
+                <span className="text-[8px] text-muted-foreground/30 font-light block mt-0.5">
+                  {order.created_at ? new Date(order.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''} · {order.created_at ? new Date(order.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : ''}
+                </span>
               </div>
               <CircularProgress value={getOrderProgress(order)} size={24} strokeWidth={2.5} />
               {getUrgencyBadge(order.urgency)}

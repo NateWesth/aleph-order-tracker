@@ -222,6 +222,8 @@ export type Database = {
       order_items: {
         Row: {
           code: string | null
+          completed_at: string | null
+          completed_by: string | null
           created_at: string
           id: string
           name: string
@@ -234,6 +236,8 @@ export type Database = {
         }
         Insert: {
           code?: string | null
+          completed_at?: string | null
+          completed_by?: string | null
           created_at?: string
           id?: string
           name: string
@@ -246,6 +250,8 @@ export type Database = {
         }
         Update: {
           code?: string | null
+          completed_at?: string | null
+          completed_by?: string | null
           created_at?: string
           id?: string
           name?: string
