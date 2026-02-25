@@ -115,58 +115,35 @@ async function handleInvoiceWebhook(
   const invoice = invData.invoice
   console.log('Invoice details:', invoice.invoice_number, '- Reference:', invoice.reference_number)
 
-  // The invoice reference_number should match the Zoho SO number,
-  // which is stored in our orders.reference field.
-  // Also try matching against salesorder_number from the invoice's salesorders array.
-  const possibleSONumbers: string[] = []
+  // The invoice's Reference# field must match our order_number exactly
+  const invoiceReference = invoice.reference_number
   
-  if (invoice.reference_number) {
-    possibleSONumbers.push(invoice.reference_number)
-  }
-  
-  // Zoho invoices can reference sales orders directly
-  if (invoice.salesorders && Array.isArray(invoice.salesorders)) {
-    for (const so of invoice.salesorders) {
-      if (so.salesorder_number) possibleSONumbers.push(so.salesorder_number)
-    }
-  }
-
-  if (possibleSONumbers.length === 0) {
-    console.log('No reference/SO number found on invoice to match orders')
+  if (!invoiceReference) {
+    console.log('No reference number found on invoice')
     return new Response(JSON.stringify({ 
       received: true, 
-      warning: 'No reference number on invoice to match orders' 
+      warning: 'No reference number on invoice' 
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
   }
 
-  console.log('Looking for orders with reference in:', possibleSONumbers)
+  console.log('Looking for order with order_number:', invoiceReference)
 
-  // Find matching order(s) in our app by the reference field (Zoho SO number)
+  // Find matching order by order_number = invoice reference
   const { data: matchingOrders, error: orderErr } = await supabase
     .from('orders')
     .select('id, order_number, reference')
-    .in('reference', possibleSONumbers)
+    .eq('order_number', invoiceReference)
 
   if (orderErr || !matchingOrders || matchingOrders.length === 0) {
-    // Also try matching by order_number
-    const { data: byOrderNum } = await supabase
-      .from('orders')
-      .select('id, order_number, reference')
-      .in('order_number', possibleSONumbers)
-
-    if (!byOrderNum || byOrderNum.length === 0) {
-      console.log('No matching orders found for SO numbers:', possibleSONumbers)
-      return new Response(JSON.stringify({ 
-        received: true, 
-        warning: 'No matching order found for invoice reference' 
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
-    }
-    
-    matchingOrders.push(...byOrderNum)
+    console.log('No matching order found for invoice reference:', invoiceReference)
+    return new Response(JSON.stringify({ 
+      received: true, 
+      warning: `No order found with order_number "${invoiceReference}"` 
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
   }
 
   const invoiceLineItems = invoice.line_items || []
