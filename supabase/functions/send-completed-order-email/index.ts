@@ -3,7 +3,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.8';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
 interface EmailRequest {
@@ -25,7 +25,6 @@ interface EmailRequest {
 }
 
 const serve_handler = async (req: Request): Promise<Response> => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -33,23 +32,39 @@ const serve_handler = async (req: Request): Promise<Response> => {
   try {
     console.log('Starting completed order email function...');
 
+    // Validate authentication
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized - Bearer token required' }),
+        { status: 401, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+      );
+    }
+
+    const supabaseAuth = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_ANON_KEY')!,
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: claimsData, error: claimsError } = await supabaseAuth.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid or expired token' }),
+        { status: 401, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+      );
+    }
+
     // Check for SendGrid API key
     const sendGridApiKey = Deno.env.get('SENDGRID_API_KEY');
     if (!sendGridApiKey) {
       console.error('SENDGRID_API_KEY environment variable is not set');
       return new Response(
         JSON.stringify({ error: 'SendGrid API key not configured' }),
-        {
-          status: 500,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders },
-        }
+        { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
       );
     }
-
-    // Initialize Supabase client
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Parse request body
     const emailRequest: EmailRequest = await req.json();
@@ -63,10 +78,7 @@ const serve_handler = async (req: Request): Promise<Response> => {
     if (!emailRequest.recipients || emailRequest.recipients.length === 0) {
       return new Response(
         JSON.stringify({ error: 'No recipients provided' }),
-        {
-          status: 400,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders },
-        }
+        { status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
       );
     }
 
@@ -186,23 +198,14 @@ const serve_handler = async (req: Request): Promise<Response> => {
         failedEmails,
         message: `Successfully sent ${sent} emails${failed > 0 ? `, ${failed} failed` : ''}`
       }),
-      {
-        status: 200,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders },
-      }
+      { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
     );
 
   } catch (error: any) {
     console.error('Error in send-completed-order-email function:', error);
     return new Response(
-      JSON.stringify({ 
-        error: 'Internal server error', 
-        details: error.message 
-      }),
-      {
-        status: 500,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders },
-      }
+      JSON.stringify({ error: 'Internal server error' }),
+      { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
     );
   }
 };
