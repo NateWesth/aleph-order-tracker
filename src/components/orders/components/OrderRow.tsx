@@ -204,10 +204,14 @@ export default function OrderRow({
             {/* Order header */}
             <div className="flex justify-between items-start gap-2">
               <div className="min-w-0 flex-1">
-                <div className={`font-medium truncate ${compact ? 'text-xs' : 'text-sm'}`}>{order.order_number}</div>
-                {order.reference && (
-                  <div className="text-xs text-muted-foreground truncate">{order.reference}</div>
-                )}
+                <div className="flex items-center gap-1.5">
+                  <span className={`font-medium truncate ${compact ? 'text-xs' : 'text-sm'}`}>{order.order_number}</span>
+                  {order.reference && (
+                    <span className="inline-flex items-center rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground whitespace-nowrap">
+                      SO: {order.reference}
+                    </span>
+                  )}
+                </div>
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
                 {isAdmin && <InlineUrgencyEdit orderId={order.id} currentValue={order.urgency || null} />}
@@ -346,10 +350,14 @@ export default function OrderRow({
       >
         <TableCell className={compact ? 'py-2' : ''}>
           <div>
-            <div className={`font-medium ${compact ? 'text-sm' : 'text-base'}`}>{order.order_number}</div>
-            {order.reference && (
-              <div className="text-xs text-muted-foreground">{order.reference}</div>
-            )}
+            <div className="flex items-center gap-1.5">
+              <span className={`font-medium ${compact ? 'text-sm' : 'text-base'}`}>{order.order_number}</span>
+              {order.reference && (
+                <span className="inline-flex items-center rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground whitespace-nowrap">
+                  SO: {order.reference}
+                </span>
+              )}
+            </div>
           </div>
         </TableCell>
         <TableCell className={`text-sm ${compact ? 'py-2' : ''}`}>{order.companyName || 'No Company'}</TableCell>
