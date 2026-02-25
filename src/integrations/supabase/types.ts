@@ -564,6 +564,8 @@ export type Database = {
           company_code: string | null
           company_id: string | null
           created_at: string | null
+          daily_afternoon_report: boolean
+          daily_morning_report: boolean
           email: string | null
           full_name: string | null
           id: string
@@ -576,6 +578,8 @@ export type Database = {
           company_code?: string | null
           company_id?: string | null
           created_at?: string | null
+          daily_afternoon_report?: boolean
+          daily_morning_report?: boolean
           email?: string | null
           full_name?: string | null
           id: string
@@ -588,6 +592,8 @@ export type Database = {
           company_code?: string | null
           company_id?: string | null
           created_at?: string | null
+          daily_afternoon_report?: boolean
+          daily_morning_report?: boolean
           email?: string | null
           full_name?: string | null
           id?: string
