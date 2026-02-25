@@ -246,8 +246,17 @@ export default function OrderRow({
             <div className="flex justify-between items-center gap-2">
               <div className="flex items-center gap-2 text-xs text-muted-foreground min-w-0">
                 <span className="truncate mr-2">{order.companyName || 'No Company'}</span>
-                <span className="flex-shrink-0">{new Date(order.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
               </div>
+            </div>
+            {/* Watermark timestamp */}
+            <div className="text-[9px] text-muted-foreground/40 font-light">
+              {new Date(order.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} · {new Date(order.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+              {order.completed_date && (
+                <span> · completed {new Date(order.completed_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} {new Date(order.completed_date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
+              )}
+              {!order.completed_date && order.updated_at && order.updated_at !== order.created_at && (
+                <span> · edited {new Date(order.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+              )}
             </div>
             {isAdmin && (
               <div className="mt-1">
@@ -358,6 +367,12 @@ export default function OrderRow({
                 </span>
               )}
             </div>
+            <span className="text-[9px] text-muted-foreground/30 font-light">
+              {new Date(order.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} · {new Date(order.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+              {order.completed_date && (
+                <> · completed {new Date(order.completed_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} {new Date(order.completed_date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</>
+              )}
+            </span>
           </div>
         </TableCell>
         <TableCell className={`text-sm ${compact ? 'py-2' : ''}`}>{order.companyName || 'No Company'}</TableCell>

@@ -474,8 +474,18 @@ export default function ItemProgressBoard({ isAdmin }: ItemProgressBoardProps) {
                               <div className={`border rounded-lg bg-card border-l-4 ${getUrgencyColor(order.urgency)}`}>
                                 <CollapsibleTrigger className="w-full p-2 flex items-center justify-between hover:bg-muted/50 rounded-t-lg">
                                   <div className="text-left min-w-0">
-                                    <p className="text-sm font-medium truncate">#{order.order_number}</p>
+                                    <div className="flex items-center gap-1">
+                                      <p className="text-sm font-medium truncate">#{order.order_number}</p>
+                                      {order.reference && (
+                                        <span className="inline-flex items-center rounded bg-muted px-1 py-0.5 text-[9px] font-medium text-muted-foreground whitespace-nowrap">
+                                          SO: {order.reference}
+                                        </span>
+                                      )}
+                                    </div>
                                     <p className="text-xs text-muted-foreground truncate">{order.companyName}</p>
+                                    <p className="text-[8px] text-muted-foreground/30 font-light">
+                                      {new Date(order.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} · {new Date(order.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                                    </p>
                                   </div>
                                   <div className="flex items-center gap-1 shrink-0">
                                     <Badge variant="outline" className="text-xs">
@@ -545,8 +555,18 @@ export default function ItemProgressBoard({ isAdmin }: ItemProgressBoardProps) {
                         <div className={`border rounded-lg bg-card border-l-4 ${getUrgencyColor(order.urgency)}`}>
                           <CollapsibleTrigger className="w-full p-3 flex items-center justify-between">
                             <div className="text-left min-w-0">
-                              <p className="text-sm font-medium">#{order.order_number}</p>
+                              <div className="flex items-center gap-1">
+                                <p className="text-sm font-medium">#{order.order_number}</p>
+                                {order.reference && (
+                                  <span className="inline-flex items-center rounded bg-muted px-1 py-0.5 text-[9px] font-medium text-muted-foreground whitespace-nowrap">
+                                    SO: {order.reference}
+                                  </span>
+                                )}
+                              </div>
                               <p className="text-xs text-muted-foreground">{order.companyName}</p>
+                              <p className="text-[8px] text-muted-foreground/30 font-light">
+                                {new Date(order.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} · {new Date(order.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                              </p>
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
                               <Badge variant="outline" className="text-xs">
