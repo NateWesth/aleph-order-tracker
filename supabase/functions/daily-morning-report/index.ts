@@ -30,7 +30,6 @@ serve(async (req: Request): Promise<Response> => {
     }
     const resend = new Resend(resendApiKey);
 
-    // Get users who opted in for morning reports
     const { data: recipients, error: recipientsErr } = await supabase
       .from('profiles')
       .select('id, email, full_name')
@@ -45,7 +44,6 @@ serve(async (req: Request): Promise<Response> => {
 
     console.log(`Found ${recipients.length} recipients for morning report`);
 
-    // Fetch all active orders with items and company info
     const { data: orders } = await supabase
       .from('orders')
       .select('id, order_number, status, urgency, description, total_amount, created_at, company_id, companies(name)')
@@ -64,72 +62,154 @@ serve(async (req: Request): Promise<Response> => {
     const items = allItems || [];
     const pos = allPOs || [];
 
-    // Categorize orders
+    // Categorize
     const awaitingStockOrders = activeOrders.filter(o => {
-      const orderItems = items.filter(i => i.order_id === o.id);
-      return orderItems.some(i => i.progress_stage === 'awaiting-stock');
+      const oi = items.filter(i => i.order_id === o.id);
+      return oi.some(i => i.progress_stage === 'awaiting-stock');
     });
-
     const inStockOrders = activeOrders.filter(o => {
-      const orderItems = items.filter(i => i.order_id === o.id);
-      return orderItems.length > 0 && orderItems.every(i => i.progress_stage === 'in-stock') && !awaitingStockOrders.includes(o);
+      const oi = items.filter(i => i.order_id === o.id);
+      return oi.length > 0 && oi.every(i => i.progress_stage === 'in-stock') && !awaitingStockOrders.includes(o);
     });
-
     const readyForDeliveryOrders = activeOrders.filter(o => {
-      const orderItems = items.filter(i => i.order_id === o.id);
-      return orderItems.some(i => i.progress_stage === 'ready-for-delivery');
+      const oi = items.filter(i => i.order_id === o.id);
+      return oi.some(i => i.progress_stage === 'ready-for-delivery');
     });
-
     const pendingOrders = activeOrders.filter(o => o.status === 'pending');
     const processingOrders = activeOrders.filter(o => o.status === 'processing');
 
     const today = new Date().toLocaleDateString('en-ZA', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
-    // Build awaiting stock section (primary focus)
-    let awaitingStockHtml = '';
-    awaitingStockOrders.forEach(order => {
+    // Helper: build an order card with item bullet list
+    const buildOrderCard = (order: any, filterStage?: string) => {
       const companyName = (order.companies as any)?.name || 'Unknown';
-      const orderItems = items.filter(i => i.order_id === order.id && i.progress_stage === 'awaiting-stock');
+      const orderItems = filterStage
+        ? items.filter(i => i.order_id === order.id && i.progress_stage === filterStage)
+        : items.filter(i => i.order_id === order.id);
       const orderPOs = pos.filter(p => p.order_id === order.id);
-      
-      awaitingStockHtml += `
-        <tr style="border-bottom: 1px solid #e5e7eb;">
-          <td style="padding: 12px 8px; font-weight: 600; color: #1f2937;">${order.order_number}</td>
-          <td style="padding: 12px 8px; color: #374151;">${companyName}</td>
-          <td style="padding: 12px 8px; color: #374151;">
-            ${orderItems.map(i => `${i.name}${i.code ? ` (${i.code})` : ''} × ${i.quantity}`).join('<br/>')}
-          </td>
-          <td style="padding: 12px 8px; color: #374151;">
-            ${orderPOs.length > 0 ? orderPOs.map(p => `${p.purchase_order_number} - ${(p.suppliers as any)?.name || ''}`).join('<br/>') : '—'}
-          </td>
-          <td style="padding: 12px 8px;">
-            <span style="background: ${order.urgency === 'urgent' ? '#fef2f2' : order.urgency === 'high' ? '#fff7ed' : '#f0fdf4'}; color: ${order.urgency === 'urgent' ? '#dc2626' : order.urgency === 'high' ? '#ea580c' : '#16a34a'}; padding: 2px 8px; border-radius: 12px; font-size: 12px;">
-              ${order.urgency || 'normal'}
-            </span>
-          </td>
-        </tr>`;
-    });
+      const urgencyColor = order.urgency === 'urgent' ? '#dc2626' : order.urgency === 'high' ? '#ea580c' : '#6b7280';
+      const urgencyBg = order.urgency === 'urgent' ? '#fef2f2' : order.urgency === 'high' ? '#fff7ed' : '#f3f4f6';
 
-    // Build summary rows for other stages
-    const buildSummaryRows = (orderList: any[]) => {
+      return `
+        <div style="background: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin-bottom: 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <div>
+              <span style="font-weight: 700; font-size: 15px; color: #111827;">${order.order_number}</span>
+              <span style="color: #6b7280; font-size: 13px; margin-left: 8px;">— ${companyName}</span>
+            </div>
+            <span style="background: ${urgencyBg}; color: ${urgencyColor}; padding: 3px 10px; border-radius: 99px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">${order.urgency || 'normal'}</span>
+          </div>
+          ${orderPOs.length > 0 ? `<div style="font-size: 12px; color: #9ca3af; margin-bottom: 8px;">PO: ${orderPOs.map(p => `${p.purchase_order_number} (${(p.suppliers as any)?.name || '—'})`).join(', ')}</div>` : ''}
+          ${orderItems.length > 0 ? `
+            <ul style="margin: 0; padding: 0 0 0 18px; list-style-type: disc;">
+              ${orderItems.map(i => `<li style="color: #374151; font-size: 13px; padding: 2px 0;">${i.name}${i.code ? ` <span style="color: #9ca3af;">(${i.code})</span>` : ''} <span style="color: #6b7280;">× ${i.quantity}</span></li>`).join('')}
+            </ul>` : '<p style="color: #9ca3af; font-size: 13px; margin: 0;">No items</p>'}
+        </div>`;
+    };
+
+    // Helper: build a compact list for secondary sections
+    const buildCompactList = (orderList: any[]) => {
+      if (orderList.length === 0) return '<p style="color: #9ca3af; font-size: 13px; font-style: italic; margin: 8px 0;">None at this time.</p>';
       return orderList.map(o => {
         const companyName = (o.companies as any)?.name || 'Unknown';
         const orderItems = items.filter(i => i.order_id === o.id);
+        const urgencyColor = o.urgency === 'urgent' ? '#dc2626' : o.urgency === 'high' ? '#ea580c' : '#6b7280';
         return `
-          <tr style="border-bottom: 1px solid #e5e7eb;">
-            <td style="padding: 8px; color: #1f2937;">${o.order_number}</td>
-            <td style="padding: 8px; color: #374151;">${companyName}</td>
-            <td style="padding: 8px; color: #374151;">${orderItems.length} items</td>
-            <td style="padding: 8px;">
-              <span style="background: ${o.urgency === 'urgent' ? '#fef2f2' : '#f0fdf4'}; color: ${o.urgency === 'urgent' ? '#dc2626' : '#16a34a'}; padding: 2px 8px; border-radius: 12px; font-size: 12px;">${o.urgency || 'normal'}</span>
-            </td>
-          </tr>`;
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #f3f4f6;">
+            <div>
+              <span style="font-weight: 600; color: #111827; font-size: 14px;">${o.order_number}</span>
+              <span style="color: #6b7280; font-size: 13px; margin-left: 6px;">— ${companyName}</span>
+              <span style="color: #9ca3af; font-size: 12px; margin-left: 6px;">(${orderItems.length} item${orderItems.length !== 1 ? 's' : ''})</span>
+            </div>
+            <span style="color: ${urgencyColor}; font-size: 11px; font-weight: 600; text-transform: uppercase;">${o.urgency || 'normal'}</span>
+          </div>`;
       }).join('');
     };
 
-    // Build PDF content as base64
+    // Section heading helper
+    const sectionHeading = (icon: string, title: string, count: number, color: string) => `
+      <div style="margin-top: 28px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; border-bottom: 2px solid ${color}20; padding-bottom: 10px;">
+        <span style="font-size: 18px;">${icon}</span>
+        <h2 style="margin: 0; font-size: 16px; font-weight: 700; color: ${color};">${title}</h2>
+        <span style="background: ${color}15; color: ${color}; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 99px; margin-left: auto;">${count}</span>
+      </div>`;
+
+    const emailHtml = `
+    <!DOCTYPE html>
+    <html>
+    <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+    <body style="margin: 0; padding: 0; background: #f3f4f6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+      <div style="max-width: 640px; margin: 0 auto; background: #ffffff;">
+        
+        <!-- Header -->
+        <div style="background: #111827; padding: 32px 24px; text-align: center;">
+          <p style="color: #9ca3af; font-size: 11px; text-transform: uppercase; letter-spacing: 2px; margin: 0 0 4px;">Aleph Engineering & Supplies</p>
+          <h1 style="color: #ffffff; margin: 0; font-size: 22px; font-weight: 700;">Morning Progress Report</h1>
+          <p style="color: #6b7280; margin: 8px 0 0; font-size: 13px;">${today}</p>
+        </div>
+
+        <!-- Summary Bar -->
+        <div style="background: #f9fafb; padding: 16px 24px; border-bottom: 1px solid #e5e7eb;">
+          <table width="100%" cellpadding="0" cellspacing="0" style="text-align: center;">
+            <tr>
+              <td style="padding: 8px;">
+                <div style="font-size: 24px; font-weight: 800; color: #dc2626;">${awaitingStockOrders.length}</div>
+                <div style="font-size: 10px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px;">Awaiting Stock</div>
+              </td>
+              <td style="padding: 8px; border-left: 1px solid #e5e7eb;">
+                <div style="font-size: 24px; font-weight: 800; color: #2563eb;">${inStockOrders.length}</div>
+                <div style="font-size: 10px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px;">In Stock</div>
+              </td>
+              <td style="padding: 8px; border-left: 1px solid #e5e7eb;">
+                <div style="font-size: 24px; font-weight: 800; color: #16a34a;">${readyForDeliveryOrders.length}</div>
+                <div style="font-size: 10px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px;">Ready to Ship</div>
+              </td>
+              <td style="padding: 8px; border-left: 1px solid #e5e7eb;">
+                <div style="font-size: 24px; font-weight: 800; color: #111827;">${activeOrders.length}</div>
+                <div style="font-size: 10px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px;">Total Active</div>
+              </td>
+            </tr>
+          </table>
+        </div>
+
+        <div style="padding: 0 24px 24px;">
+
+          <!-- AWAITING STOCK — Primary focus -->
+          ${sectionHeading('⏳', 'Awaiting Stock', awaitingStockOrders.length, '#dc2626')}
+          ${awaitingStockOrders.length > 0
+            ? awaitingStockOrders.map(o => buildOrderCard(o, 'awaiting-stock')).join('')
+            : '<p style="color: #9ca3af; font-size: 13px; font-style: italic;">All items are in stock — great work! 🎉</p>'}
+
+          <!-- IN STOCK -->
+          ${sectionHeading('📦', 'In Stock', inStockOrders.length, '#2563eb')}
+          ${buildCompactList(inStockOrders)}
+
+          <!-- READY FOR DELIVERY -->
+          ${sectionHeading('🚚', 'Ready for Delivery', readyForDeliveryOrders.length, '#16a34a')}
+          ${buildCompactList(readyForDeliveryOrders)}
+
+          <!-- PENDING -->
+          ${sectionHeading('🕐', 'Pending', pendingOrders.length, '#ca8a04')}
+          ${buildCompactList(pendingOrders)}
+
+          <!-- PROCESSING -->
+          ${sectionHeading('⚙️', 'Processing', processingOrders.length, '#7c3aed')}
+          ${buildCompactList(processingOrders)}
+        </div>
+
+        <!-- Footer -->
+        <div style="background: #f9fafb; padding: 20px 24px; text-align: center; border-top: 1px solid #e5e7eb;">
+          <p style="font-size: 11px; color: #9ca3af; margin: 0;">Automated report · Aleph Engineering & Supplies</p>
+          <p style="font-size: 11px; color: #9ca3af; margin: 4px 0 0;">
+            <a href="https://aleph-order-tracker.lovable.app/settings" style="color: #6b7280; text-decoration: underline;">Manage report preferences</a>
+          </p>
+        </div>
+      </div>
+    </body>
+    </html>`;
+
+    // PDF content
     const pdfContent = buildPdfBase64({
-      title: 'Morning Progress Report',
       date: today,
       awaitingStockOrders,
       inStockOrders,
@@ -141,138 +221,6 @@ serve(async (req: Request): Promise<Response> => {
       activeOrders,
     });
 
-    const emailHtml = `
-    <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 800px; margin: 0 auto; background: #ffffff;">
-      <div style="background: linear-gradient(135deg, #059669, #10b981); padding: 32px; text-align: center;">
-        <h1 style="color: #ffffff; margin: 0; font-size: 24px;">☀️ Morning Progress Report</h1>
-        <p style="color: #d1fae5; margin: 8px 0 0; font-size: 14px;">${today}</p>
-      </div>
-      
-      <div style="padding: 24px;">
-        <!-- Quick Stats -->
-        <div style="display: flex; gap: 12px; margin-bottom: 24px;">
-          <div style="flex: 1; background: #fef2f2; border-radius: 8px; padding: 16px; text-align: center;">
-            <div style="font-size: 28px; font-weight: 700; color: #dc2626;">${awaitingStockOrders.length}</div>
-            <div style="font-size: 12px; color: #991b1b;">Awaiting Stock</div>
-          </div>
-          <div style="flex: 1; background: #eff6ff; border-radius: 8px; padding: 16px; text-align: center;">
-            <div style="font-size: 28px; font-weight: 700; color: #2563eb;">${inStockOrders.length}</div>
-            <div style="font-size: 12px; color: #1e40af;">In Stock</div>
-          </div>
-          <div style="flex: 1; background: #f0fdf4; border-radius: 8px; padding: 16px; text-align: center;">
-            <div style="font-size: 28px; font-weight: 700; color: #16a34a;">${readyForDeliveryOrders.length}</div>
-            <div style="font-size: 12px; color: #166534;">Ready for Delivery</div>
-          </div>
-          <div style="flex: 1; background: #fefce8; border-radius: 8px; padding: 16px; text-align: center;">
-            <div style="font-size: 28px; font-weight: 700; color: #ca8a04;">${activeOrders.length}</div>
-            <div style="font-size: 12px; color: #854d0e;">Total Active</div>
-          </div>
-        </div>
-
-        <!-- Awaiting Stock Section (Primary Focus) -->
-        <div style="margin-bottom: 32px;">
-          <h2 style="color: #dc2626; font-size: 18px; border-bottom: 2px solid #fecaca; padding-bottom: 8px;">
-            🔴 Orders Awaiting Stock (${awaitingStockOrders.length})
-          </h2>
-          ${awaitingStockOrders.length > 0 ? `
-          <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
-            <thead>
-              <tr style="background: #fef2f2;">
-                <th style="padding: 10px 8px; text-align: left; color: #991b1b; font-weight: 600;">Order #</th>
-                <th style="padding: 10px 8px; text-align: left; color: #991b1b; font-weight: 600;">Company</th>
-                <th style="padding: 10px 8px; text-align: left; color: #991b1b; font-weight: 600;">Items Awaiting</th>
-                <th style="padding: 10px 8px; text-align: left; color: #991b1b; font-weight: 600;">PO Info</th>
-                <th style="padding: 10px 8px; text-align: left; color: #991b1b; font-weight: 600;">Urgency</th>
-              </tr>
-            </thead>
-            <tbody>${awaitingStockHtml}</tbody>
-          </table>` : '<p style="color: #6b7280; font-style: italic;">No orders awaiting stock — great job! 🎉</p>'}
-        </div>
-
-        <!-- In Stock Section -->
-        <div style="margin-bottom: 24px;">
-          <h2 style="color: #2563eb; font-size: 16px; border-bottom: 2px solid #bfdbfe; padding-bottom: 8px;">
-            🔵 In Stock (${inStockOrders.length})
-          </h2>
-          ${inStockOrders.length > 0 ? `
-          <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
-            <thead>
-              <tr style="background: #eff6ff;">
-                <th style="padding: 8px; text-align: left;">Order #</th>
-                <th style="padding: 8px; text-align: left;">Company</th>
-                <th style="padding: 8px; text-align: left;">Items</th>
-                <th style="padding: 8px; text-align: left;">Urgency</th>
-              </tr>
-            </thead>
-            <tbody>${buildSummaryRows(inStockOrders)}</tbody>
-          </table>` : '<p style="color: #6b7280; font-style: italic;">None</p>'}
-        </div>
-
-        <!-- Ready for Delivery -->
-        <div style="margin-bottom: 24px;">
-          <h2 style="color: #16a34a; font-size: 16px; border-bottom: 2px solid #bbf7d0; padding-bottom: 8px;">
-            🟢 Ready for Delivery (${readyForDeliveryOrders.length})
-          </h2>
-          ${readyForDeliveryOrders.length > 0 ? `
-          <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
-            <thead>
-              <tr style="background: #f0fdf4;">
-                <th style="padding: 8px; text-align: left;">Order #</th>
-                <th style="padding: 8px; text-align: left;">Company</th>
-                <th style="padding: 8px; text-align: left;">Items</th>
-                <th style="padding: 8px; text-align: left;">Urgency</th>
-              </tr>
-            </thead>
-            <tbody>${buildSummaryRows(readyForDeliveryOrders)}</tbody>
-          </table>` : '<p style="color: #6b7280; font-style: italic;">None</p>'}
-        </div>
-
-        <!-- Pending Orders -->
-        <div style="margin-bottom: 24px;">
-          <h2 style="color: #ca8a04; font-size: 16px; border-bottom: 2px solid #fde68a; padding-bottom: 8px;">
-            🟡 Pending Orders (${pendingOrders.length})
-          </h2>
-          ${pendingOrders.length > 0 ? `
-          <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
-            <thead>
-              <tr style="background: #fefce8;">
-                <th style="padding: 8px; text-align: left;">Order #</th>
-                <th style="padding: 8px; text-align: left;">Company</th>
-                <th style="padding: 8px; text-align: left;">Items</th>
-                <th style="padding: 8px; text-align: left;">Urgency</th>
-              </tr>
-            </thead>
-            <tbody>${buildSummaryRows(pendingOrders)}</tbody>
-          </table>` : '<p style="color: #6b7280; font-style: italic;">None</p>'}
-        </div>
-
-        <!-- Processing Orders -->
-        <div style="margin-bottom: 24px;">
-          <h2 style="color: #7c3aed; font-size: 16px; border-bottom: 2px solid #c4b5fd; padding-bottom: 8px;">
-            🟣 Processing Orders (${processingOrders.length})
-          </h2>
-          ${processingOrders.length > 0 ? `
-          <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
-            <thead>
-              <tr style="background: #f5f3ff;">
-                <th style="padding: 8px; text-align: left;">Order #</th>
-                <th style="padding: 8px; text-align: left;">Company</th>
-                <th style="padding: 8px; text-align: left;">Items</th>
-                <th style="padding: 8px; text-align: left;">Urgency</th>
-              </tr>
-            </thead>
-            <tbody>${buildSummaryRows(processingOrders)}</tbody>
-          </table>` : '<p style="color: #6b7280; font-style: italic;">None</p>'}
-        </div>
-      </div>
-
-      <div style="background: #f9fafb; padding: 16px 24px; text-align: center; font-size: 12px; color: #6b7280;">
-        <p>This is an automated daily report from Aleph Engineering & Supplies Order Management System.</p>
-        <p>You can disable this report in your <a href="https://aleph-order-tracker.lovable.app/settings" style="color: #059669;">notification settings</a>.</p>
-      </div>
-    </div>`;
-
-    // Send to each recipient
     let sent = 0;
     let failed = 0;
 
@@ -282,7 +230,7 @@ serve(async (req: Request): Promise<Response> => {
         const { error: sendError } = await resend.emails.send({
           from: 'Aleph Order System <onboarding@resend.dev>',
           to: [recipient.email],
-          subject: `☀️ Morning Progress Report — ${today}`,
+          subject: `Morning Progress Report — ${today}`,
           html: emailHtml,
           attachments: [{
             content: pdfContent,
@@ -316,100 +264,113 @@ serve(async (req: Request): Promise<Response> => {
   }
 });
 
-// Simple PDF generation as base64 string (plain text PDF)
 function buildPdfBase64(data: any): string {
-  const { awaitingStockOrders, inStockOrders, readyForDeliveryOrders, pendingOrders, processingOrders, items, pos, date } = data;
+  const { awaitingStockOrders, inStockOrders, readyForDeliveryOrders, pendingOrders, processingOrders, items, pos, date, activeOrders } = data;
   
-  // Build simple text-based content for PDF
-  let lines: string[] = [];
-  lines.push('ALEPH ENGINEERING & SUPPLIES');
-  lines.push('Morning Progress Report');
-  lines.push(date);
-  lines.push('');
-  lines.push(`Total Active Orders: ${(awaitingStockOrders.length + inStockOrders.length + readyForDeliveryOrders.length + pendingOrders.length + processingOrders.length)}`);
-  lines.push('');
-  lines.push('=== AWAITING STOCK ===');
+  const lines: string[] = [];
+  const divider = '────────────────────────────────────────────────────────────';
   
-  awaitingStockOrders.forEach((o: any) => {
-    const companyName = (o.companies as any)?.name || 'Unknown';
-    const orderItems = items.filter((i: any) => i.order_id === o.id && i.progress_stage === 'awaiting-stock');
-    lines.push(`Order: ${o.order_number} | Company: ${companyName} | Urgency: ${o.urgency || 'normal'}`);
-    orderItems.forEach((i: any) => {
-      lines.push(`  - ${i.name}${i.code ? ` (${i.code})` : ''} x ${i.quantity}`);
+  lines.push('');
+  lines.push('    ALEPH ENGINEERING & SUPPLIES');
+  lines.push('    Morning Progress Report');
+  lines.push(`    ${date}`);
+  lines.push('');
+  lines.push(divider);
+  lines.push('');
+  lines.push(`    SUMMARY`);
+  lines.push(`    Awaiting Stock: ${awaitingStockOrders.length}    |    In Stock: ${inStockOrders.length}    |    Ready to Ship: ${readyForDeliveryOrders.length}    |    Total Active: ${(activeOrders || []).length}`);
+  lines.push('');
+  lines.push(divider);
+
+  // Awaiting Stock detail
+  lines.push('');
+  lines.push(`    AWAITING STOCK  (${awaitingStockOrders.length})`);
+  lines.push('');
+  if (awaitingStockOrders.length === 0) {
+    lines.push('    All items are in stock.');
+  } else {
+    awaitingStockOrders.forEach((o: any) => {
+      const companyName = (o.companies as any)?.name || 'Unknown';
+      const orderItems = items.filter((i: any) => i.order_id === o.id && i.progress_stage === 'awaiting-stock');
+      const orderPOs = pos.filter((p: any) => p.order_id === o.id);
+      lines.push(`    ${o.order_number}  -  ${companyName}  [${(o.urgency || 'normal').toUpperCase()}]`);
+      if (orderPOs.length > 0) {
+        lines.push(`    PO: ${orderPOs.map((p: any) => `${p.purchase_order_number} (${(p.suppliers as any)?.name || '-'})`).join(', ')}`);
+      }
+      lines.push('    Items:');
+      orderItems.forEach((i: any) => {
+        lines.push(`      * ${i.name}${i.code ? ` (${i.code})` : ''}  x${i.quantity}`);
+      });
+      lines.push('');
     });
-  });
-  
+  }
+
+  lines.push(divider);
+
+  // Helper for compact sections
+  const addCompactSection = (title: string, orderList: any[]) => {
+    lines.push('');
+    lines.push(`    ${title}  (${orderList.length})`);
+    lines.push('');
+    if (orderList.length === 0) {
+      lines.push('    None at this time.');
+    } else {
+      orderList.forEach((o: any) => {
+        const companyName = (o.companies as any)?.name || 'Unknown';
+        const orderItems = items.filter((i: any) => i.order_id === o.id);
+        lines.push(`    ${o.order_number}  -  ${companyName}  (${orderItems.length} item${orderItems.length !== 1 ? 's' : ''})  [${(o.urgency || 'normal').toUpperCase()}]`);
+      });
+    }
+    lines.push('');
+    lines.push(divider);
+  };
+
+  addCompactSection('IN STOCK', inStockOrders);
+  addCompactSection('READY FOR DELIVERY', readyForDeliveryOrders);
+  addCompactSection('PENDING', pendingOrders);
+  addCompactSection('PROCESSING', processingOrders);
+
   lines.push('');
-  lines.push('=== IN STOCK ===');
-  inStockOrders.forEach((o: any) => {
-    lines.push(`Order: ${o.order_number} | Company: ${(o.companies as any)?.name || 'Unknown'}`);
-  });
-  
-  lines.push('');
-  lines.push('=== READY FOR DELIVERY ===');
-  readyForDeliveryOrders.forEach((o: any) => {
-    lines.push(`Order: ${o.order_number} | Company: ${(o.companies as any)?.name || 'Unknown'}`);
-  });
-  
-  lines.push('');
-  lines.push('=== PENDING ===');
-  pendingOrders.forEach((o: any) => {
-    lines.push(`Order: ${o.order_number} | Company: ${(o.companies as any)?.name || 'Unknown'}`);
-  });
-  
-  lines.push('');
-  lines.push('=== PROCESSING ===');
-  processingOrders.forEach((o: any) => {
-    lines.push(`Order: ${o.order_number} | Company: ${(o.companies as any)?.name || 'Unknown'}`);
-  });
+  lines.push('    Generated automatically by Aleph Order Management System');
 
   const textContent = lines.join('\n');
+  const safeText = textContent.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)').replace(/[^\x20-\x7E\n]/g, '');
+  const textLines = safeText.split('\n');
   
-  // Create a minimal valid PDF
+  let stream = 'BT\n/F1 9 Tf\n';
+  let y = 760;
+  for (const line of textLines) {
+    if (y < 40) {
+      stream += `1 0 0 1 30 ${y} Tm\n(... report continues) Tj\n`;
+      break;
+    }
+    stream += `1 0 0 1 30 ${y} Tm\n(${line}) Tj\n`;
+    y -= 13;
+  }
+  stream += 'ET';
+  
   const pdfLines = [
     '%PDF-1.4',
     '1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj',
     '2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj',
+    `3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]/Contents 4 0 R/Resources<</Font<</F1 5 0 R>>>>>>endobj`,
+    `4 0 obj<</Length ${stream.length}>>\nstream\n${stream}\nendstream\nendobj`,
+    '5 0 obj<</Type/Font/Subtype/Type1/BaseFont/Courier>>endobj',
   ];
   
-  // Encode text content safely for PDF
-  const safeText = textContent.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
-  const textLines = safeText.split('\n');
-  
-  // Build content stream
-  let stream = 'BT\n/F1 10 Tf\n';
-  let y = 780;
-  for (const line of textLines) {
-    if (y < 40) {
-      // simple page break handling - just stop
-      stream += `1 0 0 1 40 ${y} Tm\n(... continued in full report) Tj\n`;
-      break;
-    }
-    stream += `1 0 0 1 40 ${y} Tm\n(${line}) Tj\n`;
-    y -= 14;
-  }
-  stream += 'ET';
-  
-  pdfLines.push(`3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]/Contents 4 0 R/Resources<</Font<</F1 5 0 R>>>>>>endobj`);
-  pdfLines.push(`4 0 obj<</Length ${stream.length}>>\nstream\n${stream}\nendstream\nendobj`);
-  pdfLines.push('5 0 obj<</Type/Font/Subtype/Type1/BaseFont/Courier>>endobj');
-  
   const xrefOffset = pdfLines.join('\n').length + 1;
-  pdfLines.push('xref');
-  pdfLines.push('0 6');
-  pdfLines.push('0000000000 65535 f ');
-  pdfLines.push('0000000009 00000 n ');
-  pdfLines.push('0000000058 00000 n ');
-  pdfLines.push('0000000115 00000 n ');
-  // These offsets are approximate but functional for basic PDFs
-  pdfLines.push('0000000300 00000 n ');
-  pdfLines.push('0000000500 00000 n ');
-  pdfLines.push('trailer<</Size 6/Root 1 0 R>>');
-  pdfLines.push(`startxref\n${xrefOffset}`);
-  pdfLines.push('%%EOF');
+  pdfLines.push('xref', '0 6',
+    '0000000000 65535 f ',
+    '0000000009 00000 n ',
+    '0000000058 00000 n ',
+    '0000000115 00000 n ',
+    '0000000300 00000 n ',
+    '0000000500 00000 n ',
+    'trailer<</Size 6/Root 1 0 R>>',
+    `startxref\n${xrefOffset}`,
+    '%%EOF'
+  );
   
   const pdfString = pdfLines.join('\n');
-  const encoder = new TextEncoder();
-  const pdfBytes = encoder.encode(pdfString);
-  return base64Encode(pdfBytes);
+  return base64Encode(new TextEncoder().encode(pdfString));
 }
