@@ -14,7 +14,6 @@ interface BiometricResult {
 }
 
 export const isBiometricAvailable = async (): Promise<BiometricResult> => {
-  // Only available on native platforms
   if (!Capacitor.isNativePlatform()) {
     return { isAvailable: false, biometryType: BiometryType.NONE };
   }
@@ -51,36 +50,35 @@ export const getBiometricTypeName = (type: BiometryType): string => {
   }
 };
 
-export const saveCredentials = async (
-  email: string,
-  password: string
-): Promise<boolean> => {
+/**
+ * Save a Supabase refresh token securely in device keystore.
+ * We store the refresh token (not the password) so that biometric login
+ * can re-establish a session without ever persisting the user's password.
+ */
+export const saveRefreshToken = async (refreshToken: string): Promise<boolean> => {
   if (!Capacitor.isNativePlatform()) {
     return false;
   }
 
   try {
     await NativeBiometric.setCredentials({
-      username: email,
-      password: password,
+      username: "supabase_refresh_token",
+      password: refreshToken,
       server: SERVER_ID,
     });
-    console.log("Credentials saved for biometric login");
-    
-    // Trigger success haptic when credentials are saved
+    console.log("Refresh token saved for biometric login");
     await triggerNotificationHaptic('success');
-    
     return true;
   } catch (error) {
-    console.error("Error saving credentials:", error);
+    console.error("Error saving refresh token:", error);
     return false;
   }
 };
 
-export const getCredentials = async (): Promise<{
-  email: string;
-  password: string;
-} | null> => {
+/**
+ * Retrieve the stored refresh token from device keystore.
+ */
+export const getRefreshToken = async (): Promise<string | null> => {
   if (!Capacitor.isNativePlatform()) {
     return null;
   }
@@ -89,12 +87,12 @@ export const getCredentials = async (): Promise<{
     const credentials = await NativeBiometric.getCredentials({
       server: SERVER_ID,
     });
-    return {
-      email: credentials.username,
-      password: credentials.password,
-    };
+    if (credentials.username === "supabase_refresh_token" && credentials.password) {
+      return credentials.password;
+    }
+    return null;
   } catch (error) {
-    console.error("Error getting credentials:", error);
+    console.error("Error getting refresh token:", error);
     return null;
   }
 };
@@ -109,10 +107,7 @@ export const deleteCredentials = async (): Promise<boolean> => {
       server: SERVER_ID,
     });
     console.log("Credentials deleted");
-    
-    // Trigger medium haptic when credentials are deleted
     await triggerHapticFeedback('medium');
-    
     return true;
   } catch (error) {
     console.error("Error deleting credentials:", error);
@@ -134,8 +129,6 @@ export const authenticateWithBiometric = async (
     }
 
     const biometricName = getBiometricTypeName(availability.biometryType);
-
-    // Trigger light haptic when biometric prompt appears
     await triggerHapticFeedback('light');
 
     await NativeBiometric.verifyIdentity({
@@ -148,21 +141,18 @@ export const authenticateWithBiometric = async (
       fallbackTitle: "Use Password",
     });
 
-    // Trigger success haptic on successful authentication
     await triggerNotificationHaptic('success');
-
     return true;
   } catch (error) {
     console.error("Biometric authentication failed:", error);
-    
-    // Trigger error haptic on failed authentication
     await triggerNotificationHaptic('error');
-    
     return false;
   }
 };
 
 export const hasStoredCredentials = async (): Promise<boolean> => {
-  const credentials = await getCredentials();
-  return credentials !== null && credentials.email !== "" && credentials.password !== "";
+  const token = await getRefreshToken();
+  return token !== null && token !== "";
 };
+
+// Legacy exports removed: saveCredentials, getCredentials (password-based) are no longer available

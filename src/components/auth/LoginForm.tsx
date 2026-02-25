@@ -12,8 +12,8 @@ import {
   isBiometricAvailable, 
   getBiometricTypeName, 
   authenticateWithBiometric, 
-  getCredentials, 
-  saveCredentials,
+  getRefreshToken, 
+  saveRefreshToken,
   hasStoredCredentials,
   BiometryType
 } from "@/utils/biometricAuth";
@@ -95,12 +95,12 @@ const LoginForm = () => {
         return false;
       }
 
-      // Save credentials for biometric login if available and requested
-      if (saveForBiometric && biometricAvailable) {
-        const saved = await saveCredentials(email, password);
+      // Save refresh token for biometric login if available and requested
+      if (saveForBiometric && biometricAvailable && data.session?.refresh_token) {
+        const saved = await saveRefreshToken(data.session.refresh_token);
         if (saved) {
           setHasSavedCredentials(true);
-          console.log("Credentials saved for future biometric login");
+          console.log("Refresh token saved for future biometric login");
         }
       }
 
@@ -181,12 +181,12 @@ const LoginForm = () => {
         return;
       }
 
-      // Get stored credentials
-      const credentials = await getCredentials();
+      // Get stored refresh token
+      const refreshToken = await getRefreshToken();
       
-      if (!credentials) {
+      if (!refreshToken) {
         toast({
-          title: "No Saved Credentials",
+          title: "No Saved Session",
           description: "Please log in with your email and password first to enable biometric login.",
           variant: "destructive",
         });
@@ -194,8 +194,47 @@ const LoginForm = () => {
         return;
       }
 
-      // Perform login with stored credentials
-      await performLogin(credentials.email, credentials.password, false);
+      // Use refresh token to establish a new session
+      const { data, error } = await supabase.auth.refreshSession({ refresh_token: refreshToken });
+      
+      if (error || !data.session) {
+        toast({
+          title: "Session Expired",
+          description: "Your saved session has expired. Please log in with your email and password.",
+          variant: "destructive",
+        });
+        setHasSavedCredentials(false);
+        return;
+      }
+
+      // Save the new refresh token for next time
+      if (data.session.refresh_token) {
+        await saveRefreshToken(data.session.refresh_token);
+      }
+
+      // Check approval
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('approved, full_name')
+        .eq('id', data.session.user.id)
+        .maybeSingle();
+
+      if (!profile?.approved) {
+        await supabase.auth.signOut();
+        toast({
+          title: "Pending Approval",
+          description: "Your account is pending approval by an administrator.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      toast({
+        title: "Success",
+        description: `Welcome back${profile.full_name ? `, ${profile.full_name}` : ''}!`,
+      });
+
+      navigate("/admin-dashboard");
       
     } catch (error) {
       console.error("Biometric login error:", error);
