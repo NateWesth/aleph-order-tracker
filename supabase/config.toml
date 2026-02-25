@@ -26,3 +26,9 @@ verify_jwt = false
 
 [functions.zoho-webhook]
 verify_jwt = false
+
+[functions.daily-morning-report]
+verify_jwt = false
+
+[functions.daily-afternoon-report]
+verify_jwt = false
