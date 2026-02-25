@@ -34,6 +34,7 @@ interface Order {
   created_at: string | null;
   companyName?: string;
   items?: OrderItem[];
+  reference?: string | null;
 }
 interface StatusConfig {
   key: string;
@@ -288,8 +289,13 @@ function OrderStatusColumn({
               <div className="flex-1 min-w-0">
                 <HoverCard openDelay={400} closeDelay={100}>
                   <HoverCardTrigger asChild>
-                    <span className="font-semibold text-xs sm:text-sm text-foreground block truncate cursor-help">
+                    <span className="font-semibold text-xs sm:text-sm text-foreground truncate cursor-help flex items-center gap-1">
                       {order.order_number}
+                      {order.reference && (
+                        <span className="inline-flex items-center rounded bg-muted px-1 py-0.5 text-[9px] font-medium text-muted-foreground whitespace-nowrap">
+                          SO: {order.reference}
+                        </span>
+                      )}
                     </span>
                   </HoverCardTrigger>
                   <HoverCardContent side="right" align="start" className="p-0 w-auto">
