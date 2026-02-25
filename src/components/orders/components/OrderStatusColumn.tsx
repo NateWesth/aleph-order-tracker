@@ -315,7 +315,7 @@ function OrderStatusColumn({
                   {order.companyName}
                 </span>
                 {/* Watermark timestamp */}
-                <span className="text-[8px] text-muted-foreground/60 font-light block mt-0.5">
+                <span className="text-[10px] text-muted-foreground/60 font-light block mt-0.5">
                   {order.created_at ? new Date(order.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''} · {order.created_at ? new Date(order.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : ''}
                   {order.creatorName && <> · {order.creatorName}</>}
                 </span>

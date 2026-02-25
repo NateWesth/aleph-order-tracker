@@ -249,7 +249,7 @@ export default function OrderRow({
               </div>
             </div>
             {/* Watermark timestamp */}
-            <div className="text-[9px] text-muted-foreground/60 font-light">
+            <div className="text-[10px] text-muted-foreground/60 font-light">
               {new Date(order.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} · {new Date(order.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
               {(order as any).creatorName && <> · {(order as any).creatorName}</>}
               {order.completed_date && (
@@ -368,7 +368,7 @@ export default function OrderRow({
                 </span>
               )}
             </div>
-            <span className="text-[9px] text-muted-foreground/60 font-light">
+            <span className="text-[10px] text-muted-foreground/60 font-light">
               {new Date(order.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} · {new Date(order.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
               {(order as any).creatorName && <> · {(order as any).creatorName}</>}
               {order.completed_date && (
