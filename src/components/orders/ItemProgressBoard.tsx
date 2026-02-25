@@ -496,7 +496,7 @@ export default function ItemProgressBoard({ isAdmin }: ItemProgressBoardProps) {
                                       )}
                                     </div>
                                     <p className="text-xs text-muted-foreground truncate">{order.companyName}</p>
-                                    <p className="text-[8px] text-muted-foreground/40 font-light">
+                                    <p className="text-[8px] text-muted-foreground/60 font-light">
                                       {new Date(order.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} · {new Date(order.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
                                       {order.creatorName && <> · {order.creatorName}</>}
                                     </p>
@@ -578,7 +578,7 @@ export default function ItemProgressBoard({ isAdmin }: ItemProgressBoardProps) {
                                 )}
                               </div>
                               <p className="text-xs text-muted-foreground">{order.companyName}</p>
-                              <p className="text-[8px] text-muted-foreground/40 font-light">
+                              <p className="text-[8px] text-muted-foreground/60 font-light">
                                 {new Date(order.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} · {new Date(order.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
                                 {order.creatorName && <> · {order.creatorName}</>}
                               </p>
