@@ -280,7 +280,7 @@ serve(async (req: Request): Promise<Response> => {
       if (!recipient.email) continue;
       try {
         const { error: sendError } = await resend.emails.send({
-          from: 'Aleph Order System <noreply@alepheng.co.za>',
+          from: 'Aleph Order System <onboarding@resend.dev>',
           to: [recipient.email],
           subject: `☀️ Morning Progress Report — ${today}`,
           html: emailHtml,
