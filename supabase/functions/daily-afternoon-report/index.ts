@@ -2,6 +2,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.8';
 import { encode as base64Encode } from "https://deno.land/std@0.190.0/encoding/base64.ts";
+import { Resend } from "npm:resend@4.0.0";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -21,12 +22,13 @@ serve(async (req: Request): Promise<Response> => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const sendgridApiKey = Deno.env.get('SENDGRID_API_KEY');
-    if (!sendgridApiKey) {
-      return new Response(JSON.stringify({ error: 'SENDGRID_API_KEY not configured' }), {
+    const resendApiKey = Deno.env.get('RESEND_API_KEY');
+    if (!resendApiKey) {
+      return new Response(JSON.stringify({ error: 'RESEND_API_KEY not configured' }), {
         status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
+    const resend = new Resend(resendApiKey);
 
     // Get users who opted in for afternoon reports
     const { data: recipients, error: recipientsErr } = await supabase
@@ -231,34 +233,22 @@ serve(async (req: Request): Promise<Response> => {
     for (const recipient of recipients) {
       if (!recipient.email) continue;
       try {
-        const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${sendgridApiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            from: { email: 'noreply@alepheng.co.za', name: 'Aleph Order System' },
-            personalizations: [{
-              to: [{ email: recipient.email, name: recipient.full_name || 'User' }],
-              subject: `🌅 Afternoon Summary Report — ${todayStr}`
-            }],
-            content: [{ type: 'text/html', value: emailHtml }],
-            attachments: [{
-              content: pdfContent,
-              filename: `afternoon-report-${new Date().toISOString().split('T')[0]}.pdf`,
-              type: 'application/pdf',
-              disposition: 'attachment'
-            }]
-          })
+        const { error: sendError } = await resend.emails.send({
+          from: 'Aleph Order System <noreply@alepheng.co.za>',
+          to: [recipient.email],
+          subject: `🌅 Afternoon Summary Report — ${todayStr}`,
+          html: emailHtml,
+          attachments: [{
+            content: pdfContent,
+            filename: `afternoon-report-${new Date().toISOString().split('T')[0]}.pdf`,
+          }]
         });
 
-        if (response.ok) {
+        if (!sendError) {
           sent++;
           console.log(`✅ Afternoon report sent to ${recipient.email}`);
         } else {
-          const errText = await response.text();
-          console.error(`❌ Failed to send to ${recipient.email}: ${errText}`);
+          console.error(`❌ Failed to send to ${recipient.email}:`, JSON.stringify(sendError));
           failed++;
         }
       } catch (err) {
