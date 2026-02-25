@@ -31,8 +31,10 @@ interface Order {
   status: string | null;
   urgency: string | null;
   company_id: string | null;
+  user_id: string | null;
   created_at: string | null;
   companyName?: string;
+  creatorName?: string;
   items?: OrderItem[];
   reference?: string | null;
 }
@@ -313,8 +315,9 @@ function OrderStatusColumn({
                   {order.companyName}
                 </span>
                 {/* Watermark timestamp */}
-                <span className="text-[8px] text-muted-foreground/30 font-light block mt-0.5">
+                <span className="text-[8px] text-muted-foreground/40 font-light block mt-0.5">
                   {order.created_at ? new Date(order.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''} · {order.created_at ? new Date(order.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : ''}
+                  {order.creatorName && <> · {order.creatorName}</>}
                 </span>
               </div>
               <CircularProgress value={getOrderProgress(order)} size={24} strokeWidth={2.5} />

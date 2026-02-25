@@ -251,8 +251,9 @@ export default function OrderRow({
             {/* Watermark timestamp */}
             <div className="text-[9px] text-muted-foreground/40 font-light">
               {new Date(order.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} · {new Date(order.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+              {(order as any).creatorName && <> · {(order as any).creatorName}</>}
               {order.completed_date && (
-                <span> · completed {new Date(order.completed_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} {new Date(order.completed_date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
+                <span className="text-muted-foreground/60"> · completed {new Date(order.completed_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} {new Date(order.completed_date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
               )}
               {!order.completed_date && order.updated_at && order.updated_at !== order.created_at && (
                 <span> · edited {new Date(order.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
@@ -367,10 +368,11 @@ export default function OrderRow({
                 </span>
               )}
             </div>
-            <span className="text-[9px] text-muted-foreground/30 font-light">
+            <span className="text-[9px] text-muted-foreground/40 font-light">
               {new Date(order.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} · {new Date(order.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+              {(order as any).creatorName && <> · {(order as any).creatorName}</>}
               {order.completed_date && (
-                <> · completed {new Date(order.completed_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} {new Date(order.completed_date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</>
+                <span className="text-muted-foreground/60"> · completed {new Date(order.completed_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} {new Date(order.completed_date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
               )}
             </span>
           </div>

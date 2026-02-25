@@ -61,8 +61,10 @@ interface Order {
   status: string | null;
   urgency: string | null;
   company_id: string | null;
+  user_id: string | null;
   created_at: string | null;
   companyName?: string;
+  creatorName?: string;
   items?: OrderItem[];
   purchaseOrders?: PurchaseOrderInfo[];
 }
@@ -202,7 +204,7 @@ export default function OrdersPage({
       // Fetch all orders except delivered (those go to history)
       const { data, error } = await supabase
         .from("orders")
-        .select("id, order_number, description, status, urgency, company_id, created_at, supplier_id, purchase_order_number")
+        .select("id, order_number, description, status, urgency, company_id, user_id, created_at, supplier_id, purchase_order_number")
         .neq("status", "delivered")
         .order("created_at", { ascending: false });
 
@@ -278,11 +280,23 @@ export default function OrdersPage({
         }
       }
 
+      // Fetch creator profile names
+      const userIds = [...new Set(data?.map((o) => o.user_id).filter(Boolean))] as string[];
+      let userMap = new Map<string, string>();
+      if (userIds.length > 0) {
+        const { data: profilesData } = await supabase
+          .from("profiles")
+          .select("id, full_name")
+          .in("id", userIds);
+        userMap = new Map(profilesData?.map((p) => [p.id, p.full_name || 'Unknown']) || []);
+      }
+
       const ordersWithData = (data || []).map((order) => ({
         ...order,
         companyName: order.company_id
           ? companyMap.get(order.company_id) || "Unknown"
           : "No Client",
+        creatorName: order.user_id ? userMap.get(order.user_id) || undefined : undefined,
         items: orderItemsMap.get(order.id) || [],
         purchaseOrders: orderPOsMap.get(order.id) || [],
       }));
