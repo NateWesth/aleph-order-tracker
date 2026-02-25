@@ -44,67 +44,103 @@ serve(async (req: Request): Promise<Response> => {
 
     console.log(`Found ${recipients.length} recipients for afternoon report`);
 
-    const today = new Date();
-    const startOfDay = new Date(today);
-    startOfDay.setHours(0, 0, 0, 0);
+    // Get today's date range (SAST = UTC+2)
+    const now = new Date();
+    const startOfDay = new Date(now);
+    startOfDay.setUTCHours(0, 0, 0, 0);
+    // Adjust for SAST: start of day in SAST is 22:00 UTC previous day
+    const startSAST = new Date(startOfDay.getTime() - 2 * 60 * 60 * 1000);
+    const endSAST = new Date(startSAST.getTime() + 24 * 60 * 60 * 1000);
 
+    // Orders completed TODAY (moved to delivered/history today)
     const { data: completedToday } = await supabase
       .from('orders')
-      .select('id, order_number, status, total_amount, completed_date, company_id, companies(name), description')
-      .eq('status', 'completed')
-      .gte('completed_date', startOfDay.toISOString())
+      .select('id, order_number, status, total_amount, completed_date, company_id, companies(name), description, urgency')
+      .eq('status', 'delivered')
+      .gte('completed_date', startSAST.toISOString())
+      .lt('completed_date', endSAST.toISOString())
       .order('completed_date', { ascending: false });
 
-    const { data: allActiveOrders } = await supabase
+    // Items completed today (individual item completions)
+    const { data: itemsCompletedToday } = await supabase
+      .from('order_items')
+      .select('id, name, code, quantity, completed_at, order_id')
+      .gte('completed_at', startSAST.toISOString())
+      .lt('completed_at', endSAST.toISOString());
+
+    // Current board state for movement summary
+    const { data: boardOrders } = await supabase
       .from('orders')
       .select('id, order_number, status, urgency, total_amount, company_id, companies(name)')
-      .not('status', 'eq', 'completed')
+      .neq('status', 'delivered')
       .order('created_at', { ascending: false });
 
     const { data: allItems } = await supabase
       .from('order_items')
-      .select('id, name, code, quantity, progress_stage, order_id');
+      .select('id, name, code, quantity, progress_stage, stock_status, order_id');
 
-    const activeOrders = allActiveOrders || [];
+    // Activity log for today's movements
+    const { data: todayActivity } = await supabase
+      .from('order_activity_log')
+      .select('id, title, description, activity_type, order_id, created_at')
+      .gte('created_at', startSAST.toISOString())
+      .lt('created_at', endSAST.toISOString())
+      .order('created_at', { ascending: false })
+      .limit(50);
+
+    const completedList = completedToday || [];
+    const active = boardOrders || [];
     const itemsList = allItems || [];
-    const completedTodayList = completedToday || [];
+    const activities = todayActivity || [];
+    const completedItems = itemsCompletedToday || [];
 
-    const awaitingDeliveryOrders = activeOrders.filter(o => {
-      const oi = itemsList.filter(i => i.order_id === o.id);
-      return oi.some(i => i.progress_stage === 'ready-for-delivery');
-    });
+    const todayRevenue = completedList.reduce((sum, o) => sum + (Number(o.total_amount) || 0), 0);
 
-    const todayRevenue = completedTodayList.reduce((sum, o) => sum + (Number(o.total_amount) || 0), 0);
-    const totalActiveValue = activeOrders.reduce((sum, o) => sum + (Number(o.total_amount) || 0), 0);
-    const urgentOrders = activeOrders.filter(o => o.urgency === 'urgent' || o.urgency === 'high');
+    // Board counts
+    const boardCounts = {
+      ordered: active.filter(o => o.status === 'ordered').length,
+      inStock: active.filter(o => o.status === 'in-stock').length,
+      inProgress: active.filter(o => o.status === 'in-progress').length,
+      ready: active.filter(o => o.status === 'ready').length,
+    };
 
-    const todayStr = today.toLocaleDateString('en-ZA', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    const todayStr = now.toLocaleDateString('en-ZA', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
-    // Helper: order card with items
-    const buildOrderCard = (order: any) => {
+    // Build completed order cards
+    const buildCompletedCard = (order: any) => {
       const companyName = (order.companies as any)?.name || 'Unknown';
       const orderItems = itemsList.filter(i => i.order_id === order.id);
       return `
-        <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #f3f4f6;">
-          <div>
-            <span style="font-weight: 600; color: #111827; font-size: 14px;">${order.order_number}</span>
-            <span style="color: #6b7280; font-size: 13px; margin-left: 6px;">— ${companyName}</span>
-            <span style="color: #9ca3af; font-size: 12px; margin-left: 6px;">(${orderItems.length} item${orderItems.length !== 1 ? 's' : ''})</span>
-          </div>
-          <span style="font-weight: 600; color: #111827; font-size: 13px;">${order.total_amount ? `R${Number(order.total_amount).toLocaleString()}` : '—'}</span>
+        <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; padding: 14px; margin-bottom: 10px;">
+          <table width="100%" cellpadding="0" cellspacing="0"><tr>
+            <td><span style="font-weight: 700; font-size: 14px; color: #111827;">${order.order_number}</span> <span style="color: #6b7280; font-size: 13px;">— ${companyName}</span></td>
+            <td style="text-align: right; font-weight: 700; color: #16a34a; font-size: 14px;">${order.total_amount ? `R${Number(order.total_amount).toLocaleString()}` : '—'}</td>
+          </tr></table>
+          ${orderItems.length > 0 ? `<ul style="margin: 8px 0 0; padding: 0 0 0 16px; list-style: disc;">${orderItems.map(i => `<li style="color: #374151; font-size: 12px; padding: 2px 0;">${i.name}${i.code ? ` (${i.code})` : ''} &times; ${i.quantity}</li>`).join('')}</ul>` : ''}
         </div>`;
     };
 
-    const buildCompactList = (orderList: any[]) => {
-      if (orderList.length === 0) return '<p style="color: #9ca3af; font-size: 13px; font-style: italic; margin: 8px 0;">None at this time.</p>';
-      return orderList.map(o => buildOrderCard(o)).join('');
+    // Build activity feed
+    const buildActivityFeed = () => {
+      if (activities.length === 0) return '<p style="color: #9ca3af; font-size: 13px; font-style: italic; margin: 8px 0;">No activity recorded today.</p>';
+      return `<table width="100%" cellpadding="0" cellspacing="0" style="font-size: 12px;">${activities.slice(0, 20).map(a => {
+        const time = new Date(a.created_at).toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' });
+        return `<tr style="border-bottom: 1px solid #f3f4f6;">
+          <td style="padding: 8px 0; color: #9ca3af; width: 50px; vertical-align: top;">${time}</td>
+          <td style="padding: 8px 0 8px 8px;"><span style="font-weight: 600; color: #111827;">${a.title}</span>${a.description ? `<br/><span style="color: #6b7280;">${a.description}</span>` : ''}</td>
+        </tr>`;
+      }).join('')}</table>`;
     };
 
-    const sectionHeading = (icon: string, title: string, count: number, color: string) => `
-      <div style="margin-top: 28px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; border-bottom: 2px solid ${color}20; padding-bottom: 10px;">
-        <span style="font-size: 18px;">${icon}</span>
-        <h2 style="margin: 0; font-size: 16px; font-weight: 700; color: ${color};">${title}</h2>
-        <span style="background: ${color}15; color: ${color}; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 99px; margin-left: auto;">${count}</span>
+    const sectionBlock = (icon: string, title: string, count: number, color: string, content: string) => `
+      <div style="margin-top: 28px;">
+        <table width="100%" cellpadding="0" cellspacing="0" style="border-bottom: 2px solid ${color}; padding-bottom: 8px; margin-bottom: 14px;">
+          <tr>
+            <td><span style="font-size: 16px; margin-right: 6px;">${icon}</span><span style="font-size: 16px; font-weight: 700; color: ${color};">${title}</span></td>
+            <td style="text-align: right;"><span style="background: ${color}; color: #ffffff; font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 99px;">${count}</span></td>
+          </tr>
+        </table>
+        ${content}
       </div>`;
 
     const emailHtml = `
@@ -112,73 +148,66 @@ serve(async (req: Request): Promise<Response> => {
     <html>
     <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
     <body style="margin: 0; padding: 0; background: #f3f4f6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-      <div style="max-width: 640px; margin: 0 auto; background: #ffffff;">
+      <div style="max-width: 600px; margin: 0 auto; background: #ffffff;">
         
-        <!-- Header -->
-        <div style="background: #111827; padding: 32px 24px; text-align: center;">
-          <p style="color: #9ca3af; font-size: 11px; text-transform: uppercase; letter-spacing: 2px; margin: 0 0 4px;">Aleph Engineering & Supplies</p>
-          <h1 style="color: #ffffff; margin: 0; font-size: 22px; font-weight: 700;">Afternoon Summary</h1>
-          <p style="color: #6b7280; margin: 8px 0 0; font-size: 13px;">${todayStr}</p>
+        <div style="background: #111827; padding: 28px 24px;">
+          <p style="color: #6b7280; font-size: 11px; text-transform: uppercase; letter-spacing: 2px; margin: 0 0 6px;">Aleph Engineering & Supplies</p>
+          <h1 style="color: #ffffff; margin: 0; font-size: 20px; font-weight: 700;">Afternoon Summary</h1>
+          <p style="color: #6b7280; margin: 6px 0 0; font-size: 13px;">${todayStr}</p>
         </div>
 
-        <!-- Summary Bar -->
-        <div style="background: #f9fafb; padding: 16px 24px; border-bottom: 1px solid #e5e7eb;">
+        <!-- Summary -->
+        <div style="padding: 16px 24px; background: #f9fafb; border-bottom: 1px solid #e5e7eb;">
           <table width="100%" cellpadding="0" cellspacing="0" style="text-align: center;">
             <tr>
-              <td style="padding: 8px;">
-                <div style="font-size: 24px; font-weight: 800; color: #16a34a;">${completedTodayList.length}</div>
-                <div style="font-size: 10px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px;">Completed</div>
-              </td>
-              <td style="padding: 8px; border-left: 1px solid #e5e7eb;">
-                <div style="font-size: 24px; font-weight: 800; color: #2563eb;">${awaitingDeliveryOrders.length}</div>
-                <div style="font-size: 10px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px;">Awaiting Delivery</div>
-              </td>
-              <td style="padding: 8px; border-left: 1px solid #e5e7eb;">
-                <div style="font-size: 24px; font-weight: 800; color: #16a34a;">R${todayRevenue.toLocaleString()}</div>
-                <div style="font-size: 10px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px;">Today's Revenue</div>
-              </td>
-              <td style="padding: 8px; border-left: 1px solid #e5e7eb;">
-                <div style="font-size: 24px; font-weight: 800; color: #dc2626;">${urgentOrders.length}</div>
-                <div style="font-size: 10px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px;">Urgent Active</div>
-              </td>
+              <td style="padding: 6px;"><div style="font-size: 22px; font-weight: 800; color: #16a34a;">${completedList.length}</div><div style="font-size: 10px; color: #6b7280; text-transform: uppercase;">Completed Today</div></td>
+              <td style="padding: 6px; border-left: 1px solid #e5e7eb;"><div style="font-size: 22px; font-weight: 800; color: #16a34a;">R${todayRevenue.toLocaleString()}</div><div style="font-size: 10px; color: #6b7280; text-transform: uppercase;">Revenue</div></td>
+              <td style="padding: 6px; border-left: 1px solid #e5e7eb;"><div style="font-size: 22px; font-weight: 800; color: #111827;">${active.length}</div><div style="font-size: 10px; color: #6b7280; text-transform: uppercase;">Still Active</div></td>
+              <td style="padding: 6px; border-left: 1px solid #e5e7eb;"><div style="font-size: 22px; font-weight: 800; color: #2563eb;">${activities.length}</div><div style="font-size: 10px; color: #6b7280; text-transform: uppercase;">Movements</div></td>
             </tr>
           </table>
         </div>
 
         <div style="padding: 0 24px 24px;">
 
-          <!-- COMPLETED TODAY -->
-          ${sectionHeading('✅', 'Completed Today', completedTodayList.length, '#16a34a')}
-          ${buildCompactList(completedTodayList)}
+          ${sectionBlock('✅', 'Completed Today', completedList.length, '#16a34a',
+            completedList.length > 0
+              ? completedList.map(o => buildCompletedCard(o)).join('')
+              : '<p style="color: #9ca3af; font-size: 13px; font-style: italic; margin: 8px 0;">No orders completed today.</p>'
+          )}
 
-          <!-- AWAITING DELIVERY -->
-          ${sectionHeading('🚚', 'Awaiting Delivery', awaitingDeliveryOrders.length, '#2563eb')}
-          ${buildCompactList(awaitingDeliveryOrders)}
-
-          <!-- URGENT STILL ACTIVE -->
-          ${urgentOrders.length > 0 ? `
-            ${sectionHeading('🚨', 'Urgent — Still Active', urgentOrders.length, '#dc2626')}
-            ${buildCompactList(urgentOrders)}
-          ` : ''}
-
-          <!-- End-of-Day Stats -->
-          <div style="margin-top: 28px; background: #f9fafb; border-radius: 8px; padding: 20px; border: 1px solid #e5e7eb;">
-            <h3 style="margin: 0 0 12px; font-size: 14px; font-weight: 700; color: #111827;">📊 End-of-Day Overview</h3>
-            <table style="width: 100%; font-size: 13px;">
-              <tr><td style="padding: 6px 0; color: #6b7280;">Total Active Orders</td><td style="text-align: right; font-weight: 600; color: #111827;">${activeOrders.length}</td></tr>
-              <tr><td style="padding: 6px 0; color: #6b7280;">Total Active Value</td><td style="text-align: right; font-weight: 600; color: #111827;">R${totalActiveValue.toLocaleString()}</td></tr>
-              <tr style="border-top: 1px solid #e5e7eb;"><td style="padding: 6px 0; color: #6b7280;">Completed Today</td><td style="text-align: right; font-weight: 600; color: #16a34a;">${completedTodayList.length}</td></tr>
-              <tr><td style="padding: 6px 0; color: #6b7280;">Today's Revenue</td><td style="text-align: right; font-weight: 600; color: #16a34a;">R${todayRevenue.toLocaleString()}</td></tr>
+          <!-- Board Snapshot -->
+          <div style="margin-top: 28px;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="border-bottom: 2px solid #111827; padding-bottom: 8px; margin-bottom: 14px;">
+              <tr><td><span style="font-size: 16px; margin-right: 6px;">📋</span><span style="font-size: 16px; font-weight: 700; color: #111827;">Current Board</span></td></tr>
+            </table>
+            <table width="100%" cellpadding="0" cellspacing="0" style="font-size: 13px;">
+              <tr style="border-bottom: 1px solid #f3f4f6;">
+                <td style="padding: 10px 0; color: #6b7280;">Awaiting Stock</td>
+                <td style="padding: 10px 0; text-align: right; font-weight: 700; color: #dc2626;">${boardCounts.ordered}</td>
+              </tr>
+              <tr style="border-bottom: 1px solid #f3f4f6;">
+                <td style="padding: 10px 0; color: #6b7280;">In Stock</td>
+                <td style="padding: 10px 0; text-align: right; font-weight: 700; color: #2563eb;">${boardCounts.inStock}</td>
+              </tr>
+              <tr style="border-bottom: 1px solid #f3f4f6;">
+                <td style="padding: 10px 0; color: #6b7280;">In Progress</td>
+                <td style="padding: 10px 0; text-align: right; font-weight: 700; color: #7c3aed;">${boardCounts.inProgress}</td>
+              </tr>
+              <tr>
+                <td style="padding: 10px 0; color: #6b7280;">Ready</td>
+                <td style="padding: 10px 0; text-align: right; font-weight: 700; color: #16a34a;">${boardCounts.ready}</td>
+              </tr>
             </table>
           </div>
+
+          ${activities.length > 0 ? sectionBlock('🔄', "Today's Activity", activities.length, '#6b7280', buildActivityFeed()) : ''}
+
         </div>
 
-        <!-- Footer -->
-        <div style="background: #f9fafb; padding: 20px 24px; text-align: center; border-top: 1px solid #e5e7eb;">
+        <div style="background: #f9fafb; padding: 16px 24px; text-align: center; border-top: 1px solid #e5e7eb;">
           <p style="font-size: 11px; color: #9ca3af; margin: 0;">Automated report · Aleph Engineering & Supplies</p>
-          <p style="font-size: 11px; color: #9ca3af; margin: 4px 0 0;">
-            <a href="https://aleph-order-tracker.lovable.app/settings" style="color: #6b7280; text-decoration: underline;">Manage report preferences</a>
-          </p>
+          <p style="font-size: 11px; margin: 4px 0 0;"><a href="https://aleph-order-tracker.lovable.app/settings" style="color: #6b7280;">Manage preferences</a></p>
         </div>
       </div>
     </body>
@@ -186,18 +215,15 @@ serve(async (req: Request): Promise<Response> => {
 
     const pdfContent = buildPdfBase64({
       date: todayStr,
-      completedToday: completedTodayList,
-      awaitingDelivery: awaitingDeliveryOrders,
-      urgentOrders,
+      completedToday: completedList,
+      boardCounts,
+      activities,
       todayRevenue,
-      totalActive: activeOrders.length,
-      totalActiveValue,
+      totalActive: active.length,
       itemsList,
     });
 
-    let sent = 0;
-    let failed = 0;
-
+    let sent = 0, failed = 0;
     for (const recipient of recipients) {
       if (!recipient.email) continue;
       try {
@@ -206,26 +232,14 @@ serve(async (req: Request): Promise<Response> => {
           to: [recipient.email],
           subject: `Afternoon Summary — ${todayStr}`,
           html: emailHtml,
-          attachments: [{
-            content: pdfContent,
-            filename: `afternoon-report-${new Date().toISOString().split('T')[0]}.pdf`,
-          }]
+          attachments: [{ content: pdfContent, filename: `afternoon-report-${new Date().toISOString().split('T')[0]}.pdf` }]
         });
-
-        if (!sendError) {
-          sent++;
-          console.log(`✅ Afternoon report sent to ${recipient.email}`);
-        } else {
-          console.error(`❌ Failed to send to ${recipient.email}:`, JSON.stringify(sendError));
-          failed++;
-        }
-      } catch (err) {
-        console.error(`❌ Error sending to ${recipient.email}:`, err);
-        failed++;
-      }
+        if (!sendError) { sent++; console.log(`✅ Sent to ${recipient.email}`); }
+        else { console.error(`❌ Failed ${recipient.email}:`, JSON.stringify(sendError)); failed++; }
+      } catch (err) { console.error(`❌ Error ${recipient.email}:`, err); failed++; }
     }
 
-    console.log(`=== Afternoon Report Complete: ${sent} sent, ${failed} failed ===`);
+    console.log(`=== Afternoon Report: ${sent} sent, ${failed} failed ===`);
     return new Response(JSON.stringify({ sent, failed, recipients: recipients.length }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
@@ -239,106 +253,57 @@ serve(async (req: Request): Promise<Response> => {
 });
 
 function buildPdfBase64(data: any): string {
-  const { date, completedToday, awaitingDelivery, urgentOrders, todayRevenue, totalActive, totalActiveValue, itemsList } = data;
+  const { date, completedToday, boardCounts, activities, todayRevenue, totalActive, itemsList } = data;
+  const L: string[] = [];
+  const div = '─'.repeat(60);
   
-  const lines: string[] = [];
-  const divider = '────────────────────────────────────────────────────────────';
-  
-  lines.push('');
-  lines.push('    ALEPH ENGINEERING & SUPPLIES');
-  lines.push('    Afternoon Summary Report');
-  lines.push(`    ${date}`);
-  lines.push('');
-  lines.push(divider);
-  lines.push('');
-  lines.push('    SUMMARY');
-  lines.push(`    Completed Today: ${completedToday.length}    |    Awaiting Delivery: ${awaitingDelivery.length}`);
-  lines.push(`    Today Revenue: R${todayRevenue.toLocaleString()}    |    Total Active: ${totalActive}    |    Active Value: R${totalActiveValue.toLocaleString()}`);
-  lines.push('');
-  lines.push(divider);
+  L.push('', '    ALEPH ENGINEERING & SUPPLIES', '    Afternoon Summary Report', `    ${date}`, '', div);
+  L.push('', '    SUMMARY');
+  L.push(`    Completed Today: ${completedToday.length}  |  Revenue: R${todayRevenue.toLocaleString()}  |  Active Orders: ${totalActive}`);
+  L.push('', div);
 
-  lines.push('');
-  lines.push(`    COMPLETED TODAY  (${completedToday.length})`);
-  lines.push('');
+  L.push('', `    COMPLETED TODAY  (${completedToday.length})`, '');
   if (completedToday.length === 0) {
-    lines.push('    No orders completed today.');
+    L.push('    No orders completed today.');
   } else {
     completedToday.forEach((o: any) => {
-      const companyName = (o.companies as any)?.name || 'Unknown';
-      const orderItems = itemsList.filter((i: any) => i.order_id === o.id);
-      lines.push(`    ${o.order_number}  -  ${companyName}  (${orderItems.length} items)  R${Number(o.total_amount || 0).toLocaleString()}`);
+      const company = (o.companies as any)?.name || 'Unknown';
+      const oi = itemsList.filter((i: any) => i.order_id === o.id);
+      L.push(`    ${o.order_number}  |  ${company}  |  R${Number(o.total_amount || 0).toLocaleString()}`);
+      if (oi.length > 0) {
+        oi.forEach((i: any) => L.push(`      - ${i.name}${i.code ? ` (${i.code})` : ''} x${i.quantity}`));
+      }
+      L.push('');
     });
   }
 
-  lines.push('');
-  lines.push(divider);
-  lines.push('');
-  lines.push(`    AWAITING DELIVERY  (${awaitingDelivery.length})`);
-  lines.push('');
-  if (awaitingDelivery.length === 0) {
-    lines.push('    None at this time.');
-  } else {
-    awaitingDelivery.forEach((o: any) => {
-      const companyName = (o.companies as any)?.name || 'Unknown';
-      lines.push(`    ${o.order_number}  -  ${companyName}  R${Number(o.total_amount || 0).toLocaleString()}`);
+  L.push(div, '', '    CURRENT BOARD STATUS', '');
+  L.push(`    Awaiting Stock:  ${boardCounts.ordered}`);
+  L.push(`    In Stock:        ${boardCounts.inStock}`);
+  L.push(`    In Progress:     ${boardCounts.inProgress}`);
+  L.push(`    Ready:           ${boardCounts.ready}`);
+
+  if (activities.length > 0) {
+    L.push('', div, '', `    TODAY'S ACTIVITY  (${activities.length})`, '');
+    activities.slice(0, 20).forEach((a: any) => {
+      const time = new Date(a.created_at).toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' });
+      L.push(`    ${time}  ${a.title}${a.description ? ` - ${a.description}` : ''}`);
     });
   }
 
-  if (urgentOrders.length > 0) {
-    lines.push('');
-    lines.push(divider);
-    lines.push('');
-    lines.push(`    URGENT - STILL ACTIVE  (${urgentOrders.length})`);
-    lines.push('');
-    urgentOrders.forEach((o: any) => {
-      const companyName = (o.companies as any)?.name || 'Unknown';
-      lines.push(`    ${o.order_number}  -  ${companyName}  [${(o.urgency || '').toUpperCase()}]`);
-    });
-  }
+  L.push('', div, '', '    Generated by Aleph Order Management System');
 
-  lines.push('');
-  lines.push(divider);
-  lines.push('');
-  lines.push('    Generated automatically by Aleph Order Management System');
-
-  const textContent = lines.join('\n');
-  const safeText = textContent.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)').replace(/[^\x20-\x7E\n]/g, '');
-  const textLines = safeText.split('\n');
-  
-  let stream = 'BT\n/F1 9 Tf\n';
-  let y = 760;
-  for (const line of textLines) {
-    if (y < 40) {
-      stream += `1 0 0 1 30 ${y} Tm\n(... report continues) Tj\n`;
-      break;
-    }
-    stream += `1 0 0 1 30 ${y} Tm\n(${line}) Tj\n`;
-    y -= 13;
-  }
-  stream += 'ET';
-  
-  const pdfLines = [
-    '%PDF-1.4',
-    '1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj',
-    '2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj',
+  const text = L.join('\n');
+  const safe = text.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)').replace(/[^\x20-\x7E\n]/g, '');
+  const tl = safe.split('\n');
+  let s = 'BT\n/F1 9 Tf\n'; let y = 760;
+  for (const l of tl) { if (y < 40) { s += `1 0 0 1 30 ${y} Tm\n(... continues) Tj\n`; break; } s += `1 0 0 1 30 ${y} Tm\n(${l}) Tj\n`; y -= 13; }
+  s += 'ET';
+  const p = ['%PDF-1.4','1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj','2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj',
     `3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]/Contents 4 0 R/Resources<</Font<</F1 5 0 R>>>>>>endobj`,
-    `4 0 obj<</Length ${stream.length}>>\nstream\n${stream}\nendstream\nendobj`,
-    '5 0 obj<</Type/Font/Subtype/Type1/BaseFont/Courier>>endobj',
-  ];
-  
-  const xrefOffset = pdfLines.join('\n').length + 1;
-  pdfLines.push('xref', '0 6',
-    '0000000000 65535 f ',
-    '0000000009 00000 n ',
-    '0000000058 00000 n ',
-    '0000000115 00000 n ',
-    '0000000300 00000 n ',
-    '0000000500 00000 n ',
-    'trailer<</Size 6/Root 1 0 R>>',
-    `startxref\n${xrefOffset}`,
-    '%%EOF'
-  );
-  
-  const pdfString = pdfLines.join('\n');
-  return base64Encode(new TextEncoder().encode(pdfString));
+    `4 0 obj<</Length ${s.length}>>\nstream\n${s}\nendstream\nendobj`,'5 0 obj<</Type/Font/Subtype/Type1/BaseFont/Courier>>endobj'];
+  const xr = p.join('\n').length + 1;
+  p.push('xref','0 6','0000000000 65535 f ','0000000009 00000 n ','0000000058 00000 n ','0000000115 00000 n ','0000000300 00000 n ','0000000500 00000 n ',
+    'trailer<</Size 6/Root 1 0 R>>',`startxref\n${xr}`,'%%EOF');
+  return base64Encode(new TextEncoder().encode(p.join('\n')));
 }
