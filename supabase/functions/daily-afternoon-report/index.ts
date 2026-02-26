@@ -18,7 +18,8 @@ async function sendMailgun(domain: string, apiKey: string, to: string, subject: 
   const pdfBytes = Uint8Array.from(atob(pdfBase64), c => c.charCodeAt(0));
   form.append('attachment', new Blob([pdfBytes], { type: 'application/pdf' }), pdfFilename);
 
-  const resp = await fetch(`https://api.mailgun.net/v3/${domain}/messages`, {
+  const baseUrl = Deno.env.get('MAILGUN_BASE_URL') || 'https://api.mailgun.net';
+  const resp = await fetch(`${baseUrl}/v3/${domain}/messages`, {
     method: 'POST',
     headers: { 'Authorization': `Basic ${btoa(`api:${apiKey}`)}` },
     body: form,
