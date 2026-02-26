@@ -2,12 +2,33 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.8';
 import { encode as base64Encode } from "https://deno.land/std@0.190.0/encoding/base64.ts";
-import { Resend } from "npm:resend@4.0.0";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+async function sendMailgun(domain: string, apiKey: string, to: string, subject: string, html: string, pdfBase64: string, pdfFilename: string) {
+  const form = new FormData();
+  form.append('from', `Aleph Order System <mailgun@${domain}>`);
+  form.append('to', to);
+  form.append('subject', subject);
+  form.append('html', html);
+  
+  const pdfBytes = Uint8Array.from(atob(pdfBase64), c => c.charCodeAt(0));
+  form.append('attachment', new Blob([pdfBytes], { type: 'application/pdf' }), pdfFilename);
+
+  const resp = await fetch(`https://api.mailgun.net/v3/${domain}/messages`, {
+    method: 'POST',
+    headers: { 'Authorization': `Basic ${btoa(`api:${apiKey}`)}` },
+    body: form,
+  });
+  if (!resp.ok) {
+    const errText = await resp.text();
+    throw new Error(`Mailgun error ${resp.status}: ${errText}`);
+  }
+  return await resp.json();
+}
 
 serve(async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') {
@@ -22,13 +43,13 @@ serve(async (req: Request): Promise<Response> => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const resendApiKey = Deno.env.get('RESEND_API_KEY');
-    if (!resendApiKey) {
-      return new Response(JSON.stringify({ error: 'RESEND_API_KEY not configured' }), {
+    const mailgunApiKey = Deno.env.get('MAILGUN_API_KEY');
+    const mailgunDomain = Deno.env.get('MAILGUN_DOMAIN');
+    if (!mailgunApiKey || !mailgunDomain) {
+      return new Response(JSON.stringify({ error: 'MAILGUN_API_KEY or MAILGUN_DOMAIN not configured' }), {
         status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
-    const resend = new Resend(resendApiKey);
 
     const { data: recipients, error: recipientsErr } = await supabase
       .from('profiles')
@@ -214,19 +235,13 @@ serve(async (req: Request): Promise<Response> => {
       date: todayStr, completed, boardCounts, activities, todayRevenue, totalActive: active.length, itemsList,
     });
 
+    const pdfFilename = `afternoon-report-${new Date().toISOString().split('T')[0]}.pdf`;
     let sent = 0, failed = 0;
     for (const recipient of recipients) {
       if (!recipient.email) continue;
       try {
-        const { error: sendError } = await resend.emails.send({
-          from: 'Aleph Order System <onboarding@resend.dev>',
-          to: [recipient.email],
-          subject: `End of Day Summary — ${todayStr}`,
-          html: emailHtml,
-          attachments: [{ content: pdfContent, filename: `afternoon-report-${new Date().toISOString().split('T')[0]}.pdf` }]
-        });
-        if (!sendError) { sent++; console.log(`Sent to ${recipient.email}`); }
-        else { console.error(`Failed ${recipient.email}:`, JSON.stringify(sendError)); failed++; }
+        await sendMailgun(mailgunDomain, mailgunApiKey, recipient.email, `End of Day Summary — ${todayStr}`, emailHtml, pdfContent, pdfFilename);
+        sent++; console.log(`Sent to ${recipient.email}`);
       } catch (err) { console.error(`Error ${recipient.email}:`, err); failed++; }
     }
 
