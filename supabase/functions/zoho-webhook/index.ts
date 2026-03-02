@@ -53,6 +53,12 @@ Deno.serve(async (req) => {
 
     console.log('Zoho webhook received:', JSON.stringify(payload).substring(0, 500))
 
+    // Support lookup by salesorder_number (e.g. "SO-00005") for manual re-sync
+    const salesOrderNumber = payload.salesorder_number
+    if (salesOrderNumber) {
+      return await handleSalesOrderByNumber(supabase, payload, salesOrderNumber, clientId, clientSecret)
+    }
+
     // Detect event type - invoice or sales order
     const invoiceId = payload.invoice_id || payload.data?.invoice_id || payload.invoice?.invoice_id
     const salesOrderId = payload.salesorder_id || payload.resource_id || payload.id || 
@@ -88,6 +94,37 @@ Deno.serve(async (req) => {
     })
   }
 })
+
+// ─── SALES ORDER BY NUMBER (manual re-sync) ────────────────────────────────────
+
+async function handleSalesOrderByNumber(
+  supabase: any, payload: any, soNumber: string,
+  clientId: string, clientSecret: string
+) {
+  console.log('Looking up sales order by number:', soNumber)
+
+  const accessToken = await getValidAccessToken(supabase, clientId, clientSecret)
+  const orgId = await getOrgId(supabase)
+
+  // Search for the sales order by number
+  const searchResp = await fetch(
+    `${ZOHO_API_URL}/books/v3/salesorders?organization_id=${orgId}&salesorder_number=${encodeURIComponent(soNumber)}`,
+    { headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` } }
+  )
+  const searchData = await searchResp.json()
+
+  if (searchData.code !== 0 || !searchData.salesorders?.length) {
+    console.error('Sales order not found by number:', soNumber, searchData.message)
+    return new Response(JSON.stringify({ error: `Sales order ${soNumber} not found` }), {
+      status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
+  }
+
+  const salesOrderId = searchData.salesorders[0].salesorder_id
+  console.log('Found salesorder_id:', salesOrderId, 'for', soNumber)
+
+  return await handleSalesOrderWebhook(supabase, payload, salesOrderId, clientId, clientSecret)
+}
 
 // ─── INVOICE WEBHOOK HANDLER ───────────────────────────────────────────────────
 
