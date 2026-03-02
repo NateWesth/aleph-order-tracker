@@ -100,7 +100,6 @@ async function handleInvoiceWebhook(
   const accessToken = await getValidAccessToken(supabase, clientId, clientSecret)
   const orgId = await getOrgId(supabase)
 
-  // Fetch full invoice details from Zoho
   const invResponse = await fetch(
     `${ZOHO_API_URL}/books/v3/invoices/${invoiceId}?organization_id=${orgId}`,
     { headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` } }
@@ -115,7 +114,6 @@ async function handleInvoiceWebhook(
   const invoice = invData.invoice
   console.log('Invoice details:', invoice.invoice_number, '- Reference:', invoice.reference_number)
 
-  // The invoice's Reference# field must match our order_number exactly
   const invoiceReference = invoice.reference_number
   
   if (!invoiceReference) {
@@ -130,7 +128,6 @@ async function handleInvoiceWebhook(
 
   console.log('Looking for order with order_number:', invoiceReference)
 
-  // Find matching order by order_number = invoice reference
   const { data: matchingOrders, error: orderErr } = await supabase
     .from('orders')
     .select('id, order_number, reference')
@@ -152,7 +149,6 @@ async function handleInvoiceWebhook(
   for (const order of matchingOrders) {
     console.log(`Processing order ${order.order_number} (${order.id})`)
 
-    // Get all order items for this order
     const { data: orderItems, error: itemsErr } = await supabase
       .from('order_items')
       .select('id, name, code, quantity, progress_stage')
@@ -163,7 +159,6 @@ async function handleInvoiceWebhook(
       continue
     }
 
-    // Match invoice line items to order items by SKU/code AND quantity
     for (const invoiceLine of invoiceLineItems) {
       const invoiceSku = invoiceLine.sku || invoiceLine.item_code || null
       const invoiceQty = invoiceLine.quantity || 0
@@ -173,13 +168,11 @@ async function handleInvoiceWebhook(
         continue
       }
 
-      // Find matching order items by code (case-insensitive)
       const matchedItems = orderItems.filter((oi: any) => 
         oi.code && oi.code.toLowerCase() === invoiceSku.toLowerCase()
       )
 
       for (const matchedItem of matchedItems) {
-        // Only update if quantities match exactly
         if (matchedItem.quantity !== invoiceQty) {
           console.log(
             `Quantity mismatch for ${matchedItem.code}: order has ${matchedItem.quantity}, invoice has ${invoiceQty} - skipping`
@@ -187,7 +180,6 @@ async function handleInvoiceWebhook(
           continue
         }
 
-        // Only update if item is not already at or past ready-for-delivery
         if (matchedItem.progress_stage === 'ready-for-delivery' || matchedItem.progress_stage === 'completed') {
           console.log(`Item ${matchedItem.code} already at ${matchedItem.progress_stage} - skipping`)
           continue
@@ -211,7 +203,6 @@ async function handleInvoiceWebhook(
     }
   }
 
-  // Log sync
   await supabase.from('zoho_sync_log').insert({
     sync_type: 'invoice_webhook',
     status: 'completed',
@@ -242,7 +233,7 @@ async function handleSalesOrderWebhook(
   const accessToken = await getValidAccessToken(supabase, clientId, clientSecret)
   const orgId = await getOrgId(supabase)
 
-  // Fetch full sales order details from Zoho
+  // Fetch full sales order details from Zoho API
   const soResponse = await fetch(
     `${ZOHO_API_URL}/books/v3/salesorders/${salesOrderId}?organization_id=${orgId}`,
     { headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` } }
@@ -255,38 +246,82 @@ async function handleSalesOrderWebhook(
   }
 
   const salesOrder = soData.salesorder
-  console.log('Sales order details:', salesOrder.salesorder_number, '- Customer:', salesOrder.customer_name)
+  
+  // Also extract inline line_items from webhook payload as fallback
+  const inlineLineItems = payload.salesorder?.line_items || payload.line_items || []
+  
+  // Use API line_items first, fallback to inline payload
+  const lineItems = (salesOrder.line_items && salesOrder.line_items.length > 0) 
+    ? salesOrder.line_items 
+    : inlineLineItems
+
+  console.log('Sales order details:', salesOrder.salesorder_number, 
+    '- Customer:', salesOrder.customer_name,
+    '- Line items from API:', salesOrder.line_items?.length || 0,
+    '- Line items from payload:', inlineLineItems.length,
+    '- Using:', lineItems.length, 'items')
 
   // 1. Match or create the company from the customer
   let companyId: string | null = null
   if (salesOrder.customer_name || salesOrder.customer_id) {
     companyId = await matchOrCreateCompany(supabase, salesOrder)
+    console.log('Company matched/created:', companyId, 'for customer:', salesOrder.customer_name)
   }
 
   // 2. Map Zoho fields
   const zohoSONumber = salesOrder.salesorder_number || `SO-${salesOrderId}`
   const orderNumber = salesOrder.reference_number || zohoSONumber
 
-  // Check if this order already exists
+  // Check if this order already exists (by reference = SO number)
   const { data: existingOrder } = await supabase
     .from('orders')
-    .select('id')
+    .select('id, company_id')
     .eq('reference', zohoSONumber)
     .maybeSingle()
 
   if (existingOrder) {
-    console.log('Order already exists for SO:', zohoSONumber)
+    console.log('Order already exists for SO:', zohoSONumber, '- updating items and company')
+    
+    // UPDATE existing order: fix company_id if missing, and sync items
+    const updates: any = { updated_at: new Date().toISOString() }
+    if (!existingOrder.company_id && companyId) {
+      updates.company_id = companyId
+      console.log('Updating missing company_id to:', companyId)
+    }
+
+    // Update description from latest line items
+    const description = lineItems.map((li: any) =>
+      `${li.name || li.item_name} (Qty: ${li.quantity})`
+    ).join('\n')
+    if (description) {
+      updates.description = description
+    }
+
+    await supabase.from('orders').update(updates).eq('id', existingOrder.id)
+
+    // Sync items: add any new items not already in order_items
+    const itemsSynced = await syncOrderItems(supabase, existingOrder.id, lineItems)
+
+    await supabase.from('zoho_sync_log').insert({
+      sync_type: 'salesorder_webhook_update',
+      status: 'completed',
+      items_synced: itemsSynced,
+      completed_at: new Date().toISOString(),
+    })
+
     return new Response(JSON.stringify({ 
       success: true, 
-      message: 'Order already exists', 
-      order_id: existingOrder.id 
+      message: 'Order updated', 
+      order_id: existingOrder.id,
+      items_synced: itemsSynced,
+      company_updated: !existingOrder.company_id && companyId ? true : false,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
   }
 
   // 3. Create the order
-  const description = (salesOrder.line_items || []).map((li: any) =>
+  const description = lineItems.map((li: any) =>
     `${li.name || li.item_name} (Qty: ${li.quantity})`
   ).join('\n')
 
@@ -313,44 +348,7 @@ async function handleSalesOrderWebhook(
   console.log('Created order:', newOrder.id, orderNumber)
 
   // 4. Create order_items
-  const lineItems = salesOrder.line_items || []
-  let itemsCreated = 0
-
-  for (const lineItem of lineItems) {
-    const itemCode = lineItem.sku || lineItem.item_code || null
-    const itemName = lineItem.name || lineItem.item_name || lineItem.description || 'Unknown Item'
-
-    let matchedCode = itemCode
-    if (itemCode) {
-      const { data: existingItem } = await supabase
-        .from('items')
-        .select('code, name')
-        .ilike('code', itemCode)
-        .maybeSingle()
-
-      if (existingItem) {
-        matchedCode = existingItem.code
-      }
-    }
-
-    const { error: itemError } = await supabase
-      .from('order_items')
-      .insert({
-        order_id: newOrder.id,
-        name: itemName,
-        code: matchedCode,
-        quantity: lineItem.quantity || 1,
-        stock_status: 'awaiting',
-        progress_stage: 'awaiting-stock',
-        notes: lineItem.description !== itemName ? lineItem.description : null,
-      })
-
-    if (itemError) {
-      console.error(`Failed to create order item ${itemName}:`, itemError)
-    } else {
-      itemsCreated++
-    }
-  }
+  const itemsCreated = await syncOrderItems(supabase, newOrder.id, lineItems)
 
   // Log sync
   await supabase.from('zoho_sync_log').insert({
@@ -373,6 +371,72 @@ async function handleSalesOrderWebhook(
   })
 }
 
+// ─── SYNC ORDER ITEMS ──────────────────────────────────────────────────────────
+
+async function syncOrderItems(supabase: any, orderId: string, lineItems: any[]): Promise<number> {
+  // Get existing order items
+  const { data: existingItems } = await supabase
+    .from('order_items')
+    .select('id, name, code, quantity')
+    .eq('order_id', orderId)
+
+  const existing = existingItems || []
+  let itemsCreated = 0
+
+  for (const lineItem of lineItems) {
+    const itemCode = lineItem.sku || lineItem.item_code || null
+    const itemName = lineItem.name || lineItem.item_name || lineItem.description || 'Unknown Item'
+    const qty = lineItem.quantity || 1
+
+    // Check if this item already exists in the order (by code or name)
+    const alreadyExists = existing.some((ei: any) => {
+      if (itemCode && ei.code) {
+        return ei.code.toLowerCase() === itemCode.toLowerCase() && ei.quantity === qty
+      }
+      return ei.name.toLowerCase() === itemName.toLowerCase() && ei.quantity === qty
+    })
+
+    if (alreadyExists) {
+      console.log(`Item already exists: ${itemName} (Qty: ${qty}) - skipping`)
+      continue
+    }
+
+    // Try to match code from items table
+    let matchedCode = itemCode
+    if (itemCode) {
+      const { data: existingItem } = await supabase
+        .from('items')
+        .select('code, name')
+        .ilike('code', itemCode)
+        .maybeSingle()
+
+      if (existingItem) {
+        matchedCode = existingItem.code
+      }
+    }
+
+    const { error: itemError } = await supabase
+      .from('order_items')
+      .insert({
+        order_id: orderId,
+        name: itemName,
+        code: matchedCode,
+        quantity: qty,
+        stock_status: 'awaiting',
+        progress_stage: 'awaiting-stock',
+        notes: lineItem.description !== itemName ? lineItem.description : null,
+      })
+
+    if (itemError) {
+      console.error(`Failed to create order item ${itemName}:`, itemError)
+    } else {
+      itemsCreated++
+    }
+  }
+
+  return itemsCreated
+}
+
 // ─── SHARED HELPERS ────────────────────────────────────────────────────────────
 
 async function getOrgId(supabase: any): Promise<string> {
@@ -388,9 +452,12 @@ async function getOrgId(supabase: any): Promise<string> {
 }
 
 async function matchOrCreateCompany(supabase: any, salesOrder: any): Promise<string | null> {
-  const customerName = salesOrder.customer_name
+  const customerName = salesOrder.customer_name?.trim()
   const customerEmail = salesOrder.email
   
+  if (!customerName) return null
+
+  // 1. Exact name match (case-insensitive, trimmed)
   const { data: byName } = await supabase
     .from('companies')
     .select('id')
@@ -399,6 +466,27 @@ async function matchOrCreateCompany(supabase: any, salesOrder: any): Promise<str
 
   if (byName) return byName.id
 
+  // 2. Try matching with trimmed whitespace variations
+  const { data: byTrimmedName } = await supabase
+    .from('companies')
+    .select('id, name')
+    .ilike('name', `%${customerName}%`)
+
+  if (byTrimmedName && byTrimmedName.length > 0) {
+    // Find the best match - prefer exact substring match
+    for (const company of byTrimmedName) {
+      const companyNameNorm = company.name.trim().toLowerCase().replace(/\s+/g, ' ')
+      const customerNameNorm = customerName.toLowerCase().replace(/\s+/g, ' ')
+      if (companyNameNorm === customerNameNorm || 
+          companyNameNorm.includes(customerNameNorm) || 
+          customerNameNorm.includes(companyNameNorm)) {
+        console.log(`Fuzzy matched company: "${customerName}" -> "${company.name}" (${company.id})`)
+        return company.id
+      }
+    }
+  }
+
+  // 3. Try email match
   if (customerEmail) {
     const { data: byEmail } = await supabase
       .from('companies')
@@ -409,11 +497,22 @@ async function matchOrCreateCompany(supabase: any, salesOrder: any): Promise<str
     if (byEmail) return byEmail.id
   }
 
-  const code = `ZOHO-${salesOrder.customer_id || customerName.substring(0, 10).toUpperCase().replace(/\s/g, '')}`
+  // 4. Try matching by Zoho customer ID code
+  const zohoCode = `ZOHO-${salesOrder.customer_id}`
+  const { data: byZohoCode } = await supabase
+    .from('companies')
+    .select('id')
+    .eq('code', zohoCode)
+    .maybeSingle()
+
+  if (byZohoCode) return byZohoCode.id
+
+  // 5. Create new company
+  const code = salesOrder.customer_id ? `ZOHO-${salesOrder.customer_id}` : `ZOHO-${customerName.substring(0, 10).toUpperCase().replace(/\s/g, '')}`
   
   const { data: newCompany, error } = await supabase
     .from('companies')
-    .insert({
+    .upsert({
       code,
       name: customerName,
       email: customerEmail || null,
@@ -422,16 +521,22 @@ async function matchOrCreateCompany(supabase: any, salesOrder: any): Promise<str
         ? `${salesOrder.contact_person_details[0].first_name} ${salesOrder.contact_person_details[0].last_name || ''}`.trim()
         : null,
       address: formatAddress(salesOrder.billing_address),
-    })
+    }, { onConflict: 'code' })
     .select('id')
     .single()
 
   if (error) {
-    console.error('Failed to create company:', error)
-    return null
+    console.error('Failed to create/upsert company:', error)
+    // Last resort: try to find by code
+    const { data: existingByCode } = await supabase
+      .from('companies')
+      .select('id')
+      .eq('code', code)
+      .maybeSingle()
+    return existingByCode?.id || null
   }
 
-  console.log('Created new company:', customerName, newCompany.id)
+  console.log('Created/upserted company:', customerName, newCompany.id)
   return newCompany.id
 }
 
