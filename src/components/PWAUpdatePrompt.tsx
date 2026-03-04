@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { RefreshCw, X } from 'lucide-react';
@@ -6,6 +6,7 @@ import { RefreshCw, X } from 'lucide-react';
 export const PWAUpdatePrompt = () => {
   const [showUpdatePrompt, setShowUpdatePrompt] = useState(false);
   const [waitingWorker, setWaitingWorker] = useState<ServiceWorker | null>(null);
+  const userClickedUpdate = useRef(false);
 
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return;
@@ -45,16 +46,24 @@ export const PWAUpdatePrompt = () => {
       }
     };
 
-    // Listen for controller change (update applied)
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
-      window.location.reload();
-    });
+    // Listen for controller change (update applied) — only reload if user explicitly clicked update
+    const handleControllerChange = () => {
+      if (userClickedUpdate.current) {
+        window.location.reload();
+      }
+    };
+    navigator.serviceWorker.addEventListener('controllerchange', handleControllerChange);
+
+    return () => {
+      navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
+    };
 
     checkForUpdates();
   }, []);
 
   const handleUpdate = useCallback(() => {
     if (waitingWorker) {
+      userClickedUpdate.current = true;
       waitingWorker.postMessage({ type: 'SKIP_WAITING' });
     }
   }, [waitingWorker]);
