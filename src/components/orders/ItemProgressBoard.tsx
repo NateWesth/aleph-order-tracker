@@ -451,7 +451,7 @@ export default function ItemProgressBoard({ isAdmin }: ItemProgressBoardProps) {
 
         {/* Desktop: Horizontal columns */}
         {!isMobile ? (
-          <div className="grid grid-cols-5 gap-4 min-h-[600px]">
+          <div className="grid grid-cols-5 gap-4 h-[calc(100vh-220px)] min-h-[400px]">
             {PROGRESS_STAGES.map(stage => {
               const StageIcon = stage.icon;
               const ordersInStage = ordersByStage[stage.id];
@@ -459,8 +459,8 @@ export default function ItemProgressBoard({ isAdmin }: ItemProgressBoardProps) {
               
               return (
                 <DroppableColumn key={stage.id} stageId={stage.id}>
-                  <Card className="flex flex-col h-full">
-                    <CardHeader className="py-3 px-4 border-b">
+                  <Card className="flex flex-col h-full overflow-hidden">
+                    <CardHeader className="py-3 px-4 border-b shrink-0">
                       <div className="flex items-center gap-2">
                         <div className={`p-1.5 rounded ${stage.color}`}>
                           <StageIcon className="h-4 w-4 text-white" />
@@ -471,7 +471,7 @@ export default function ItemProgressBoard({ isAdmin }: ItemProgressBoardProps) {
                         </Badge>
                       </div>
                     </CardHeader>
-                    <ScrollArea className="flex-1">
+                    <ScrollArea className="flex-1 min-h-0">
                       <CardContent className="p-2 space-y-2">
                         {ordersInStage.length === 0 ? (
                           <p className="text-xs text-muted-foreground text-center py-8">
