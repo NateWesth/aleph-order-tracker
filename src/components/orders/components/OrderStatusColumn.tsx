@@ -225,7 +225,7 @@ function OrderStatusColumn({
         <div className="flex-1 bg-muted/30 dark:bg-muted/10 rounded-b-xl border border-t-0 border-border glass-card !rounded-t-none min-h-[200px] sm:min-h-[400px] animate-fade-in">
           <ScrollArea className={cn(
             "sm:h-[calc(100vh-320px)]",
-            isMobile ? "max-h-[50vh]" : ""
+            isMobile ? "h-[calc(100vh-280px)]" : ""
           )}>
             <div className="p-2 space-y-2">
               {orders.length === 0 ? (
