@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { Plus, Search } from "lucide-react";
+import { Plus, Search, Users } from "lucide-react";
 import { Input } from "@/components/ui/input";
 
 import CompanyForm, { companySchema, type CompanyFormValues } from "./components/CompanyForm";
@@ -19,6 +19,7 @@ import DeleteCompanyDialog from "./components/DeleteCompanyDialog";
 import { useCompanyData } from "./hooks/useCompanyData";
 import { generateCompanyCode, copyToClipboard } from "./utils/companyUtils";
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
+import ClientInviteDialog from "./ClientInviteDialog";
 
 export default function ClientCompaniesPage() {
   const { companies, loading, refetch } = useCompanyData();
@@ -29,6 +30,7 @@ export default function ClientCompaniesPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [companyToDelete, setCompanyToDelete] = useState<any>(null);
+  const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
 
   const form = useForm<CompanyFormValues>({
     resolver: zodResolver(companySchema),
@@ -194,10 +196,16 @@ export default function ClientCompaniesPage() {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <Button size="sm" onClick={() => setIsNewCompanyDialogOpen(true)}>
-          <Plus className="h-4 w-4 mr-1" />
-          Add Client
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" onClick={() => setInviteDialogOpen(true)}>
+            <Users className="h-4 w-4 mr-1" />
+            Invite Client
+          </Button>
+          <Button size="sm" onClick={() => setIsNewCompanyDialogOpen(true)}>
+            <Plus className="h-4 w-4 mr-1" />
+            Add Client
+          </Button>
+        </div>
       </div>
 
       <CompanyTable 
@@ -241,6 +249,12 @@ export default function ClientCompaniesPage() {
         onOpenChange={setDeleteDialogOpen}
         company={companyToDelete}
         onConfirm={handleDeleteCompany}
+      />
+
+      {/* Client Invite Dialog */}
+      <ClientInviteDialog
+        open={inviteDialogOpen}
+        onOpenChange={setInviteDialogOpen}
       />
     </div>
   );

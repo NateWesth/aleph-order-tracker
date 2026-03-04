@@ -32,3 +32,6 @@ verify_jwt = false
 
 [functions.daily-afternoon-report]
 verify_jwt = false
+
+[functions.send-client-invite]
+verify_jwt = false
