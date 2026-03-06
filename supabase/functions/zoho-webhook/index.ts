@@ -422,7 +422,7 @@ async function syncOrderItems(supabase: any, orderId: string, lineItems: any[]):
 
   for (const lineItem of lineItems) {
     const itemCode = lineItem.sku || lineItem.item_code || null
-    const itemName = lineItem.name || lineItem.item_name || lineItem.description || 'Unknown Item'
+    const itemName = lineItem.description || lineItem.name || lineItem.item_name || 'Unknown Item'
     const qty = lineItem.quantity || 1
 
     // Check if this item already exists in the order (by code or name)
