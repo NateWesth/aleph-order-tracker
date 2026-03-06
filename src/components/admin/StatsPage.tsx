@@ -2,20 +2,20 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { 
   BarChart, Bar, XAxis, YAxis, ResponsiveContainer,
-  PieChart, Pie, Cell, AreaChart, Area, Legend
+  PieChart, Pie, Cell, AreaChart, Area, Tooltip
 } from "recharts";
 import { 
   Package, TrendingUp, Clock, Users,
-  ArrowUpRight, ArrowDownRight, Calendar, GitCompare
+  Calendar, ShoppingBag, Award, Hash, BarChart3
 } from "lucide-react";
-import { format, subMonths, startOfMonth, endOfMonth, differenceInDays, startOfYear, subDays, isWithinInterval, eachMonthOfInterval } from "date-fns";
+import { format, subDays, startOfYear, isWithinInterval, eachMonthOfInterval, startOfMonth, endOfMonth, differenceInDays } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
 
 import ReportGenerator from "./ReportGenerator";
 import SupplierScorecard from "./SupplierScorecard";
@@ -28,19 +28,31 @@ interface DateRange {
   to: Date;
 }
 
-interface PeriodStats {
+interface TopItem {
+  name: string;
+  code: string | null;
+  orderCount: number;    // how many orders it appears in
+  avgQuantity: number;   // average quantity per order
+  totalQuantity: number; // total across all orders
+}
+
+interface TopClient {
+  name: string;
+  orders: number;
+  totalValue: number;
+}
+
+interface Stats {
+  totalOrders: number;
+  totalClients: number;
   ordersInRange: number;
   avgCompletionDays: number;
   ordersByStatus: { name: string; value: number; color: string }[];
   ordersByPeriod: { period: string; orders: number }[];
-  topItems: { name: string; quantity: number }[];
-  topClients: { name: string; orders: number }[];
-}
-
-interface OrderStats extends PeriodStats {
-  totalOrders: number;
-  totalClients: number;
-  comparisonStats?: PeriodStats;
+  topItems: TopItem[];
+  topClients: TopClient[];
+  activeOrders: number;
+  completedInRange: number;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -53,49 +65,36 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 const PRESETS: { key: PresetKey; label: string }[] = [
-  { key: "7d", label: "7 days" },
-  { key: "30d", label: "30 days" },
-  { key: "90d", label: "90 days" },
-  { key: "year", label: "This year" },
-  { key: "all", label: "All time" },
+  { key: "7d", label: "7D" },
+  { key: "30d", label: "30D" },
+  { key: "90d", label: "90D" },
+  { key: "year", label: "YTD" },
+  { key: "all", label: "All" },
 ];
 
 function getPresetRange(preset: PresetKey): DateRange {
   const now = new Date();
-  
   switch (preset) {
-    case "7d":
-      return { from: subDays(now, 7), to: now };
-    case "30d":
-      return { from: subDays(now, 30), to: now };
-    case "90d":
-      return { from: subDays(now, 90), to: now };
-    case "year":
-      return { from: startOfYear(now), to: now };
+    case "7d": return { from: subDays(now, 7), to: now };
+    case "30d": return { from: subDays(now, 30), to: now };
+    case "90d": return { from: subDays(now, 90), to: now };
+    case "year": return { from: startOfYear(now), to: now };
     case "all":
-    default:
-      return { from: new Date(2020, 0, 1), to: now };
+    default: return { from: new Date(2020, 0, 1), to: now };
   }
 }
 
 export default function StatsPage() {
-  const [stats, setStats] = useState<OrderStats | null>(null);
+  const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
   const [activePreset, setActivePreset] = useState<PresetKey>("30d");
   const [dateRange, setDateRange] = useState<DateRange>(getPresetRange("30d"));
   const [customRange, setCustomRange] = useState<{ from?: Date; to?: Date }>({});
   const [isCustom, setIsCustom] = useState(false);
-  
-  // Comparison mode
-  const [comparisonMode, setComparisonMode] = useState(false);
-  const [comparisonPreset, setComparisonPreset] = useState<PresetKey>("30d");
-  const [comparisonRange, setComparisonRange] = useState<DateRange>(getPresetRange("30d"));
-  const [comparisonCustomRange, setComparisonCustomRange] = useState<{ from?: Date; to?: Date }>({});
-  const [isComparisonCustom, setIsComparisonCustom] = useState(false);
 
   useEffect(() => {
     fetchStats();
-  }, [dateRange, comparisonMode, comparisonRange]);
+  }, [dateRange]);
 
   const handlePresetClick = (preset: PresetKey) => {
     setActivePreset(preset);
@@ -113,135 +112,126 @@ export default function StatsPage() {
     }
   };
 
-  const handleComparisonPresetClick = (preset: PresetKey) => {
-    setComparisonPreset(preset);
-    setIsComparisonCustom(false);
-    setComparisonRange(getPresetRange(preset));
-  };
-
-  const handleComparisonCustomDateSelect = (range: { from?: Date; to?: Date } | undefined) => {
-    if (!range) return;
-    setComparisonCustomRange(range);
-    if (range.from && range.to) {
-      setIsComparisonCustom(true);
-      setComparisonPreset("all");
-      setComparisonRange({ from: range.from, to: range.to });
-    }
-  };
-
-  const calculatePeriodStats = (
-    orders: any[], 
-    orderItems: any[], 
-    range: DateRange
-  ): PeriodStats => {
-    const ordersInRange = orders.filter(o => {
-      const date = new Date(o.created_at!);
-      return isWithinInterval(date, { start: range.from, end: range.to });
-    });
-
-    const completedOrdersInRange = ordersInRange.filter(o => 
-      (o.status === "completed" || o.status === "delivered") && o.completed_date
-    );
-    const avgCompletionDays = completedOrdersInRange.length > 0
-      ? completedOrdersInRange.reduce((acc, o) => {
-          const days = differenceInDays(new Date(o.completed_date!), new Date(o.created_at!));
-          return acc + days;
-        }, 0) / completedOrdersInRange.length
-      : 0;
-
-    const statusCounts: Record<string, number> = {};
-    ordersInRange.forEach(o => {
-      const status = o.status || "pending";
-      statusCounts[status] = (statusCounts[status] || 0) + 1;
-    });
-    const ordersByStatus = Object.entries(statusCounts).map(([name, value]) => ({
-      name: name.charAt(0).toUpperCase() + name.slice(1).replace("-", " "),
-      value,
-      color: STATUS_COLORS[name] || "#94a3b8",
-    }));
-
-    const months = eachMonthOfInterval({ start: range.from, end: range.to });
-    const ordersByPeriod = months.slice(-6).map(monthDate => {
-      const monthStart = startOfMonth(monthDate);
-      const monthEnd = endOfMonth(monthDate);
-      const count = ordersInRange.filter(o => {
-        const date = new Date(o.created_at!);
-        return isWithinInterval(date, { start: monthStart, end: monthEnd });
-      }).length;
-      return {
-        period: format(monthDate, "MMM"),
-        orders: count,
-      };
-    });
-
-    const orderIdsInRange = new Set(ordersInRange.map(o => o.id));
-    const itemsInRange = orderItems.filter(item => orderIdsInRange.has(item.order_id));
-    
-    const itemCounts: Record<string, number> = {};
-    itemsInRange.forEach(item => {
-      const name = item.name;
-      itemCounts[name] = (itemCounts[name] || 0) + item.quantity;
-    });
-    const topItems = Object.entries(itemCounts)
-      .sort(([, a], [, b]) => b - a)
-      .slice(0, 5)
-      .map(([name, quantity]) => ({ name: name.length > 15 ? name.slice(0, 15) + "…" : name, quantity }));
-
-    const clientCounts: Record<string, number> = {};
-    ordersInRange.forEach(o => {
-      const companyName = (o.companies as any)?.name || "Unknown";
-      clientCounts[companyName] = (clientCounts[companyName] || 0) + 1;
-    });
-    const topClients = Object.entries(clientCounts)
-      .sort(([, a], [, b]) => b - a)
-      .slice(0, 5)
-      .map(([name, orderCount]) => ({ name: name.length > 12 ? name.slice(0, 12) + "…" : name, orders: orderCount }));
-
-    return {
-      ordersInRange: ordersInRange.length,
-      avgCompletionDays: Math.round(avgCompletionDays * 10) / 10,
-      ordersByStatus,
-      ordersByPeriod,
-      topItems,
-      topClients,
-    };
-  };
-
   const fetchStats = async () => {
     try {
       setLoading(true);
+
+      const [ordersRes, itemsRes, companiesRes] = await Promise.all([
+        supabase.from("orders").select("*, companies(name)"),
+        supabase.from("order_items").select("name, code, quantity, order_id"),
+        supabase.from("companies").select("id"),
+      ]);
+
+      if (ordersRes.error) throw ordersRes.error;
+      if (itemsRes.error) throw itemsRes.error;
+
+      const orders = ordersRes.data || [];
+      const orderItems = itemsRes.data || [];
+      const totalOrders = orders.length;
+      const totalClients = companiesRes.data?.length || 0;
+
+      // Filter to range
+      const ordersInRange = orders.filter(o => {
+        const date = new Date(o.created_at!);
+        return isWithinInterval(date, { start: dateRange.from, end: dateRange.to });
+      });
+
+      const activeOrders = ordersInRange.filter(o => 
+        o.status && !["completed", "delivered"].includes(o.status)
+      ).length;
+
+      const completedInRange = ordersInRange.filter(o => 
+        o.status === "completed" || o.status === "delivered"
+      ).length;
+
+      // Avg completion
+      const completedWithDates = ordersInRange.filter(o => 
+        (o.status === "completed" || o.status === "delivered") && o.completed_date
+      );
+      const avgCompletionDays = completedWithDates.length > 0
+        ? Math.round(completedWithDates.reduce((acc, o) => 
+            acc + differenceInDays(new Date(o.completed_date!), new Date(o.created_at!)), 0
+          ) / completedWithDates.length * 10) / 10
+        : 0;
+
+      // Status distribution
+      const statusCounts: Record<string, number> = {};
+      ordersInRange.forEach(o => {
+        const status = o.status || "pending";
+        statusCounts[status] = (statusCounts[status] || 0) + 1;
+      });
+      const ordersByStatus = Object.entries(statusCounts).map(([name, value]) => ({
+        name: name.charAt(0).toUpperCase() + name.slice(1).replace("-", " "),
+        value,
+        color: STATUS_COLORS[name] || "#94a3b8",
+      }));
+
+      // Orders by period
+      const months = eachMonthOfInterval({ start: dateRange.from, end: dateRange.to });
+      const ordersByPeriod = months.slice(-12).map(monthDate => {
+        const monthStart = startOfMonth(monthDate);
+        const monthEnd = endOfMonth(monthDate);
+        return {
+          period: format(monthDate, "MMM"),
+          orders: ordersInRange.filter(o => 
+            isWithinInterval(new Date(o.created_at!), { start: monthStart, end: monthEnd })
+          ).length,
+        };
+      });
+
+      // TOP ITEMS — ranked by how many ORDERS they appear in (frequency), not raw quantity
+      const orderIdsInRange = new Set(ordersInRange.map(o => o.id));
+      const itemsInRange = orderItems.filter(item => orderIdsInRange.has(item.order_id));
       
-      const { data: orders, error: ordersError } = await supabase
-        .from("orders")
-        .select("*, companies(name)");
-
-      if (ordersError) throw ordersError;
-
-      const { data: orderItems, error: itemsError } = await supabase
-        .from("order_items")
-        .select("name, quantity, order_id");
-
-      if (itemsError) throw itemsError;
-
-      const { data: companies } = await supabase
-        .from("companies")
-        .select("id");
-
-      const totalOrders = orders?.length || 0;
-      const totalClients = companies?.length || 0;
-
-      const periodStats = calculatePeriodStats(orders || [], orderItems || [], dateRange);
+      const itemStats: Record<string, { 
+        name: string; code: string | null; orderIds: Set<string>; totalQty: number 
+      }> = {};
       
-      let comparisonStats: PeriodStats | undefined;
-      if (comparisonMode) {
-        comparisonStats = calculatePeriodStats(orders || [], orderItems || [], comparisonRange);
-      }
+      itemsInRange.forEach(item => {
+        // Use code as key if available, otherwise name
+        const key = item.code ? item.code.toLowerCase() : item.name.toLowerCase();
+        if (!itemStats[key]) {
+          itemStats[key] = { name: item.name, code: item.code, orderIds: new Set(), totalQty: 0 };
+        }
+        itemStats[key].orderIds.add(item.order_id);
+        itemStats[key].totalQty += item.quantity;
+      });
+
+      const topItems: TopItem[] = Object.values(itemStats)
+        .map(s => ({
+          name: s.name,
+          code: s.code,
+          orderCount: s.orderIds.size,
+          avgQuantity: Math.round((s.totalQty / s.orderIds.size) * 10) / 10,
+          totalQuantity: s.totalQty,
+        }))
+        .sort((a, b) => b.orderCount - a.orderCount)
+        .slice(0, 8);
+
+      // Top clients
+      const clientData: Record<string, { orders: number; totalValue: number }> = {};
+      ordersInRange.forEach(o => {
+        const name = (o.companies as any)?.name || "Unknown";
+        if (!clientData[name]) clientData[name] = { orders: 0, totalValue: 0 };
+        clientData[name].orders++;
+        clientData[name].totalValue += o.total_amount || 0;
+      });
+      const topClients: TopClient[] = Object.entries(clientData)
+        .sort(([, a], [, b]) => b.orders - a.orders)
+        .slice(0, 6)
+        .map(([name, data]) => ({ name, ...data }));
 
       setStats({
         totalOrders,
         totalClients,
-        ...periodStats,
-        comparisonStats,
+        ordersInRange: ordersInRange.length,
+        avgCompletionDays,
+        ordersByStatus,
+        ordersByPeriod,
+        topItems,
+        topClients,
+        activeOrders,
+        completedInRange,
       });
     } catch (error) {
       console.error("Error fetching stats:", error);
@@ -250,521 +240,310 @@ export default function StatsPage() {
     }
   };
 
-  if (loading) {
-    return <PageSkeleton variant="stats" />;
-  }
-
-  if (!stats) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <p className="text-muted-foreground">Unable to load statistics</p>
-      </div>
-    );
-  }
-
-  const comparisonChange = stats.comparisonStats && stats.comparisonStats.ordersInRange > 0
-    ? Math.round(((stats.ordersInRange - stats.comparisonStats.ordersInRange) / stats.comparisonStats.ordersInRange) * 100)
-    : 0;
+  if (loading) return <PageSkeleton variant="stats" />;
+  if (!stats) return (
+    <div className="flex items-center justify-center h-64">
+      <p className="text-muted-foreground">Unable to load statistics</p>
+    </div>
+  );
 
   return (
     <div className="space-y-6 pb-8">
-      {/* Controls */}
-      <div className="space-y-4">
-        {/* Top controls row */}
-        <div className="flex items-center justify-between flex-wrap gap-2">
+      {/* Header */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Analytics</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            {format(dateRange.from, "MMM d, yyyy")} — {format(dateRange.to, "MMM d, yyyy")}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
           <ReportGenerator />
         </div>
-
-        {/* Comparison Toggle */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <GitCompare className="h-4 w-4 text-muted-foreground" />
-            <Label htmlFor="comparison-mode" className="text-sm font-medium">Compare Periods</Label>
-          </div>
-          <Switch
-            id="comparison-mode"
-            checked={comparisonMode}
-            onCheckedChange={setComparisonMode}
-          />
-        </div>
-
-        {/* Primary Date Range */}
-        <div className="space-y-2">
-          {comparisonMode && <p className="text-xs text-muted-foreground font-medium">Period A</p>}
-          <div className="flex flex-wrap items-center gap-2">
-            {PRESETS.map(preset => (
-              <Button
-                key={preset.key}
-                variant={activePreset === preset.key && !isCustom ? "default" : "outline"}
-                size="sm"
-                onClick={() => handlePresetClick(preset.key)}
-                className="text-xs"
-              >
-                {preset.label}
-              </Button>
-            ))}
-            
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant={isCustom ? "default" : "outline"}
-                  size="sm"
-                  className={cn("text-xs gap-1.5")}
-                >
-                  <Calendar className="h-3.5 w-3.5" />
-                  {isCustom && customRange.from && customRange.to
-                    ? `${format(customRange.from, "MMM d")} - ${format(customRange.to, "MMM d")}`
-                    : "Custom"
-                  }
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <CalendarComponent
-                  mode="range"
-                  selected={customRange as any}
-                  onSelect={handleCustomDateSelect as any}
-                  numberOfMonths={2}
-                  defaultMonth={subMonths(new Date(), 1)}
-                  className="pointer-events-auto"
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
-        </div>
-
-        {/* Comparison Date Range */}
-        {comparisonMode && (
-          <div className="space-y-2 pt-2 border-t border-border/50">
-            <p className="text-xs text-muted-foreground font-medium">Period B (Compare with)</p>
-            <div className="flex flex-wrap items-center gap-2">
-              {PRESETS.map(preset => (
-                <Button
-                  key={`comp-${preset.key}`}
-                  variant={comparisonPreset === preset.key && !isComparisonCustom ? "secondary" : "outline"}
-                  size="sm"
-                  onClick={() => handleComparisonPresetClick(preset.key)}
-                  className="text-xs"
-                >
-                  {preset.label}
-                </Button>
-              ))}
-              
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant={isComparisonCustom ? "secondary" : "outline"}
-                    size="sm"
-                    className={cn("text-xs gap-1.5")}
-                  >
-                    <Calendar className="h-3.5 w-3.5" />
-                    {isComparisonCustom && comparisonCustomRange.from && comparisonCustomRange.to
-                      ? `${format(comparisonCustomRange.from, "MMM d")} - ${format(comparisonCustomRange.to, "MMM d")}`
-                      : "Custom"
-                    }
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <CalendarComponent
-                    mode="range"
-                    selected={comparisonCustomRange as any}
-                    onSelect={handleComparisonCustomDateSelect as any}
-                    numberOfMonths={2}
-                    defaultMonth={subMonths(new Date(), 1)}
-                    className="pointer-events-auto"
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-          </div>
-        )}
       </div>
 
-      {/* Metric Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <MetricCard
-          label="Total Orders"
-          value={stats.totalOrders}
-          icon={<Package className="h-5 w-5" />}
-        />
-        <MetricCard
-          label={comparisonMode ? "Period A" : "In Period"}
-          value={stats.ordersInRange}
-          comparisonValue={stats.comparisonStats?.ordersInRange}
-          icon={<TrendingUp className="h-5 w-5" />}
-          showComparison={comparisonMode}
-        />
-        <MetricCard
-          label="Avg. Completion"
-          value={`${stats.avgCompletionDays}d`}
-          comparisonValue={stats.comparisonStats ? `${stats.comparisonStats.avgCompletionDays}d` : undefined}
-          icon={<Clock className="h-5 w-5" />}
-          showComparison={comparisonMode}
-        />
-        <MetricCard
-          label="Total Clients"
-          value={stats.totalClients}
-          icon={<Users className="h-5 w-5" />}
-        />
+      {/* Date Range Selector */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="inline-flex items-center rounded-lg border border-border bg-card p-0.5 gap-0.5">
+          {PRESETS.map(preset => (
+            <button
+              key={preset.key}
+              onClick={() => handlePresetClick(preset.key)}
+              className={cn(
+                "px-3 py-1.5 text-xs font-medium rounded-md transition-all",
+                activePreset === preset.key && !isCustom
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
+              )}
+            >
+              {preset.label}
+            </button>
+          ))}
+        </div>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant={isCustom ? "default" : "outline"}
+              size="sm"
+              className="text-xs gap-1.5 h-8"
+            >
+              <Calendar className="h-3.5 w-3.5" />
+              {isCustom && customRange.from && customRange.to
+                ? `${format(customRange.from, "MMM d")} – ${format(customRange.to, "MMM d")}`
+                : "Custom"
+              }
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <CalendarComponent
+              mode="range"
+              selected={customRange as any}
+              onSelect={handleCustomDateSelect as any}
+              numberOfMonths={2}
+              className="pointer-events-auto"
+            />
+          </PopoverContent>
+        </Popover>
       </div>
 
-      {/* Charts Grid */}
-      <div className="grid lg:grid-cols-2 gap-6">
-        {/* Orders Trend - Comparison */}
-        <div className="glass-card glow-border rounded-xl p-6">
-          <h3 className="text-sm font-medium text-muted-foreground mb-6">Orders Trend</h3>
-          <div className="h-48">
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+        <KPICard icon={<Package className="h-4 w-4" />} label="Total Orders" value={stats.totalOrders} />
+        <KPICard icon={<ShoppingBag className="h-4 w-4" />} label="In Period" value={stats.ordersInRange} accent />
+        <KPICard icon={<TrendingUp className="h-4 w-4" />} label="Active" value={stats.activeOrders} />
+        <KPICard icon={<Clock className="h-4 w-4" />} label="Avg. Completion" value={`${stats.avgCompletionDays}d`} />
+        <KPICard icon={<Users className="h-4 w-4" />} label="Clients" value={stats.totalClients} className="col-span-2 lg:col-span-1" />
+      </div>
+
+      {/* Main Charts Row */}
+      <div className="grid lg:grid-cols-3 gap-4">
+        {/* Orders Trend */}
+        <div className="lg:col-span-2 bg-card border border-border rounded-xl p-5">
+          <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
+            <BarChart3 className="h-4 w-4 text-primary" />
+            Orders Over Time
+          </h3>
+          <div className="h-56">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={comparisonMode ? mergeChartData(stats.ordersByPeriod, stats.comparisonStats?.ordersByPeriod || []) : stats.ordersByPeriod}>
+              <AreaChart data={stats.ordersByPeriod}>
                 <defs>
-                  <linearGradient id="orderGradientA" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                  <linearGradient id="orderGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.2} />
                     <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="orderGradientB" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#f59e0b" stopOpacity={0.3} />
-                    <stop offset="100%" stopColor="#f59e0b" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <XAxis 
                   dataKey="period" 
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
+                  axisLine={false} tickLine={false}
+                  tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
                 />
                 <YAxis 
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
-                  width={30}
+                  axisLine={false} tickLine={false} width={28}
+                  tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
                 />
-                {comparisonMode && <Legend />}
+                <Tooltip
+                  contentStyle={{ 
+                    background: 'hsl(var(--card))', 
+                    border: '1px solid hsl(var(--border))',
+                    borderRadius: '8px',
+                    fontSize: '12px'
+                  }}
+                />
                 <Area 
-                  type="monotone" 
-                  dataKey={comparisonMode ? "ordersA" : "orders"}
-                  name={comparisonMode ? "Period A" : "Orders"}
-                  stroke="hsl(var(--primary))" 
-                  strokeWidth={2}
-                  fill="url(#orderGradientA)"
+                  type="monotone" dataKey="orders" name="Orders"
+                  stroke="hsl(var(--primary))" strokeWidth={2}
+                  fill="url(#orderGrad)"
                 />
-                {comparisonMode && (
-                  <Area 
-                    type="monotone" 
-                    dataKey="ordersB"
-                    name="Period B"
-                    stroke="#f59e0b" 
-                    strokeWidth={2}
-                    fill="url(#orderGradientB)"
-                  />
-                )}
               </AreaChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        {/* Status Distribution - Side by Side in Comparison Mode */}
-        <div className="glass-card glow-border rounded-xl p-6">
-          <h3 className="text-sm font-medium text-muted-foreground mb-6">Status Distribution</h3>
-          {comparisonMode ? (
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-xs text-center text-muted-foreground mb-2">Period A</p>
-                <StatusPieChart data={stats.ordersByStatus} />
-              </div>
-              <div>
-                <p className="text-xs text-center text-muted-foreground mb-2">Period B</p>
-                <StatusPieChart data={stats.comparisonStats?.ordersByStatus || []} />
-              </div>
-            </div>
-          ) : (
-            <div className="flex items-center gap-6">
-              <div className="h-40 w-40 flex-shrink-0">
-                <StatusPieChart data={stats.ordersByStatus} />
-              </div>
-              <div className="flex-1 space-y-2">
-                {stats.ordersByStatus.length > 0 ? stats.ordersByStatus.map((status, i) => (
-                  <div key={i} className="flex items-center justify-between text-sm">
-                    <div className="flex items-center gap-2">
-                      <div 
-                        className="w-2 h-2 rounded-full" 
-                        style={{ backgroundColor: status.color }}
-                      />
-                      <span className="text-muted-foreground">{status.name}</span>
-                    </div>
-                    <span className="font-medium tabular-nums">{status.value}</span>
-                  </div>
-                )) : (
-                  <p className="text-sm text-muted-foreground">No orders in this period</p>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Top Items - Comparison */}
-        <div className="glass-card glow-border rounded-xl p-6">
-          <h3 className="text-sm font-medium text-muted-foreground mb-6">Top Items</h3>
-          {comparisonMode ? (
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-xs text-center text-muted-foreground mb-2">Period A</p>
-                <TopItemsList items={stats.topItems} color="hsl(var(--primary))" />
-              </div>
-              <div>
-                <p className="text-xs text-center text-muted-foreground mb-2">Period B</p>
-                <TopItemsList items={stats.comparisonStats?.topItems || []} color="#f59e0b" />
-              </div>
-            </div>
-          ) : stats.topItems.length > 0 ? (
-            <div className="h-48">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={stats.topItems} layout="vertical" barSize={16}>
-                  <XAxis 
-                    type="number" 
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
-                  />
-                  <YAxis 
-                    dataKey="name" 
-                    type="category" 
-                    axisLine={false}
-                    tickLine={false}
-                    width={100}
-                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
-                  />
-                  <Bar 
-                    dataKey="quantity" 
-                    fill="hsl(var(--primary))" 
-                    radius={[0, 4, 4, 0]}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          ) : (
-            <div className="h-48 flex items-center justify-center text-muted-foreground text-sm">
-              No items in this period
-            </div>
-          )}
-        </div>
-
-        {/* Top Clients - Comparison */}
-        <div className="glass-card glow-border rounded-xl p-6">
-          <h3 className="text-sm font-medium text-muted-foreground mb-6">Top Clients</h3>
-          {comparisonMode ? (
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-xs text-center text-muted-foreground mb-2">Period A</p>
-                <TopClientsList clients={stats.topClients} />
-              </div>
-              <div>
-                <p className="text-xs text-center text-muted-foreground mb-2">Period B</p>
-                <TopClientsList clients={stats.comparisonStats?.topClients || []} />
-              </div>
-            </div>
-          ) : stats.topClients.length > 0 ? (
-            <div className="space-y-3">
-              {stats.topClients.map((client, i) => (
-                <div key={i} className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary">
-                    {i + 1}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{client.name}</p>
-                    <p className="text-xs text-muted-foreground">{client.orders} orders</p>
-                  </div>
-                  <div className="flex-shrink-0">
-                    <div 
-                      className="h-1.5 rounded-full bg-primary/20" 
-                      style={{ width: `${Math.max(40, (client.orders / (stats.topClients[0]?.orders || 1)) * 80)}px` }}
+        {/* Status Breakdown */}
+        <div className="bg-card border border-border rounded-xl p-5">
+          <h3 className="text-sm font-semibold mb-4">Status Breakdown</h3>
+          {stats.ordersByStatus.length > 0 ? (
+            <div className="space-y-4">
+              <div className="h-32 mx-auto w-32">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={stats.ordersByStatus}
+                      cx="50%" cy="50%"
+                      innerRadius={30} outerRadius={52}
+                      paddingAngle={3} dataKey="value"
                     >
-                      <div 
-                        className="h-full rounded-full bg-primary"
-                        style={{ width: `${(client.orders / (stats.topClients[0]?.orders || 1)) * 100}%` }}
-                      />
+                      {stats.ordersByStatus.map((entry, i) => (
+                        <Cell key={i} fill={entry.color} />
+                      ))}
+                    </Pie>
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="space-y-2">
+                {stats.ordersByStatus.map((status, i) => (
+                  <div key={i} className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: status.color }} />
+                      <span className="text-xs text-muted-foreground">{status.name}</span>
                     </div>
+                    <span className="text-xs font-semibold tabular-nums">{status.value}</span>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           ) : (
-            <div className="h-48 flex items-center justify-center text-muted-foreground text-sm">
-              No client data in this period
-            </div>
+            <p className="text-sm text-muted-foreground text-center py-8">No orders in period</p>
           )}
         </div>
       </div>
 
+      {/* Most Popular Items & Top Clients */}
+      <div className="grid lg:grid-cols-2 gap-4">
+        {/* Most Popular Items */}
+        <div className="bg-card border border-border rounded-xl p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-semibold flex items-center gap-2">
+              <Award className="h-4 w-4 text-primary" />
+              Most Popular Items
+            </h3>
+            <Badge variant="secondary" className="text-[10px] font-normal">
+              By order frequency
+            </Badge>
+          </div>
+          <p className="text-[11px] text-muted-foreground mb-4">
+            Ranked by how many orders each item appears in, not raw quantity
+          </p>
+          {stats.topItems.length > 0 ? (
+            <div className="space-y-3">
+              {stats.topItems.map((item, i) => {
+                const maxOrders = stats.topItems[0]?.orderCount || 1;
+                const pct = (item.orderCount / maxOrders) * 100;
+                return (
+                  <div key={i} className="group">
+                    <div className="flex items-center gap-3">
+                      <div className={cn(
+                        "w-6 h-6 rounded-md flex items-center justify-center text-[10px] font-bold shrink-0",
+                        i === 0 ? "bg-primary text-primary-foreground" :
+                        i === 1 ? "bg-primary/20 text-primary" :
+                        i === 2 ? "bg-primary/10 text-primary" :
+                        "bg-muted text-muted-foreground"
+                      )}>
+                        {i + 1}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-xs font-medium truncate">{item.name}</p>
+                          {item.code && (
+                            <span className="text-[10px] text-muted-foreground font-mono shrink-0">
+                              {item.code}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3 mt-1">
+                          <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+                            <div 
+                              className="h-full rounded-full bg-primary/60 transition-all"
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+                              <Hash className="h-2.5 w-2.5" />
+                              {item.orderCount} orders
+                            </span>
+                            <span className="text-[10px] text-muted-foreground">
+                              ~{item.avgQuantity}/order
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground text-center py-8">No items in period</p>
+          )}
+        </div>
 
-      {/* Order Activity Heatmap */}
+        {/* Top Clients */}
+        <div className="bg-card border border-border rounded-xl p-5">
+          <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
+            <Users className="h-4 w-4 text-primary" />
+            Top Clients
+          </h3>
+          {stats.topClients.length > 0 ? (
+            <div className="space-y-3">
+              {stats.topClients.map((client, i) => {
+                const maxOrders = stats.topClients[0]?.orders || 1;
+                return (
+                  <div key={i} className="flex items-center gap-3">
+                    <div className={cn(
+                      "w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold shrink-0",
+                      i === 0 ? "bg-primary text-primary-foreground" :
+                      i === 1 ? "bg-primary/20 text-primary" :
+                      "bg-muted text-muted-foreground"
+                    )}>
+                      {i + 1}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{client.name}</p>
+                      <div className="flex items-center gap-3 mt-1">
+                        <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+                          <div 
+                            className="h-full rounded-full bg-primary/50 transition-all"
+                            style={{ width: `${(client.orders / maxOrders) * 100}%` }}
+                          />
+                        </div>
+                        <span className="text-xs text-muted-foreground shrink-0">
+                          {client.orders} orders
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground text-center py-8">No clients in period</p>
+          )}
+        </div>
+      </div>
+
+      {/* Activity Heatmap */}
       <OrderActivityHeatmap />
 
       {/* Supplier Scorecard */}
       <SupplierScorecard />
-
-      {/* Period Summary */}
-      {comparisonMode ? (
-        <div className="grid md:grid-cols-2 gap-4">
-          <div className="bg-gradient-to-br from-primary/5 to-primary/10 border border-primary/20 rounded-xl p-6">
-            <p className="text-xs font-medium text-primary mb-1">Period A</p>
-            <p className="text-sm text-muted-foreground">
-              {format(dateRange.from, "MMM d, yyyy")} — {format(dateRange.to, "MMM d, yyyy")}
-            </p>
-            <p className="text-3xl font-bold mt-2">{stats.ordersInRange} orders</p>
-          </div>
-          <div className="bg-gradient-to-br from-amber-500/5 to-amber-500/10 border border-amber-500/20 rounded-xl p-6">
-            <p className="text-xs font-medium text-amber-600 mb-1">Period B</p>
-            <p className="text-sm text-muted-foreground">
-              {format(comparisonRange.from, "MMM d, yyyy")} — {format(comparisonRange.to, "MMM d, yyyy")}
-            </p>
-            <p className="text-3xl font-bold mt-2">{stats.comparisonStats?.ordersInRange || 0} orders</p>
-            {comparisonChange !== 0 && (
-              <div className={`inline-flex items-center gap-1 mt-2 px-2 py-0.5 rounded-full text-xs font-medium ${
-                comparisonChange >= 0 
-                  ? 'bg-emerald-500/10 text-emerald-600' 
-                  : 'bg-red-500/10 text-red-600'
-              }`}>
-                {comparisonChange >= 0 ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
-                {Math.abs(comparisonChange)}% difference
-              </div>
-            )}
-          </div>
-        </div>
-      ) : (
-        <div className="bg-gradient-to-br from-primary/5 to-primary/10 border border-primary/20 rounded-xl p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground">
-                {format(dateRange.from, "MMM d, yyyy")} — {format(dateRange.to, "MMM d, yyyy")}
-              </p>
-              <p className="text-3xl font-bold mt-1">{stats.ordersInRange} orders</p>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
 
-// Helper function to merge chart data for comparison
-function mergeChartData(
-  dataA: { period: string; orders: number }[], 
-  dataB: { period: string; orders: number }[]
-): { period: string; ordersA: number; ordersB: number }[] {
-  const maxLen = Math.max(dataA.length, dataB.length);
-  const result = [];
-  
-  for (let i = 0; i < maxLen; i++) {
-    result.push({
-      period: dataA[i]?.period || dataB[i]?.period || `Period ${i + 1}`,
-      ordersA: dataA[i]?.orders || 0,
-      ordersB: dataB[i]?.orders || 0,
-    });
-  }
-  
-  return result;
-}
+// ─── KPI Card ──────────────────────────────────────────────────────────────────
 
-// Sub-components
-function StatusPieChart({ data }: { data: { name: string; value: number; color: string }[] }) {
-  if (data.length === 0) {
-    return (
-      <div className="h-32 flex items-center justify-center text-muted-foreground text-xs">
-        No data
+function KPICard({ 
+  icon, label, value, accent, className 
+}: { 
+  icon: React.ReactNode; label: string; value: string | number; accent?: boolean; className?: string 
+}) {
+  return (
+    <div className={cn(
+      "rounded-xl border p-4 transition-all",
+      accent 
+        ? "bg-primary/5 border-primary/20" 
+        : "bg-card border-border",
+      className
+    )}>
+      <div className={cn(
+        "inline-flex items-center justify-center w-7 h-7 rounded-lg mb-3",
+        accent ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"
+      )}>
+        {icon}
       </div>
-    );
-  }
-  
-  return (
-    <div className="h-32">
-      <ResponsiveContainer width="100%" height="100%">
-        <PieChart>
-          <Pie
-            data={data}
-            cx="50%"
-            cy="50%"
-            innerRadius={25}
-            outerRadius={45}
-            paddingAngle={3}
-            dataKey="value"
-          >
-            {data.map((entry, index) => (
-              <Cell key={`cell-${index}`} fill={entry.color} />
-            ))}
-          </Pie>
-        </PieChart>
-      </ResponsiveContainer>
-    </div>
-  );
-}
-
-function TopItemsList({ items, color }: { items: { name: string; quantity: number }[]; color: string }) {
-  if (items.length === 0) {
-    return <p className="text-xs text-muted-foreground text-center py-4">No items</p>;
-  }
-  
-  const maxQty = items[0]?.quantity || 1;
-  
-  return (
-    <div className="space-y-2">
-      {items.slice(0, 4).map((item, i) => (
-        <div key={i} className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground truncate flex-1">{item.name}</span>
-          <div className="w-16 h-1.5 rounded-full bg-muted">
-            <div 
-              className="h-full rounded-full" 
-              style={{ width: `${(item.quantity / maxQty) * 100}%`, backgroundColor: color }}
-            />
-          </div>
-          <span className="text-xs font-medium w-6 text-right">{item.quantity}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function TopClientsList({ clients }: { clients: { name: string; orders: number }[] }) {
-  if (clients.length === 0) {
-    return <p className="text-xs text-muted-foreground text-center py-4">No clients</p>;
-  }
-  
-  return (
-    <div className="space-y-2">
-      {clients.slice(0, 4).map((client, i) => (
-        <div key={i} className="flex items-center gap-2">
-          <span className="text-xs font-medium text-primary w-4">{i + 1}</span>
-          <span className="text-xs text-muted-foreground truncate flex-1">{client.name}</span>
-          <span className="text-xs font-medium">{client.orders}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-interface MetricCardProps {
-  label: string;
-  value: string | number;
-  comparisonValue?: string | number;
-  icon: React.ReactNode;
-  showComparison?: boolean;
-}
-
-function MetricCard({ label, value, comparisonValue, icon, showComparison }: MetricCardProps) {
-  return (
-    <div className="glass-card glow-border rounded-xl p-5 transition-all hover:shadow-glow">
-      <div className="flex items-start justify-between">
-        <div className="p-2 rounded-lg bg-primary/10 text-primary">
-          {icon}
-        </div>
-      </div>
-      <div className="mt-4">
-        <div className="flex items-baseline gap-2">
-          <p className="text-2xl font-bold tracking-tight">{value}</p>
-          {showComparison && comparisonValue !== undefined && (
-            <p className="text-sm text-amber-600 font-medium">vs {comparisonValue}</p>
-          )}
-        </div>
-        <p className="text-xs text-muted-foreground mt-0.5">{label}</p>
-      </div>
+      <p className="text-xl font-bold tracking-tight">{value}</p>
+      <p className="text-[11px] text-muted-foreground mt-0.5">{label}</p>
     </div>
   );
 }
