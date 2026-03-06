@@ -53,6 +53,11 @@ Deno.serve(async (req) => {
 
     console.log('Zoho webhook received:', JSON.stringify(payload).substring(0, 500))
 
+    // Support bulk resync of all orders (re-fetches descriptions from Zoho)
+    if (payload.action === 'resync_all_items') {
+      return await handleBulkResyncItems(supabase, clientId, clientSecret)
+    }
+
     // Support lookup by salesorder_number (e.g. "SO-00005") for manual re-sync
     const salesOrderNumber = payload.salesorder_number
     if (salesOrderNumber) {
@@ -124,6 +129,89 @@ async function handleSalesOrderByNumber(
   console.log('Found salesorder_id:', salesOrderId, 'for', soNumber)
 
   return await handleSalesOrderWebhook(supabase, payload, salesOrderId, clientId, clientSecret)
+}
+
+// ─── BULK RESYNC ITEM DESCRIPTIONS ─────────────────────────────────────────────
+
+async function handleBulkResyncItems(
+  supabase: any, clientId: string, clientSecret: string
+) {
+  console.log('Starting bulk resync of all order item descriptions from Zoho')
+
+  const accessToken = await getValidAccessToken(supabase, clientId, clientSecret)
+  const orgId = await getOrgId(supabase)
+
+  // Get all orders that have a Zoho SO reference
+  const { data: orders, error: ordersErr } = await supabase
+    .from('orders')
+    .select('id, order_number, reference')
+    .not('reference', 'is', null)
+    .like('reference', 'SO-%')
+
+  if (ordersErr || !orders?.length) {
+    console.log('No orders with SO references found')
+    return new Response(JSON.stringify({ message: 'No orders to resync', count: 0 }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
+  }
+
+  let totalUpdated = 0
+  let ordersProcessed = 0
+
+  for (const order of orders) {
+    try {
+      // Look up the sales order in Zoho by its SO number (stored in reference)
+      const searchResp = await fetch(
+        `${ZOHO_API_URL}/books/v3/salesorders?organization_id=${orgId}&salesorder_number=${encodeURIComponent(order.reference)}`,
+        { headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` } }
+      )
+      const searchData = await searchResp.json()
+
+      if (searchData.code !== 0 || !searchData.salesorders?.length) {
+        console.log(`SO not found for ${order.reference} - skipping`)
+        continue
+      }
+
+      const soId = searchData.salesorders[0].salesorder_id
+
+      // Fetch full sales order details
+      const soResp = await fetch(
+        `${ZOHO_API_URL}/books/v3/salesorders/${soId}?organization_id=${orgId}`,
+        { headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` } }
+      )
+      const soData = await soResp.json()
+
+      if (soData.code !== 0 || !soData.salesorder) {
+        console.log(`Failed to fetch SO details for ${order.reference}`)
+        continue
+      }
+
+      const lineItems = soData.salesorder.line_items || []
+      const itemsSynced = await syncOrderItems(supabase, order.id, lineItems)
+      totalUpdated += itemsSynced
+      ordersProcessed++
+      console.log(`Resynced ${order.reference}: ${itemsSynced} items updated/created`)
+    } catch (err) {
+      console.error(`Error resyncing ${order.reference}:`, err)
+    }
+  }
+
+  await supabase.from('zoho_sync_log').insert({
+    sync_type: 'bulk_resync_items',
+    status: 'completed',
+    items_synced: totalUpdated,
+    completed_at: new Date().toISOString(),
+  })
+
+  console.log(`Bulk resync complete: ${ordersProcessed} orders, ${totalUpdated} items updated`)
+
+  return new Response(JSON.stringify({
+    success: true,
+    orders_processed: ordersProcessed,
+    items_updated: totalUpdated,
+  }), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+  })
 }
 
 // ─── INVOICE WEBHOOK HANDLER ───────────────────────────────────────────────────
@@ -422,19 +510,29 @@ async function syncOrderItems(supabase: any, orderId: string, lineItems: any[]):
 
   for (const lineItem of lineItems) {
     const itemCode = lineItem.sku || lineItem.item_code || null
+    // Always prefer Zoho line item description over catalog item name
     const itemName = lineItem.description || lineItem.name || lineItem.item_name || 'Unknown Item'
     const qty = lineItem.quantity || 1
 
-    // Check if this item already exists in the order (by code or name)
-    const alreadyExists = existing.some((ei: any) => {
+    // Check if this item already exists in the order (by code + qty match)
+    const matchedExisting = existing.find((ei: any) => {
       if (itemCode && ei.code) {
         return ei.code.toLowerCase() === itemCode.toLowerCase() && ei.quantity === qty
       }
       return ei.name.toLowerCase() === itemName.toLowerCase() && ei.quantity === qty
     })
 
-    if (alreadyExists) {
-      console.log(`Item already exists: ${itemName} (Qty: ${qty}) - skipping`)
+    if (matchedExisting) {
+      // Update the name if it differs (e.g. M-MISCELLANEOUS items with generic names)
+      if (matchedExisting.name !== itemName) {
+        console.log(`Updating item name: "${matchedExisting.name}" -> "${itemName}" (code: ${itemCode})`)
+        await supabase
+          .from('order_items')
+          .update({ name: itemName, updated_at: new Date().toISOString() })
+          .eq('id', matchedExisting.id)
+      } else {
+        console.log(`Item already exists: ${itemName} (Qty: ${qty}) - skipping`)
+      }
       continue
     }
 
