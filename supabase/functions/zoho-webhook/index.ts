@@ -65,6 +65,17 @@ Deno.serve(async (req) => {
     }
 
     // Detect event type - invoice or sales order
+    // Support manual invoice check by order number
+    if (payload.action === 'check_invoices') {
+      return await handleCheckInvoicesForOrder(supabase, payload, clientId, clientSecret)
+    }
+
+    // Support scanning ALL recent invoices to match orders
+    if (payload.action === 'scan_all_invoices') {
+      return await handleScanAllInvoices(supabase, clientId, clientSecret)
+    }
+
+    // Detect event type - invoice or sales order
     const invoiceId = payload.invoice_id || payload.data?.invoice_id || payload.invoice?.invoice_id
     const salesOrderId = payload.salesorder_id || payload.resource_id || payload.id || 
       payload.salesorder?.salesorder_id || payload.data?.salesorder_id
