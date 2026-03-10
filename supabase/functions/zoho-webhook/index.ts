@@ -330,28 +330,75 @@ async function handleInvoiceWebhook(
 
   console.log(`Found ${matchedOrders.length} matching order(s):`, matchedOrders.map((o: any) => o.order_number))
 
-  // Move ALL items on matched orders to ready-for-delivery
+  // Extract SKUs from invoice line items
+  const invoiceLineItems = invoice.line_items || []
+  const invoiceSkus = invoiceLineItems
+    .map((li: any) => (li.sku || li.item_code || '').toLowerCase())
+    .filter(Boolean)
+  
+  console.log('Invoice line item SKUs:', invoiceSkus)
+  console.log('Invoice line items detail:', invoiceLineItems.map((li: any) => ({
+    sku: li.sku || li.item_code,
+    name: li.name || li.item_name,
+    qty: li.quantity
+  })))
+
+  if (invoiceSkus.length === 0) {
+    console.log('No SKUs found on invoice line items - cannot match items')
+    return new Response(JSON.stringify({ 
+      received: true, 
+      warning: 'Invoice has no line items with SKUs',
+      orders_matched: matchedOrders.map((o: any) => o.order_number),
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
+  }
+
+  // Only move items whose SKU/code matches an invoice line item
   let totalItemsUpdated = 0
 
   for (const order of matchedOrders) {
     console.log(`Processing order ${order.order_number} (${order.id})`)
 
-    const { data: updatedItems, error: updateErr } = await supabase
+    // Get all order items
+    const { data: orderItems, error: itemsErr } = await supabase
       .from('order_items')
-      .update({ 
-        progress_stage: 'ready-for-delivery',
-        updated_at: new Date().toISOString()
-      })
+      .select('id, name, code, quantity, progress_stage')
       .eq('order_id', order.id)
-      .not('progress_stage', 'in', '("ready-for-delivery","completed")')
-      .select('id')
 
-    if (updateErr) {
-      console.error(`Failed to update items for order ${order.id}:`, updateErr)
-    } else {
-      const count = updatedItems?.length || 0
-      totalItemsUpdated += count
-      console.log(`Moved ${count} items to ready-for-delivery for order ${order.order_number}`)
+    if (itemsErr || !orderItems) {
+      console.error(`Failed to fetch items for order ${order.id}:`, itemsErr)
+      continue
+    }
+
+    for (const item of orderItems) {
+      // Skip items already at ready-for-delivery or completed
+      if (item.progress_stage === 'ready-for-delivery' || item.progress_stage === 'completed') {
+        console.log(`  Item ${item.code} "${item.name}" already at ${item.progress_stage} - skipping`)
+        continue
+      }
+
+      // Match by SKU/code (case-insensitive)
+      const itemCode = (item.code || '').toLowerCase()
+      if (!itemCode || !invoiceSkus.includes(itemCode)) {
+        console.log(`  Item ${item.code} "${item.name}" not on invoice - skipping`)
+        continue
+      }
+
+      const { error: updateErr } = await supabase
+        .from('order_items')
+        .update({ 
+          progress_stage: 'ready-for-delivery',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', item.id)
+
+      if (updateErr) {
+        console.error(`  Failed to update item ${item.id}:`, updateErr)
+      } else {
+        totalItemsUpdated++
+        console.log(`  ✅ Moved item ${item.code} "${item.name}" to ready-for-delivery`)
+      }
     }
   }
 
@@ -492,23 +539,47 @@ async function handleScanAllInvoices(
 
     console.log(`Invoice ${inv.invoice_number} ref "${ref}" matches order(s):`, orders.map((o: any) => o.order_number))
 
-    for (const order of orders) {
-      const { data: updatedItems } = await supabase
-        .from('order_items')
-        .update({ 
-          progress_stage: 'ready-for-delivery',
-          updated_at: new Date().toISOString()
-        })
-        .eq('order_id', order.id)
-        .not('progress_stage', 'in', '("ready-for-delivery","completed")')
-        .select('id')
+    // Fetch full invoice details to get line items with SKUs
+    const invDetailResp = await fetch(
+      `${ZOHO_API_URL}/books/v3/invoices/${inv.invoice_id}?organization_id=${orgId}`,
+      { headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` } }
+    )
+    const invDetailData = await invDetailResp.json()
+    const invoiceLineItems = invDetailData?.invoice?.line_items || []
+    const invoiceSkus = invoiceLineItems
+      .map((li: any) => (li.sku || li.item_code || '').toLowerCase())
+      .filter(Boolean)
 
-      const count = updatedItems?.length || 0
-      totalItemsUpdated += count
-      if (count > 0) {
+    if (invoiceSkus.length === 0) continue
+
+    for (const order of orders) {
+      // Get order items and match by SKU
+      const { data: orderItems } = await supabase
+        .from('order_items')
+        .select('id, code, name, progress_stage')
+        .eq('order_id', order.id)
+
+      if (!orderItems) continue
+
+      for (const item of orderItems) {
+        if (item.progress_stage === 'ready-for-delivery' || item.progress_stage === 'completed') continue
+        const itemCode = (item.code || '').toLowerCase()
+        if (!itemCode || !invoiceSkus.includes(itemCode)) continue
+
+        const { error } = await supabase
+          .from('order_items')
+          .update({ progress_stage: 'ready-for-delivery', updated_at: new Date().toISOString() })
+          .eq('id', item.id)
+
+        if (!error) {
+          totalItemsUpdated++
+          console.log(`  ✅ ${order.order_number}: moved ${item.code} "${item.name}" to ready-for-delivery`)
+        }
+      }
+
+      if (totalItemsUpdated > 0) {
         totalMatched++
         matchedOrders.push(order.order_number)
-        console.log(`  -> Moved ${count} items to ready-for-delivery for ${order.order_number}`)
       }
     }
   }
