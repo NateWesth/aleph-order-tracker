@@ -65,6 +65,17 @@ Deno.serve(async (req) => {
     }
 
     // Detect event type - invoice or sales order
+    // Support manual invoice check by order number
+    if (payload.action === 'check_invoices') {
+      return await handleCheckInvoicesForOrder(supabase, payload, clientId, clientSecret)
+    }
+
+    // Support scanning ALL recent invoices to match orders
+    if (payload.action === 'scan_all_invoices') {
+      return await handleScanAllInvoices(supabase, clientId, clientSecret)
+    }
+
+    // Detect event type - invoice or sales order
     const invoiceId = payload.invoice_id || payload.data?.invoice_id || payload.invoice?.invoice_id
     const salesOrderId = payload.salesorder_id || payload.resource_id || payload.id || 
       payload.salesorder?.salesorder_id || payload.data?.salesorder_id
@@ -220,7 +231,8 @@ async function handleInvoiceWebhook(
   supabase: any, payload: any, invoiceId: string,
   clientId: string, clientSecret: string
 ) {
-  console.log('Processing invoice webhook:', invoiceId)
+  console.log('=== INVOICE WEBHOOK START ===')
+  console.log('Invoice ID:', invoiceId)
 
   const accessToken = await getValidAccessToken(supabase, clientId, clientSecret)
   const orgId = await getOrgId(supabase)
@@ -237,94 +249,109 @@ async function handleInvoiceWebhook(
   }
 
   const invoice = invData.invoice
-  console.log('Invoice details:', invoice.invoice_number, '- Reference:', invoice.reference_number)
+  console.log('Invoice number:', invoice.invoice_number)
+  console.log('Invoice reference_number:', invoice.reference_number)
+  console.log('Invoice salesorder_ids:', JSON.stringify(invoice.salesorders || []))
+  console.log('Invoice PO number:', invoice.purchase_order || invoice.purchaseorder_number)
 
-  const invoiceReference = invoice.reference_number
+  // Try multiple fields to find the order_number match
+  const possibleMatches: string[] = []
   
-  if (!invoiceReference) {
-    console.log('No reference number found on invoice')
+  if (invoice.reference_number) possibleMatches.push(invoice.reference_number)
+  if (invoice.purchase_order) possibleMatches.push(invoice.purchase_order)
+  if (invoice.purchaseorder_number) possibleMatches.push(invoice.purchaseorder_number)
+  
+  // Also check linked salesorder reference numbers
+  if (invoice.salesorders && invoice.salesorders.length > 0) {
+    for (const so of invoice.salesorders) {
+      if (so.reference_number) possibleMatches.push(so.reference_number)
+      if (so.salesorder_number) {
+        // Fetch SO details to get its reference_number (our order_number)
+        try {
+          const soResp = await fetch(
+            `${ZOHO_API_URL}/books/v3/salesorders/${so.salesorder_id}?organization_id=${orgId}`,
+            { headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` } }
+          )
+          const soData = await soResp.json()
+          if (soData.salesorder?.reference_number) {
+            possibleMatches.push(soData.salesorder.reference_number)
+          }
+        } catch (e) {
+          console.error('Failed to fetch linked SO:', e)
+        }
+      }
+    }
+  }
+
+  // Deduplicate and filter empty
+  const uniqueMatches = [...new Set(possibleMatches.filter(Boolean))]
+  console.log('Possible order_number matches to try:', uniqueMatches)
+
+  if (uniqueMatches.length === 0) {
+    console.log('No reference/PO number found on invoice - cannot match')
     return new Response(JSON.stringify({ 
       received: true, 
-      warning: 'No reference number on invoice' 
+      warning: 'No reference or PO number found on invoice to match against orders' 
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
   }
 
-  console.log('Looking for order with order_number:', invoiceReference)
+  // Try each possible match
+  let matchedOrders: any[] = []
+  for (const ref of uniqueMatches) {
+    const { data: orders } = await supabase
+      .from('orders')
+      .select('id, order_number, status')
+      .eq('order_number', ref)
+    
+    if (orders && orders.length > 0) {
+      matchedOrders.push(...orders)
+    }
+  }
 
-  const { data: matchingOrders, error: orderErr } = await supabase
-    .from('orders')
-    .select('id, order_number, reference')
-    .eq('order_number', invoiceReference)
+  // Deduplicate by order id
+  const seenIds = new Set<string>()
+  matchedOrders = matchedOrders.filter(o => {
+    if (seenIds.has(o.id)) return false
+    seenIds.add(o.id)
+    return true
+  })
 
-  if (orderErr || !matchingOrders || matchingOrders.length === 0) {
-    console.log('No matching order found for invoice reference:', invoiceReference)
+  if (matchedOrders.length === 0) {
+    console.log('No matching orders found for refs:', uniqueMatches)
     return new Response(JSON.stringify({ 
       received: true, 
-      warning: `No order found with order_number "${invoiceReference}"` 
+      warning: `No orders found matching: ${uniqueMatches.join(', ')}` 
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
   }
 
-  const invoiceLineItems = invoice.line_items || []
+  console.log(`Found ${matchedOrders.length} matching order(s):`, matchedOrders.map((o: any) => o.order_number))
+
+  // Move ALL items on matched orders to ready-for-delivery
   let totalItemsUpdated = 0
 
-  for (const order of matchingOrders) {
+  for (const order of matchedOrders) {
     console.log(`Processing order ${order.order_number} (${order.id})`)
 
-    const { data: orderItems, error: itemsErr } = await supabase
+    const { data: updatedItems, error: updateErr } = await supabase
       .from('order_items')
-      .select('id, name, code, quantity, progress_stage')
+      .update({ 
+        progress_stage: 'ready-for-delivery',
+        updated_at: new Date().toISOString()
+      })
       .eq('order_id', order.id)
+      .not('progress_stage', 'in', '("ready-for-delivery","completed")')
+      .select('id')
 
-    if (itemsErr || !orderItems) {
-      console.error(`Failed to fetch items for order ${order.id}:`, itemsErr)
-      continue
-    }
-
-    for (const invoiceLine of invoiceLineItems) {
-      const invoiceSku = invoiceLine.sku || invoiceLine.item_code || null
-      const invoiceQty = invoiceLine.quantity || 0
-
-      if (!invoiceSku) {
-        console.log('Skipping invoice line without SKU:', invoiceLine.name || invoiceLine.item_name)
-        continue
-      }
-
-      const matchedItems = orderItems.filter((oi: any) => 
-        oi.code && oi.code.toLowerCase() === invoiceSku.toLowerCase()
-      )
-
-      for (const matchedItem of matchedItems) {
-        if (matchedItem.quantity !== invoiceQty) {
-          console.log(
-            `Quantity mismatch for ${matchedItem.code}: order has ${matchedItem.quantity}, invoice has ${invoiceQty} - skipping`
-          )
-          continue
-        }
-
-        if (matchedItem.progress_stage === 'ready-for-delivery' || matchedItem.progress_stage === 'completed') {
-          console.log(`Item ${matchedItem.code} already at ${matchedItem.progress_stage} - skipping`)
-          continue
-        }
-
-        const { error: updateErr } = await supabase
-          .from('order_items')
-          .update({ 
-            progress_stage: 'ready-for-delivery',
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', matchedItem.id)
-
-        if (updateErr) {
-          console.error(`Failed to update item ${matchedItem.id}:`, updateErr)
-        } else {
-          totalItemsUpdated++
-          console.log(`Moved item ${matchedItem.code} (qty: ${matchedItem.quantity}) to ready-for-delivery`)
-        }
-      }
+    if (updateErr) {
+      console.error(`Failed to update items for order ${order.id}:`, updateErr)
+    } else {
+      const count = updatedItems?.length || 0
+      totalItemsUpdated += count
+      console.log(`Moved ${count} items to ready-for-delivery for order ${order.order_number}`)
     }
   }
 
@@ -335,13 +362,172 @@ async function handleInvoiceWebhook(
     completed_at: new Date().toISOString(),
   })
 
-  console.log(`Invoice ${invoice.invoice_number}: ${totalItemsUpdated} items moved to ready-for-delivery`)
+  console.log(`=== INVOICE WEBHOOK COMPLETE: ${totalItemsUpdated} items updated ===`)
 
   return new Response(JSON.stringify({
     success: true,
     invoice_number: invoice.invoice_number,
     items_updated: totalItemsUpdated,
-    orders_matched: matchingOrders.map((o: any) => o.order_number),
+    orders_matched: matchedOrders.map((o: any) => o.order_number),
+  }), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+  })
+}
+
+// ─── CHECK INVOICES FOR A SPECIFIC ORDER ───────────────────────────────────────
+
+async function handleCheckInvoicesForOrder(
+  supabase: any, payload: any,
+  clientId: string, clientSecret: string
+) {
+  const orderNumber = payload.order_number
+  if (!orderNumber) {
+    return new Response(JSON.stringify({ error: 'order_number is required' }), {
+      status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
+  }
+
+  console.log('Checking Zoho invoices for order_number:', orderNumber)
+
+  const accessToken = await getValidAccessToken(supabase, clientId, clientSecret)
+  const orgId = await getOrgId(supabase)
+
+  // Search invoices by reference number matching our order number
+  const searchResp = await fetch(
+    `${ZOHO_API_URL}/books/v3/invoices?organization_id=${orgId}&reference_number=${encodeURIComponent(orderNumber)}`,
+    { headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` } }
+  )
+  const searchData = await searchResp.json()
+
+  console.log('Invoice search result:', JSON.stringify(searchData).substring(0, 500))
+
+  if (searchData.code === 0 && searchData.invoices?.length > 0) {
+    // Process each matching invoice
+    const results = []
+    for (const inv of searchData.invoices) {
+      console.log(`Found invoice ${inv.invoice_number} for ref ${orderNumber}`)
+      const result = await handleInvoiceWebhook(supabase, {}, inv.invoice_id, clientId, clientSecret)
+      const body = await result.json()
+      results.push(body)
+    }
+    return new Response(JSON.stringify({ success: true, invoices_found: searchData.invoices.length, results }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
+  }
+
+  // Also try searching by customer PO number
+  const poSearchResp = await fetch(
+    `${ZOHO_API_URL}/books/v3/invoices?organization_id=${orgId}&search_text=${encodeURIComponent(orderNumber)}`,
+    { headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` } }
+  )
+  const poSearchData = await poSearchResp.json()
+
+  if (poSearchData.code === 0 && poSearchData.invoices?.length > 0) {
+    const results = []
+    for (const inv of poSearchData.invoices) {
+      if (inv.reference_number === orderNumber || inv.purchase_order === orderNumber) {
+        console.log(`Found invoice ${inv.invoice_number} via search for ${orderNumber}`)
+        const result = await handleInvoiceWebhook(supabase, {}, inv.invoice_id, clientId, clientSecret)
+        const body = await result.json()
+        results.push(body)
+      }
+    }
+    if (results.length > 0) {
+      return new Response(JSON.stringify({ success: true, invoices_found: results.length, results }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+  }
+
+  return new Response(JSON.stringify({ 
+    success: false, 
+    message: `No invoices found in Zoho with reference "${orderNumber}"` 
+  }), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+  })
+}
+
+// ─── SCAN ALL RECENT INVOICES ──────────────────────────────────────────────────
+
+async function handleScanAllInvoices(
+  supabase: any, clientId: string, clientSecret: string
+) {
+  console.log('=== SCANNING ALL RECENT INVOICES ===')
+
+  const accessToken = await getValidAccessToken(supabase, clientId, clientSecret)
+  const orgId = await getOrgId(supabase)
+
+  // Fetch recent invoices (last 30 days)
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+  const invResp = await fetch(
+    `${ZOHO_API_URL}/books/v3/invoices?organization_id=${orgId}&date_after=${thirtyDaysAgo}&per_page=200`,
+    { headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` } }
+  )
+  const invData = await invResp.json()
+
+  if (invData.code !== 0 || !invData.invoices) {
+    console.error('Failed to fetch invoices:', invData.message)
+    return new Response(JSON.stringify({ error: 'Failed to fetch invoices from Zoho' }), {
+      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
+  }
+
+  console.log(`Found ${invData.invoices.length} invoices in last 30 days`)
+
+  let totalMatched = 0
+  let totalItemsUpdated = 0
+  const matchedOrders: string[] = []
+
+  for (const inv of invData.invoices) {
+    const ref = inv.reference_number
+    if (!ref) continue
+
+    // Check if this reference matches any order_number
+    const { data: orders } = await supabase
+      .from('orders')
+      .select('id, order_number')
+      .eq('order_number', ref)
+
+    if (!orders || orders.length === 0) continue
+
+    console.log(`Invoice ${inv.invoice_number} ref "${ref}" matches order(s):`, orders.map((o: any) => o.order_number))
+
+    for (const order of orders) {
+      const { data: updatedItems } = await supabase
+        .from('order_items')
+        .update({ 
+          progress_stage: 'ready-for-delivery',
+          updated_at: new Date().toISOString()
+        })
+        .eq('order_id', order.id)
+        .not('progress_stage', 'in', '("ready-for-delivery","completed")')
+        .select('id')
+
+      const count = updatedItems?.length || 0
+      totalItemsUpdated += count
+      if (count > 0) {
+        totalMatched++
+        matchedOrders.push(order.order_number)
+        console.log(`  -> Moved ${count} items to ready-for-delivery for ${order.order_number}`)
+      }
+    }
+  }
+
+  await supabase.from('zoho_sync_log').insert({
+    sync_type: 'invoice_scan',
+    status: 'completed',
+    items_synced: totalItemsUpdated,
+    completed_at: new Date().toISOString(),
+  })
+
+  console.log(`=== INVOICE SCAN COMPLETE: ${totalMatched} orders matched, ${totalItemsUpdated} items updated ===`)
+
+  return new Response(JSON.stringify({
+    success: true,
+    invoices_scanned: invData.invoices.length,
+    orders_matched: totalMatched,
+    items_updated: totalItemsUpdated,
+    matched_order_numbers: matchedOrders,
   }), {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' }
   })
