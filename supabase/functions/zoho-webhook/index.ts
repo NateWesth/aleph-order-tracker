@@ -539,23 +539,47 @@ async function handleScanAllInvoices(
 
     console.log(`Invoice ${inv.invoice_number} ref "${ref}" matches order(s):`, orders.map((o: any) => o.order_number))
 
-    for (const order of orders) {
-      const { data: updatedItems } = await supabase
-        .from('order_items')
-        .update({ 
-          progress_stage: 'ready-for-delivery',
-          updated_at: new Date().toISOString()
-        })
-        .eq('order_id', order.id)
-        .not('progress_stage', 'in', '("ready-for-delivery","completed")')
-        .select('id')
+    // Fetch full invoice details to get line items with SKUs
+    const invDetailResp = await fetch(
+      `${ZOHO_API_URL}/books/v3/invoices/${inv.invoice_id}?organization_id=${orgId}`,
+      { headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` } }
+    )
+    const invDetailData = await invDetailResp.json()
+    const invoiceLineItems = invDetailData?.invoice?.line_items || []
+    const invoiceSkus = invoiceLineItems
+      .map((li: any) => (li.sku || li.item_code || '').toLowerCase())
+      .filter(Boolean)
 
-      const count = updatedItems?.length || 0
-      totalItemsUpdated += count
-      if (count > 0) {
+    if (invoiceSkus.length === 0) continue
+
+    for (const order of orders) {
+      // Get order items and match by SKU
+      const { data: orderItems } = await supabase
+        .from('order_items')
+        .select('id, code, name, progress_stage')
+        .eq('order_id', order.id)
+
+      if (!orderItems) continue
+
+      for (const item of orderItems) {
+        if (item.progress_stage === 'ready-for-delivery' || item.progress_stage === 'completed') continue
+        const itemCode = (item.code || '').toLowerCase()
+        if (!itemCode || !invoiceSkus.includes(itemCode)) continue
+
+        const { error } = await supabase
+          .from('order_items')
+          .update({ progress_stage: 'ready-for-delivery', updated_at: new Date().toISOString() })
+          .eq('id', item.id)
+
+        if (!error) {
+          totalItemsUpdated++
+          console.log(`  ✅ ${order.order_number}: moved ${item.code} "${item.name}" to ready-for-delivery`)
+        }
+      }
+
+      if (totalItemsUpdated > 0) {
         totalMatched++
         matchedOrders.push(order.order_number)
-        console.log(`  -> Moved ${count} items to ready-for-delivery for ${order.order_number}`)
       }
     }
   }
