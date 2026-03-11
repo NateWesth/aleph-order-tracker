@@ -303,7 +303,7 @@ async function handleInvoiceWebhook(
     const { data: orders } = await supabase
       .from('orders')
       .select('id, order_number, status')
-      .eq('order_number', ref)
+      .ilike('order_number', ref)
     
     if (orders && orders.length > 0) {
       matchedOrders.push(...orders)
