@@ -303,7 +303,7 @@ async function handleInvoiceWebhook(
     const { data: orders } = await supabase
       .from('orders')
       .select('id, order_number, status')
-      .eq('order_number', ref)
+      .ilike('order_number', ref)
     
     if (orders && orders.length > 0) {
       matchedOrders.push(...orders)
@@ -472,7 +472,7 @@ async function handleCheckInvoicesForOrder(
   if (poSearchData.code === 0 && poSearchData.invoices?.length > 0) {
     const results = []
     for (const inv of poSearchData.invoices) {
-      if (inv.reference_number === orderNumber || inv.purchase_order === orderNumber) {
+      if (inv.reference_number?.toLowerCase() === orderNumber.toLowerCase() || inv.purchase_order?.toLowerCase() === orderNumber.toLowerCase()) {
         console.log(`Found invoice ${inv.invoice_number} via search for ${orderNumber}`)
         const result = await handleInvoiceWebhook(supabase, {}, inv.invoice_id, clientId, clientSecret)
         const body = await result.json()
@@ -533,7 +533,7 @@ async function handleScanAllInvoices(
     const { data: orders } = await supabase
       .from('orders')
       .select('id, order_number')
-      .eq('order_number', ref)
+      .ilike('order_number', ref)
 
     if (!orders || orders.length === 0) continue
 
