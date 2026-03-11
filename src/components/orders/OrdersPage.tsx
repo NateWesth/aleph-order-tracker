@@ -428,14 +428,19 @@ export default function OrdersPage({
 
   const handleSetItemStockStatus = useCallback(async (itemId: string, newStatus: string) => {
     try {
+      // When marking as received (in-stock), also advance progress_stage
+      const updateData: Record<string, string> = { stock_status: newStatus };
+      if (newStatus === 'in-stock') {
+        updateData.progress_stage = 'in-stock';
+      }
+
       const { error } = await supabase
         .from("order_items")
-        .update({ stock_status: newStatus })
+        .update(updateData)
         .eq("id", itemId);
 
       if (error) throw error;
 
-      // Refresh orders (the database trigger will auto-move the order if all items are in stock)
       fetchOrders();
     } catch (error) {
       toast({
