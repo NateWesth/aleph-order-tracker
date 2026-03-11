@@ -533,7 +533,7 @@ async function handleScanAllInvoices(
     const { data: orders } = await supabase
       .from('orders')
       .select('id, order_number')
-      .eq('order_number', ref)
+      .ilike('order_number', ref)
 
     if (!orders || orders.length === 0) continue
 
