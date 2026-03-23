@@ -261,11 +261,13 @@ async function handleInvoiceWebhook(
   if (invoice.purchase_order) possibleMatches.push(invoice.purchase_order)
   if (invoice.purchaseorder_number) possibleMatches.push(invoice.purchaseorder_number)
   
-  // Also check linked salesorder reference numbers
+  // Also check linked salesorder reference numbers AND salesorder numbers
+  const linkedSoNumbers: string[] = []
   if (invoice.salesorders && invoice.salesorders.length > 0) {
     for (const so of invoice.salesorders) {
       if (so.reference_number) possibleMatches.push(so.reference_number)
-      if (so.salesorder_number) {
+      if (so.salesorder_number) linkedSoNumbers.push(so.salesorder_number)
+      if (so.salesorder_id) {
         // Fetch SO details to get its reference_number (our order_number)
         try {
           const soResp = await fetch(
@@ -276,6 +278,9 @@ async function handleInvoiceWebhook(
           if (soData.salesorder?.reference_number) {
             possibleMatches.push(soData.salesorder.reference_number)
           }
+          if (soData.salesorder?.salesorder_number) {
+            linkedSoNumbers.push(soData.salesorder.salesorder_number)
+          }
         } catch (e) {
           console.error('Failed to fetch linked SO:', e)
         }
@@ -285,25 +290,51 @@ async function handleInvoiceWebhook(
 
   // Deduplicate and filter empty
   const uniqueMatches = [...new Set(possibleMatches.filter(Boolean))]
+  const uniqueSoNumbers = [...new Set(linkedSoNumbers.filter(Boolean))]
   console.log('Possible order_number matches to try:', uniqueMatches)
+  console.log('Linked SO numbers to match against reference:', uniqueSoNumbers)
 
-  if (uniqueMatches.length === 0) {
-    console.log('No reference/PO number found on invoice - cannot match')
+  if (uniqueMatches.length === 0 && uniqueSoNumbers.length === 0) {
+    console.log('No reference/PO/SO number found on invoice - cannot match')
     return new Response(JSON.stringify({ 
       received: true, 
-      warning: 'No reference or PO number found on invoice to match against orders' 
+      warning: 'No reference, PO, or SO number found on invoice to match against orders' 
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
   }
 
-  // Try each possible match
+  // Try each possible match against order_number
   let matchedOrders: any[] = []
   for (const ref of uniqueMatches) {
     const { data: orders } = await supabase
       .from('orders')
       .select('id, order_number, status')
       .ilike('order_number', ref)
+    
+    if (orders && orders.length > 0) {
+      matchedOrders.push(...orders)
+    }
+  }
+
+  // Also try matching linked SO numbers against orders.reference field
+  for (const soNum of uniqueSoNumbers) {
+    const { data: orders } = await supabase
+      .from('orders')
+      .select('id, order_number, status')
+      .ilike('reference', soNum)
+    
+    if (orders && orders.length > 0) {
+      matchedOrders.push(...orders)
+    }
+  }
+
+  // Also try matching possibleMatches against orders.reference field
+  for (const ref of uniqueMatches) {
+    const { data: orders } = await supabase
+      .from('orders')
+      .select('id, order_number, status')
+      .ilike('reference', ref)
     
     if (orders && orders.length > 0) {
       matchedOrders.push(...orders)
@@ -527,15 +558,32 @@ async function handleScanAllInvoices(
 
   for (const inv of invData.invoices) {
     const ref = inv.reference_number
-    if (!ref) continue
+    const po = inv.purchase_order || inv.purchaseorder_number
+    const possibleRefs = [ref, po].filter(Boolean)
+    
+    if (possibleRefs.length === 0) continue
 
-    // Check if this reference matches any order_number
-    const { data: orders } = await supabase
-      .from('orders')
-      .select('id, order_number')
-      .ilike('order_number', ref)
+    // Check if any reference matches order_number or orders.reference
+    let orders: any[] = []
+    for (const r of possibleRefs) {
+      const { data: byOrderNum } = await supabase
+        .from('orders')
+        .select('id, order_number')
+        .ilike('order_number', r)
+      if (byOrderNum?.length) orders.push(...byOrderNum)
 
-    if (!orders || orders.length === 0) continue
+      const { data: byRef } = await supabase
+        .from('orders')
+        .select('id, order_number')
+        .ilike('reference', r)
+      if (byRef?.length) orders.push(...byRef)
+    }
+
+    // Deduplicate
+    const seen = new Set<string>()
+    orders = orders.filter(o => { if (seen.has(o.id)) return false; seen.add(o.id); return true })
+
+    if (orders.length === 0) continue
 
     console.log(`Invoice ${inv.invoice_number} ref "${ref}" matches order(s):`, orders.map((o: any) => o.order_number))
 
