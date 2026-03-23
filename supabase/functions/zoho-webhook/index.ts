@@ -558,15 +558,32 @@ async function handleScanAllInvoices(
 
   for (const inv of invData.invoices) {
     const ref = inv.reference_number
-    if (!ref) continue
+    const po = inv.purchase_order || inv.purchaseorder_number
+    const possibleRefs = [ref, po].filter(Boolean)
+    
+    if (possibleRefs.length === 0) continue
 
-    // Check if this reference matches any order_number
-    const { data: orders } = await supabase
-      .from('orders')
-      .select('id, order_number')
-      .ilike('order_number', ref)
+    // Check if any reference matches order_number or orders.reference
+    let orders: any[] = []
+    for (const r of possibleRefs) {
+      const { data: byOrderNum } = await supabase
+        .from('orders')
+        .select('id, order_number')
+        .ilike('order_number', r)
+      if (byOrderNum?.length) orders.push(...byOrderNum)
 
-    if (!orders || orders.length === 0) continue
+      const { data: byRef } = await supabase
+        .from('orders')
+        .select('id, order_number')
+        .ilike('reference', r)
+      if (byRef?.length) orders.push(...byRef)
+    }
+
+    // Deduplicate
+    const seen = new Set<string>()
+    orders = orders.filter(o => { if (seen.has(o.id)) return false; seen.add(o.id); return true })
+
+    if (orders.length === 0) continue
 
     console.log(`Invoice ${inv.invoice_number} ref "${ref}" matches order(s):`, orders.map((o: any) => o.order_number))
 
