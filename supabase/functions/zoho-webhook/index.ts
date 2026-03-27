@@ -420,6 +420,7 @@ async function handleInvoiceWebhook(
         .from('order_items')
         .update({ 
           progress_stage: 'ready-for-delivery',
+          stock_status: 'in-stock',
           updated_at: new Date().toISOString()
         })
         .eq('id', item.id)
