@@ -394,7 +394,7 @@ async function handleInvoiceWebhook(
     // Get all order items
     const { data: orderItems, error: itemsErr } = await supabase
       .from('order_items')
-      .select('id, name, code, quantity, progress_stage')
+      .select('id, name, code, quantity, progress_stage, stock_status')
       .eq('order_id', order.id)
 
     if (itemsErr || !orderItems) {
@@ -403,9 +403,9 @@ async function handleInvoiceWebhook(
     }
 
     for (const item of orderItems) {
-      // Skip items already at ready-for-delivery or completed
-      if (item.progress_stage === 'ready-for-delivery' || item.progress_stage === 'completed') {
-        console.log(`  Item ${item.code} "${item.name}" already at ${item.progress_stage} - skipping`)
+      // Never touch completed items
+      if (item.progress_stage === 'completed') {
+        console.log(`  Item ${item.code} "${item.name}" already completed - skipping`)
         continue
       }
 
@@ -416,10 +416,17 @@ async function handleInvoiceWebhook(
         continue
       }
 
+      const alreadySynced = item.progress_stage === 'ready-for-delivery' && item.stock_status === 'in-stock'
+      if (alreadySynced) {
+        console.log(`  Item ${item.code} "${item.name}" already synced - skipping`)
+        continue
+      }
+
       const { error: updateErr } = await supabase
         .from('order_items')
         .update({ 
           progress_stage: 'ready-for-delivery',
+          stock_status: 'in-stock',
           updated_at: new Date().toISOString()
         })
         .eq('id', item.id)
@@ -428,7 +435,7 @@ async function handleInvoiceWebhook(
         console.error(`  Failed to update item ${item.id}:`, updateErr)
       } else {
         totalItemsUpdated++
-        console.log(`  ✅ Moved item ${item.code} "${item.name}" to ready-for-delivery`)
+        console.log(`  ✅ Synced item ${item.code} "${item.name}" to ready-for-delivery + in-stock`)
       }
     }
   }
@@ -604,24 +611,31 @@ async function handleScanAllInvoices(
       // Get order items and match by SKU
       const { data: orderItems } = await supabase
         .from('order_items')
-        .select('id, code, name, progress_stage')
+        .select('id, code, name, progress_stage, stock_status')
         .eq('order_id', order.id)
 
       if (!orderItems) continue
 
       for (const item of orderItems) {
-        if (item.progress_stage === 'ready-for-delivery' || item.progress_stage === 'completed') continue
+        if (item.progress_stage === 'completed') continue
         const itemCode = (item.code || '').toLowerCase()
         if (!itemCode || !invoiceSkus.includes(itemCode)) continue
 
+        const alreadySynced = item.progress_stage === 'ready-for-delivery' && item.stock_status === 'in-stock'
+        if (alreadySynced) continue
+
         const { error } = await supabase
           .from('order_items')
-          .update({ progress_stage: 'ready-for-delivery', updated_at: new Date().toISOString() })
+          .update({
+            progress_stage: 'ready-for-delivery',
+            stock_status: 'in-stock',
+            updated_at: new Date().toISOString()
+          })
           .eq('id', item.id)
 
         if (!error) {
           totalItemsUpdated++
-          console.log(`  ✅ ${order.order_number}: moved ${item.code} "${item.name}" to ready-for-delivery`)
+          console.log(`  ✅ ${order.order_number}: synced ${item.code} "${item.name}" to ready-for-delivery + in-stock`)
         }
       }
 
