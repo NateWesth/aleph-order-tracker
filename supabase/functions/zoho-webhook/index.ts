@@ -611,15 +611,18 @@ async function handleScanAllInvoices(
       // Get order items and match by SKU
       const { data: orderItems } = await supabase
         .from('order_items')
-        .select('id, code, name, progress_stage')
+        .select('id, code, name, progress_stage, stock_status')
         .eq('order_id', order.id)
 
       if (!orderItems) continue
 
       for (const item of orderItems) {
-        if (item.progress_stage === 'ready-for-delivery' || item.progress_stage === 'completed') continue
+        if (item.progress_stage === 'completed') continue
         const itemCode = (item.code || '').toLowerCase()
         if (!itemCode || !invoiceSkus.includes(itemCode)) continue
+
+        const alreadySynced = item.progress_stage === 'ready-for-delivery' && item.stock_status === 'in-stock'
+        if (alreadySynced) continue
 
         const { error } = await supabase
           .from('order_items')
@@ -632,7 +635,7 @@ async function handleScanAllInvoices(
 
         if (!error) {
           totalItemsUpdated++
-          console.log(`  ✅ ${order.order_number}: moved ${item.code} "${item.name}" to ready-for-delivery`)
+          console.log(`  ✅ ${order.order_number}: synced ${item.code} "${item.name}" to ready-for-delivery + in-stock`)
         }
       }
 
