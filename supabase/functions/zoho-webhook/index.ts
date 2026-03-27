@@ -394,7 +394,7 @@ async function handleInvoiceWebhook(
     // Get all order items
     const { data: orderItems, error: itemsErr } = await supabase
       .from('order_items')
-      .select('id, name, code, quantity, progress_stage')
+      .select('id, name, code, quantity, progress_stage, stock_status')
       .eq('order_id', order.id)
 
     if (itemsErr || !orderItems) {
@@ -403,9 +403,9 @@ async function handleInvoiceWebhook(
     }
 
     for (const item of orderItems) {
-      // Skip items already at ready-for-delivery or completed
-      if (item.progress_stage === 'ready-for-delivery' || item.progress_stage === 'completed') {
-        console.log(`  Item ${item.code} "${item.name}" already at ${item.progress_stage} - skipping`)
+      // Never touch completed items
+      if (item.progress_stage === 'completed') {
+        console.log(`  Item ${item.code} "${item.name}" already completed - skipping`)
         continue
       }
 
@@ -413,6 +413,12 @@ async function handleInvoiceWebhook(
       const itemCode = (item.code || '').toLowerCase()
       if (!itemCode || !invoiceSkus.includes(itemCode)) {
         console.log(`  Item ${item.code} "${item.name}" not on invoice - skipping`)
+        continue
+      }
+
+      const alreadySynced = item.progress_stage === 'ready-for-delivery' && item.stock_status === 'in-stock'
+      if (alreadySynced) {
+        console.log(`  Item ${item.code} "${item.name}" already synced - skipping`)
         continue
       }
 
@@ -429,7 +435,7 @@ async function handleInvoiceWebhook(
         console.error(`  Failed to update item ${item.id}:`, updateErr)
       } else {
         totalItemsUpdated++
-        console.log(`  ✅ Moved item ${item.code} "${item.name}" to ready-for-delivery`)
+        console.log(`  ✅ Synced item ${item.code} "${item.name}" to ready-for-delivery + in-stock`)
       }
     }
   }
