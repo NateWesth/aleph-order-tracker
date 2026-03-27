@@ -617,7 +617,11 @@ async function handleScanAllInvoices(
 
         const { error } = await supabase
           .from('order_items')
-          .update({ progress_stage: 'ready-for-delivery', updated_at: new Date().toISOString() })
+          .update({
+            progress_stage: 'ready-for-delivery',
+            stock_status: 'in-stock',
+            updated_at: new Date().toISOString()
+          })
           .eq('id', item.id)
 
         if (!error) {
