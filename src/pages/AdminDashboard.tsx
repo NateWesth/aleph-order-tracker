@@ -149,6 +149,7 @@ const AdminDashboard = () => {
     { id: "suppliers", label: "Suppliers", icon: Truck, badge: 0 },
     { id: "stats", label: "Stats", icon: BarChart3, badge: 0 },
     { id: "po-tracking", label: "PO Tracking", icon: FileText, badge: 0 },
+    { id: "buying-sheet", label: "Buying", icon: ShoppingCart, badge: 0 },
     { id: "items", label: "Items", icon: Box, badge: 0 },
     ...(isAdmin ? [{ id: "users", label: "Users", icon: Users, badge: 0 }] : []),
   ];
