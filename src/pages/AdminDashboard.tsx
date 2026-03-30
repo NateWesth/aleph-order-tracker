@@ -26,6 +26,7 @@ import CustomizableDashboard from "@/components/admin/CustomizableDashboard";
 import UsersManagementPage from "@/components/admin/UsersManagementPage";
 import SuppliersPage from "@/components/admin/SuppliersPage";
 import POTrackingPage from "@/components/admin/POTrackingPage";
+import BuyingSheetPage from "@/components/admin/BuyingSheetPage";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useGlobalUnreadCount } from "@/hooks/useGlobalUnreadCount";
 import { cn } from "@/lib/utils";
