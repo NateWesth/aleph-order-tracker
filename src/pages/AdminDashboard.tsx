@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Package, History, BarChart3, Settings, LogOut, Building2, Home, Box, Users, Truck, FileText, Command } from "lucide-react";
+import { Package, History, BarChart3, Settings, LogOut, Building2, Home, Box, Users, Truck, FileText, Command, ShoppingCart } from "lucide-react";
 import { playClick, playWhoosh } from "@/utils/ambientSounds";
 import NotificationCenter from "@/components/NotificationCenter";
 import FloatingAIChat from "@/components/admin/FloatingAIChat";
