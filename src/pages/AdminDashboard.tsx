@@ -289,6 +289,7 @@ const AdminDashboard = () => {
               {activeView === "suppliers" && <SuppliersPage />}
               {activeView === "po-tracking" && <POTrackingPage />}
               {activeView === "items" && <ItemsPage />}
+              {activeView === "buying-sheet" && <BuyingSheetPage />}
               {activeView === "users" && isAdmin && <UsersManagementPage />}
               {activeView === "stats" && <StatsPage />}
             </PageTransition>
