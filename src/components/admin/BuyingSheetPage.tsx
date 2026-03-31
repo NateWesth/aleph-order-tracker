@@ -536,6 +536,11 @@ export default function BuyingSheetPage() {
   const sortedRows = useMemo(() => {
     const sorted = [...filteredRows];
     sorted.sort((a, b) => {
+      // Pinned items always on top
+      const aPinned = pinnedSkus.includes(a.sku);
+      const bPinned = pinnedSkus.includes(b.sku);
+      if (aPinned && !bPinned) return -1;
+      if (!aPinned && bPinned) return 1;
       let aVal: any = a[sortField], bVal: any = b[sortField];
       if (aVal === null) aVal = sortDirection === "asc" ? Infinity : -Infinity;
       if (bVal === null) bVal = sortDirection === "asc" ? Infinity : -Infinity;
@@ -544,7 +549,31 @@ export default function BuyingSheetPage() {
       return aVal < bVal ? (sortDirection === "asc" ? -1 : 1) : aVal > bVal ? (sortDirection === "asc" ? 1 : -1) : 0;
     });
     return sorted;
-  }, [filteredRows, sortField, sortDirection]);
+  }, [filteredRows, sortField, sortDirection, pinnedSkus]);
+
+  // Detect items appearing with multiple suppliers
+  const multiSupplierSkus = useMemo(() => {
+    const skuSuppliers = new Map<string, Set<string>>();
+    rows.forEach(r => {
+      if (!skuSuppliers.has(r.sku)) skuSuppliers.set(r.sku, new Set());
+      skuSuppliers.get(r.sku)!.add(r.supplierName);
+    });
+    const multi = new Set<string>();
+    skuSuppliers.forEach((suppliers, sku) => { if (suppliers.size > 1) multi.add(sku); });
+    return multi;
+  }, [rows]);
+
+  // Top supplier chips for quick filtering
+  const topSupplierChips = useMemo(() => {
+    const map = new Map<string, { id: string | null; count: number; toOrder: number }>();
+    rows.forEach(r => {
+      const key = r.supplierName;
+      const existing = map.get(key);
+      if (existing) { existing.count++; existing.toOrder += r.toOrder; }
+      else map.set(key, { id: r.supplierId, count: 1, toOrder: r.toOrder });
+    });
+    return Array.from(map.entries()).sort((a, b) => b[1].toOrder - a[1].toOrder).slice(0, 8);
+  }, [rows]);
 
   const groupedRows = useMemo(() => {
     if (!groupBySupplier) return null;
