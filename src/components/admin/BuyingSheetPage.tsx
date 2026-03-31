@@ -418,6 +418,11 @@ export default function BuyingSheetPage() {
       if (orderItemIds.length > 0) {
         const { error } = await supabase.from("order_items").update({ stock_status: "ordered" as any, notes: `Marked ordered from buying sheet on ${new Date().toLocaleDateString()}` }).in("id", orderItemIds);
         if (error) throw error;
+        // Track recently ordered
+        const newRecent: RecentlyOrderedItem[] = targetRows.map(r => ({ sku: r.sku, itemName: r.itemName, quantity: r.toOrder, orderedAt: new Date().toISOString(), supplier: r.supplierName }));
+        const updated = [...newRecent, ...recentlyOrdered].slice(0, 50);
+        setRecentlyOrdered(updated);
+        saveRecentlyOrdered(updated);
         toast({ title: "Updated", description: `${orderItemIds.length} items marked as ordered` });
         setSelectedSkus(new Set());
         fetchLocalData();
