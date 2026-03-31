@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef, Fragment } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -14,7 +14,8 @@ import {
   AlertTriangle, TrendingUp, TrendingDown, Minus, ChevronDown, ChevronRight,
   ArrowUpDown, ArrowUp, ArrowDown, Layers, Clock, Flame, CheckCircle2,
   FileSpreadsheet, Users, Printer, Mail, StickyNote, Copy, X,
-  BarChart3, Filter
+  BarChart3, Filter, Maximize2, Minimize2, ClipboardCopy, Timer,
+  ChevronUp, Eye, PieChart
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
@@ -41,6 +42,8 @@ interface BuyingSheetRow {
   demandTrend: "up" | "down" | "stable" | "new";
   lastMonthQty: number;
   prevMonthQty: number;
+  stockoutRiskDays: number | null;
+  lastPurchasedDate: string | null;
 }
 
 interface SuggestedRestockRow {
@@ -56,11 +59,10 @@ interface ZohoStockData {
   [sku: string]: { stockOnHand: number; onPurchaseOrder: number; vendorName?: string; vendorEmail?: string };
 }
 
-type SortField = "sku" | "itemName" | "totalNeeded" | "stockOnHand" | "onPurchaseOrder" | "toOrder" | "supplierName" | "daysWaiting" | "priorityScore";
+type SortField = "sku" | "itemName" | "totalNeeded" | "stockOnHand" | "onPurchaseOrder" | "toOrder" | "supplierName" | "daysWaiting" | "priorityScore" | "stockoutRiskDays";
 type SortDirection = "asc" | "desc";
 type PriorityFilter = "all" | "critical" | "high" | "medium" | "low";
 
-// Persistent notes stored in localStorage
 const NOTES_KEY = "buying-sheet-notes";
 const loadNotes = (): Record<string, string> => {
   try { return JSON.parse(localStorage.getItem(NOTES_KEY) || "{}"); } catch { return {}; }
@@ -89,12 +91,32 @@ export default function BuyingSheetPage() {
   const [editingNote, setEditingNote] = useState<string | null>(null);
   const [noteText, setNoteText] = useState("");
   const [demandHistory, setDemandHistory] = useState<Map<string, { lastMonth: number; prevMonth: number }>>(new Map());
+  const [expandedSkus, setExpandedSkus] = useState<Set<string>>(new Set());
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showSupplierChart, setShowSupplierChart] = useState(false);
+  const [lastPurchaseMap, setLastPurchaseMap] = useState<Map<string, string>>(new Map());
   const printRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetchDemandHistory();
+    fetchLastPurchaseDates();
     fetchLocalData();
   }, []);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (e.key === "f" && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        document.querySelector<HTMLInputElement>('[placeholder*="Search"]')?.focus();
+      }
+      if (e.key === "Escape" && isFullscreen) setIsFullscreen(false);
+      if (e.key === "g" && !e.metaKey && !e.ctrlKey) setGroupBySupplier(v => !v);
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [isFullscreen]);
 
   const getAuthHeaders = async () => {
     const { data: sessionData } = await supabase.auth.getSession();
@@ -105,7 +127,6 @@ export default function BuyingSheetPage() {
     };
   };
 
-  // Fetch demand history: compare last month vs previous month quantities per SKU
   const fetchDemandHistory = async () => {
     try {
       const now = new Date();
@@ -144,6 +165,27 @@ export default function BuyingSheetPage() {
       setDemandHistory(history);
     } catch (err) {
       console.error("Failed to fetch demand history:", err);
+    }
+  };
+
+  const fetchLastPurchaseDates = async () => {
+    try {
+      const { data } = await supabase
+        .from("order_items")
+        .select("code, completed_at")
+        .eq("progress_stage", "completed")
+        .not("code", "is", null)
+        .not("completed_at", "is", null)
+        .order("completed_at", { ascending: false });
+
+      const map = new Map<string, string>();
+      (data || []).forEach(item => {
+        const sku = (item.code || "").toUpperCase();
+        if (!map.has(sku) && item.completed_at) map.set(sku, item.completed_at);
+      });
+      setLastPurchaseMap(map);
+    } catch (err) {
+      console.error("Failed to fetch last purchase dates:", err);
     }
   };
 
@@ -245,6 +287,17 @@ export default function BuyingSheetPage() {
     if (percentChange > 15) return { trend: "up", ...history };
     if (percentChange < -15) return { trend: "down", ...history };
     return { trend: "stable", ...history };
+  };
+
+  // Calculate stockout risk: days of stock remaining based on daily demand rate
+  const getStockoutRiskDays = (sku: string, stockOnHand: number, onPO: number): number | null => {
+    const history = demandHistory.get(sku);
+    if (!history || (history.lastMonth === 0 && history.prevMonth === 0)) return null;
+    const avgMonthlyDemand = (history.lastMonth + history.prevMonth) / 2;
+    if (avgMonthlyDemand === 0) return null;
+    const dailyDemand = avgMonthlyDemand / 30;
+    const totalAvailable = stockOnHand + onPO;
+    return Math.round(totalAvailable / dailyDemand);
   };
 
   const fetchLocalData = async () => {
@@ -371,6 +424,8 @@ export default function BuyingSheetPage() {
         const covered = zohoEntry.stockOnHand + zohoEntry.onPurchaseOrder;
         const coveragePercent = entry.totalNeeded > 0 ? Math.min(100, Math.round((covered / entry.totalNeeded) * 100)) : 100;
         const { trend, lastMonth, prevMonth } = getDemandTrend(entry.sku);
+        const stockoutRiskDays = getStockoutRiskDays(entry.sku, zohoEntry.stockOnHand, zohoEntry.onPurchaseOrder);
+        const lastPurchasedDate = lastPurchaseMap.get(entry.sku) || null;
 
         let priorityScore = 0;
         if (toOrder > 0) priorityScore += 30;
@@ -380,6 +435,9 @@ export default function BuyingSheetPage() {
         if (coveragePercent < 25) priorityScore += 15;
         else if (coveragePercent < 50) priorityScore += 10;
         priorityScore += Math.min(20, entry.orders.length * 5);
+        // Boost for stockout risk
+        if (stockoutRiskDays !== null && stockoutRiskDays <= 7) priorityScore += 15;
+        else if (stockoutRiskDays !== null && stockoutRiskDays <= 14) priorityScore += 5;
 
         return {
           ...entry,
@@ -394,6 +452,8 @@ export default function BuyingSheetPage() {
           demandTrend: trend,
           lastMonthQty: lastMonth,
           prevMonthQty: prevMonth,
+          stockoutRiskDays,
+          lastPurchasedDate,
         };
       });
 
@@ -417,6 +477,7 @@ export default function BuyingSheetPage() {
             const supplierEmail = row.supplierEmail || zohoEntry.vendorEmail || undefined;
             const covered = zohoEntry.stockOnHand + zohoEntry.onPurchaseOrder;
             const coveragePercent = row.totalNeeded > 0 ? Math.min(100, Math.round((covered / row.totalNeeded) * 100)) : 100;
+            const stockoutRiskDays = getStockoutRiskDays(row.sku, zohoEntry.stockOnHand, zohoEntry.onPurchaseOrder);
             let priorityScore = 0;
             if (toOrder > 0) priorityScore += 30;
             if (row.hasUrgent) priorityScore += 40;
@@ -425,7 +486,9 @@ export default function BuyingSheetPage() {
             if (coveragePercent < 25) priorityScore += 15;
             else if (coveragePercent < 50) priorityScore += 10;
             priorityScore += Math.min(20, row.orders.length * 5);
-            return { ...row, supplierName, supplierEmail, stockOnHand: zohoEntry.stockOnHand, onPurchaseOrder: zohoEntry.onPurchaseOrder, toOrder, coveragePercent, priorityScore };
+            if (stockoutRiskDays !== null && stockoutRiskDays <= 7) priorityScore += 15;
+            else if (stockoutRiskDays !== null && stockoutRiskDays <= 14) priorityScore += 5;
+            return { ...row, supplierName, supplierEmail, stockOnHand: zohoEntry.stockOnHand, onPurchaseOrder: zohoEntry.onPurchaseOrder, toOrder, coveragePercent, priorityScore, stockoutRiskDays };
           })
         );
         toast({ title: "Updated", description: "Zoho stock & PO data loaded" });
@@ -444,6 +507,7 @@ export default function BuyingSheetPage() {
             ? zohoEntry.vendorName : row.supplierName;
           const covered = zohoEntry.stockOnHand + zohoEntry.onPurchaseOrder;
           const coveragePercent = row.totalNeeded > 0 ? Math.min(100, Math.round((covered / row.totalNeeded) * 100)) : 100;
+          const stockoutRiskDays = getStockoutRiskDays(row.sku, zohoEntry.stockOnHand, zohoEntry.onPurchaseOrder);
           let priorityScore = 0;
           if (toOrder > 0) priorityScore += 30;
           if (row.hasUrgent) priorityScore += 40;
@@ -452,7 +516,9 @@ export default function BuyingSheetPage() {
           if (coveragePercent < 25) priorityScore += 15;
           else if (coveragePercent < 50) priorityScore += 10;
           priorityScore += Math.min(20, row.orders.length * 5);
-          return { ...row, supplierName, stockOnHand: zohoEntry.stockOnHand, onPurchaseOrder: zohoEntry.onPurchaseOrder, toOrder, coveragePercent, priorityScore };
+          if (stockoutRiskDays !== null && stockoutRiskDays <= 7) priorityScore += 15;
+          else if (stockoutRiskDays !== null && stockoutRiskDays <= 14) priorityScore += 5;
+          return { ...row, supplierName, stockOnHand: zohoEntry.stockOnHand, onPurchaseOrder: zohoEntry.onPurchaseOrder, toOrder, coveragePercent, priorityScore, stockoutRiskDays };
         })
       );
       toast({ title: "Updated", description: "Stock & PO data refreshed from Zoho Books" });
@@ -484,6 +550,32 @@ export default function BuyingSheetPage() {
       }
     });
     return Array.from(suppliers.entries()).sort((a, b) => a[1].name.localeCompare(b[1].name));
+  }, [rows]);
+
+  // Supplier concentration data for chart
+  const supplierConcentration = useMemo(() => {
+    const map = new Map<string, number>();
+    rows.forEach(r => {
+      const name = r.supplierName || "No Supplier";
+      map.set(name, (map.get(name) || 0) + r.toOrder);
+    });
+    const sorted = Array.from(map.entries())
+      .sort((a, b) => b[1] - a[1]);
+    const total = sorted.reduce((s, [, v]) => s + v, 0);
+    const colors = [
+      "hsl(var(--primary))",
+      "hsl(var(--chart-2))",
+      "hsl(var(--chart-3))",
+      "hsl(var(--chart-4))",
+      "hsl(var(--chart-5))",
+      "hsl(var(--muted-foreground))",
+    ];
+    return sorted.map(([name, qty], i) => ({
+      name,
+      qty,
+      percent: total > 0 ? Math.round((qty / total) * 100) : 0,
+      color: colors[i % colors.length],
+    }));
   }, [rows]);
 
   const getPriorityLevel = (score: number): PriorityFilter => {
@@ -521,6 +613,9 @@ export default function BuyingSheetPage() {
     sorted.sort((a, b) => {
       let aVal: any = a[sortField];
       let bVal: any = b[sortField];
+      // Handle nulls for stockoutRiskDays
+      if (aVal === null) aVal = sortDirection === "asc" ? Infinity : -Infinity;
+      if (bVal === null) bVal = sortDirection === "asc" ? Infinity : -Infinity;
       if (typeof aVal === "string") aVal = aVal.toLowerCase();
       if (typeof bVal === "string") bVal = bVal.toLowerCase();
       if (aVal < bVal) return sortDirection === "asc" ? -1 : 1;
@@ -554,7 +649,8 @@ export default function BuyingSheetPage() {
       toOrder: acc.toOrder + r.toOrder,
       urgent: acc.urgent + (r.hasUrgent ? 1 : 0),
       avgDays: acc.avgDays + r.daysWaiting,
-    }), { needed: 0, inStock: 0, onPO: 0, toOrder: 0, urgent: 0, avgDays: 0 });
+      stockoutRisk: acc.stockoutRisk + (r.stockoutRiskDays !== null && r.stockoutRiskDays <= 7 ? 1 : 0),
+    }), { needed: 0, inStock: 0, onPO: 0, toOrder: 0, urgent: 0, avgDays: 0, stockoutRisk: 0 });
   }, [filteredRows]);
 
   const avgDaysWaiting = filteredRows.length > 0 ? Math.round(totals.avgDays / filteredRows.length) : 0;
@@ -576,7 +672,15 @@ export default function BuyingSheetPage() {
     }
   };
 
-  // Notes management
+  const toggleExpand = (sku: string) => {
+    setExpandedSkus(prev => {
+      const next = new Set(prev);
+      if (next.has(sku)) next.delete(sku);
+      else next.add(sku);
+      return next;
+    });
+  };
+
   const handleSaveNote = (sku: string) => {
     const updated = { ...notes, [sku]: noteText };
     if (!noteText.trim()) delete updated[sku];
@@ -591,7 +695,6 @@ export default function BuyingSheetPage() {
     setNoteText(notes[sku] || "");
   };
 
-  // Copy all supplier emails to clipboard
   const handleCopySupplierEmails = () => {
     const emails = new Set<string>();
     const targetRows = selectedSkus.size > 0 ? sortedRows.filter(r => selectedSkus.has(r.sku)) : sortedRows;
@@ -606,7 +709,22 @@ export default function BuyingSheetPage() {
     toast({ title: "Copied!", description: `${emails.size} supplier email${emails.size !== 1 ? "s" : ""} copied to clipboard` });
   };
 
-  // Print-friendly view
+  // Copy a formatted PO line to clipboard
+  const handleCopyPOLine = (row: BuyingSheetRow) => {
+    const line = `${row.sku}\t${row.itemName}\t${row.toOrder}\t${row.supplierName}`;
+    navigator.clipboard.writeText(line);
+    toast({ title: "Copied", description: `PO line for ${row.sku} copied` });
+  };
+
+  // Copy all selected as PO lines
+  const handleCopySelectedPOLines = () => {
+    const targetRows = sortedRows.filter(r => selectedSkus.has(r.sku));
+    const header = "SKU\tItem Name\tQty to Order\tSupplier";
+    const lines = targetRows.map(r => `${r.sku}\t${r.itemName}\t${r.toOrder}\t${r.supplierName}`);
+    navigator.clipboard.writeText([header, ...lines].join("\n"));
+    toast({ title: "Copied", description: `${targetRows.length} PO lines copied` });
+  };
+
   const handlePrint = () => {
     const printWindow = window.open("", "_blank");
     if (!printWindow) return;
@@ -614,7 +732,6 @@ export default function BuyingSheetPage() {
     const targetRows = selectedSkus.size > 0 ? sortedRows.filter(r => selectedSkus.has(r.sku)) : sortedRows;
     const date = new Date().toLocaleDateString();
 
-    // Group by supplier for print
     const groups = new Map<string, BuyingSheetRow[]>();
     for (const row of targetRows) {
       const key = row.supplierName || "No Supplier";
@@ -641,6 +758,9 @@ export default function BuyingSheetPage() {
       .urgent { color: #dc2626; font-weight: bold; }
       .total-row { border-top: 2px solid #333; font-weight: bold; background: #f8f8f8; }
       .note { font-style: italic; color: #666; font-size: 10px; }
+      .risk { font-size: 10px; padding: 2px 6px; border-radius: 3px; }
+      .risk-critical { background: #fde2e2; color: #dc2626; }
+      .risk-warning { background: #fef3c7; color: #d97706; }
       @media print { body { padding: 0; } }
     </style></head><body>
     <h1>📋 Buying Sheet</h1>
@@ -650,6 +770,7 @@ export default function BuyingSheetPage() {
       <div class="summary-item"><div class="summary-label">In Stock</div><div class="summary-value">${totals.inStock.toLocaleString()}</div></div>
       <div class="summary-item"><div class="summary-label">On PO</div><div class="summary-value">${totals.onPO.toLocaleString()}</div></div>
       <div class="summary-item"><div class="summary-label">To Order</div><div class="summary-value" style="color:#2563eb">${totals.toOrder.toLocaleString()}</div></div>
+      <div class="summary-item"><div class="summary-label">Stockout Risk</div><div class="summary-value" style="color:#dc2626">${totals.stockoutRisk}</div></div>
     </div>`;
 
     for (const [supplier, items] of groups.entries()) {
@@ -659,10 +780,13 @@ export default function BuyingSheetPage() {
       html += `<table><thead><tr>
         <th>SKU</th><th>Item</th><th class="text-right">Needed</th>
         <th class="text-right">Stock</th><th class="text-right">On PO</th>
-        <th class="text-right">To Order</th><th>Orders</th><th>Notes</th>
+        <th class="text-right">To Order</th><th>Risk</th><th>Orders</th><th>Notes</th>
       </tr></thead><tbody>`;
       for (const item of items) {
         const note = notes[item.sku] || "";
+        const riskLabel = item.stockoutRiskDays !== null
+          ? (item.stockoutRiskDays <= 7 ? `<span class="risk risk-critical">${item.stockoutRiskDays}d</span>` : item.stockoutRiskDays <= 14 ? `<span class="risk risk-warning">${item.stockoutRiskDays}d</span>` : `${item.stockoutRiskDays}d`)
+          : "—";
         html += `<tr>
           <td style="font-family:monospace;font-size:10px">${item.sku}</td>
           <td>${item.itemName}</td>
@@ -670,11 +794,12 @@ export default function BuyingSheetPage() {
           <td class="text-right">${item.stockOnHand}</td>
           <td class="text-right">${item.onPurchaseOrder}</td>
           <td class="text-right ${item.toOrder > 0 ? "urgent" : ""}">${item.toOrder}</td>
+          <td>${riskLabel}</td>
           <td style="font-size:10px">${item.orders.map(o => `${o.orderNumber} (${o.customerName})`).join(", ")}</td>
           <td class="note">${note}</td>
         </tr>`;
       }
-      html += `<tr class="total-row"><td colspan="5">Total for ${supplier}</td><td class="text-right">${supplierTotal}</td><td colspan="2"></td></tr>`;
+      html += `<tr class="total-row"><td colspan="5">Total for ${supplier}</td><td class="text-right">${supplierTotal}</td><td colspan="3"></td></tr>`;
       html += `</tbody></table>`;
     }
 
@@ -686,12 +811,13 @@ export default function BuyingSheetPage() {
 
   const handleExportCSV = () => {
     const targetRows = selectedSkus.size > 0 ? sortedRows.filter((r) => selectedSkus.has(r.sku)) : sortedRows;
-    const headers = ["SKU", "Item Name", "Total Needed", "In Stock (Zoho)", "On PO (Zoho)", "To Order", "Coverage %", "Days Waiting", "Priority", "Supplier", "Demand Trend", "Notes", "Orders"];
+    const headers = ["SKU", "Item Name", "Total Needed", "In Stock (Zoho)", "On PO (Zoho)", "To Order", "Coverage %", "Days Waiting", "Stockout Risk (days)", "Priority", "Supplier", "Demand Trend", "Last Purchased", "Notes", "Orders"];
     const csvRows = targetRows.map((r) => [
       r.sku, r.itemName, r.totalNeeded.toString(), r.stockOnHand.toString(),
       r.onPurchaseOrder.toString(), r.toOrder.toString(), r.coveragePercent.toString(),
-      r.daysWaiting.toString(), r.priorityScore.toString(), r.supplierName,
-      r.demandTrend, notes[r.sku] || "",
+      r.daysWaiting.toString(), r.stockoutRiskDays?.toString() || "N/A", r.priorityScore.toString(), r.supplierName,
+      r.demandTrend, r.lastPurchasedDate ? new Date(r.lastPurchasedDate).toLocaleDateString() : "N/A",
+      notes[r.sku] || "",
       r.orders.map((o) => `${o.orderNumber} (${o.customerName}: ${o.quantity})`).join("; "),
     ]);
     const csv = [headers, ...csvRows].map((r) => r.map((c) => `"${c}"`).join(",")).join("\n");
@@ -717,12 +843,12 @@ export default function BuyingSheetPage() {
     let csv = "";
     for (const [supplier, items] of groups.entries()) {
       csv += `\n"SUPPLIER: ${supplier}"\n`;
-      csv += `"SKU","Item Name","Qty to Order","Currently in Stock","On PO","Notes"\n`;
+      csv += `"SKU","Item Name","Qty to Order","Currently in Stock","On PO","Stockout Risk","Notes"\n`;
       const totalToOrder = items.reduce((s, r) => s + r.toOrder, 0);
       for (const item of items) {
-        csv += `"${item.sku}","${item.itemName}","${item.toOrder}","${item.stockOnHand}","${item.onPurchaseOrder}","${notes[item.sku] || ""}"\n`;
+        csv += `"${item.sku}","${item.itemName}","${item.toOrder}","${item.stockOnHand}","${item.onPurchaseOrder}","${item.stockoutRiskDays ?? 'N/A'}","${notes[item.sku] || ""}"\n`;
       }
-      csv += `"","TOTAL","${totalToOrder}","","",""\n`;
+      csv += `"","TOTAL","${totalToOrder}","","","",""\n`;
     }
 
     const blob = new Blob([csv], { type: "text/csv" });
@@ -747,7 +873,7 @@ export default function BuyingSheetPage() {
     </TableHead>
   );
 
-  const PriorityBadge = ({ score, hasUrgent }: { score: number; hasUrgent: boolean }) => {
+  const PriorityBadge = ({ score }: { score: number }) => {
     if (score >= 70) return <Badge className="bg-destructive text-destructive-foreground gap-1 text-xs"><Flame className="h-3 w-3" />Critical</Badge>;
     if (score >= 50) return <Badge className="bg-orange-500 text-white gap-1 text-xs"><AlertTriangle className="h-3 w-3" />High</Badge>;
     if (score >= 30) return <Badge variant="secondary" className="gap-1 text-xs"><Clock className="h-3 w-3" />Medium</Badge>;
@@ -784,92 +910,192 @@ export default function BuyingSheetPage() {
     );
   };
 
-  const renderRow = (row: BuyingSheetRow) => (
-    <TableRow key={row.sku} className={`${row.toOrder > 0 ? "" : "opacity-60"} ${selectedSkus.has(row.sku) ? "bg-primary/5" : ""} ${row.hasUrgent ? "border-l-2 border-l-destructive" : ""}`}>
-      <TableCell className="w-8">
-        <Checkbox checked={selectedSkus.has(row.sku)} onCheckedChange={() => toggleSelect(row.sku)} />
-      </TableCell>
-      <TableCell>
-        <PriorityBadge score={row.priorityScore} hasUrgent={row.hasUrgent} />
-      </TableCell>
-      <TableCell className="font-mono text-xs text-muted-foreground">{row.sku}</TableCell>
-      <TableCell className="font-medium max-w-[180px] truncate">{row.itemName}</TableCell>
-      <TableCell className="text-right font-semibold">{row.totalNeeded}</TableCell>
-      <TableCell className="text-right font-medium">{row.stockOnHand}</TableCell>
-      <TableCell className="text-right font-medium">{row.onPurchaseOrder}</TableCell>
-      <TableCell><CoverageBar percent={row.coveragePercent} /></TableCell>
-      <TableCell className="text-right">
-        {row.toOrder > 0 ? (
-          <Badge variant="destructive" className="font-bold">{row.toOrder}</Badge>
-        ) : (
-          <Badge variant="outline" className="text-accent-foreground">0</Badge>
-        )}
-      </TableCell>
-      <TableCell className="text-center">
-        <DemandTrendIcon trend={row.demandTrend} lastMonth={row.lastMonthQty} prevMonth={row.prevMonthQty} />
-      </TableCell>
-      <TableCell className="text-center">
-        <span className={`text-sm font-medium ${row.daysWaiting > 7 ? "text-destructive" : row.daysWaiting > 3 ? "text-orange-500" : "text-muted-foreground"}`}>
-          {row.daysWaiting}d
-        </span>
-      </TableCell>
-      <TableCell className="text-sm">{row.supplierName}</TableCell>
-      <TableCell>
-        <div className="flex items-center gap-1">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span className="text-xs text-muted-foreground cursor-help">
-                {row.orders.length} order{row.orders.length !== 1 ? "s" : ""}
-              </span>
-            </TooltipTrigger>
-            <TooltipContent side="left" className="max-w-[300px]">
+  const StockoutRiskBadge = ({ days }: { days: number | null }) => {
+    if (days === null) return <span className="text-xs text-muted-foreground/50">—</span>;
+    if (days <= 7) return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Badge variant="destructive" className="text-xs gap-1 animate-pulse"><Timer className="h-3 w-3" />{days}d</Badge>
+        </TooltipTrigger>
+        <TooltipContent><p className="text-xs">⚠️ Stock runs out in ~{days} days at current demand rate</p></TooltipContent>
+      </Tooltip>
+    );
+    if (days <= 14) return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Badge className="text-xs gap-1 bg-orange-500 text-white"><Timer className="h-3 w-3" />{days}d</Badge>
+        </TooltipTrigger>
+        <TooltipContent><p className="text-xs">Stock runs out in ~{days} days at current demand rate</p></TooltipContent>
+      </Tooltip>
+    );
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="text-xs text-muted-foreground">{days}d</span>
+        </TooltipTrigger>
+        <TooltipContent><p className="text-xs">~{days} days of stock remaining at current demand</p></TooltipContent>
+      </Tooltip>
+    );
+  };
+
+  const renderExpandedRow = (row: BuyingSheetRow) => (
+    <TableRow key={`expanded-${row.sku}`} className="bg-muted/30">
+      <TableCell colSpan={16}>
+        <div className="py-2 px-4 space-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {/* Order Breakdown */}
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground mb-1.5">Order Breakdown</p>
               <div className="space-y-1">
                 {row.orders.map((o, i) => (
-                  <div key={i} className="text-xs flex items-center gap-1">
-                    <span className="font-mono font-medium">{o.orderNumber}</span>
-                    <span className="text-muted-foreground">— {o.customerName} ({o.quantity})</span>
-                    {(o.urgency === "urgent" || o.urgency === "critical") && <Flame className="h-3 w-3 text-destructive" />}
+                  <div key={i} className="flex items-center justify-between text-xs p-1.5 rounded bg-background/60">
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-mono font-medium text-foreground">{o.orderNumber}</span>
+                      {(o.urgency === "urgent" || o.urgency === "critical") && <Flame className="h-3 w-3 text-destructive" />}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-muted-foreground">{o.customerName}</span>
+                      <Badge variant="outline" className="text-[10px]">×{o.quantity}</Badge>
+                    </div>
                   </div>
                 ))}
               </div>
-            </TooltipContent>
-          </Tooltip>
-        </div>
-      </TableCell>
-      <TableCell className="w-8">
-        <Popover open={editingNote === row.sku} onOpenChange={(open) => { if (!open) setEditingNote(null); }}>
-          <PopoverTrigger asChild>
-            <button
-              onClick={() => handleOpenNote(row.sku)}
-              className={`p-1 rounded hover:bg-muted transition-colors ${notes[row.sku] ? "text-primary" : "text-muted-foreground/40"}`}
-            >
-              <StickyNote className="h-3.5 w-3.5" />
-            </button>
-          </PopoverTrigger>
-          <PopoverContent className="w-64 p-3" side="left">
-            <div className="space-y-2">
-              <p className="text-xs font-medium text-muted-foreground">Note for {row.sku}</p>
-              <Textarea
-                value={noteText}
-                onChange={(e) => setNoteText(e.target.value)}
-                placeholder="Add procurement note..."
-                className="min-h-[60px] text-sm"
-                autoFocus
-              />
-              <div className="flex gap-1 justify-end">
-                {notes[row.sku] && (
-                  <Button variant="ghost" size="sm" onClick={() => { setNoteText(""); handleSaveNote(row.sku); }}>
-                    <X className="h-3 w-3 mr-1" />Clear
-                  </Button>
+            </div>
+
+            {/* Stock & Demand Info */}
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground mb-1.5">Stock & Demand</p>
+              <div className="space-y-1.5 text-xs">
+                <div className="flex justify-between"><span className="text-muted-foreground">Last Month Demand:</span><span className="font-medium">{row.lastMonthQty}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Previous Month:</span><span className="font-medium">{row.prevMonthQty}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Coverage:</span><CoverageBar percent={row.coveragePercent} /></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Stockout Risk:</span><StockoutRiskBadge days={row.stockoutRiskDays} /></div>
+                {row.lastPurchasedDate && (
+                  <div className="flex justify-between"><span className="text-muted-foreground">Last Purchased:</span><span className="font-medium">{new Date(row.lastPurchasedDate).toLocaleDateString()}</span></div>
                 )}
-                <Button size="sm" onClick={() => handleSaveNote(row.sku)}>Save</Button>
               </div>
             </div>
-          </PopoverContent>
-        </Popover>
+
+            {/* Quick Actions & Note */}
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground mb-1.5">Quick Actions</p>
+              <div className="space-y-1.5">
+                <Button variant="outline" size="sm" className="w-full justify-start gap-2 text-xs" onClick={() => handleCopyPOLine(row)}>
+                  <ClipboardCopy className="h-3 w-3" />Copy PO Line
+                </Button>
+                {row.supplierEmail && (
+                  <Button variant="outline" size="sm" className="w-full justify-start gap-2 text-xs" onClick={() => {
+                    navigator.clipboard.writeText(row.supplierEmail!);
+                    toast({ title: "Copied", description: `${row.supplierEmail} copied` });
+                  }}>
+                    <Mail className="h-3 w-3" />Copy Supplier Email
+                  </Button>
+                )}
+                {notes[row.sku] && (
+                  <div className="p-2 rounded bg-primary/5 border border-primary/10">
+                    <p className="text-[10px] font-medium text-primary mb-0.5">Note:</p>
+                    <p className="text-xs text-muted-foreground">{notes[row.sku]}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
       </TableCell>
     </TableRow>
   );
+
+  const renderRow = (row: BuyingSheetRow) => {
+    const isExpanded = expandedSkus.has(row.sku);
+    return (
+      <Fragment key={row.sku}>
+        <TableRow
+          className={`cursor-pointer transition-colors ${row.toOrder > 0 ? "" : "opacity-60"} ${selectedSkus.has(row.sku) ? "bg-primary/5" : ""} ${row.hasUrgent ? "border-l-2 border-l-destructive" : ""} ${isExpanded ? "bg-muted/20" : ""}`}
+        >
+          <TableCell className="w-8" onClick={(e) => e.stopPropagation()}>
+            <Checkbox checked={selectedSkus.has(row.sku)} onCheckedChange={() => toggleSelect(row.sku)} />
+          </TableCell>
+          <TableCell onClick={() => toggleExpand(row.sku)}>
+            <div className="flex items-center gap-1">
+              {isExpanded ? <ChevronUp className="h-3 w-3 text-muted-foreground" /> : <ChevronDown className="h-3 w-3 text-muted-foreground/40" />}
+              <PriorityBadge score={row.priorityScore} />
+            </div>
+          </TableCell>
+          <TableCell className="font-mono text-xs text-muted-foreground" onClick={() => toggleExpand(row.sku)}>{row.sku}</TableCell>
+          <TableCell className="font-medium max-w-[180px] truncate" onClick={() => toggleExpand(row.sku)}>{row.itemName}</TableCell>
+          <TableCell className="text-right font-semibold" onClick={() => toggleExpand(row.sku)}>{row.totalNeeded}</TableCell>
+          <TableCell className="text-right font-medium" onClick={() => toggleExpand(row.sku)}>{row.stockOnHand}</TableCell>
+          <TableCell className="text-right font-medium" onClick={() => toggleExpand(row.sku)}>{row.onPurchaseOrder}</TableCell>
+          <TableCell onClick={() => toggleExpand(row.sku)}><CoverageBar percent={row.coveragePercent} /></TableCell>
+          <TableCell className="text-right" onClick={() => toggleExpand(row.sku)}>
+            {row.toOrder > 0 ? (
+              <Badge variant="destructive" className="font-bold">{row.toOrder}</Badge>
+            ) : (
+              <Badge variant="outline" className="text-accent-foreground">0</Badge>
+            )}
+          </TableCell>
+          <TableCell className="text-center" onClick={() => toggleExpand(row.sku)}>
+            <StockoutRiskBadge days={row.stockoutRiskDays} />
+          </TableCell>
+          <TableCell className="text-center" onClick={() => toggleExpand(row.sku)}>
+            <DemandTrendIcon trend={row.demandTrend} lastMonth={row.lastMonthQty} prevMonth={row.prevMonthQty} />
+          </TableCell>
+          <TableCell className="text-center" onClick={() => toggleExpand(row.sku)}>
+            <span className={`text-sm font-medium ${row.daysWaiting > 7 ? "text-destructive" : row.daysWaiting > 3 ? "text-orange-500" : "text-muted-foreground"}`}>
+              {row.daysWaiting}d
+            </span>
+          </TableCell>
+          <TableCell className="text-sm" onClick={() => toggleExpand(row.sku)}>{row.supplierName}</TableCell>
+          <TableCell onClick={() => toggleExpand(row.sku)}>
+            <span className="text-xs text-muted-foreground">
+              {row.orders.length} order{row.orders.length !== 1 ? "s" : ""}
+            </span>
+          </TableCell>
+          <TableCell className="w-8" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-0.5">
+              <Popover open={editingNote === row.sku} onOpenChange={(open) => { if (!open) setEditingNote(null); }}>
+                <PopoverTrigger asChild>
+                  <button
+                    onClick={() => handleOpenNote(row.sku)}
+                    className={`p-1 rounded hover:bg-muted transition-colors ${notes[row.sku] ? "text-primary" : "text-muted-foreground/40"}`}
+                  >
+                    <StickyNote className="h-3.5 w-3.5" />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent className="w-64 p-3" side="left">
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-muted-foreground">Note for {row.sku}</p>
+                    <Textarea
+                      value={noteText}
+                      onChange={(e) => setNoteText(e.target.value)}
+                      placeholder="Add procurement note..."
+                      className="min-h-[60px] text-sm"
+                      autoFocus
+                    />
+                    <div className="flex gap-1 justify-end">
+                      {notes[row.sku] && (
+                        <Button variant="ghost" size="sm" onClick={() => { setNoteText(""); handleSaveNote(row.sku); }}>
+                          <X className="h-3 w-3 mr-1" />Clear
+                        </Button>
+                      )}
+                      <Button size="sm" onClick={() => handleSaveNote(row.sku)}>Save</Button>
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
+              <button
+                onClick={() => handleCopyPOLine(row)}
+                className="p-1 rounded hover:bg-muted transition-colors text-muted-foreground/40 hover:text-foreground"
+              >
+                <ClipboardCopy className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </TableCell>
+        </TableRow>
+        {isExpanded && renderExpandedRow(row)}
+      </Fragment>
+    );
+  };
 
   if (loading) {
     return (
@@ -881,9 +1107,11 @@ export default function BuyingSheetPage() {
     );
   }
 
+  const colSpanCount = 15;
+
   return (
     <TooltipProvider>
-      <div className="space-y-4" ref={printRef}>
+      <div className={`space-y-4 ${isFullscreen ? "fixed inset-0 z-50 bg-background p-4 overflow-auto" : ""}`} ref={printRef}>
         {/* Header */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2 flex-wrap">
@@ -893,29 +1121,34 @@ export default function BuyingSheetPage() {
             {zohoLoading && <Badge variant="secondary" className="gap-1"><Loader2 className="h-3 w-3 animate-spin" />Loading Zoho...</Badge>}
           </div>
           <div className="flex items-center gap-2 flex-wrap">
+            <Button variant="outline" size="sm" onClick={() => setIsFullscreen(!isFullscreen)} className="gap-2">
+              {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+              {isFullscreen ? "Exit" : "Focus"}
+            </Button>
+            <Button variant={showSupplierChart ? "default" : "outline"} size="sm" onClick={() => setShowSupplierChart(!showSupplierChart)} className="gap-2">
+              <PieChart className="h-4 w-4" />
+              Suppliers
+            </Button>
             <Button variant={groupBySupplier ? "default" : "outline"} size="sm" onClick={() => setGroupBySupplier(!groupBySupplier)} className="gap-2">
               <Layers className="h-4 w-4" />
-              {groupBySupplier ? "Grouped" : "Group by Supplier"}
+              {groupBySupplier ? "Grouped" : "Group"}
             </Button>
             <Button variant="outline" size="sm" onClick={handleRefreshZoho} disabled={zohoLoading} className="gap-2">
               {zohoLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-              Refresh Zoho
+              Zoho
             </Button>
             <Button variant="outline" size="sm" onClick={handlePrint} className="gap-2">
               <Printer className="h-4 w-4" />
-              Print
             </Button>
             <Button variant="outline" size="sm" onClick={handleCopySupplierEmails} className="gap-2">
               <Mail className="h-4 w-4" />
-              Copy Emails
             </Button>
             <Button variant="outline" size="sm" onClick={handleExportCSV} className="gap-2">
               <Download className="h-4 w-4" />
-              Export{selectedSkus.size > 0 ? ` (${selectedSkus.size})` : ""}
+              {selectedSkus.size > 0 ? `(${selectedSkus.size})` : "CSV"}
             </Button>
             <Button variant="outline" size="sm" onClick={handleExportBySupplier} className="gap-2">
               <FileSpreadsheet className="h-4 w-4" />
-              By Supplier
             </Button>
           </div>
         </div>
@@ -947,7 +1180,7 @@ export default function BuyingSheetPage() {
         </Tabs>
 
         {/* Summary Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
           <Card className="bg-card/60">
             <CardContent className="p-3">
               <p className="text-xs text-muted-foreground">Total Needed</p>
@@ -974,8 +1207,14 @@ export default function BuyingSheetPage() {
           </Card>
           <Card className={`${totals.urgent > 0 ? "bg-destructive/10 border-destructive/20" : "bg-card/60"}`}>
             <CardContent className="p-3">
-              <p className="text-xs text-muted-foreground">Urgent Items</p>
+              <p className="text-xs text-muted-foreground">Urgent</p>
               <p className={`text-xl font-bold ${totals.urgent > 0 ? "text-destructive" : "text-foreground"}`}>{totals.urgent}</p>
+            </CardContent>
+          </Card>
+          <Card className={`${totals.stockoutRisk > 0 ? "bg-destructive/10 border-destructive/20" : "bg-card/60"}`}>
+            <CardContent className="p-3">
+              <p className="text-xs text-muted-foreground">Stockout Risk</p>
+              <p className={`text-xl font-bold ${totals.stockoutRisk > 0 ? "text-destructive" : "text-foreground"}`}>{totals.stockoutRisk}</p>
             </CardContent>
           </Card>
           <Card className="bg-card/60">
@@ -987,6 +1226,47 @@ export default function BuyingSheetPage() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Supplier Concentration Chart */}
+        {showSupplierChart && supplierConcentration.length > 0 && (
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <PieChart className="h-4 w-4 text-primary" />
+                <span className="font-semibold text-sm text-foreground">Supplier Concentration (To Order)</span>
+              </div>
+              <div className="flex items-center gap-6 flex-wrap">
+                {/* Visual bar chart */}
+                <div className="flex-1 min-w-[300px] space-y-1.5">
+                  {supplierConcentration.slice(0, 8).map((s, i) => (
+                    <div key={s.name} className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground w-32 truncate text-right">{s.name}</span>
+                      <div className="flex-1 h-5 bg-muted/40 rounded-full overflow-hidden">
+                        <div
+                          className="h-full rounded-full transition-all duration-500"
+                          style={{ width: `${Math.max(2, s.percent)}%`, backgroundColor: s.color }}
+                        />
+                      </div>
+                      <span className="text-xs font-medium w-16 text-right">{s.qty} ({s.percent}%)</span>
+                    </div>
+                  ))}
+                </div>
+                {/* Concentration warning */}
+                {supplierConcentration.length > 0 && supplierConcentration[0].percent > 50 && (
+                  <div className="p-3 rounded-lg bg-orange-500/10 border border-orange-500/20 max-w-[200px]">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <AlertTriangle className="h-3.5 w-3.5 text-orange-500" />
+                      <span className="text-xs font-semibold text-orange-600">High Concentration</span>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground">
+                      {supplierConcentration[0].percent}% of orders depend on {supplierConcentration[0].name}. Consider diversifying.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Suggested Restock */}
         {suggestedRows.length > 0 && (
@@ -1041,7 +1321,7 @@ export default function BuyingSheetPage() {
         <div className="flex flex-col sm:flex-row gap-2">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Search items, SKU, order, customer..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+            <Input placeholder="Search items, SKU, order, customer... (Ctrl+F)" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
           </div>
           <Select value={supplierFilter} onValueChange={setSupplierFilter}>
             <SelectTrigger className="w-full sm:w-[220px]">
@@ -1065,15 +1345,24 @@ export default function BuyingSheetPage() {
 
         {/* Batch Actions Bar */}
         {selectedSkus.size > 0 && (
-          <div className="flex items-center gap-3 p-3 rounded-lg bg-primary/10 border border-primary/20">
-            <span className="text-sm font-medium text-foreground">{selectedSkus.size} item{selectedSkus.size !== 1 ? "s" : ""} selected</span>
-            <Button variant="outline" size="sm" onClick={handleExportCSV} className="gap-1"><Download className="h-3 w-3" />Export Selected</Button>
+          <div className="flex items-center gap-2 p-3 rounded-lg bg-primary/10 border border-primary/20 flex-wrap">
+            <span className="text-sm font-medium text-foreground">{selectedSkus.size} selected</span>
+            <Button variant="outline" size="sm" onClick={handleExportCSV} className="gap-1"><Download className="h-3 w-3" />Export</Button>
             <Button variant="outline" size="sm" onClick={handleExportBySupplier} className="gap-1"><FileSpreadsheet className="h-3 w-3" />By Supplier</Button>
-            <Button variant="outline" size="sm" onClick={handleCopySupplierEmails} className="gap-1"><Copy className="h-3 w-3" />Copy Emails</Button>
-            <Button variant="outline" size="sm" onClick={handlePrint} className="gap-1"><Printer className="h-3 w-3" />Print Selected</Button>
+            <Button variant="outline" size="sm" onClick={handleCopySelectedPOLines} className="gap-1"><ClipboardCopy className="h-3 w-3" />Copy PO Lines</Button>
+            <Button variant="outline" size="sm" onClick={handleCopySupplierEmails} className="gap-1"><Copy className="h-3 w-3" />Emails</Button>
+            <Button variant="outline" size="sm" onClick={handlePrint} className="gap-1"><Printer className="h-3 w-3" />Print</Button>
             <Button variant="ghost" size="sm" onClick={() => setSelectedSkus(new Set())}>Clear</Button>
           </div>
         )}
+
+        {/* Keyboard shortcut hints */}
+        <div className="flex items-center gap-3 text-[10px] text-muted-foreground/50">
+          <span><kbd className="px-1 py-0.5 rounded bg-muted text-[10px]">Ctrl+F</kbd> Search</span>
+          <span><kbd className="px-1 py-0.5 rounded bg-muted text-[10px]">G</kbd> Group</span>
+          <span><kbd className="px-1 py-0.5 rounded bg-muted text-[10px]">Esc</kbd> Exit Focus</span>
+          <span>Click row to expand details</span>
+        </div>
 
         {/* Table */}
         <Card>
@@ -1087,33 +1376,36 @@ export default function BuyingSheetPage() {
                     </TableHead>
                     <SortableHeader field="priorityScore">Priority</SortableHeader>
                     <SortableHeader field="sku">SKU</SortableHeader>
-                    <SortableHeader field="itemName">Item Name</SortableHeader>
+                    <SortableHeader field="itemName">Item</SortableHeader>
                     <SortableHeader field="totalNeeded" className="text-right">Needed</SortableHeader>
-                    <SortableHeader field="stockOnHand" className="text-right">In Stock</SortableHeader>
+                    <SortableHeader field="stockOnHand" className="text-right">Stock</SortableHeader>
                     <SortableHeader field="onPurchaseOrder" className="text-right">On PO</SortableHeader>
                     <TableHead>Coverage</TableHead>
-                    <SortableHeader field="toOrder" className="text-right">To Order</SortableHeader>
+                    <SortableHeader field="toOrder" className="text-right">Order</SortableHeader>
+                    <SortableHeader field="stockoutRiskDays" className="text-center">Risk</SortableHeader>
                     <TableHead className="text-center">Trend</TableHead>
-                    <SortableHeader field="daysWaiting" className="text-right">Wait</SortableHeader>
+                    <SortableHeader field="daysWaiting" className="text-center">Wait</SortableHeader>
                     <SortableHeader field="supplierName">Supplier</SortableHeader>
                     <TableHead>Orders</TableHead>
-                    <TableHead className="w-8">
-                      <StickyNote className="h-3.5 w-3.5 text-muted-foreground" />
+                    <TableHead className="w-16">
+                      <div className="flex items-center gap-1">
+                        <StickyNote className="h-3 w-3 text-muted-foreground" />
+                      </div>
                     </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {sortedRows.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={14} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={colSpanCount} className="text-center py-8 text-muted-foreground">
                         {showOnlyNeedOrder ? "All items are covered by stock and POs!" : "No items found"}
                       </TableCell>
                     </TableRow>
                   ) : groupedRows ? (
                     groupedRows.map(([supplier, items]) => (
-                      <>
-                        <TableRow key={`group-${supplier}`} className="bg-muted/50 hover:bg-muted/70">
-                          <TableCell colSpan={14}>
+                      <Fragment key={`group-${supplier}`}>
+                        <TableRow className="bg-muted/50 hover:bg-muted/70">
+                          <TableCell colSpan={colSpanCount}>
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-2">
                                 <Users className="h-4 w-4 text-primary" />
@@ -1130,7 +1422,7 @@ export default function BuyingSheetPage() {
                           </TableCell>
                         </TableRow>
                         {items.map(renderRow)}
-                      </>
+                      </Fragment>
                     ))
                   ) : (
                     sortedRows.map(renderRow)
