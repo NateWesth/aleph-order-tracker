@@ -583,6 +583,8 @@ export default function BuyingSheetPage() {
         const { trend, lastMonth, prevMonth } = getDemandTrend(entry.sku);
         const stockoutRiskDays = getStockoutRiskDays(entry.sku, zohoEntry.stockOnHand, zohoEntry.onPurchaseOrder);
         const lastPurchasedDate = lastPurchaseMap.get(entry.sku) || null;
+        const seasonalPattern = seasonalMap.get(entry.sku) || null;
+        const avgLeadTimeDays = leadTimeMap.get(entry.sku) ?? null;
 
         let priorityScore = 0;
         if (toOrder > 0) priorityScore += 30;
@@ -592,9 +594,9 @@ export default function BuyingSheetPage() {
         if (coveragePercent < 25) priorityScore += 15;
         else if (coveragePercent < 50) priorityScore += 10;
         priorityScore += Math.min(20, entry.orders.length * 5);
-        // Boost for stockout risk
         if (stockoutRiskDays !== null && stockoutRiskDays <= 7) priorityScore += 15;
         else if (stockoutRiskDays !== null && stockoutRiskDays <= 14) priorityScore += 5;
+        if (seasonalPattern === "peak") priorityScore += 10;
 
         return {
           ...entry,
@@ -611,6 +613,8 @@ export default function BuyingSheetPage() {
           prevMonthQty: prevMonth,
           stockoutRiskDays,
           lastPurchasedDate,
+          seasonalPattern,
+          avgLeadTimeDays,
         };
       });
 
