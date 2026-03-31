@@ -808,6 +808,21 @@ export default function BuyingSheetPage() {
                 <Button variant="outline" size="sm" onClick={() => setIsFullscreen(!isFullscreen)} className="h-8">
                   {isFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
                 </Button>
+                <Tooltip><TooltipTrigger asChild>
+                  <Button variant="outline" size="sm" onClick={() => { const next: ViewDensity = viewDensity === "compact" ? "comfortable" : "compact"; setViewDensity(next); saveDensity(next); }} className="h-8">
+                    {viewDensity === "compact" ? <AlignJustify className="h-3.5 w-3.5" /> : <AlignCenter className="h-3.5 w-3.5" />}
+                  </Button>
+                </TooltipTrigger><TooltipContent><p className="text-xs">{viewDensity === "compact" ? "Comfortable" : "Compact"} view</p></TooltipContent></Tooltip>
+                <Select value={String(autoRefreshInterval)} onValueChange={v => setAutoRefreshInterval(Number(v))}>
+                  <SelectTrigger className="w-[90px] h-8 text-xs"><RotateCw className="h-3 w-3 mr-1" /><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="0">Off</SelectItem>
+                    <SelectItem value="5">5 min</SelectItem>
+                    <SelectItem value="10">10 min</SelectItem>
+                    <SelectItem value="15">15 min</SelectItem>
+                    <SelectItem value="30">30 min</SelectItem>
+                  </SelectContent>
+                </Select>
                 <Button variant="outline" size="sm" onClick={handleRefreshZoho} disabled={zohoLoading} className="h-8 gap-1.5">
                   {zohoLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}Zoho
                 </Button>
