@@ -1164,6 +1164,9 @@ export default function BuyingSheetPage() {
                     <Mail className="h-3 w-3" />Copy Supplier Email
                   </Button>
                 )}
+                <Button variant="outline" size="sm" className="w-full justify-start gap-2 text-xs" onClick={() => generateEmailDraft(row.supplierName)}>
+                  <Send className="h-3 w-3" />Draft Email to {row.supplierName}
+                </Button>
                 {notes[row.sku] && (
                   <div className="p-2 rounded bg-primary/5 border border-primary/10">
                     <p className="text-[10px] font-medium text-primary mb-0.5">Note:</p>
