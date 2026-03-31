@@ -81,44 +81,48 @@ Deno.serve(async (req) => {
 
     console.log(`Fetched stock for ${stockMap.size} items from Zoho`)
 
-    // 2. Fetch open/pending purchase orders from Zoho
-    const poQtyMap = new Map<string, number>() // SKU -> total qty on POs
-    page = 1
-    hasMore = true
+    // 2. Fetch purchase orders NOT yet fully invoiced/billed from Zoho
+    const poQtyMap = new Map<string, number>() // SKU -> total qty on uninvoiced POs
+    const poStatuses = ['open', 'draft']
 
-    while (hasMore) {
-      const resp = await fetch(
-        `${ZOHO_API_URL}/books/v3/purchaseorders?organization_id=${orgId}&status=open&page=${page}&per_page=200`,
-        { headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` } }
-      )
-      const data = await resp.json()
+    for (const poStatus of poStatuses) {
+      page = 1
+      hasMore = true
 
-      if (data.code !== 0 || !data.purchaseorders?.length) {
-        hasMore = false
-        break
-      }
-
-      // For each PO, fetch its line items
-      for (const po of data.purchaseorders) {
-        const detailResp = await fetch(
-          `${ZOHO_API_URL}/books/v3/purchaseorders/${po.purchaseorder_id}?organization_id=${orgId}`,
+      while (hasMore) {
+        const resp = await fetch(
+          `${ZOHO_API_URL}/books/v3/purchaseorders?organization_id=${orgId}&status=${poStatus}&page=${page}&per_page=200`,
           { headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` } }
         )
-        const detailData = await detailResp.json()
+        const data = await resp.json()
 
-        if (detailData.code === 0 && detailData.purchaseorder?.line_items) {
-          for (const lineItem of detailData.purchaseorder.line_items) {
-            const sku = (lineItem.sku || lineItem.item_id || '').toUpperCase()
-            if (sku) {
-              const existing = poQtyMap.get(sku) || 0
-              poQtyMap.set(sku, existing + (lineItem.quantity || 0))
+        if (data.code !== 0 || !data.purchaseorders?.length) {
+          hasMore = false
+          break
+        }
+
+        // For each PO, fetch its line items
+        for (const po of data.purchaseorders) {
+          const detailResp = await fetch(
+            `${ZOHO_API_URL}/books/v3/purchaseorders/${po.purchaseorder_id}?organization_id=${orgId}`,
+            { headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` } }
+          )
+          const detailData = await detailResp.json()
+
+          if (detailData.code === 0 && detailData.purchaseorder?.line_items) {
+            for (const lineItem of detailData.purchaseorder.line_items) {
+              const sku = (lineItem.sku || lineItem.item_id || '').toUpperCase()
+              if (sku) {
+                const existing = poQtyMap.get(sku) || 0
+                poQtyMap.set(sku, existing + (lineItem.quantity || 0))
+              }
             }
           }
         }
-      }
 
-      hasMore = data.page_context?.has_more_page ?? false
-      page++
+        hasMore = data.page_context?.has_more_page ?? false
+        page++
+      }
     }
 
     console.log(`Fetched PO quantities for ${poQtyMap.size} SKUs from Zoho`)
