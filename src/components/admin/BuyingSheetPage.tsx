@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -8,16 +8,20 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Search, Download, ShoppingCart, Package, RefreshCw, Loader2,
-  AlertTriangle, TrendingUp, ChevronDown, ChevronRight, ArrowUpDown,
-  ArrowUp, ArrowDown, Layers, Clock, Flame, CheckCircle2,
-  FileSpreadsheet, Users
+  AlertTriangle, TrendingUp, TrendingDown, Minus, ChevronDown, ChevronRight,
+  ArrowUpDown, ArrowUp, ArrowDown, Layers, Clock, Flame, CheckCircle2,
+  FileSpreadsheet, Users, Printer, Mail, StickyNote, Copy, X,
+  BarChart3, Filter
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 interface BuyingSheetRow {
   sku: string;
@@ -29,10 +33,14 @@ interface BuyingSheetRow {
   orders: { orderNumber: string; customerName: string; quantity: number; urgency?: string }[];
   supplierName: string;
   supplierId: string | null;
+  supplierEmail?: string;
   daysWaiting: number;
   priorityScore: number;
   coveragePercent: number;
   hasUrgent: boolean;
+  demandTrend: "up" | "down" | "stable" | "new";
+  lastMonthQty: number;
+  prevMonthQty: number;
 }
 
 interface SuggestedRestockRow {
@@ -45,11 +53,21 @@ interface SuggestedRestockRow {
 }
 
 interface ZohoStockData {
-  [sku: string]: { stockOnHand: number; onPurchaseOrder: number; vendorName?: string };
+  [sku: string]: { stockOnHand: number; onPurchaseOrder: number; vendorName?: string; vendorEmail?: string };
 }
 
 type SortField = "sku" | "itemName" | "totalNeeded" | "stockOnHand" | "onPurchaseOrder" | "toOrder" | "supplierName" | "daysWaiting" | "priorityScore";
 type SortDirection = "asc" | "desc";
+type PriorityFilter = "all" | "critical" | "high" | "medium" | "low";
+
+// Persistent notes stored in localStorage
+const NOTES_KEY = "buying-sheet-notes";
+const loadNotes = (): Record<string, string> => {
+  try { return JSON.parse(localStorage.getItem(NOTES_KEY) || "{}"); } catch { return {}; }
+};
+const saveNotes = (notes: Record<string, string>) => {
+  localStorage.setItem(NOTES_KEY, JSON.stringify(notes));
+};
 
 export default function BuyingSheetPage() {
   const { toast } = useToast();
@@ -66,8 +84,15 @@ export default function BuyingSheetPage() {
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [groupBySupplier, setGroupBySupplier] = useState(false);
   const [selectedSkus, setSelectedSkus] = useState<Set<string>>(new Set());
+  const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>("all");
+  const [notes, setNotes] = useState<Record<string, string>>(loadNotes);
+  const [editingNote, setEditingNote] = useState<string | null>(null);
+  const [noteText, setNoteText] = useState("");
+  const [demandHistory, setDemandHistory] = useState<Map<string, { lastMonth: number; prevMonth: number }>>(new Map());
+  const printRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    fetchDemandHistory();
     fetchLocalData();
   }, []);
 
@@ -78,6 +103,48 @@ export default function BuyingSheetPage() {
       'Authorization': `Bearer ${token}`,
       'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
     };
+  };
+
+  // Fetch demand history: compare last month vs previous month quantities per SKU
+  const fetchDemandHistory = async () => {
+    try {
+      const now = new Date();
+      const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+      const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+      const prevMonthEnd = new Date(now.getFullYear(), now.getMonth() - 1, 0);
+
+      const [lastRes, prevRes] = await Promise.all([
+        supabase.from("order_items").select("code, quantity")
+          .not("code", "is", null)
+          .gte("created_at", lastMonthStart.toISOString())
+          .lte("created_at", lastMonthEnd.toISOString()),
+        supabase.from("order_items").select("code, quantity")
+          .not("code", "is", null)
+          .gte("created_at", prevMonthStart.toISOString())
+          .lte("created_at", prevMonthEnd.toISOString()),
+      ]);
+
+      const lastMap = new Map<string, number>();
+      const prevMap = new Map<string, number>();
+      (lastRes.data || []).forEach(i => {
+        const sku = (i.code || "").toUpperCase();
+        lastMap.set(sku, (lastMap.get(sku) || 0) + (i.quantity || 1));
+      });
+      (prevRes.data || []).forEach(i => {
+        const sku = (i.code || "").toUpperCase();
+        prevMap.set(sku, (prevMap.get(sku) || 0) + (i.quantity || 1));
+      });
+
+      const history = new Map<string, { lastMonth: number; prevMonth: number }>();
+      const allSkus = new Set([...lastMap.keys(), ...prevMap.keys()]);
+      allSkus.forEach(sku => {
+        history.set(sku, { lastMonth: lastMap.get(sku) || 0, prevMonth: prevMap.get(sku) || 0 });
+      });
+      setDemandHistory(history);
+    } catch (err) {
+      console.error("Failed to fetch demand history:", err);
+    }
   };
 
   const fetchZohoData = async (): Promise<ZohoStockData | null> => {
@@ -168,6 +235,18 @@ export default function BuyingSheetPage() {
     }
   };
 
+  const getDemandTrend = (sku: string): { trend: "up" | "down" | "stable" | "new"; lastMonth: number; prevMonth: number } => {
+    const history = demandHistory.get(sku);
+    if (!history) return { trend: "new", lastMonth: 0, prevMonth: 0 };
+    if (history.prevMonth === 0 && history.lastMonth > 0) return { trend: "up", ...history };
+    if (history.lastMonth === 0 && history.prevMonth === 0) return { trend: "new", ...history };
+    const change = history.lastMonth - history.prevMonth;
+    const percentChange = history.prevMonth > 0 ? (change / history.prevMonth) * 100 : 0;
+    if (percentChange > 15) return { trend: "up", ...history };
+    if (percentChange < -15) return { trend: "down", ...history };
+    return { trend: "stable", ...history };
+  };
+
   const fetchLocalData = async () => {
     setLoading(true);
     try {
@@ -209,17 +288,19 @@ export default function BuyingSheetPage() {
 
       const [companiesRes, suppliersRes] = await Promise.all([
         companyIds.length > 0 ? supabase.from("companies").select("id, name").in("id", companyIds) : { data: [] },
-        allSupplierIds.length > 0 ? supabase.from("suppliers").select("id, name").in("id", allSupplierIds) : { data: [] },
+        allSupplierIds.length > 0 ? supabase.from("suppliers").select("id, name, email").in("id", allSupplierIds) : { data: [] },
       ]);
 
       const companiesMap = new Map((companiesRes.data || []).map((c) => [c.id, c.name]));
-      const suppliersMap = new Map((suppliersRes.data || []).map((s) => [s.id, s.name]));
+      const suppliersMap = new Map((suppliersRes.data || []).map((s) => [s.id, { name: s.name, email: s.email }]));
       const ordersMap = new Map((orders || []).map((o) => [o.id, o]));
-      const orderSupplierMap = new Map<string, { name: string; id: string | null }>();
+      const orderSupplierMap = new Map<string, { name: string; id: string | null; email?: string }>();
       (orderPOs || []).forEach((po) => {
+        const supplier = suppliersMap.get(po.supplier_id);
         orderSupplierMap.set(po.order_id, {
-          name: suppliersMap.get(po.supplier_id) || "Unknown",
+          name: supplier?.name || "Unknown",
           id: po.supplier_id,
+          email: supplier?.email || undefined,
         });
       });
 
@@ -230,6 +311,7 @@ export default function BuyingSheetPage() {
         orders: { orderNumber: string; customerName: string; quantity: number; urgency?: string }[];
         supplierName: string;
         supplierId: string | null;
+        supplierEmail?: string;
         oldestCreatedAt: string;
         hasUrgent: boolean;
       }>();
@@ -243,9 +325,18 @@ export default function BuyingSheetPage() {
 
         let supplierName = "No Supplier";
         let supplierId: string | null = null;
+        let supplierEmail: string | undefined;
         const poSupplier = orderSupplierMap.get(item.order_id);
-        if (poSupplier) { supplierName = poSupplier.name; supplierId = poSupplier.id; }
-        else if (order?.supplier_id) { supplierName = suppliersMap.get(order.supplier_id) || "Unknown"; supplierId = order.supplier_id; }
+        if (poSupplier) {
+          supplierName = poSupplier.name;
+          supplierId = poSupplier.id;
+          supplierEmail = poSupplier.email;
+        } else if (order?.supplier_id) {
+          const supplier = suppliersMap.get(order.supplier_id);
+          supplierName = supplier?.name || "Unknown";
+          supplierId = order.supplier_id;
+          supplierEmail = supplier?.email || undefined;
+        }
 
         const existing = skuMap.get(sku);
         if (existing) {
@@ -261,6 +352,7 @@ export default function BuyingSheetPage() {
             orders: [{ orderNumber: order?.order_number || "—", customerName, quantity: item.quantity, urgency }],
             supplierName,
             supplierId,
+            supplierEmail,
             oldestCreatedAt: item.created_at,
             hasUrgent: urgency === "urgent" || urgency === "critical",
           });
@@ -270,15 +362,16 @@ export default function BuyingSheetPage() {
       const zohoStock = zohoData || {};
       const now = Date.now();
       const buyingRows: BuyingSheetRow[] = Array.from(skuMap.values()).map((entry) => {
-        const zohoEntry = zohoStock[entry.sku] || { stockOnHand: 0, onPurchaseOrder: 0, vendorName: '' };
+        const zohoEntry = zohoStock[entry.sku] || { stockOnHand: 0, onPurchaseOrder: 0, vendorName: '', vendorEmail: '' };
         const toOrder = Math.max(0, entry.totalNeeded - zohoEntry.stockOnHand - zohoEntry.onPurchaseOrder);
         const supplierName = entry.supplierName === "No Supplier" && zohoEntry.vendorName
           ? zohoEntry.vendorName : entry.supplierName;
+        const supplierEmail = entry.supplierEmail || zohoEntry.vendorEmail || undefined;
         const daysWaiting = Math.floor((now - new Date(entry.oldestCreatedAt).getTime()) / (1000 * 60 * 60 * 24));
         const covered = zohoEntry.stockOnHand + zohoEntry.onPurchaseOrder;
         const coveragePercent = entry.totalNeeded > 0 ? Math.min(100, Math.round((covered / entry.totalNeeded) * 100)) : 100;
+        const { trend, lastMonth, prevMonth } = getDemandTrend(entry.sku);
 
-        // Priority score: higher = more urgent to order
         let priorityScore = 0;
         if (toOrder > 0) priorityScore += 30;
         if (entry.hasUrgent) priorityScore += 40;
@@ -286,17 +379,21 @@ export default function BuyingSheetPage() {
         if (daysWaiting > 3) priorityScore += 10;
         if (coveragePercent < 25) priorityScore += 15;
         else if (coveragePercent < 50) priorityScore += 10;
-        priorityScore += Math.min(20, entry.orders.length * 5); // more orders = higher priority
+        priorityScore += Math.min(20, entry.orders.length * 5);
 
         return {
           ...entry,
           supplierName,
+          supplierEmail,
           stockOnHand: zohoEntry.stockOnHand,
           onPurchaseOrder: zohoEntry.onPurchaseOrder,
           toOrder,
           daysWaiting,
           priorityScore,
           coveragePercent,
+          demandTrend: trend,
+          lastMonthQty: lastMonth,
+          prevMonthQty: prevMonth,
         };
       });
 
@@ -313,13 +410,13 @@ export default function BuyingSheetPage() {
       if (zoho) {
         setRows((prev) =>
           prev.map((row) => {
-            const zohoEntry = zoho[row.sku] || { stockOnHand: 0, onPurchaseOrder: 0, vendorName: '' };
+            const zohoEntry = zoho[row.sku] || { stockOnHand: 0, onPurchaseOrder: 0, vendorName: '', vendorEmail: '' };
             const toOrder = Math.max(0, row.totalNeeded - zohoEntry.stockOnHand - zohoEntry.onPurchaseOrder);
             const supplierName = row.supplierName === "No Supplier" && zohoEntry.vendorName
               ? zohoEntry.vendorName : row.supplierName;
+            const supplierEmail = row.supplierEmail || zohoEntry.vendorEmail || undefined;
             const covered = zohoEntry.stockOnHand + zohoEntry.onPurchaseOrder;
             const coveragePercent = row.totalNeeded > 0 ? Math.min(100, Math.round((covered / row.totalNeeded) * 100)) : 100;
-
             let priorityScore = 0;
             if (toOrder > 0) priorityScore += 30;
             if (row.hasUrgent) priorityScore += 40;
@@ -328,8 +425,7 @@ export default function BuyingSheetPage() {
             if (coveragePercent < 25) priorityScore += 15;
             else if (coveragePercent < 50) priorityScore += 10;
             priorityScore += Math.min(20, row.orders.length * 5);
-
-            return { ...row, supplierName, stockOnHand: zohoEntry.stockOnHand, onPurchaseOrder: zohoEntry.onPurchaseOrder, toOrder, coveragePercent, priorityScore };
+            return { ...row, supplierName, supplierEmail, stockOnHand: zohoEntry.stockOnHand, onPurchaseOrder: zohoEntry.onPurchaseOrder, toOrder, coveragePercent, priorityScore };
           })
         );
         toast({ title: "Updated", description: "Zoho stock & PO data loaded" });
@@ -342,7 +438,7 @@ export default function BuyingSheetPage() {
     if (zoho) {
       setRows((prev) =>
         prev.map((row) => {
-          const zohoEntry = zoho[row.sku] || { stockOnHand: 0, onPurchaseOrder: 0, vendorName: '' };
+          const zohoEntry = zoho[row.sku] || { stockOnHand: 0, onPurchaseOrder: 0, vendorName: '', vendorEmail: '' };
           const toOrder = Math.max(0, row.totalNeeded - zohoEntry.stockOnHand - zohoEntry.onPurchaseOrder);
           const supplierName = row.supplierName === "No Supplier" && zohoEntry.vendorName
             ? zohoEntry.vendorName : row.supplierName;
@@ -375,7 +471,7 @@ export default function BuyingSheetPage() {
   }, []);
 
   const uniqueSuppliers = useMemo(() => {
-    const suppliers = new Map<string, { name: string; count: number; totalToOrder: number }>();
+    const suppliers = new Map<string, { name: string; count: number; totalToOrder: number; email?: string }>();
     rows.forEach((r) => {
       if (r.supplierId) {
         const existing = suppliers.get(r.supplierId);
@@ -383,11 +479,27 @@ export default function BuyingSheetPage() {
           existing.count++;
           existing.totalToOrder += r.toOrder;
         } else {
-          suppliers.set(r.supplierId, { name: r.supplierName, count: 1, totalToOrder: r.toOrder });
+          suppliers.set(r.supplierId, { name: r.supplierName, count: 1, totalToOrder: r.toOrder, email: r.supplierEmail });
         }
       }
     });
     return Array.from(suppliers.entries()).sort((a, b) => a[1].name.localeCompare(b[1].name));
+  }, [rows]);
+
+  const getPriorityLevel = (score: number): PriorityFilter => {
+    if (score >= 70) return "critical";
+    if (score >= 50) return "high";
+    if (score >= 30) return "medium";
+    return "low";
+  };
+
+  const priorityCounts = useMemo(() => {
+    const counts = { critical: 0, high: 0, medium: 0, low: 0 };
+    rows.forEach(r => {
+      const level = getPriorityLevel(r.priorityScore);
+      counts[level]++;
+    });
+    return counts;
   }, [rows]);
 
   const filteredRows = useMemo(() => {
@@ -399,9 +511,10 @@ export default function BuyingSheetPage() {
         row.orders.some((o) => o.orderNumber.toLowerCase().includes(search.toLowerCase()) || o.customerName.toLowerCase().includes(search.toLowerCase()));
       const matchesSupplier = supplierFilter === "all" || row.supplierId === supplierFilter;
       const matchesNeedOrder = !showOnlyNeedOrder || row.toOrder > 0;
-      return matchesSearch && matchesSupplier && matchesNeedOrder;
+      const matchesPriority = priorityFilter === "all" || getPriorityLevel(row.priorityScore) === priorityFilter;
+      return matchesSearch && matchesSupplier && matchesNeedOrder && matchesPriority;
     });
-  }, [rows, search, supplierFilter, showOnlyNeedOrder]);
+  }, [rows, search, supplierFilter, showOnlyNeedOrder, priorityFilter]);
 
   const sortedRows = useMemo(() => {
     const sorted = [...filteredRows];
@@ -463,13 +576,122 @@ export default function BuyingSheetPage() {
     }
   };
 
+  // Notes management
+  const handleSaveNote = (sku: string) => {
+    const updated = { ...notes, [sku]: noteText };
+    if (!noteText.trim()) delete updated[sku];
+    setNotes(updated);
+    saveNotes(updated);
+    setEditingNote(null);
+    setNoteText("");
+  };
+
+  const handleOpenNote = (sku: string) => {
+    setEditingNote(sku);
+    setNoteText(notes[sku] || "");
+  };
+
+  // Copy all supplier emails to clipboard
+  const handleCopySupplierEmails = () => {
+    const emails = new Set<string>();
+    const targetRows = selectedSkus.size > 0 ? sortedRows.filter(r => selectedSkus.has(r.sku)) : sortedRows;
+    targetRows.forEach(r => {
+      if (r.supplierEmail) emails.add(r.supplierEmail);
+    });
+    if (emails.size === 0) {
+      toast({ title: "No emails", description: "No supplier emails found for selected items", variant: "destructive" });
+      return;
+    }
+    navigator.clipboard.writeText(Array.from(emails).join("; "));
+    toast({ title: "Copied!", description: `${emails.size} supplier email${emails.size !== 1 ? "s" : ""} copied to clipboard` });
+  };
+
+  // Print-friendly view
+  const handlePrint = () => {
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+
+    const targetRows = selectedSkus.size > 0 ? sortedRows.filter(r => selectedSkus.has(r.sku)) : sortedRows;
+    const date = new Date().toLocaleDateString();
+
+    // Group by supplier for print
+    const groups = new Map<string, BuyingSheetRow[]>();
+    for (const row of targetRows) {
+      const key = row.supplierName || "No Supplier";
+      const existing = groups.get(key) || [];
+      existing.push(row);
+      groups.set(key, existing);
+    }
+
+    let html = `<!DOCTYPE html><html><head><title>Buying Sheet - ${date}</title>
+    <style>
+      body { font-family: Arial, sans-serif; font-size: 11px; padding: 20px; color: #333; }
+      h1 { font-size: 18px; margin-bottom: 5px; }
+      h2 { font-size: 14px; margin: 20px 0 8px; padding: 5px 8px; background: #f0f0f0; border-radius: 4px; }
+      .date { color: #666; font-size: 12px; margin-bottom: 15px; }
+      .summary { display: flex; gap: 20px; margin-bottom: 15px; padding: 10px; background: #f8f8f8; border-radius: 6px; }
+      .summary-item { text-align: center; }
+      .summary-label { font-size: 10px; color: #666; text-transform: uppercase; }
+      .summary-value { font-size: 16px; font-weight: bold; }
+      table { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
+      th { text-align: left; padding: 6px 8px; border-bottom: 2px solid #333; font-size: 10px; text-transform: uppercase; color: #666; }
+      td { padding: 5px 8px; border-bottom: 1px solid #ddd; }
+      .text-right { text-align: right; }
+      .bold { font-weight: bold; }
+      .urgent { color: #dc2626; font-weight: bold; }
+      .total-row { border-top: 2px solid #333; font-weight: bold; background: #f8f8f8; }
+      .note { font-style: italic; color: #666; font-size: 10px; }
+      @media print { body { padding: 0; } }
+    </style></head><body>
+    <h1>📋 Buying Sheet</h1>
+    <p class="date">Generated: ${date} | ${targetRows.length} SKUs | To Order: ${totals.toOrder.toLocaleString()} units</p>
+    <div class="summary">
+      <div class="summary-item"><div class="summary-label">Total Needed</div><div class="summary-value">${totals.needed.toLocaleString()}</div></div>
+      <div class="summary-item"><div class="summary-label">In Stock</div><div class="summary-value">${totals.inStock.toLocaleString()}</div></div>
+      <div class="summary-item"><div class="summary-label">On PO</div><div class="summary-value">${totals.onPO.toLocaleString()}</div></div>
+      <div class="summary-item"><div class="summary-label">To Order</div><div class="summary-value" style="color:#2563eb">${totals.toOrder.toLocaleString()}</div></div>
+    </div>`;
+
+    for (const [supplier, items] of groups.entries()) {
+      const supplierTotal = items.reduce((s, r) => s + r.toOrder, 0);
+      const supplierEmail = items.find(i => i.supplierEmail)?.supplierEmail;
+      html += `<h2>${supplier}${supplierEmail ? ` (${supplierEmail})` : ""}</h2>`;
+      html += `<table><thead><tr>
+        <th>SKU</th><th>Item</th><th class="text-right">Needed</th>
+        <th class="text-right">Stock</th><th class="text-right">On PO</th>
+        <th class="text-right">To Order</th><th>Orders</th><th>Notes</th>
+      </tr></thead><tbody>`;
+      for (const item of items) {
+        const note = notes[item.sku] || "";
+        html += `<tr>
+          <td style="font-family:monospace;font-size:10px">${item.sku}</td>
+          <td>${item.itemName}</td>
+          <td class="text-right">${item.totalNeeded}</td>
+          <td class="text-right">${item.stockOnHand}</td>
+          <td class="text-right">${item.onPurchaseOrder}</td>
+          <td class="text-right ${item.toOrder > 0 ? "urgent" : ""}">${item.toOrder}</td>
+          <td style="font-size:10px">${item.orders.map(o => `${o.orderNumber} (${o.customerName})`).join(", ")}</td>
+          <td class="note">${note}</td>
+        </tr>`;
+      }
+      html += `<tr class="total-row"><td colspan="5">Total for ${supplier}</td><td class="text-right">${supplierTotal}</td><td colspan="2"></td></tr>`;
+      html += `</tbody></table>`;
+    }
+
+    html += `</body></html>`;
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.print();
+  };
+
   const handleExportCSV = () => {
     const targetRows = selectedSkus.size > 0 ? sortedRows.filter((r) => selectedSkus.has(r.sku)) : sortedRows;
-    const headers = ["SKU", "Item Name", "Total Needed", "In Stock (Zoho)", "On PO (Zoho)", "To Order", "Coverage %", "Days Waiting", "Priority", "Supplier", "Orders"];
+    const headers = ["SKU", "Item Name", "Total Needed", "In Stock (Zoho)", "On PO (Zoho)", "To Order", "Coverage %", "Days Waiting", "Priority", "Supplier", "Demand Trend", "Notes", "Orders"];
     const csvRows = targetRows.map((r) => [
       r.sku, r.itemName, r.totalNeeded.toString(), r.stockOnHand.toString(),
       r.onPurchaseOrder.toString(), r.toOrder.toString(), r.coveragePercent.toString(),
       r.daysWaiting.toString(), r.priorityScore.toString(), r.supplierName,
+      r.demandTrend, notes[r.sku] || "",
       r.orders.map((o) => `${o.orderNumber} (${o.customerName}: ${o.quantity})`).join("; "),
     ]);
     const csv = [headers, ...csvRows].map((r) => r.map((c) => `"${c}"`).join(",")).join("\n");
@@ -495,12 +717,12 @@ export default function BuyingSheetPage() {
     let csv = "";
     for (const [supplier, items] of groups.entries()) {
       csv += `\n"SUPPLIER: ${supplier}"\n`;
-      csv += `"SKU","Item Name","Qty to Order","Currently in Stock","On PO"\n`;
+      csv += `"SKU","Item Name","Qty to Order","Currently in Stock","On PO","Notes"\n`;
       const totalToOrder = items.reduce((s, r) => s + r.toOrder, 0);
       for (const item of items) {
-        csv += `"${item.sku}","${item.itemName}","${item.toOrder}","${item.stockOnHand}","${item.onPurchaseOrder}"\n`;
+        csv += `"${item.sku}","${item.itemName}","${item.toOrder}","${item.stockOnHand}","${item.onPurchaseOrder}","${notes[item.sku] || ""}"\n`;
       }
-      csv += `"","TOTAL","${totalToOrder}","",""\n`;
+      csv += `"","TOTAL","${totalToOrder}","","",""\n`;
     }
 
     const blob = new Blob([csv], { type: "text/csv" });
@@ -542,6 +764,26 @@ export default function BuyingSheetPage() {
     </div>
   );
 
+  const DemandTrendIcon = ({ trend, lastMonth, prevMonth }: { trend: string; lastMonth: number; prevMonth: number }) => {
+    const label = trend === "up" ? `↑ Demand rising (${prevMonth} → ${lastMonth})` :
+                  trend === "down" ? `↓ Demand falling (${prevMonth} → ${lastMonth})` :
+                  trend === "new" ? "New item" :
+                  `Stable (${lastMonth}/mo)`;
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="inline-flex items-center">
+            {trend === "up" && <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />}
+            {trend === "down" && <TrendingDown className="h-3.5 w-3.5 text-destructive" />}
+            {trend === "stable" && <Minus className="h-3.5 w-3.5 text-muted-foreground" />}
+            {trend === "new" && <BarChart3 className="h-3.5 w-3.5 text-primary" />}
+          </span>
+        </TooltipTrigger>
+        <TooltipContent><p className="text-xs">{label}</p></TooltipContent>
+      </Tooltip>
+    );
+  };
+
   const renderRow = (row: BuyingSheetRow) => (
     <TableRow key={row.sku} className={`${row.toOrder > 0 ? "" : "opacity-60"} ${selectedSkus.has(row.sku) ? "bg-primary/5" : ""} ${row.hasUrgent ? "border-l-2 border-l-destructive" : ""}`}>
       <TableCell className="w-8">
@@ -564,30 +806,67 @@ export default function BuyingSheetPage() {
         )}
       </TableCell>
       <TableCell className="text-center">
+        <DemandTrendIcon trend={row.demandTrend} lastMonth={row.lastMonthQty} prevMonth={row.prevMonthQty} />
+      </TableCell>
+      <TableCell className="text-center">
         <span className={`text-sm font-medium ${row.daysWaiting > 7 ? "text-destructive" : row.daysWaiting > 3 ? "text-orange-500" : "text-muted-foreground"}`}>
           {row.daysWaiting}d
         </span>
       </TableCell>
       <TableCell className="text-sm">{row.supplierName}</TableCell>
       <TableCell>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span className="text-xs text-muted-foreground cursor-help">
-              {row.orders.length} order{row.orders.length !== 1 ? "s" : ""}
-            </span>
-          </TooltipTrigger>
-          <TooltipContent side="left" className="max-w-[300px]">
-            <div className="space-y-1">
-              {row.orders.map((o, i) => (
-                <div key={i} className="text-xs flex items-center gap-1">
-                  <span className="font-mono font-medium">{o.orderNumber}</span>
-                  <span className="text-muted-foreground">— {o.customerName} ({o.quantity})</span>
-                  {(o.urgency === "urgent" || o.urgency === "critical") && <Flame className="h-3 w-3 text-destructive" />}
-                </div>
-              ))}
+        <div className="flex items-center gap-1">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="text-xs text-muted-foreground cursor-help">
+                {row.orders.length} order{row.orders.length !== 1 ? "s" : ""}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="left" className="max-w-[300px]">
+              <div className="space-y-1">
+                {row.orders.map((o, i) => (
+                  <div key={i} className="text-xs flex items-center gap-1">
+                    <span className="font-mono font-medium">{o.orderNumber}</span>
+                    <span className="text-muted-foreground">— {o.customerName} ({o.quantity})</span>
+                    {(o.urgency === "urgent" || o.urgency === "critical") && <Flame className="h-3 w-3 text-destructive" />}
+                  </div>
+                ))}
+              </div>
+            </TooltipContent>
+          </Tooltip>
+        </div>
+      </TableCell>
+      <TableCell className="w-8">
+        <Popover open={editingNote === row.sku} onOpenChange={(open) => { if (!open) setEditingNote(null); }}>
+          <PopoverTrigger asChild>
+            <button
+              onClick={() => handleOpenNote(row.sku)}
+              className={`p-1 rounded hover:bg-muted transition-colors ${notes[row.sku] ? "text-primary" : "text-muted-foreground/40"}`}
+            >
+              <StickyNote className="h-3.5 w-3.5" />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent className="w-64 p-3" side="left">
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-muted-foreground">Note for {row.sku}</p>
+              <Textarea
+                value={noteText}
+                onChange={(e) => setNoteText(e.target.value)}
+                placeholder="Add procurement note..."
+                className="min-h-[60px] text-sm"
+                autoFocus
+              />
+              <div className="flex gap-1 justify-end">
+                {notes[row.sku] && (
+                  <Button variant="ghost" size="sm" onClick={() => { setNoteText(""); handleSaveNote(row.sku); }}>
+                    <X className="h-3 w-3 mr-1" />Clear
+                  </Button>
+                )}
+                <Button size="sm" onClick={() => handleSaveNote(row.sku)}>Save</Button>
+              </div>
             </div>
-          </TooltipContent>
-        </Tooltip>
+          </PopoverContent>
+        </Popover>
       </TableCell>
     </TableRow>
   );
@@ -604,7 +883,7 @@ export default function BuyingSheetPage() {
 
   return (
     <TooltipProvider>
-      <div className="space-y-4">
+      <div className="space-y-4" ref={printRef}>
         {/* Header */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2 flex-wrap">
@@ -622,6 +901,14 @@ export default function BuyingSheetPage() {
               {zohoLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
               Refresh Zoho
             </Button>
+            <Button variant="outline" size="sm" onClick={handlePrint} className="gap-2">
+              <Printer className="h-4 w-4" />
+              Print
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleCopySupplierEmails} className="gap-2">
+              <Mail className="h-4 w-4" />
+              Copy Emails
+            </Button>
             <Button variant="outline" size="sm" onClick={handleExportCSV} className="gap-2">
               <Download className="h-4 w-4" />
               Export{selectedSkus.size > 0 ? ` (${selectedSkus.size})` : ""}
@@ -632,6 +919,32 @@ export default function BuyingSheetPage() {
             </Button>
           </div>
         </div>
+
+        {/* Priority Filter Tabs */}
+        <Tabs value={priorityFilter} onValueChange={(v) => setPriorityFilter(v as PriorityFilter)}>
+          <TabsList className="bg-muted/50">
+            <TabsTrigger value="all" className="gap-1.5 text-xs">
+              <Filter className="h-3 w-3" />All
+              <Badge variant="outline" className="text-[10px] px-1.5 py-0">{rows.length}</Badge>
+            </TabsTrigger>
+            <TabsTrigger value="critical" className="gap-1.5 text-xs">
+              <Flame className="h-3 w-3" />Critical
+              <Badge variant={priorityCounts.critical > 0 ? "destructive" : "outline"} className="text-[10px] px-1.5 py-0">{priorityCounts.critical}</Badge>
+            </TabsTrigger>
+            <TabsTrigger value="high" className="gap-1.5 text-xs">
+              <AlertTriangle className="h-3 w-3" />High
+              <Badge className="text-[10px] px-1.5 py-0 bg-orange-500 text-white">{priorityCounts.high}</Badge>
+            </TabsTrigger>
+            <TabsTrigger value="medium" className="gap-1.5 text-xs">
+              <Clock className="h-3 w-3" />Medium
+              <Badge variant="secondary" className="text-[10px] px-1.5 py-0">{priorityCounts.medium}</Badge>
+            </TabsTrigger>
+            <TabsTrigger value="low" className="gap-1.5 text-xs">
+              <CheckCircle2 className="h-3 w-3" />Low
+              <Badge variant="outline" className="text-[10px] px-1.5 py-0">{priorityCounts.low}</Badge>
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
 
         {/* Summary Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
@@ -756,6 +1069,8 @@ export default function BuyingSheetPage() {
             <span className="text-sm font-medium text-foreground">{selectedSkus.size} item{selectedSkus.size !== 1 ? "s" : ""} selected</span>
             <Button variant="outline" size="sm" onClick={handleExportCSV} className="gap-1"><Download className="h-3 w-3" />Export Selected</Button>
             <Button variant="outline" size="sm" onClick={handleExportBySupplier} className="gap-1"><FileSpreadsheet className="h-3 w-3" />By Supplier</Button>
+            <Button variant="outline" size="sm" onClick={handleCopySupplierEmails} className="gap-1"><Copy className="h-3 w-3" />Copy Emails</Button>
+            <Button variant="outline" size="sm" onClick={handlePrint} className="gap-1"><Printer className="h-3 w-3" />Print Selected</Button>
             <Button variant="ghost" size="sm" onClick={() => setSelectedSkus(new Set())}>Clear</Button>
           </div>
         )}
@@ -778,15 +1093,19 @@ export default function BuyingSheetPage() {
                     <SortableHeader field="onPurchaseOrder" className="text-right">On PO</SortableHeader>
                     <TableHead>Coverage</TableHead>
                     <SortableHeader field="toOrder" className="text-right">To Order</SortableHeader>
+                    <TableHead className="text-center">Trend</TableHead>
                     <SortableHeader field="daysWaiting" className="text-right">Wait</SortableHeader>
                     <SortableHeader field="supplierName">Supplier</SortableHeader>
                     <TableHead>Orders</TableHead>
+                    <TableHead className="w-8">
+                      <StickyNote className="h-3.5 w-3.5 text-muted-foreground" />
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {sortedRows.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={12} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={14} className="text-center py-8 text-muted-foreground">
                         {showOnlyNeedOrder ? "All items are covered by stock and POs!" : "No items found"}
                       </TableCell>
                     </TableRow>
@@ -794,12 +1113,15 @@ export default function BuyingSheetPage() {
                     groupedRows.map(([supplier, items]) => (
                       <>
                         <TableRow key={`group-${supplier}`} className="bg-muted/50 hover:bg-muted/70">
-                          <TableCell colSpan={12}>
+                          <TableCell colSpan={14}>
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-2">
                                 <Users className="h-4 w-4 text-primary" />
                                 <span className="font-semibold text-foreground">{supplier}</span>
                                 <Badge variant="secondary" className="text-xs">{items.length} items</Badge>
+                                {items[0]?.supplierEmail && (
+                                  <span className="text-xs text-muted-foreground">({items[0].supplierEmail})</span>
+                                )}
                               </div>
                               <div className="flex items-center gap-3 text-sm">
                                 <span className="text-muted-foreground">To Order: <strong className="text-primary">{items.reduce((s, r) => s + r.toOrder, 0)}</strong></span>
