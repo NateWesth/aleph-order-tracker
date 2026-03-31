@@ -77,12 +77,9 @@ export default function BuyingSheetPage() {
     }
   };
 
-  const fetchData = async () => {
+  const fetchLocalData = async () => {
     setLoading(true);
     try {
-      // Fetch Zoho data and local data in parallel
-      const [zoho] = await Promise.all([fetchZohoData()]);
-
       // Fetch awaiting-stock order items
       const { data: orderItems, error: itemsError } = await supabase
         .from("order_items")
@@ -91,7 +88,7 @@ export default function BuyingSheetPage() {
         .order("created_at", { ascending: false });
 
       if (itemsError) throw itemsError;
-      if (!orderItems?.length) { setRows([]); return; }
+      if (!orderItems?.length) { setRows([]); setLoading(false); return; }
 
       const orderIds = [...new Set(orderItems.map((i) => i.order_id))];
 
