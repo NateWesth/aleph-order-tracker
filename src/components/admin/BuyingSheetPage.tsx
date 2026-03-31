@@ -24,7 +24,7 @@ interface BuyingSheetRow {
 }
 
 interface ZohoStockData {
-  [sku: string]: { stockOnHand: number; onPurchaseOrder: number };
+  [sku: string]: { stockOnHand: number; onPurchaseOrder: number; vendorName?: string };
 }
 
 export default function BuyingSheetPage() {
