@@ -366,7 +366,20 @@ export default function BuyingSheetPage() {
         if (stockoutRiskDays !== null && stockoutRiskDays <= 7) priorityScore += 15;
         else if (stockoutRiskDays !== null && stockoutRiskDays <= 14) priorityScore += 5;
         if (seasonalPattern === "peak") priorityScore += 10;
-        return { ...entry, supplierName, supplierEmail, stockOnHand: z.stockOnHand, onPurchaseOrder: z.onPurchaseOrder, toOrder, daysWaiting, priorityScore, coveragePercent, demandTrend: trend, lastMonthQty: lastMonth, prevMonthQty: prevMonth, stockoutRiskDays, lastPurchasedDate, seasonalPattern, avgLeadTimeDays };
+        // Distinct customers affected - more customers = higher priority
+        const distinctCustomers = new Set(entry.orders.map(o => o.customerName)).size;
+        if (distinctCustomers >= 3) priorityScore += 10;
+        else if (distinctCustomers >= 2) priorityScore += 5;
+        // Age escalation: if waiting longer than avg lead time, boost priority
+        if (avgLeadTimeDays !== null && daysWaiting > avgLeadTimeDays) priorityScore += 10;
+        // Demand variability penalty for erratic items
+        const demandVar = getDemandVariability(entry.sku);
+        if (demandVar === "erratic") priorityScore += 5;
+        // Safety stock & recommended order qty
+        const safetyStock = getSafetyStock(entry.sku, avgLeadTimeDays);
+        const dailyBurn = getDailyBurnRate(entry.sku);
+        const recommendedOrderQty = toOrder > 0 ? toOrder + safetyStock : 0;
+        return { ...entry, supplierName, supplierEmail, stockOnHand: z.stockOnHand, onPurchaseOrder: z.onPurchaseOrder, toOrder, daysWaiting, priorityScore, coveragePercent, demandTrend: trend, lastMonthQty: lastMonth, prevMonthQty: prevMonth, stockoutRiskDays, lastPurchasedDate, seasonalPattern, avgLeadTimeDays, safetyStock, dailyBurnRate: dailyBurn, demandVariability: demandVar, distinctCustomers, recommendedOrderQty };
       });
       buyingRows.sort((a, b) => b.priorityScore - a.priorityScore);
       setRows(buyingRows);
