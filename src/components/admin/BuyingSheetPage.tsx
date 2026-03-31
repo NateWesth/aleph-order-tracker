@@ -490,11 +490,35 @@ export default function BuyingSheetPage() {
   const generateEmailDraft = (supplierName: string) => {
     const items = sortedRows.filter(r => r.supplierName === supplierName && r.toOrder > 0);
     if (items.length === 0) return;
-    const itemLines = items.map(r => `  • ${r.sku} — ${r.itemName} — Qty: ${r.toOrder}`).join("\n");
-    const totalQty = items.reduce((s, r) => s + r.toOrder, 0);
-    setEmailDraftBody(`Dear ${supplierName},\n\nPlease find below our purchase order requirements:\n\n${itemLines}\n\nTotal items: ${items.length}\nTotal quantity: ${totalQty}\n\nPlease confirm availability and expected delivery date.\n\nKind regards`);
+    const itemLines = items.map(r => {
+      const recQty = r.recommendedOrderQty > r.toOrder ? `${r.toOrder} (+ ${r.safetyStock} safety stock = ${r.recommendedOrderQty})` : `${r.toOrder}`;
+      return `  • ${r.sku} — ${r.itemName} — Qty: ${recQty}`;
+    }).join("\n");
+    const totalQty = items.reduce((s, r) => s + r.recommendedOrderQty, 0);
+    const urgentItems = items.filter(r => r.hasUrgent);
+    const urgentNote = urgentItems.length > 0 ? `\n⚠️ URGENT: ${urgentItems.map(r => r.sku).join(", ")} — Please prioritize these items.\n` : "";
+    setEmailDraftBody(`Dear ${supplierName},\n\nPlease find below our purchase order requirements:\n${urgentNote}\n${itemLines}\n\nTotal items: ${items.length}\nTotal quantity (incl. safety stock): ${totalQty}\n\nPlease confirm availability and expected delivery date.\n\nKind regards`);
     setEmailDraftSupplier(supplierName);
     setEmailDraftOpen(true);
+  };
+
+  // Batch email ALL suppliers at once — copies all drafts to clipboard
+  const handleBatchEmailAllSuppliers = () => {
+    const supplierGroups = new Map<string, BuyingSheetRow[]>();
+    sortedRows.filter(r => r.toOrder > 0).forEach(r => {
+      const key = r.supplierName || "No Supplier";
+      supplierGroups.set(key, [...(supplierGroups.get(key) || []), r]);
+    });
+    if (supplierGroups.size === 0) { toast({ title: "Nothing to order", variant: "destructive" }); return; }
+    const allDrafts: string[] = [];
+    for (const [supplier, items] of supplierGroups) {
+      if (supplier === "No Supplier") continue;
+      const itemLines = items.map(r => `  • ${r.sku} — ${r.itemName} — Qty: ${r.recommendedOrderQty}`).join("\n");
+      const totalQty = items.reduce((s, r) => s + r.recommendedOrderQty, 0);
+      allDrafts.push(`═══ ${supplier} ═══\n\nDear ${supplier},\n\nPlease find below our purchase order requirements:\n\n${itemLines}\n\nTotal items: ${items.length} | Total qty: ${totalQty}\n\nPlease confirm availability and expected delivery date.\n\nKind regards\n`);
+    }
+    navigator.clipboard.writeText(allDrafts.join("\n\n"));
+    toast({ title: "All Drafts Copied", description: `${allDrafts.length} supplier emails copied to clipboard` });
   };
 
   const handleSaveNote = (sku: string) => {
