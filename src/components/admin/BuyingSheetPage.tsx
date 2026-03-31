@@ -15,8 +15,10 @@ import {
   ArrowUpDown, ArrowUp, ArrowDown, Layers, Clock, Flame, CheckCircle2,
   FileSpreadsheet, Users, Printer, Mail, StickyNote, Copy, X,
   BarChart3, Filter, Maximize2, Minimize2, ClipboardCopy, Timer,
-  ChevronUp, Eye, PieChart
+  ChevronUp, Eye, PieChart, Send, History, Truck, CalendarDays,
+  CheckSquare, Snowflake, Sun, Leaf, Cloud, Zap, Save, RotateCcw
 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -44,6 +46,8 @@ interface BuyingSheetRow {
   prevMonthQty: number;
   stockoutRiskDays: number | null;
   lastPurchasedDate: string | null;
+  seasonalPattern: "peak" | "low" | "normal" | null;
+  avgLeadTimeDays: number | null;
 }
 
 interface SuggestedRestockRow {
@@ -95,11 +99,23 @@ export default function BuyingSheetPage() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showSupplierChart, setShowSupplierChart] = useState(false);
   const [lastPurchaseMap, setLastPurchaseMap] = useState<Map<string, string>>(new Map());
+  const [leadTimeMap, setLeadTimeMap] = useState<Map<string, number>>(new Map());
+  const [seasonalMap, setSeasonalMap] = useState<Map<string, "peak" | "low" | "normal">>(new Map());
+  const [emailDraftOpen, setEmailDraftOpen] = useState(false);
+  const [emailDraftSupplier, setEmailDraftSupplier] = useState<string | null>(null);
+  const [emailDraftBody, setEmailDraftBody] = useState("");
+  const [snapshotSaved, setSnapshotSaved] = useState(false);
+  const [showSnapshot, setShowSnapshot] = useState(false);
+  const [snapshotData, setSnapshotData] = useState<{ date: string; rows: { sku: string; toOrder: number }[] } | null>(null);
+  const [bulkOrdering, setBulkOrdering] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetchDemandHistory();
     fetchLastPurchaseDates();
+    fetchLeadTimes();
+    fetchSeasonalPatterns();
+    loadSnapshot();
     fetchLocalData();
   }, []);
 
@@ -166,6 +182,147 @@ export default function BuyingSheetPage() {
     } catch (err) {
       console.error("Failed to fetch demand history:", err);
     }
+  };
+
+  // Fetch lead times per supplier (avg days from order creation to completion)
+  const fetchLeadTimes = async () => {
+    try {
+      const { data } = await supabase
+        .from("order_items")
+        .select("code, created_at, completed_at, order_id")
+        .eq("progress_stage", "completed")
+        .not("code", "is", null)
+        .not("completed_at", "is", null);
+      
+      const skuLeadTimes = new Map<string, number[]>();
+      (data || []).forEach(item => {
+        if (!item.created_at || !item.completed_at) return;
+        const sku = (item.code || "").toUpperCase();
+        const days = Math.max(0, Math.round((new Date(item.completed_at).getTime() - new Date(item.created_at).getTime()) / (1000 * 60 * 60 * 24)));
+        const arr = skuLeadTimes.get(sku) || [];
+        arr.push(days);
+        skuLeadTimes.set(sku, arr);
+      });
+
+      const map = new Map<string, number>();
+      skuLeadTimes.forEach((days, sku) => {
+        map.set(sku, Math.round(days.reduce((a, b) => a + b, 0) / days.length));
+      });
+      setLeadTimeMap(map);
+    } catch (err) {
+      console.error("Failed to fetch lead times:", err);
+    }
+  };
+
+  // Fetch seasonal patterns (compare current month historically)
+  const fetchSeasonalPatterns = async () => {
+    try {
+      const now = new Date();
+      const currentMonth = now.getMonth();
+      const { data } = await supabase
+        .from("order_items")
+        .select("code, quantity, created_at")
+        .not("code", "is", null);
+
+      const skuMonthlyTotals = new Map<string, Map<number, number[]>>();
+      (data || []).forEach(item => {
+        const sku = (item.code || "").toUpperCase();
+        const month = new Date(item.created_at).getMonth();
+        if (!skuMonthlyTotals.has(sku)) skuMonthlyTotals.set(sku, new Map());
+        const monthMap = skuMonthlyTotals.get(sku)!;
+        const arr = monthMap.get(month) || [];
+        arr.push(item.quantity || 1);
+        monthMap.set(month, arr);
+      });
+
+      const map = new Map<string, "peak" | "low" | "normal">();
+      skuMonthlyTotals.forEach((monthMap, sku) => {
+        const allMonthAvgs: number[] = [];
+        monthMap.forEach((qtys) => {
+          allMonthAvgs.push(qtys.reduce((a, b) => a + b, 0) / qtys.length);
+        });
+        const overallAvg = allMonthAvgs.length > 0 ? allMonthAvgs.reduce((a, b) => a + b, 0) / allMonthAvgs.length : 0;
+        const currentMonthQtys = monthMap.get(currentMonth) || [];
+        const currentAvg = currentMonthQtys.length > 0 ? currentMonthQtys.reduce((a, b) => a + b, 0) / currentMonthQtys.length : 0;
+        
+        if (overallAvg > 0 && currentAvg > overallAvg * 1.3) map.set(sku, "peak");
+        else if (overallAvg > 0 && currentAvg < overallAvg * 0.7) map.set(sku, "low");
+        else if (monthMap.size >= 2) map.set(sku, "normal");
+      });
+      setSeasonalMap(map);
+    } catch (err) {
+      console.error("Failed to fetch seasonal patterns:", err);
+    }
+  };
+
+  // Snapshot management
+  const SNAPSHOT_KEY = "buying-sheet-snapshot";
+  const loadSnapshot = () => {
+    try {
+      const raw = localStorage.getItem(SNAPSHOT_KEY);
+      if (raw) setSnapshotData(JSON.parse(raw));
+    } catch { /* ignore */ }
+  };
+  const saveSnapshot = () => {
+    const snapshot = { date: new Date().toISOString(), rows: sortedRows.map(r => ({ sku: r.sku, toOrder: r.toOrder })) };
+    localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(snapshot));
+    setSnapshotData(snapshot);
+    setSnapshotSaved(true);
+    setTimeout(() => setSnapshotSaved(false), 2000);
+    toast({ title: "Snapshot Saved", description: `${snapshot.rows.length} items saved for comparison` });
+  };
+  const getSnapshotDiff = (sku: string, currentToOrder: number): { diff: number; isNew: boolean } | null => {
+    if (!snapshotData || !showSnapshot) return null;
+    const prev = snapshotData.rows.find(r => r.sku === sku);
+    if (!prev) return { diff: currentToOrder, isNew: true };
+    const diff = currentToOrder - prev.toOrder;
+    if (diff === 0) return null;
+    return { diff, isNew: false };
+  };
+
+  // Bulk mark as ordered
+  const handleBulkMarkOrdered = async () => {
+    if (selectedSkus.size === 0) return;
+    setBulkOrdering(true);
+    try {
+      const targetRows = sortedRows.filter(r => selectedSkus.has(r.sku));
+      const orderItemIds: string[] = [];
+      for (const row of targetRows) {
+        const { data } = await supabase
+          .from("order_items")
+          .select("id")
+          .eq("progress_stage", "awaiting-stock")
+          .ilike("code", row.sku);
+        if (data) orderItemIds.push(...data.map(d => d.id));
+      }
+      if (orderItemIds.length > 0) {
+        const { error } = await supabase
+          .from("order_items")
+          .update({ stock_status: "ordered" as any, notes: `Marked ordered from buying sheet on ${new Date().toLocaleDateString()}` })
+          .in("id", orderItemIds);
+        if (error) throw error;
+        toast({ title: "Updated", description: `${orderItemIds.length} items marked as ordered` });
+        setSelectedSkus(new Set());
+        fetchLocalData();
+      }
+    } catch (err) {
+      console.error("Bulk order failed:", err);
+      toast({ title: "Error", description: "Failed to update items", variant: "destructive" });
+    } finally {
+      setBulkOrdering(false);
+    }
+  };
+
+  // Email draft generator
+  const generateEmailDraft = (supplierName: string) => {
+    const items = sortedRows.filter(r => r.supplierName === supplierName && r.toOrder > 0);
+    if (items.length === 0) return;
+    const itemLines = items.map(r => `  • ${r.sku} — ${r.itemName} — Qty: ${r.toOrder}`).join("\n");
+    const totalQty = items.reduce((s, r) => s + r.toOrder, 0);
+    const body = `Dear ${supplierName},\n\nPlease find below our purchase order requirements:\n\n${itemLines}\n\nTotal items: ${items.length}\nTotal quantity: ${totalQty}\n\nPlease confirm availability and expected delivery date.\n\nKind regards`;
+    setEmailDraftBody(body);
+    setEmailDraftSupplier(supplierName);
+    setEmailDraftOpen(true);
   };
 
   const fetchLastPurchaseDates = async () => {
@@ -426,6 +583,8 @@ export default function BuyingSheetPage() {
         const { trend, lastMonth, prevMonth } = getDemandTrend(entry.sku);
         const stockoutRiskDays = getStockoutRiskDays(entry.sku, zohoEntry.stockOnHand, zohoEntry.onPurchaseOrder);
         const lastPurchasedDate = lastPurchaseMap.get(entry.sku) || null;
+        const seasonalPattern = seasonalMap.get(entry.sku) || null;
+        const avgLeadTimeDays = leadTimeMap.get(entry.sku) ?? null;
 
         let priorityScore = 0;
         if (toOrder > 0) priorityScore += 30;
@@ -435,9 +594,9 @@ export default function BuyingSheetPage() {
         if (coveragePercent < 25) priorityScore += 15;
         else if (coveragePercent < 50) priorityScore += 10;
         priorityScore += Math.min(20, entry.orders.length * 5);
-        // Boost for stockout risk
         if (stockoutRiskDays !== null && stockoutRiskDays <= 7) priorityScore += 15;
         else if (stockoutRiskDays !== null && stockoutRiskDays <= 14) priorityScore += 5;
+        if (seasonalPattern === "peak") priorityScore += 10;
 
         return {
           ...entry,
@@ -454,6 +613,8 @@ export default function BuyingSheetPage() {
           prevMonthQty: prevMonth,
           stockoutRiskDays,
           lastPurchasedDate,
+          seasonalPattern,
+          avgLeadTimeDays,
         };
       });
 
@@ -970,6 +1131,18 @@ export default function BuyingSheetPage() {
                 <div className="flex justify-between"><span className="text-muted-foreground">Previous Month:</span><span className="font-medium">{row.prevMonthQty}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Coverage:</span><CoverageBar percent={row.coveragePercent} /></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Stockout Risk:</span><StockoutRiskBadge days={row.stockoutRiskDays} /></div>
+                {row.avgLeadTimeDays !== null && (
+                  <div className="flex justify-between"><span className="text-muted-foreground">Avg Lead Time:</span><span className="font-medium">{row.avgLeadTimeDays}d</span></div>
+                )}
+                {row.seasonalPattern && (
+                  <div className="flex justify-between"><span className="text-muted-foreground">Season:</span>
+                    <span className="flex items-center gap-1 font-medium">
+                      {row.seasonalPattern === "peak" && <><Sun className="h-3 w-3 text-orange-500" />Peak</>}
+                      {row.seasonalPattern === "low" && <><Snowflake className="h-3 w-3 text-blue-500" />Low</>}
+                      {row.seasonalPattern === "normal" && <><Leaf className="h-3 w-3 text-emerald-500" />Normal</>}
+                    </span>
+                  </div>
+                )}
                 {row.lastPurchasedDate && (
                   <div className="flex justify-between"><span className="text-muted-foreground">Last Purchased:</span><span className="font-medium">{new Date(row.lastPurchasedDate).toLocaleDateString()}</span></div>
                 )}
@@ -991,6 +1164,9 @@ export default function BuyingSheetPage() {
                     <Mail className="h-3 w-3" />Copy Supplier Email
                   </Button>
                 )}
+                <Button variant="outline" size="sm" className="w-full justify-start gap-2 text-xs" onClick={() => generateEmailDraft(row.supplierName)}>
+                  <Send className="h-3 w-3" />Draft Email to {row.supplierName}
+                </Button>
                 {notes[row.sku] && (
                   <div className="p-2 rounded bg-primary/5 border border-primary/10">
                     <p className="text-[10px] font-medium text-primary mb-0.5">Note:</p>
@@ -1028,11 +1204,19 @@ export default function BuyingSheetPage() {
           <TableCell className="text-right font-medium" onClick={() => toggleExpand(row.sku)}>{row.onPurchaseOrder}</TableCell>
           <TableCell onClick={() => toggleExpand(row.sku)}><CoverageBar percent={row.coveragePercent} /></TableCell>
           <TableCell className="text-right" onClick={() => toggleExpand(row.sku)}>
-            {row.toOrder > 0 ? (
-              <Badge variant="destructive" className="font-bold">{row.toOrder}</Badge>
-            ) : (
-              <Badge variant="outline" className="text-accent-foreground">0</Badge>
-            )}
+            <div className="flex items-center justify-end gap-1">
+              {row.toOrder > 0 ? (
+                <Badge variant="destructive" className="font-bold">{row.toOrder}</Badge>
+              ) : (
+                <Badge variant="outline" className="text-accent-foreground">0</Badge>
+              )}
+              {(() => {
+                const diff = getSnapshotDiff(row.sku, row.toOrder);
+                if (!diff) return null;
+                if (diff.isNew) return <span className="text-[10px] text-primary font-medium">NEW</span>;
+                return <span className={`text-[10px] font-medium ${diff.diff > 0 ? "text-destructive" : "text-emerald-600"}`}>{diff.diff > 0 ? "+" : ""}{diff.diff}</span>;
+              })()}
+            </div>
           </TableCell>
           <TableCell className="text-center" onClick={() => toggleExpand(row.sku)}>
             <StockoutRiskBadge days={row.stockoutRiskDays} />
@@ -1045,7 +1229,27 @@ export default function BuyingSheetPage() {
               {row.daysWaiting}d
             </span>
           </TableCell>
-          <TableCell className="text-sm" onClick={() => toggleExpand(row.sku)}>{row.supplierName}</TableCell>
+          <TableCell className="text-sm" onClick={() => toggleExpand(row.sku)}>
+            <div className="flex items-center gap-1.5">
+              <span>{row.supplierName}</span>
+              {row.avgLeadTimeDays !== null && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="text-[10px] text-muted-foreground bg-muted px-1 rounded">{row.avgLeadTimeDays}d</span>
+                  </TooltipTrigger>
+                  <TooltipContent><p className="text-xs">Avg lead time: {row.avgLeadTimeDays} days</p></TooltipContent>
+                </Tooltip>
+              )}
+              {row.seasonalPattern === "peak" && (
+                <Tooltip><TooltipTrigger asChild><Sun className="h-3 w-3 text-orange-500" /></TooltipTrigger>
+                  <TooltipContent><p className="text-xs">🔥 Peak season — higher demand expected</p></TooltipContent></Tooltip>
+              )}
+              {row.seasonalPattern === "low" && (
+                <Tooltip><TooltipTrigger asChild><Snowflake className="h-3 w-3 text-blue-500" /></TooltipTrigger>
+                  <TooltipContent><p className="text-xs">❄️ Low season — reduced demand expected</p></TooltipContent></Tooltip>
+              )}
+            </div>
+          </TableCell>
           <TableCell onClick={() => toggleExpand(row.sku)}>
             <span className="text-xs text-muted-foreground">
               {row.orders.length} order{row.orders.length !== 1 ? "s" : ""}
@@ -1150,8 +1354,32 @@ export default function BuyingSheetPage() {
             <Button variant="outline" size="sm" onClick={handleExportBySupplier} className="gap-2">
               <FileSpreadsheet className="h-4 w-4" />
             </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant={snapshotSaved ? "default" : "outline"} size="sm" onClick={saveSnapshot} className="gap-2">
+                  <Save className="h-4 w-4" />{snapshotSaved && "✓"}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent><p className="text-xs">Save snapshot for comparison</p></TooltipContent>
+            </Tooltip>
+            {snapshotData && (
+              <Button variant={showSnapshot ? "default" : "outline"} size="sm" onClick={() => setShowSnapshot(!showSnapshot)} className="gap-2">
+                <History className="h-4 w-4" />
+                {showSnapshot ? "Hide" : "Compare"}
+              </Button>
+            )}
           </div>
         </div>
+
+        {/* Snapshot comparison bar */}
+        {showSnapshot && snapshotData && (
+          <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/50 border border-border text-xs">
+            <History className="h-3.5 w-3.5 text-muted-foreground" />
+            <span className="text-muted-foreground">Comparing to snapshot from <strong>{new Date(snapshotData.date).toLocaleString()}</strong></span>
+            <span className="text-muted-foreground">({snapshotData.rows.length} items)</span>
+            <Button variant="ghost" size="sm" className="ml-auto h-6 text-xs" onClick={() => setShowSnapshot(false)}>Hide</Button>
+          </div>
+        )}
 
         {/* Priority Filter Tabs */}
         <Tabs value={priorityFilter} onValueChange={(v) => setPriorityFilter(v as PriorityFilter)}>
@@ -1352,6 +1580,9 @@ export default function BuyingSheetPage() {
             <Button variant="outline" size="sm" onClick={handleCopySelectedPOLines} className="gap-1"><ClipboardCopy className="h-3 w-3" />Copy PO Lines</Button>
             <Button variant="outline" size="sm" onClick={handleCopySupplierEmails} className="gap-1"><Copy className="h-3 w-3" />Emails</Button>
             <Button variant="outline" size="sm" onClick={handlePrint} className="gap-1"><Printer className="h-3 w-3" />Print</Button>
+            <Button variant="default" size="sm" onClick={handleBulkMarkOrdered} disabled={bulkOrdering} className="gap-1">
+              {bulkOrdering ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckSquare className="h-3 w-3" />}Mark as Ordered
+            </Button>
             <Button variant="ghost" size="sm" onClick={() => setSelectedSkus(new Set())}>Clear</Button>
           </div>
         )}
@@ -1415,7 +1646,10 @@ export default function BuyingSheetPage() {
                                   <span className="text-xs text-muted-foreground">({items[0].supplierEmail})</span>
                                 )}
                               </div>
-                              <div className="flex items-center gap-3 text-sm">
+                              <div className="flex items-center gap-2 text-sm">
+                                <Button variant="ghost" size="sm" className="h-6 text-xs gap-1" onClick={() => generateEmailDraft(supplier)}>
+                                  <Send className="h-3 w-3" />Email
+                                </Button>
                                 <span className="text-muted-foreground">To Order: <strong className="text-primary">{items.reduce((s, r) => s + r.toOrder, 0)}</strong></span>
                               </div>
                             </div>
@@ -1432,6 +1666,40 @@ export default function BuyingSheetPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Email Draft Dialog */}
+        <Dialog open={emailDraftOpen} onOpenChange={setEmailDraftOpen}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Send className="h-4 w-4 text-primary" />
+                Email Draft — {emailDraftSupplier}
+              </DialogTitle>
+            </DialogHeader>
+            <Textarea
+              value={emailDraftBody}
+              onChange={(e) => setEmailDraftBody(e.target.value)}
+              className="min-h-[250px] font-mono text-sm"
+            />
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={() => {
+                navigator.clipboard.writeText(emailDraftBody);
+                toast({ title: "Copied", description: "Email draft copied to clipboard" });
+              }}>
+                <Copy className="h-4 w-4 mr-2" />Copy
+              </Button>
+              <Button onClick={() => {
+                const supplier = sortedRows.find(r => r.supplierName === emailDraftSupplier && r.supplierEmail);
+                const email = supplier?.supplierEmail || "";
+                const subject = encodeURIComponent(`Purchase Order — ${emailDraftSupplier}`);
+                const body = encodeURIComponent(emailDraftBody);
+                window.open(`mailto:${email}?subject=${subject}&body=${body}`, "_blank");
+              }}>
+                <Mail className="h-4 w-4 mr-2" />Open in Email
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </TooltipProvider>
   );
