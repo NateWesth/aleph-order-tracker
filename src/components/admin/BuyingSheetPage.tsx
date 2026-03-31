@@ -1552,6 +1552,9 @@ export default function BuyingSheetPage() {
             <Button variant="outline" size="sm" onClick={handleCopySelectedPOLines} className="gap-1"><ClipboardCopy className="h-3 w-3" />Copy PO Lines</Button>
             <Button variant="outline" size="sm" onClick={handleCopySupplierEmails} className="gap-1"><Copy className="h-3 w-3" />Emails</Button>
             <Button variant="outline" size="sm" onClick={handlePrint} className="gap-1"><Printer className="h-3 w-3" />Print</Button>
+            <Button variant="default" size="sm" onClick={handleBulkMarkOrdered} disabled={bulkOrdering} className="gap-1">
+              {bulkOrdering ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckSquare className="h-3 w-3" />}Mark as Ordered
+            </Button>
             <Button variant="ghost" size="sm" onClick={() => setSelectedSkus(new Set())}>Clear</Button>
           </div>
         )}
