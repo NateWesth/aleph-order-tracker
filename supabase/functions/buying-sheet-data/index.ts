@@ -48,7 +48,7 @@ Deno.serve(async (req) => {
     const orgId = await getOrgId(supabase)
 
     // 1. Fetch all items with stock from Zoho Books
-    const stockMap = new Map<string, { stockOnHand: number; itemName: string }>()
+    const stockMap = new Map<string, { stockOnHand: number; itemName: string; vendorName: string }>()
     let page = 1
     let hasMore = true
 
