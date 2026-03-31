@@ -1229,7 +1229,27 @@ export default function BuyingSheetPage() {
               {row.daysWaiting}d
             </span>
           </TableCell>
-          <TableCell className="text-sm" onClick={() => toggleExpand(row.sku)}>{row.supplierName}</TableCell>
+          <TableCell className="text-sm" onClick={() => toggleExpand(row.sku)}>
+            <div className="flex items-center gap-1.5">
+              <span>{row.supplierName}</span>
+              {row.avgLeadTimeDays !== null && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="text-[10px] text-muted-foreground bg-muted px-1 rounded">{row.avgLeadTimeDays}d</span>
+                  </TooltipTrigger>
+                  <TooltipContent><p className="text-xs">Avg lead time: {row.avgLeadTimeDays} days</p></TooltipContent>
+                </Tooltip>
+              )}
+              {row.seasonalPattern === "peak" && (
+                <Tooltip><TooltipTrigger asChild><Sun className="h-3 w-3 text-orange-500" /></TooltipTrigger>
+                  <TooltipContent><p className="text-xs">🔥 Peak season — higher demand expected</p></TooltipContent></Tooltip>
+              )}
+              {row.seasonalPattern === "low" && (
+                <Tooltip><TooltipTrigger asChild><Snowflake className="h-3 w-3 text-blue-500" /></TooltipTrigger>
+                  <TooltipContent><p className="text-xs">❄️ Low season — reduced demand expected</p></TooltipContent></Tooltip>
+              )}
+            </div>
+          </TableCell>
           <TableCell onClick={() => toggleExpand(row.sku)}>
             <span className="text-xs text-muted-foreground">
               {row.orders.length} order{row.orders.length !== 1 ? "s" : ""}
