@@ -16,7 +16,8 @@ import {
   FileSpreadsheet, Users, Printer, Mail, StickyNote, Copy, X,
   BarChart3, Filter, Maximize2, Minimize2, ClipboardCopy, Timer,
   ChevronUp, PieChart, Send, History, CheckSquare, Snowflake, Sun,
-  Save, LayoutGrid, TableIcon, Zap
+  Save, LayoutGrid, TableIcon, Zap, Pin, PinOff, AlignJustify, AlignCenter,
+  RotateCw, Eye, Star, Sparkles
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -26,8 +27,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
-import type { BuyingSheetRow, SuggestedRestockRow, ZohoStockData, SortField, SortDirection, PriorityFilter, ViewMode } from "./buying-sheet/types";
-import { getPriorityLevel, NOTES_KEY, SNAPSHOT_KEY, loadNotes, saveNotes } from "./buying-sheet/types";
+import type { BuyingSheetRow, SuggestedRestockRow, ZohoStockData, SortField, SortDirection, PriorityFilter, ViewMode, ViewDensity, RecentlyOrderedItem } from "./buying-sheet/types";
+import { getPriorityLevel, NOTES_KEY, SNAPSHOT_KEY, loadNotes, saveNotes, loadPinned, savePinned, loadDensity, saveDensity, loadRecentlyOrdered, saveRecentlyOrdered } from "./buying-sheet/types";
 import { BuyingSheetSummary } from "./buying-sheet/BuyingSheetSummary";
 import { SupplierCardsView } from "./buying-sheet/SupplierCardsView";
 import { QuickOrderView } from "./buying-sheet/QuickOrderView";
@@ -66,6 +67,13 @@ export default function BuyingSheetPage() {
   const [snapshotData, setSnapshotData] = useState<{ date: string; rows: { sku: string; toOrder: number }[] } | null>(null);
   const [bulkOrdering, setBulkOrdering] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("table");
+  const [pinnedSkus, setPinnedSkus] = useState<string[]>(loadPinned);
+  const [viewDensity, setViewDensity] = useState<ViewDensity>(loadDensity);
+  const [recentlyOrdered, setRecentlyOrdered] = useState<RecentlyOrderedItem[]>(loadRecentlyOrdered);
+  const [autoRefreshInterval, setAutoRefreshInterval] = useState<number>(0); // minutes, 0 = off
+  const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(null);
+  const [autoRefreshCountdown, setAutoRefreshCountdown] = useState(0);
+  const [showRecentlyOrdered, setShowRecentlyOrdered] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -83,10 +91,28 @@ export default function BuyingSheetPage() {
       if (e.key === "f" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); document.querySelector<HTMLInputElement>('[placeholder*="Search"]')?.focus(); }
       if (e.key === "Escape" && isFullscreen) setIsFullscreen(false);
       if (e.key === "g" && !e.metaKey && !e.ctrlKey) setGroupBySupplier(v => !v);
+      if (e.key === "p" && !e.metaKey && !e.ctrlKey) setViewDensity(v => { const next = v === "compact" ? "comfortable" : "compact"; saveDensity(next); return next; });
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [isFullscreen]);
+
+  // Auto-refresh timer
+  useEffect(() => {
+    if (autoRefreshInterval <= 0) return;
+    const totalSeconds = autoRefreshInterval * 60;
+    setAutoRefreshCountdown(totalSeconds);
+    const countdown = setInterval(() => {
+      setAutoRefreshCountdown(prev => {
+        if (prev <= 1) {
+          handleRefreshZoho();
+          return totalSeconds;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(countdown);
+  }, [autoRefreshInterval]);
 
   // ── Data Fetching ──────────────────────────────────────────────────────
   const getAuthHeaders = async () => {
@@ -178,7 +204,7 @@ export default function BuyingSheetPage() {
       const headers = await getAuthHeaders();
       const response = await fetch(`https://${projectId}.supabase.co/functions/v1/buying-sheet-data`, { headers });
       const result = await response.json();
-      if (result.success && result.data) { setZohoData(result.data); return result.data; }
+      if (result.success && result.data) { setZohoData(result.data); setLastRefreshedAt(new Date()); return result.data; }
       toast({ title: "Zoho Data", description: result.error || "Could not fetch stock data from Zoho", variant: "destructive" });
       return null;
     } catch (error) {
@@ -392,6 +418,11 @@ export default function BuyingSheetPage() {
       if (orderItemIds.length > 0) {
         const { error } = await supabase.from("order_items").update({ stock_status: "ordered" as any, notes: `Marked ordered from buying sheet on ${new Date().toLocaleDateString()}` }).in("id", orderItemIds);
         if (error) throw error;
+        // Track recently ordered
+        const newRecent: RecentlyOrderedItem[] = targetRows.map(r => ({ sku: r.sku, itemName: r.itemName, quantity: r.toOrder, orderedAt: new Date().toISOString(), supplier: r.supplierName }));
+        const updated = [...newRecent, ...recentlyOrdered].slice(0, 50);
+        setRecentlyOrdered(updated);
+        saveRecentlyOrdered(updated);
         toast({ title: "Updated", description: `${orderItemIds.length} items marked as ordered` });
         setSelectedSkus(new Set());
         fetchLocalData();
@@ -505,6 +536,11 @@ export default function BuyingSheetPage() {
   const sortedRows = useMemo(() => {
     const sorted = [...filteredRows];
     sorted.sort((a, b) => {
+      // Pinned items always on top
+      const aPinned = pinnedSkus.includes(a.sku);
+      const bPinned = pinnedSkus.includes(b.sku);
+      if (aPinned && !bPinned) return -1;
+      if (!aPinned && bPinned) return 1;
       let aVal: any = a[sortField], bVal: any = b[sortField];
       if (aVal === null) aVal = sortDirection === "asc" ? Infinity : -Infinity;
       if (bVal === null) bVal = sortDirection === "asc" ? Infinity : -Infinity;
@@ -513,7 +549,31 @@ export default function BuyingSheetPage() {
       return aVal < bVal ? (sortDirection === "asc" ? -1 : 1) : aVal > bVal ? (sortDirection === "asc" ? 1 : -1) : 0;
     });
     return sorted;
-  }, [filteredRows, sortField, sortDirection]);
+  }, [filteredRows, sortField, sortDirection, pinnedSkus]);
+
+  // Detect items appearing with multiple suppliers
+  const multiSupplierSkus = useMemo(() => {
+    const skuSuppliers = new Map<string, Set<string>>();
+    rows.forEach(r => {
+      if (!skuSuppliers.has(r.sku)) skuSuppliers.set(r.sku, new Set());
+      skuSuppliers.get(r.sku)!.add(r.supplierName);
+    });
+    const multi = new Set<string>();
+    skuSuppliers.forEach((suppliers, sku) => { if (suppliers.size > 1) multi.add(sku); });
+    return multi;
+  }, [rows]);
+
+  // Top supplier chips for quick filtering
+  const topSupplierChips = useMemo(() => {
+    const map = new Map<string, { id: string | null; count: number; toOrder: number }>();
+    rows.forEach(r => {
+      const key = r.supplierName;
+      const existing = map.get(key);
+      if (existing) { existing.count++; existing.toOrder += r.toOrder; }
+      else map.set(key, { id: r.supplierId, count: 1, toOrder: r.toOrder });
+    });
+    return Array.from(map.entries()).sort((a, b) => b[1].toOrder - a[1].toOrder).slice(0, 8);
+  }, [rows]);
 
   const groupedRows = useMemo(() => {
     if (!groupBySupplier) return null;
@@ -534,6 +594,30 @@ export default function BuyingSheetPage() {
   const toggleSelect = (sku: string) => setSelectedSkus(prev => { const next = new Set(prev); if (next.has(sku)) next.delete(sku); else next.add(sku); return next; });
   const toggleSelectAll = () => setSelectedSkus(selectedSkus.size === sortedRows.length ? new Set() : new Set(sortedRows.map(r => r.sku)));
   const toggleExpand = (sku: string) => setExpandedSkus(prev => { const next = new Set(prev); if (next.has(sku)) next.delete(sku); else next.add(sku); return next; });
+  const togglePin = (sku: string) => {
+    const updated = pinnedSkus.includes(sku) ? pinnedSkus.filter(s => s !== sku) : [...pinnedSkus, sku];
+    setPinnedSkus(updated); savePinned(updated);
+    toast({ title: pinnedSkus.includes(sku) ? "Unpinned" : "Pinned", description: `${sku} ${pinnedSkus.includes(sku) ? "removed from" : "pinned to"} top` });
+  };
+
+  const getWaitHeatColor = (days: number) => {
+    if (days > 14) return "bg-destructive/10";
+    if (days > 7) return "bg-orange-500/5";
+    if (days > 3) return "bg-amber-500/5";
+    return "";
+  };
+
+  const highlightText = (text: string) => {
+    if (!search) return text;
+    const idx = text.toLowerCase().indexOf(search.toLowerCase());
+    if (idx === -1) return text;
+    return <>{text.slice(0, idx)}<mark className="bg-primary/20 text-foreground rounded px-0.5">{text.slice(idx, idx + search.length)}</mark>{text.slice(idx + search.length)}</>;
+  };
+
+  const todayOrdered = useMemo(() => {
+    const today = new Date().toISOString().split("T")[0];
+    return recentlyOrdered.filter(r => r.orderedAt.startsWith(today));
+  }, [recentlyOrdered]);
 
   const SortableHeader = ({ field, children, className = "" }: { field: SortField; children: React.ReactNode; className?: string }) => (
     <TableHead className={`cursor-pointer select-none hover:bg-muted/50 transition-colors ${className}`} onClick={() => handleSort(field)}>
@@ -626,35 +710,46 @@ export default function BuyingSheetPage() {
 
   const renderRow = (row: BuyingSheetRow) => {
     const isExpanded = expandedSkus.has(row.sku);
+    const isPinned = pinnedSkus.includes(row.sku);
+    const isMultiSupplier = multiSupplierSkus.has(row.sku);
+    const densityPy = viewDensity === "compact" ? "py-1" : "py-2";
     return (
       <Fragment key={row.sku}>
-        <TableRow className={`cursor-pointer transition-colors ${row.toOrder > 0 ? "" : "opacity-60"} ${selectedSkus.has(row.sku) ? "bg-primary/5" : ""} ${row.hasUrgent ? "border-l-2 border-l-destructive" : ""} ${isExpanded ? "bg-muted/20" : ""}`}>
-          <TableCell className="w-8" onClick={e => e.stopPropagation()}><Checkbox checked={selectedSkus.has(row.sku)} onCheckedChange={() => toggleSelect(row.sku)} /></TableCell>
-          <TableCell onClick={() => toggleExpand(row.sku)}><div className="flex items-center gap-1">{isExpanded ? <ChevronUp className="h-3 w-3 text-muted-foreground" /> : <ChevronDown className="h-3 w-3 text-muted-foreground/40" />}<PriorityBadge score={row.priorityScore} /></div></TableCell>
-          <TableCell className="font-mono text-xs text-muted-foreground" onClick={() => toggleExpand(row.sku)}>{row.sku}</TableCell>
-          <TableCell className="font-medium max-w-[180px] truncate" onClick={() => toggleExpand(row.sku)}>{row.itemName}</TableCell>
-          <TableCell className="text-right font-semibold" onClick={() => toggleExpand(row.sku)}>{row.totalNeeded}</TableCell>
-          <TableCell className="text-right font-medium" onClick={() => toggleExpand(row.sku)}>{row.stockOnHand}</TableCell>
-          <TableCell className="text-right font-medium" onClick={() => toggleExpand(row.sku)}>{row.onPurchaseOrder}</TableCell>
-          <TableCell onClick={() => toggleExpand(row.sku)}><CoverageBar percent={row.coveragePercent} /></TableCell>
-          <TableCell className="text-right" onClick={() => toggleExpand(row.sku)}>
+        <TableRow className={`cursor-pointer transition-colors ${getWaitHeatColor(row.daysWaiting)} ${row.toOrder > 0 ? "" : "opacity-60"} ${selectedSkus.has(row.sku) ? "bg-primary/5" : ""} ${row.hasUrgent ? "border-l-2 border-l-destructive" : ""} ${isExpanded ? "bg-muted/20" : ""} ${isPinned ? "border-l-2 border-l-primary bg-primary/[0.02]" : ""}`}>
+          <TableCell className={`w-8 ${densityPy}`} onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-0.5">
+              <Checkbox checked={selectedSkus.has(row.sku)} onCheckedChange={() => toggleSelect(row.sku)} />
+              <button onClick={() => togglePin(row.sku)} className={`p-0.5 rounded hover:bg-muted transition-colors ${isPinned ? "text-primary" : "text-muted-foreground/20 hover:text-muted-foreground"}`}>
+                {isPinned ? <Pin className="h-3 w-3" /> : <PinOff className="h-3 w-3" />}
+              </button>
+            </div>
+          </TableCell>
+          <TableCell className={densityPy} onClick={() => toggleExpand(row.sku)}><div className="flex items-center gap-1">{isExpanded ? <ChevronUp className="h-3 w-3 text-muted-foreground" /> : <ChevronDown className="h-3 w-3 text-muted-foreground/40" />}<PriorityBadge score={row.priorityScore} /></div></TableCell>
+          <TableCell className={`font-mono text-xs text-muted-foreground ${densityPy}`} onClick={() => toggleExpand(row.sku)}>{highlightText(row.sku)}</TableCell>
+          <TableCell className={`font-medium max-w-[180px] truncate ${densityPy}`} onClick={() => toggleExpand(row.sku)}>{highlightText(row.itemName)}</TableCell>
+          <TableCell className={`text-right font-semibold ${densityPy}`} onClick={() => toggleExpand(row.sku)}>{row.totalNeeded}</TableCell>
+          <TableCell className={`text-right font-medium ${densityPy}`} onClick={() => toggleExpand(row.sku)}>{row.stockOnHand}</TableCell>
+          <TableCell className={`text-right font-medium ${densityPy}`} onClick={() => toggleExpand(row.sku)}>{row.onPurchaseOrder}</TableCell>
+          <TableCell className={densityPy} onClick={() => toggleExpand(row.sku)}><CoverageBar percent={row.coveragePercent} /></TableCell>
+          <TableCell className={`text-right ${densityPy}`} onClick={() => toggleExpand(row.sku)}>
             <div className="flex items-center justify-end gap-1">
               {row.toOrder > 0 ? <Badge variant="destructive" className="font-bold">{row.toOrder}</Badge> : <Badge variant="outline" className="text-accent-foreground">0</Badge>}
               {(() => { const diff = getSnapshotDiff(row.sku, row.toOrder); if (!diff) return null; if (diff.isNew) return <span className="text-[10px] text-primary font-medium">NEW</span>; return <span className={`text-[10px] font-medium ${diff.diff > 0 ? "text-destructive" : "text-emerald-600"}`}>{diff.diff > 0 ? "+" : ""}{diff.diff}</span>; })()}
             </div>
           </TableCell>
-          <TableCell className="text-center" onClick={() => toggleExpand(row.sku)}><StockoutRiskBadge days={row.stockoutRiskDays} /></TableCell>
-          <TableCell className="text-center" onClick={() => toggleExpand(row.sku)}><DemandTrendIcon trend={row.demandTrend} lastMonth={row.lastMonthQty} prevMonth={row.prevMonthQty} /></TableCell>
-          <TableCell className="text-center" onClick={() => toggleExpand(row.sku)}><span className={`text-sm font-medium ${row.daysWaiting > 7 ? "text-destructive" : row.daysWaiting > 3 ? "text-orange-500" : "text-muted-foreground"}`}>{row.daysWaiting}d</span></TableCell>
-          <TableCell className="text-sm" onClick={() => toggleExpand(row.sku)}>
+          <TableCell className={`text-center ${densityPy}`} onClick={() => toggleExpand(row.sku)}><StockoutRiskBadge days={row.stockoutRiskDays} /></TableCell>
+          <TableCell className={`text-center ${densityPy}`} onClick={() => toggleExpand(row.sku)}><DemandTrendIcon trend={row.demandTrend} lastMonth={row.lastMonthQty} prevMonth={row.prevMonthQty} /></TableCell>
+          <TableCell className={`text-center ${densityPy}`} onClick={() => toggleExpand(row.sku)}><span className={`text-sm font-medium ${row.daysWaiting > 7 ? "text-destructive" : row.daysWaiting > 3 ? "text-orange-500" : "text-muted-foreground"}`}>{row.daysWaiting}d</span></TableCell>
+          <TableCell className={`text-sm ${densityPy}`} onClick={() => toggleExpand(row.sku)}>
             <div className="flex items-center gap-1.5">
-              <span>{row.supplierName}</span>
+              <span>{highlightText(row.supplierName)}</span>
+              {isMultiSupplier && <Tooltip><TooltipTrigger asChild><Sparkles className="h-3 w-3 text-amber-500" /></TooltipTrigger><TooltipContent><p className="text-xs">⚠️ This item appears with multiple suppliers</p></TooltipContent></Tooltip>}
               {row.avgLeadTimeDays !== null && <Tooltip><TooltipTrigger asChild><span className="text-[10px] text-muted-foreground bg-muted px-1 rounded">{row.avgLeadTimeDays}d</span></TooltipTrigger><TooltipContent><p className="text-xs">Avg lead time: {row.avgLeadTimeDays} days</p></TooltipContent></Tooltip>}
               {row.seasonalPattern === "peak" && <Tooltip><TooltipTrigger asChild><Sun className="h-3 w-3 text-orange-500" /></TooltipTrigger><TooltipContent><p className="text-xs">🔥 Peak season</p></TooltipContent></Tooltip>}
               {row.seasonalPattern === "low" && <Tooltip><TooltipTrigger asChild><Snowflake className="h-3 w-3 text-blue-500" /></TooltipTrigger><TooltipContent><p className="text-xs">❄️ Low season</p></TooltipContent></Tooltip>}
             </div>
           </TableCell>
-          <TableCell onClick={() => toggleExpand(row.sku)}><span className="text-xs text-muted-foreground">{row.orders.length} order{row.orders.length !== 1 ? "s" : ""}</span></TableCell>
+          <TableCell className={densityPy} onClick={() => toggleExpand(row.sku)}><span className="text-xs text-muted-foreground">{row.orders.length} order{row.orders.length !== 1 ? "s" : ""}</span></TableCell>
           <TableCell className="w-8" onClick={e => e.stopPropagation()}>
             <div className="flex items-center gap-0.5">
               <Popover open={editingNote === row.sku} onOpenChange={open => { if (!open) setEditingNote(null); }}>
@@ -713,6 +808,21 @@ export default function BuyingSheetPage() {
                 <Button variant="outline" size="sm" onClick={() => setIsFullscreen(!isFullscreen)} className="h-8">
                   {isFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
                 </Button>
+                <Tooltip><TooltipTrigger asChild>
+                  <Button variant="outline" size="sm" onClick={() => { const next: ViewDensity = viewDensity === "compact" ? "comfortable" : "compact"; setViewDensity(next); saveDensity(next); }} className="h-8">
+                    {viewDensity === "compact" ? <AlignJustify className="h-3.5 w-3.5" /> : <AlignCenter className="h-3.5 w-3.5" />}
+                  </Button>
+                </TooltipTrigger><TooltipContent><p className="text-xs">{viewDensity === "compact" ? "Comfortable" : "Compact"} view</p></TooltipContent></Tooltip>
+                <Select value={String(autoRefreshInterval)} onValueChange={v => setAutoRefreshInterval(Number(v))}>
+                  <SelectTrigger className="w-[90px] h-8 text-xs"><RotateCw className="h-3 w-3 mr-1" /><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="0">Off</SelectItem>
+                    <SelectItem value="5">5 min</SelectItem>
+                    <SelectItem value="10">10 min</SelectItem>
+                    <SelectItem value="15">15 min</SelectItem>
+                    <SelectItem value="30">30 min</SelectItem>
+                  </SelectContent>
+                </Select>
                 <Button variant="outline" size="sm" onClick={handleRefreshZoho} disabled={zohoLoading} className="h-8 gap-1.5">
                   {zohoLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}Zoho
                 </Button>
@@ -760,6 +870,55 @@ export default function BuyingSheetPage() {
             <span className="text-muted-foreground">Comparing to <strong>{new Date(snapshotData.date).toLocaleString()}</strong> ({snapshotData.rows.length} items)</span>
             <Button variant="ghost" size="sm" className="ml-auto h-6 text-xs" onClick={() => setShowSnapshot(false)}>Hide</Button>
           </div>
+        )}
+
+        {/* Auto-refresh & last refreshed status */}
+        {(autoRefreshInterval > 0 || lastRefreshedAt) && (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            {lastRefreshedAt && <span>Last refreshed: {lastRefreshedAt.toLocaleTimeString()}</span>}
+            {autoRefreshInterval > 0 && <span className="flex items-center gap-1"><RotateCw className="h-3 w-3 animate-spin" style={{ animationDuration: "3s" }} />Next in {Math.floor(autoRefreshCountdown / 60)}:{String(autoRefreshCountdown % 60).padStart(2, "0")}</span>}
+          </div>
+        )}
+
+        {/* Supplier Quick-Filter Chips */}
+        {topSupplierChips.length > 1 && (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-[10px] text-muted-foreground uppercase tracking-wider mr-1">Suppliers:</span>
+            <button onClick={() => setSupplierFilter("all")} className={`px-2 py-0.5 rounded-full text-xs transition-colors border ${supplierFilter === "all" ? "bg-primary text-primary-foreground border-primary" : "bg-muted/50 text-muted-foreground border-border hover:bg-muted"}`}>All</button>
+            {topSupplierChips.map(([name, info]) => (
+              <button key={name} onClick={() => { if (info.id) setSupplierFilter(info.id); }} className={`px-2 py-0.5 rounded-full text-xs transition-colors border ${info.id && supplierFilter === info.id ? "bg-primary text-primary-foreground border-primary" : "bg-muted/50 text-muted-foreground border-border hover:bg-muted"}`}>
+                {name} <span className="opacity-60">({info.toOrder})</span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Recently Ordered Today */}
+        {todayOrdered.length > 0 && (
+          <Collapsible open={showRecentlyOrdered} onOpenChange={setShowRecentlyOrdered}>
+            <Card className="border-dashed border-emerald-500/30 bg-emerald-500/5">
+              <CollapsibleTrigger asChild>
+                <button className="w-full flex items-center justify-between p-3 hover:bg-emerald-500/10 transition-colors rounded-t-lg">
+                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-emerald-500" /><span className="font-semibold text-sm text-foreground">Ordered Today</span><Badge className="text-xs bg-emerald-500/20 text-emerald-700 border-emerald-500/30">{todayOrdered.length}</Badge></div>
+                  {showRecentlyOrdered ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                </button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <CardContent className="p-0 divide-y divide-border/50">
+                  {todayOrdered.map((item, i) => (
+                    <div key={`${item.sku}-${i}`} className="flex items-center justify-between px-4 py-2 text-sm">
+                      <div><span className="font-mono text-xs text-muted-foreground mr-2">{item.sku}</span><span className="font-medium">{item.itemName}</span></div>
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                        <span>{item.supplier}</span>
+                        <Badge variant="outline">{item.quantity}</Badge>
+                        <span>{new Date(item.orderedAt).toLocaleTimeString()}</span>
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </CollapsibleContent>
+            </Card>
+          </Collapsible>
         )}
 
         {/* Summary Cards */}
@@ -862,6 +1021,8 @@ export default function BuyingSheetPage() {
               <div className="flex items-center gap-2 text-[10px] text-muted-foreground/50">
                 <span><kbd className="px-1 py-0.5 rounded bg-muted text-[10px]">Ctrl+F</kbd> Search</span>
                 <span><kbd className="px-1 py-0.5 rounded bg-muted text-[10px]">G</kbd> Group</span>
+                <span><kbd className="px-1 py-0.5 rounded bg-muted text-[10px]">P</kbd> Density</span>
+                {pinnedSkus.length > 0 && <span className="flex items-center gap-0.5"><Pin className="h-2.5 w-2.5" />{pinnedSkus.length} pinned</span>}
                 <span>Click row to expand</span>
               </div>
             </div>
@@ -915,6 +1076,21 @@ export default function BuyingSheetPage() {
                           </Fragment>
                         ))
                       ) : sortedRows.map(renderRow)}
+                      {/* Stats Footer Row */}
+                      {sortedRows.length > 0 && (
+                        <TableRow className="bg-muted/60 font-semibold border-t-2 border-border">
+                          <TableCell colSpan={4} className="text-xs text-muted-foreground uppercase">Totals ({sortedRows.length} SKUs)</TableCell>
+                          <TableCell className="text-right font-bold">{totals.needed.toLocaleString()}</TableCell>
+                          <TableCell className="text-right font-bold">{totals.inStock.toLocaleString()}</TableCell>
+                          <TableCell className="text-right font-bold">{totals.onPO.toLocaleString()}</TableCell>
+                          <TableCell><CoverageBar percent={totals.needed > 0 ? Math.min(100, Math.round(((totals.inStock + totals.onPO) / totals.needed) * 100)) : 100} /></TableCell>
+                          <TableCell className="text-right"><Badge variant="destructive" className="font-bold">{totals.toOrder.toLocaleString()}</Badge></TableCell>
+                          <TableCell className="text-center"><span className="text-xs">{totals.stockoutRisk} at risk</span></TableCell>
+                          <TableCell />
+                          <TableCell className="text-center"><span className="text-xs">{avgDaysWaiting}d avg</span></TableCell>
+                          <TableCell colSpan={3} />
+                        </TableRow>
+                      )}
                     </TableBody>
                   </Table>
                 </div>

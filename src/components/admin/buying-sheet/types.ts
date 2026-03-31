@@ -39,6 +39,39 @@ export type SortField = "sku" | "itemName" | "totalNeeded" | "stockOnHand" | "on
 export type SortDirection = "asc" | "desc";
 export type PriorityFilter = "all" | "critical" | "high" | "medium" | "low";
 export type ViewMode = "table" | "suppliers" | "quick";
+export type ViewDensity = "compact" | "comfortable";
+
+export const PINNED_KEY = "buying-sheet-pinned";
+export const DENSITY_KEY = "buying-sheet-density";
+export const RECENTLY_ORDERED_KEY = "buying-sheet-recently-ordered";
+
+export const loadPinned = (): string[] => {
+  try { return JSON.parse(localStorage.getItem(PINNED_KEY) || "[]"); } catch { return []; }
+};
+export const savePinned = (pinned: string[]) => {
+  localStorage.setItem(PINNED_KEY, JSON.stringify(pinned));
+};
+export const loadDensity = (): ViewDensity => {
+  return (localStorage.getItem(DENSITY_KEY) as ViewDensity) || "comfortable";
+};
+export const saveDensity = (density: ViewDensity) => {
+  localStorage.setItem(DENSITY_KEY, density);
+};
+
+export interface RecentlyOrderedItem {
+  sku: string;
+  itemName: string;
+  quantity: number;
+  orderedAt: string;
+  supplier: string;
+}
+
+export const loadRecentlyOrdered = (): RecentlyOrderedItem[] => {
+  try { return JSON.parse(localStorage.getItem(RECENTLY_ORDERED_KEY) || "[]"); } catch { return []; }
+};
+export const saveRecentlyOrdered = (items: RecentlyOrderedItem[]) => {
+  localStorage.setItem(RECENTLY_ORDERED_KEY, JSON.stringify(items.slice(0, 50)));
+};
 
 export const getPriorityLevel = (score: number): PriorityFilter => {
   if (score >= 70) return "critical";
