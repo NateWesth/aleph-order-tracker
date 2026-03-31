@@ -91,10 +91,28 @@ export default function BuyingSheetPage() {
       if (e.key === "f" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); document.querySelector<HTMLInputElement>('[placeholder*="Search"]')?.focus(); }
       if (e.key === "Escape" && isFullscreen) setIsFullscreen(false);
       if (e.key === "g" && !e.metaKey && !e.ctrlKey) setGroupBySupplier(v => !v);
+      if (e.key === "p" && !e.metaKey && !e.ctrlKey) setViewDensity(v => { const next = v === "compact" ? "comfortable" : "compact"; saveDensity(next); return next; });
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [isFullscreen]);
+
+  // Auto-refresh timer
+  useEffect(() => {
+    if (autoRefreshInterval <= 0) return;
+    const totalSeconds = autoRefreshInterval * 60;
+    setAutoRefreshCountdown(totalSeconds);
+    const countdown = setInterval(() => {
+      setAutoRefreshCountdown(prev => {
+        if (prev <= 1) {
+          handleRefreshZoho();
+          return totalSeconds;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(countdown);
+  }, [autoRefreshInterval]);
 
   // ── Data Fetching ──────────────────────────────────────────────────────
   const getAuthHeaders = async () => {
