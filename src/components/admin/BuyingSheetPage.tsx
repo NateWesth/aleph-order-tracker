@@ -253,9 +253,44 @@ export default function BuyingSheetPage() {
   const getStockoutRiskDays = (sku: string, stockOnHand: number, onPO: number): number | null => {
     const h = demandHistory.get(sku);
     if (!h || (h.lastMonth === 0 && h.prevMonth === 0)) return null;
-    const avgMonthly = (h.lastMonth + h.prevMonth) / 2;
-    if (avgMonthly === 0) return null;
-    return Math.round((stockOnHand + onPO) / (avgMonthly / 30));
+    // Use daily burn rate for more accurate prediction
+    const dailyBurnRate = getDailyBurnRate(sku);
+    if (dailyBurnRate <= 0) return null;
+    return Math.round((stockOnHand + onPO) / dailyBurnRate);
+  };
+
+  // Daily burn rate: weighted average favoring recent month
+  const getDailyBurnRate = (sku: string): number => {
+    const h = demandHistory.get(sku);
+    if (!h) return 0;
+    // Weight last month 70%, previous 30% for recency bias
+    const weightedMonthly = (h.lastMonth * 0.7) + (h.prevMonth * 0.3);
+    return weightedMonthly / 30;
+  };
+
+  // Safety stock: based on demand variability and lead time
+  const getSafetyStock = (sku: string, avgLeadTimeDays: number | null): number => {
+    const h = demandHistory.get(sku);
+    if (!h || (h.lastMonth === 0 && h.prevMonth === 0)) return 0;
+    // Demand variability = standard deviation of monthly demand
+    const avg = (h.lastMonth + h.prevMonth) / 2;
+    const variance = ((h.lastMonth - avg) ** 2 + (h.prevMonth - avg) ** 2) / 2;
+    const stdDev = Math.sqrt(variance);
+    // Safety stock = Z-score (1.65 for 95% service level) × stdDev × sqrt(lead time in months)
+    const leadTimeMonths = (avgLeadTimeDays || 14) / 30;
+    return Math.ceil(1.65 * stdDev * Math.sqrt(leadTimeMonths));
+  };
+
+  // Demand variability coefficient (CV) - higher = more erratic
+  const getDemandVariability = (sku: string): "stable" | "moderate" | "erratic" => {
+    const h = demandHistory.get(sku);
+    if (!h || (h.lastMonth === 0 && h.prevMonth === 0)) return "stable";
+    const avg = (h.lastMonth + h.prevMonth) / 2;
+    if (avg === 0) return "stable";
+    const cv = Math.abs(h.lastMonth - h.prevMonth) / avg;
+    if (cv > 0.5) return "erratic";
+    if (cv > 0.2) return "moderate";
+    return "stable";
   };
 
   const fetchLocalData = async () => {
@@ -331,7 +366,20 @@ export default function BuyingSheetPage() {
         if (stockoutRiskDays !== null && stockoutRiskDays <= 7) priorityScore += 15;
         else if (stockoutRiskDays !== null && stockoutRiskDays <= 14) priorityScore += 5;
         if (seasonalPattern === "peak") priorityScore += 10;
-        return { ...entry, supplierName, supplierEmail, stockOnHand: z.stockOnHand, onPurchaseOrder: z.onPurchaseOrder, toOrder, daysWaiting, priorityScore, coveragePercent, demandTrend: trend, lastMonthQty: lastMonth, prevMonthQty: prevMonth, stockoutRiskDays, lastPurchasedDate, seasonalPattern, avgLeadTimeDays };
+        // Distinct customers affected - more customers = higher priority
+        const distinctCustomers = new Set(entry.orders.map(o => o.customerName)).size;
+        if (distinctCustomers >= 3) priorityScore += 10;
+        else if (distinctCustomers >= 2) priorityScore += 5;
+        // Age escalation: if waiting longer than avg lead time, boost priority
+        if (avgLeadTimeDays !== null && daysWaiting > avgLeadTimeDays) priorityScore += 10;
+        // Demand variability penalty for erratic items
+        const demandVar = getDemandVariability(entry.sku);
+        if (demandVar === "erratic") priorityScore += 5;
+        // Safety stock & recommended order qty
+        const safetyStock = getSafetyStock(entry.sku, avgLeadTimeDays);
+        const dailyBurn = getDailyBurnRate(entry.sku);
+        const recommendedOrderQty = toOrder > 0 ? toOrder + safetyStock : 0;
+        return { ...entry, supplierName, supplierEmail, stockOnHand: z.stockOnHand, onPurchaseOrder: z.onPurchaseOrder, toOrder, daysWaiting, priorityScore, coveragePercent, demandTrend: trend, lastMonthQty: lastMonth, prevMonthQty: prevMonth, stockoutRiskDays, lastPurchasedDate, seasonalPattern, avgLeadTimeDays, safetyStock, dailyBurnRate: dailyBurn, demandVariability: demandVar, distinctCustomers, recommendedOrderQty };
       });
       buyingRows.sort((a, b) => b.priorityScore - a.priorityScore);
       setRows(buyingRows);
@@ -355,7 +403,12 @@ export default function BuyingSheetPage() {
           priorityScore += Math.min(20, row.orders.length * 5);
           if (stockoutRiskDays !== null && stockoutRiskDays <= 7) priorityScore += 15;
           else if (stockoutRiskDays !== null && stockoutRiskDays <= 14) priorityScore += 5;
-          return { ...row, supplierName, supplierEmail, stockOnHand: z.stockOnHand, onPurchaseOrder: z.onPurchaseOrder, toOrder, coveragePercent, priorityScore, stockoutRiskDays };
+          if (row.distinctCustomers >= 3) priorityScore += 10;
+          else if (row.distinctCustomers >= 2) priorityScore += 5;
+          if (row.avgLeadTimeDays !== null && row.daysWaiting > row.avgLeadTimeDays) priorityScore += 10;
+          const safetyStock = getSafetyStock(row.sku, row.avgLeadTimeDays);
+          const recommendedOrderQty = toOrder > 0 ? toOrder + safetyStock : 0;
+          return { ...row, supplierName, supplierEmail, stockOnHand: z.stockOnHand, onPurchaseOrder: z.onPurchaseOrder, toOrder, coveragePercent, priorityScore, stockoutRiskDays, safetyStock, recommendedOrderQty };
         }));
         toast({ title: "Updated", description: "Zoho stock & PO data loaded" });
       }
@@ -378,7 +431,11 @@ export default function BuyingSheetPage() {
         if (coveragePercent < 25) priorityScore += 15; else if (coveragePercent < 50) priorityScore += 10;
         priorityScore += Math.min(20, row.orders.length * 5);
         if (stockoutRiskDays !== null && stockoutRiskDays <= 7) priorityScore += 15;
-        return { ...row, supplierName, stockOnHand: z.stockOnHand, onPurchaseOrder: z.onPurchaseOrder, toOrder, coveragePercent, priorityScore, stockoutRiskDays };
+        if (row.distinctCustomers >= 3) priorityScore += 10;
+        if (row.avgLeadTimeDays !== null && row.daysWaiting > row.avgLeadTimeDays) priorityScore += 10;
+        const safetyStock = getSafetyStock(row.sku, row.avgLeadTimeDays);
+        const recommendedOrderQty = toOrder > 0 ? toOrder + safetyStock : 0;
+        return { ...row, supplierName, stockOnHand: z.stockOnHand, onPurchaseOrder: z.onPurchaseOrder, toOrder, coveragePercent, priorityScore, stockoutRiskDays, safetyStock, recommendedOrderQty };
       }));
       toast({ title: "Updated", description: "Stock & PO data refreshed from Zoho Books" });
     }
@@ -433,11 +490,35 @@ export default function BuyingSheetPage() {
   const generateEmailDraft = (supplierName: string) => {
     const items = sortedRows.filter(r => r.supplierName === supplierName && r.toOrder > 0);
     if (items.length === 0) return;
-    const itemLines = items.map(r => `  • ${r.sku} — ${r.itemName} — Qty: ${r.toOrder}`).join("\n");
-    const totalQty = items.reduce((s, r) => s + r.toOrder, 0);
-    setEmailDraftBody(`Dear ${supplierName},\n\nPlease find below our purchase order requirements:\n\n${itemLines}\n\nTotal items: ${items.length}\nTotal quantity: ${totalQty}\n\nPlease confirm availability and expected delivery date.\n\nKind regards`);
+    const itemLines = items.map(r => {
+      const recQty = r.recommendedOrderQty > r.toOrder ? `${r.toOrder} (+ ${r.safetyStock} safety stock = ${r.recommendedOrderQty})` : `${r.toOrder}`;
+      return `  • ${r.sku} — ${r.itemName} — Qty: ${recQty}`;
+    }).join("\n");
+    const totalQty = items.reduce((s, r) => s + r.recommendedOrderQty, 0);
+    const urgentItems = items.filter(r => r.hasUrgent);
+    const urgentNote = urgentItems.length > 0 ? `\n⚠️ URGENT: ${urgentItems.map(r => r.sku).join(", ")} — Please prioritize these items.\n` : "";
+    setEmailDraftBody(`Dear ${supplierName},\n\nPlease find below our purchase order requirements:\n${urgentNote}\n${itemLines}\n\nTotal items: ${items.length}\nTotal quantity (incl. safety stock): ${totalQty}\n\nPlease confirm availability and expected delivery date.\n\nKind regards`);
     setEmailDraftSupplier(supplierName);
     setEmailDraftOpen(true);
+  };
+
+  // Batch email ALL suppliers at once — copies all drafts to clipboard
+  const handleBatchEmailAllSuppliers = () => {
+    const supplierGroups = new Map<string, BuyingSheetRow[]>();
+    sortedRows.filter(r => r.toOrder > 0).forEach(r => {
+      const key = r.supplierName || "No Supplier";
+      supplierGroups.set(key, [...(supplierGroups.get(key) || []), r]);
+    });
+    if (supplierGroups.size === 0) { toast({ title: "Nothing to order", variant: "destructive" }); return; }
+    const allDrafts: string[] = [];
+    for (const [supplier, items] of supplierGroups) {
+      if (supplier === "No Supplier") continue;
+      const itemLines = items.map(r => `  • ${r.sku} — ${r.itemName} — Qty: ${r.recommendedOrderQty}`).join("\n");
+      const totalQty = items.reduce((s, r) => s + r.recommendedOrderQty, 0);
+      allDrafts.push(`═══ ${supplier} ═══\n\nDear ${supplier},\n\nPlease find below our purchase order requirements:\n\n${itemLines}\n\nTotal items: ${items.length} | Total qty: ${totalQty}\n\nPlease confirm availability and expected delivery date.\n\nKind regards\n`);
+    }
+    navigator.clipboard.writeText(allDrafts.join("\n\n"));
+    toast({ title: "All Drafts Copied", description: `${allDrafts.length} supplier emails copied to clipboard` });
   };
 
   const handleSaveNote = (sku: string) => {
@@ -485,8 +566,8 @@ export default function BuyingSheetPage() {
 
   const handleExportCSV = () => {
     const target = selectedSkus.size > 0 ? sortedRows.filter(r => selectedSkus.has(r.sku)) : sortedRows;
-    const headers = ["SKU","Item Name","Total Needed","In Stock","On PO","To Order","Coverage %","Days Waiting","Stockout Risk","Priority","Supplier","Trend","Notes","Orders"];
-    const csvRows = target.map(r => [r.sku, r.itemName, r.totalNeeded, r.stockOnHand, r.onPurchaseOrder, r.toOrder, r.coveragePercent, r.daysWaiting, r.stockoutRiskDays ?? "N/A", r.priorityScore, r.supplierName, r.demandTrend, notes[r.sku] || "", r.orders.map(o => `${o.orderNumber}(${o.customerName}:${o.quantity})`).join("; ")]);
+    const headers = ["SKU","Item Name","Total Needed","In Stock","On PO","To Order","Safety Stock","Recommended Qty","Coverage %","Days Waiting","Stockout Risk Days","Daily Burn Rate","Demand Variability","Distinct Customers","Priority","Supplier","Lead Time","Trend","Season","Notes","Orders"];
+    const csvRows = target.map(r => [r.sku, r.itemName, r.totalNeeded, r.stockOnHand, r.onPurchaseOrder, r.toOrder, r.safetyStock, r.recommendedOrderQty, r.coveragePercent, r.daysWaiting, r.stockoutRiskDays ?? "N/A", r.dailyBurnRate.toFixed(1), r.demandVariability, r.distinctCustomers, r.priorityScore, r.supplierName, r.avgLeadTimeDays ?? "N/A", r.demandTrend, r.seasonalPattern || "N/A", notes[r.sku] || "", r.orders.map(o => `${o.orderNumber}(${o.customerName}:${o.quantity})`).join("; ")]);
     const csv = [headers, ...csvRows].map(r => r.map(c => `"${c}"`).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" }); const url = URL.createObjectURL(blob);
     const a = document.createElement("a"); a.href = url; a.download = `buying-sheet-${new Date().toISOString().split("T")[0]}.csv`; a.click(); URL.revokeObjectURL(url);
@@ -526,6 +607,11 @@ export default function BuyingSheetPage() {
     const c = { critical: 0, high: 0, medium: 0, low: 0 };
     rows.forEach(r => { c[getPriorityLevel(r.priorityScore)]++; });
     return c;
+  }, [rows]);
+
+  // Coverage gaps: items needing order but with no supplier
+  const coverageGaps = useMemo(() => {
+    return rows.filter(r => r.toOrder > 0 && (r.supplierName === "No Supplier" || !r.supplierName));
   }, [rows]);
 
   const filteredRows = useMemo(() => rows.filter(row => {
@@ -589,6 +675,10 @@ export default function BuyingSheetPage() {
   }), { needed: 0, inStock: 0, onPO: 0, toOrder: 0, urgent: 0, avgDays: 0, stockoutRisk: 0 }), [filteredRows]);
 
   const avgDaysWaiting = filteredRows.length > 0 ? Math.round(totals.avgDays / filteredRows.length) : 0;
+
+  // Total recommended order qty (including safety stock)
+  const totalRecommendedQty = useMemo(() => filteredRows.reduce((s, r) => s + r.recommendedOrderQty, 0), [filteredRows]);
+  const totalSafetyBuffer = useMemo(() => filteredRows.reduce((s, r) => s + r.safetyStock, 0), [filteredRows]);
 
   // ── Inline Helpers ────────────────────────────────────────────────────
   const toggleSelect = (sku: string) => setSelectedSkus(prev => { const next = new Set(prev); if (next.has(sku)) next.delete(sku); else next.add(sku); return next; });
@@ -683,13 +773,18 @@ export default function BuyingSheetPage() {
             </div>
           </div>
           <div>
-            <p className="text-xs font-semibold text-muted-foreground mb-1.5">Stock & Demand</p>
+            <p className="text-xs font-semibold text-muted-foreground mb-1.5">Stock & Demand Analysis</p>
             <div className="space-y-1.5 text-xs">
               <div className="flex justify-between"><span className="text-muted-foreground">Last Month:</span><span className="font-medium">{row.lastMonthQty}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Previous:</span><span className="font-medium">{row.prevMonthQty}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Daily Burn Rate:</span><span className="font-medium">{row.dailyBurnRate.toFixed(1)}/day</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Demand Pattern:</span><span className={`font-medium ${row.demandVariability === "erratic" ? "text-destructive" : row.demandVariability === "moderate" ? "text-orange-500" : "text-emerald-500"}`}>{row.demandVariability}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Safety Stock:</span><span className="font-medium">{row.safetyStock > 0 ? `+${row.safetyStock} buffer` : "—"}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Recommended Qty:</span><span className="font-bold text-primary">{row.recommendedOrderQty}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Coverage:</span><CoverageBar percent={row.coveragePercent} /></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Stockout Risk:</span><StockoutRiskBadge days={row.stockoutRiskDays} /></div>
-              {row.avgLeadTimeDays !== null && <div className="flex justify-between"><span className="text-muted-foreground">Avg Lead Time:</span><span className="font-medium">{row.avgLeadTimeDays}d</span></div>}
+              <div className="flex justify-between"><span className="text-muted-foreground">Customers Affected:</span><span className="font-medium">{row.distinctCustomers}</span></div>
+              {row.avgLeadTimeDays !== null && <div className="flex justify-between"><span className="text-muted-foreground">Avg Lead Time:</span><span className={`font-medium ${row.daysWaiting > row.avgLeadTimeDays ? "text-destructive" : ""}`}>{row.avgLeadTimeDays}d {row.daysWaiting > row.avgLeadTimeDays ? "(overdue!)" : ""}</span></div>}
               {row.seasonalPattern && <div className="flex justify-between"><span className="text-muted-foreground">Season:</span><span className="flex items-center gap-1 font-medium">{row.seasonalPattern === "peak" ? <><Sun className="h-3 w-3 text-orange-500" />Peak</> : row.seasonalPattern === "low" ? <><Snowflake className="h-3 w-3 text-blue-500" />Low</> : "Normal"}</span></div>}
               {row.lastPurchasedDate && <div className="flex justify-between"><span className="text-muted-foreground">Last Purchased:</span><span className="font-medium">{new Date(row.lastPurchasedDate).toLocaleDateString()}</span></div>}
             </div>
@@ -1017,6 +1112,17 @@ export default function BuyingSheetPage() {
                 <Button variant={groupBySupplier ? "default" : "outline"} size="sm" onClick={() => setGroupBySupplier(!groupBySupplier)} className="h-7 text-xs gap-1.5"><Layers className="h-3 w-3" />{groupBySupplier ? "Grouped" : "Group"}</Button>
                 <Button variant={showSupplierChart ? "default" : "outline"} size="sm" onClick={() => setShowSupplierChart(!showSupplierChart)} className="h-7 text-xs gap-1.5"><PieChart className="h-3 w-3" />Chart</Button>
                 <Button variant="outline" size="sm" onClick={handleCopySupplierEmails} className="h-7 text-xs gap-1.5"><Mail className="h-3 w-3" />Emails</Button>
+                <Button variant="outline" size="sm" onClick={handleBatchEmailAllSuppliers} className="h-7 text-xs gap-1.5"><Send className="h-3 w-3" />All Drafts</Button>
+                {coverageGaps.length > 0 && (
+                  <Tooltip><TooltipTrigger asChild>
+                    <Badge variant="destructive" className="text-xs gap-1 cursor-help"><AlertTriangle className="h-3 w-3" />{coverageGaps.length} no supplier</Badge>
+                  </TooltipTrigger><TooltipContent><p className="text-xs">{coverageGaps.length} items need ordering but have no supplier assigned:<br/>{coverageGaps.slice(0, 5).map(r => r.sku).join(", ")}{coverageGaps.length > 5 ? "..." : ""}</p></TooltipContent></Tooltip>
+                )}
+                {totalSafetyBuffer > 0 && (
+                  <Tooltip><TooltipTrigger asChild>
+                    <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded cursor-help">+{totalSafetyBuffer} safety</span>
+                  </TooltipTrigger><TooltipContent><p className="text-xs">Recommended: {totalRecommendedQty} total (incl. {totalSafetyBuffer} safety stock buffer)</p></TooltipContent></Tooltip>
+                )}
               </div>
               <div className="flex items-center gap-2 text-[10px] text-muted-foreground/50">
                 <span><kbd className="px-1 py-0.5 rounded bg-muted text-[10px]">Ctrl+F</kbd> Search</span>
