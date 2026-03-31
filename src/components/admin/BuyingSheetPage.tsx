@@ -609,6 +609,21 @@ export default function BuyingSheetPage() {
     return c;
   }, [rows]);
 
+  // Coverage gaps: items needing order but with no supplier
+  const coverageGaps = useMemo(() => {
+    return rows.filter(r => r.toOrder > 0 && (r.supplierName === "No Supplier" || !r.supplierName));
+  }, [rows]);
+
+  // Total recommended order qty (including safety stock)
+  const totalRecommendedQty = useMemo(() => {
+    return filteredRows.reduce((s, r) => s + r.recommendedOrderQty, 0);
+  }, [filteredRows]);
+
+  // Total safety stock buffer across all items
+  const totalSafetyBuffer = useMemo(() => {
+    return filteredRows.reduce((s, r) => s + r.safetyStock, 0);
+  }, [filteredRows]);
+
   const filteredRows = useMemo(() => rows.filter(row => {
     const matchesSearch = !search || row.itemName.toLowerCase().includes(search.toLowerCase()) || row.sku.toLowerCase().includes(search.toLowerCase()) || row.supplierName.toLowerCase().includes(search.toLowerCase()) || row.orders.some(o => o.orderNumber.toLowerCase().includes(search.toLowerCase()) || o.customerName.toLowerCase().includes(search.toLowerCase()));
     return matchesSearch && (supplierFilter === "all" || row.supplierId === supplierFilter) && (!showOnlyNeedOrder || row.toOrder > 0) && (priorityFilter === "all" || getPriorityLevel(row.priorityScore) === priorityFilter);
