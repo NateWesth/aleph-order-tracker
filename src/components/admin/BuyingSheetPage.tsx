@@ -1666,6 +1666,40 @@ export default function BuyingSheetPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Email Draft Dialog */}
+        <Dialog open={emailDraftOpen} onOpenChange={setEmailDraftOpen}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Send className="h-4 w-4 text-primary" />
+                Email Draft — {emailDraftSupplier}
+              </DialogTitle>
+            </DialogHeader>
+            <Textarea
+              value={emailDraftBody}
+              onChange={(e) => setEmailDraftBody(e.target.value)}
+              className="min-h-[250px] font-mono text-sm"
+            />
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={() => {
+                navigator.clipboard.writeText(emailDraftBody);
+                toast({ title: "Copied", description: "Email draft copied to clipboard" });
+              }}>
+                <Copy className="h-4 w-4 mr-2" />Copy
+              </Button>
+              <Button onClick={() => {
+                const supplier = sortedRows.find(r => r.supplierName === emailDraftSupplier && r.supplierEmail);
+                const email = supplier?.supplierEmail || "";
+                const subject = encodeURIComponent(`Purchase Order — ${emailDraftSupplier}`);
+                const body = encodeURIComponent(emailDraftBody);
+                window.open(`mailto:${email}?subject=${subject}&body=${body}`, "_blank");
+              }}>
+                <Mail className="h-4 w-4 mr-2" />Open in Email
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </TooltipProvider>
   );
