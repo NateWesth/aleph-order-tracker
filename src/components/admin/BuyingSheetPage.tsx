@@ -1131,6 +1131,18 @@ export default function BuyingSheetPage() {
                 <div className="flex justify-between"><span className="text-muted-foreground">Previous Month:</span><span className="font-medium">{row.prevMonthQty}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Coverage:</span><CoverageBar percent={row.coveragePercent} /></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Stockout Risk:</span><StockoutRiskBadge days={row.stockoutRiskDays} /></div>
+                {row.avgLeadTimeDays !== null && (
+                  <div className="flex justify-between"><span className="text-muted-foreground">Avg Lead Time:</span><span className="font-medium">{row.avgLeadTimeDays}d</span></div>
+                )}
+                {row.seasonalPattern && (
+                  <div className="flex justify-between"><span className="text-muted-foreground">Season:</span>
+                    <span className="flex items-center gap-1 font-medium">
+                      {row.seasonalPattern === "peak" && <><Sun className="h-3 w-3 text-orange-500" />Peak</>}
+                      {row.seasonalPattern === "low" && <><Snowflake className="h-3 w-3 text-blue-500" />Low</>}
+                      {row.seasonalPattern === "normal" && <><Leaf className="h-3 w-3 text-emerald-500" />Normal</>}
+                    </span>
+                  </div>
+                )}
                 {row.lastPurchasedDate && (
                   <div className="flex justify-between"><span className="text-muted-foreground">Last Purchased:</span><span className="font-medium">{new Date(row.lastPurchasedDate).toLocaleDateString()}</span></div>
                 )}
