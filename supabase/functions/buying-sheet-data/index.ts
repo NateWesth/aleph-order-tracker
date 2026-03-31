@@ -124,7 +124,7 @@ Deno.serve(async (req) => {
     console.log(`Fetched PO quantities for ${poQtyMap.size} SKUs from Zoho`)
 
     // Return combined data
-    const result: Record<string, { stockOnHand: number; onPurchaseOrder: number }> = {}
+    const result: Record<string, { stockOnHand: number; onPurchaseOrder: number; vendorName: string }> = {}
 
     // Merge stock and PO data by SKU
     const allSkus = new Set([...stockMap.keys(), ...poQtyMap.keys()])
@@ -132,6 +132,7 @@ Deno.serve(async (req) => {
       result[sku] = {
         stockOnHand: stockMap.get(sku)?.stockOnHand ?? 0,
         onPurchaseOrder: poQtyMap.get(sku) ?? 0,
+        vendorName: stockMap.get(sku)?.vendorName ?? '',
       }
     }
 
