@@ -27,8 +27,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
-import type { BuyingSheetRow, SuggestedRestockRow, ZohoStockData, SortField, SortDirection, PriorityFilter, ViewMode } from "./buying-sheet/types";
-import { getPriorityLevel, NOTES_KEY, SNAPSHOT_KEY, loadNotes, saveNotes } from "./buying-sheet/types";
+import type { BuyingSheetRow, SuggestedRestockRow, ZohoStockData, SortField, SortDirection, PriorityFilter, ViewMode, ViewDensity, RecentlyOrderedItem } from "./buying-sheet/types";
+import { getPriorityLevel, NOTES_KEY, SNAPSHOT_KEY, loadNotes, saveNotes, loadPinned, savePinned, loadDensity, saveDensity, loadRecentlyOrdered, saveRecentlyOrdered } from "./buying-sheet/types";
 import { BuyingSheetSummary } from "./buying-sheet/BuyingSheetSummary";
 import { SupplierCardsView } from "./buying-sheet/SupplierCardsView";
 import { QuickOrderView } from "./buying-sheet/QuickOrderView";
