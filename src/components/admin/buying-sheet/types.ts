@@ -20,6 +20,12 @@ export interface BuyingSheetRow {
   lastPurchasedDate: string | null;
   seasonalPattern: "peak" | "low" | "normal" | null;
   avgLeadTimeDays: number | null;
+  // New functional fields
+  safetyStock: number;
+  dailyBurnRate: number;
+  demandVariability: "stable" | "moderate" | "erratic";
+  distinctCustomers: number;
+  recommendedOrderQty: number; // toOrder + safetyStock buffer
 }
 
 export interface SuggestedRestockRow {
