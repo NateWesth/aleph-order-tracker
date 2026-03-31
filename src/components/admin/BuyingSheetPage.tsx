@@ -253,9 +253,44 @@ export default function BuyingSheetPage() {
   const getStockoutRiskDays = (sku: string, stockOnHand: number, onPO: number): number | null => {
     const h = demandHistory.get(sku);
     if (!h || (h.lastMonth === 0 && h.prevMonth === 0)) return null;
-    const avgMonthly = (h.lastMonth + h.prevMonth) / 2;
-    if (avgMonthly === 0) return null;
-    return Math.round((stockOnHand + onPO) / (avgMonthly / 30));
+    // Use daily burn rate for more accurate prediction
+    const dailyBurnRate = getDailyBurnRate(sku);
+    if (dailyBurnRate <= 0) return null;
+    return Math.round((stockOnHand + onPO) / dailyBurnRate);
+  };
+
+  // Daily burn rate: weighted average favoring recent month
+  const getDailyBurnRate = (sku: string): number => {
+    const h = demandHistory.get(sku);
+    if (!h) return 0;
+    // Weight last month 70%, previous 30% for recency bias
+    const weightedMonthly = (h.lastMonth * 0.7) + (h.prevMonth * 0.3);
+    return weightedMonthly / 30;
+  };
+
+  // Safety stock: based on demand variability and lead time
+  const getSafetyStock = (sku: string, avgLeadTimeDays: number | null): number => {
+    const h = demandHistory.get(sku);
+    if (!h || (h.lastMonth === 0 && h.prevMonth === 0)) return 0;
+    // Demand variability = standard deviation of monthly demand
+    const avg = (h.lastMonth + h.prevMonth) / 2;
+    const variance = ((h.lastMonth - avg) ** 2 + (h.prevMonth - avg) ** 2) / 2;
+    const stdDev = Math.sqrt(variance);
+    // Safety stock = Z-score (1.65 for 95% service level) × stdDev × sqrt(lead time in months)
+    const leadTimeMonths = (avgLeadTimeDays || 14) / 30;
+    return Math.ceil(1.65 * stdDev * Math.sqrt(leadTimeMonths));
+  };
+
+  // Demand variability coefficient (CV) - higher = more erratic
+  const getDemandVariability = (sku: string): "stable" | "moderate" | "erratic" => {
+    const h = demandHistory.get(sku);
+    if (!h || (h.lastMonth === 0 && h.prevMonth === 0)) return "stable";
+    const avg = (h.lastMonth + h.prevMonth) / 2;
+    if (avg === 0) return "stable";
+    const cv = Math.abs(h.lastMonth - h.prevMonth) / avg;
+    if (cv > 0.5) return "erratic";
+    if (cv > 0.2) return "moderate";
+    return "stable";
   };
 
   const fetchLocalData = async () => {
