@@ -38,7 +38,7 @@ export default function BuyingSheetPage() {
   const [showOnlyNeedOrder, setShowOnlyNeedOrder] = useState(true);
 
   useEffect(() => {
-    fetchData();
+    fetchLocalData();
   }, []);
 
   const getAuthHeaders = async () => {
@@ -77,12 +77,9 @@ export default function BuyingSheetPage() {
     }
   };
 
-  const fetchData = async () => {
+  const fetchLocalData = async () => {
     setLoading(true);
     try {
-      // Fetch Zoho data and local data in parallel
-      const [zoho] = await Promise.all([fetchZohoData()]);
-
       // Fetch awaiting-stock order items
       const { data: orderItems, error: itemsError } = await supabase
         .from("order_items")
@@ -91,7 +88,7 @@ export default function BuyingSheetPage() {
         .order("created_at", { ascending: false });
 
       if (itemsError) throw itemsError;
-      if (!orderItems?.length) { setRows([]); return; }
+      if (!orderItems?.length) { setRows([]); setLoading(false); return; }
 
       const orderIds = [...new Set(orderItems.map((i) => i.order_id))];
 
@@ -167,12 +164,11 @@ export default function BuyingSheetPage() {
         }
       }
 
-      // Build rows with Zoho data
-      const zohoStock = zoho || zohoData || {};
+      // Build rows without Zoho data first (show immediately)
+      const zohoStock = zohoData || {};
       const buyingRows: BuyingSheetRow[] = Array.from(skuMap.values()).map((entry) => {
         const zohoEntry = zohoStock[entry.sku] || { stockOnHand: 0, onPurchaseOrder: 0, vendorName: '' };
         const toOrder = Math.max(0, entry.totalNeeded - zohoEntry.stockOnHand - zohoEntry.onPurchaseOrder);
-        // Use Zoho vendor name as fallback if no local supplier found
         const supplierName = entry.supplierName === "No Supplier" && zohoEntry.vendorName
           ? zohoEntry.vendorName
           : entry.supplierName;
@@ -185,7 +181,6 @@ export default function BuyingSheetPage() {
         };
       });
 
-      // Sort by toOrder descending (items that need ordering first)
       buyingRows.sort((a, b) => b.toOrder - a.toOrder);
       setRows(buyingRows);
     } catch (error) {
@@ -193,6 +188,23 @@ export default function BuyingSheetPage() {
     } finally {
       setLoading(false);
     }
+
+    // Fetch Zoho data in background after table is shown
+    fetchZohoData().then((zoho) => {
+      if (zoho) {
+        setRows((prev) =>
+          prev.map((row) => {
+            const zohoEntry = zoho[row.sku] || { stockOnHand: 0, onPurchaseOrder: 0, vendorName: '' };
+            const toOrder = Math.max(0, row.totalNeeded - zohoEntry.stockOnHand - zohoEntry.onPurchaseOrder);
+            const supplierName = row.supplierName === "No Supplier" && zohoEntry.vendorName
+              ? zohoEntry.vendorName
+              : row.supplierName;
+            return { ...row, supplierName, stockOnHand: zohoEntry.stockOnHand, onPurchaseOrder: zohoEntry.onPurchaseOrder, toOrder };
+          })
+        );
+        toast({ title: "Updated", description: "Zoho stock & PO data loaded" });
+      }
+    });
   };
 
   const handleRefreshZoho = async () => {
@@ -275,6 +287,7 @@ export default function BuyingSheetPage() {
             <ShoppingCart className="h-5 w-5 text-primary" />
             <h2 className="text-lg sm:text-xl font-bold text-foreground">Buying Sheet</h2>
             <Badge variant="outline" className="ml-2">{filteredRows.length} SKUs</Badge>
+            {zohoLoading && <Badge variant="secondary" className="ml-1 gap-1"><Loader2 className="h-3 w-3 animate-spin" />Loading Zoho...</Badge>}
           </div>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={handleRefreshZoho} disabled={zohoLoading} className="gap-2">
