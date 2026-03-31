@@ -1204,11 +1204,19 @@ export default function BuyingSheetPage() {
           <TableCell className="text-right font-medium" onClick={() => toggleExpand(row.sku)}>{row.onPurchaseOrder}</TableCell>
           <TableCell onClick={() => toggleExpand(row.sku)}><CoverageBar percent={row.coveragePercent} /></TableCell>
           <TableCell className="text-right" onClick={() => toggleExpand(row.sku)}>
-            {row.toOrder > 0 ? (
-              <Badge variant="destructive" className="font-bold">{row.toOrder}</Badge>
-            ) : (
-              <Badge variant="outline" className="text-accent-foreground">0</Badge>
-            )}
+            <div className="flex items-center justify-end gap-1">
+              {row.toOrder > 0 ? (
+                <Badge variant="destructive" className="font-bold">{row.toOrder}</Badge>
+              ) : (
+                <Badge variant="outline" className="text-accent-foreground">0</Badge>
+              )}
+              {(() => {
+                const diff = getSnapshotDiff(row.sku, row.toOrder);
+                if (!diff) return null;
+                if (diff.isNew) return <span className="text-[10px] text-primary font-medium">NEW</span>;
+                return <span className={`text-[10px] font-medium ${diff.diff > 0 ? "text-destructive" : "text-emerald-600"}`}>{diff.diff > 0 ? "+" : ""}{diff.diff}</span>;
+              })()}
+            </div>
           </TableCell>
           <TableCell className="text-center" onClick={() => toggleExpand(row.sku)}>
             <StockoutRiskBadge days={row.stockoutRiskDays} />
