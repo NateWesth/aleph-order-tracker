@@ -1074,6 +1074,21 @@ export default function BuyingSheetPage() {
                           </Fragment>
                         ))
                       ) : sortedRows.map(renderRow)}
+                      {/* Stats Footer Row */}
+                      {sortedRows.length > 0 && (
+                        <TableRow className="bg-muted/60 font-semibold border-t-2 border-border">
+                          <TableCell colSpan={4} className="text-xs text-muted-foreground uppercase">Totals ({sortedRows.length} SKUs)</TableCell>
+                          <TableCell className="text-right font-bold">{totals.needed.toLocaleString()}</TableCell>
+                          <TableCell className="text-right font-bold">{totals.inStock.toLocaleString()}</TableCell>
+                          <TableCell className="text-right font-bold">{totals.onPO.toLocaleString()}</TableCell>
+                          <TableCell><CoverageBar percent={totals.needed > 0 ? Math.min(100, Math.round(((totals.inStock + totals.onPO) / totals.needed) * 100)) : 100} /></TableCell>
+                          <TableCell className="text-right"><Badge variant="destructive" className="font-bold">{totals.toOrder.toLocaleString()}</Badge></TableCell>
+                          <TableCell className="text-center"><span className="text-xs">{totals.stockoutRisk} at risk</span></TableCell>
+                          <TableCell />
+                          <TableCell className="text-center"><span className="text-xs">{avgDaysWaiting}d avg</span></TableCell>
+                          <TableCell colSpan={3} />
+                        </TableRow>
+                      )}
                     </TableBody>
                   </Table>
                 </div>
