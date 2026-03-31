@@ -67,6 +67,13 @@ export default function BuyingSheetPage() {
   const [snapshotData, setSnapshotData] = useState<{ date: string; rows: { sku: string; toOrder: number }[] } | null>(null);
   const [bulkOrdering, setBulkOrdering] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("table");
+  const [pinnedSkus, setPinnedSkus] = useState<string[]>(loadPinned);
+  const [viewDensity, setViewDensity] = useState<ViewDensity>(loadDensity);
+  const [recentlyOrdered, setRecentlyOrdered] = useState<RecentlyOrderedItem[]>(loadRecentlyOrdered);
+  const [autoRefreshInterval, setAutoRefreshInterval] = useState<number>(0); // minutes, 0 = off
+  const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(null);
+  const [autoRefreshCountdown, setAutoRefreshCountdown] = useState(0);
+  const [showRecentlyOrdered, setShowRecentlyOrdered] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
