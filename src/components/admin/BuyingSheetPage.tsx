@@ -676,6 +676,10 @@ export default function BuyingSheetPage() {
 
   const avgDaysWaiting = filteredRows.length > 0 ? Math.round(totals.avgDays / filteredRows.length) : 0;
 
+  // Total recommended order qty (including safety stock)
+  const totalRecommendedQty = useMemo(() => filteredRows.reduce((s, r) => s + r.recommendedOrderQty, 0), [filteredRows]);
+  const totalSafetyBuffer = useMemo(() => filteredRows.reduce((s, r) => s + r.safetyStock, 0), [filteredRows]);
+
   // ── Inline Helpers ────────────────────────────────────────────────────
   const toggleSelect = (sku: string) => setSelectedSkus(prev => { const next = new Set(prev); if (next.has(sku)) next.delete(sku); else next.add(sku); return next; });
   const toggleSelectAll = () => setSelectedSkus(selectedSkus.size === sortedRows.length ? new Set() : new Set(sortedRows.map(r => r.sku)));
