@@ -1112,6 +1112,17 @@ export default function BuyingSheetPage() {
                 <Button variant={groupBySupplier ? "default" : "outline"} size="sm" onClick={() => setGroupBySupplier(!groupBySupplier)} className="h-7 text-xs gap-1.5"><Layers className="h-3 w-3" />{groupBySupplier ? "Grouped" : "Group"}</Button>
                 <Button variant={showSupplierChart ? "default" : "outline"} size="sm" onClick={() => setShowSupplierChart(!showSupplierChart)} className="h-7 text-xs gap-1.5"><PieChart className="h-3 w-3" />Chart</Button>
                 <Button variant="outline" size="sm" onClick={handleCopySupplierEmails} className="h-7 text-xs gap-1.5"><Mail className="h-3 w-3" />Emails</Button>
+                <Button variant="outline" size="sm" onClick={handleBatchEmailAllSuppliers} className="h-7 text-xs gap-1.5"><Send className="h-3 w-3" />All Drafts</Button>
+                {coverageGaps.length > 0 && (
+                  <Tooltip><TooltipTrigger asChild>
+                    <Badge variant="destructive" className="text-xs gap-1 cursor-help"><AlertTriangle className="h-3 w-3" />{coverageGaps.length} no supplier</Badge>
+                  </TooltipTrigger><TooltipContent><p className="text-xs">{coverageGaps.length} items need ordering but have no supplier assigned:<br/>{coverageGaps.slice(0, 5).map(r => r.sku).join(", ")}{coverageGaps.length > 5 ? "..." : ""}</p></TooltipContent></Tooltip>
+                )}
+                {totalSafetyBuffer > 0 && (
+                  <Tooltip><TooltipTrigger asChild>
+                    <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded cursor-help">+{totalSafetyBuffer} safety</span>
+                  </TooltipTrigger><TooltipContent><p className="text-xs">Recommended: {totalRecommendedQty} total (incl. {totalSafetyBuffer} safety stock buffer)</p></TooltipContent></Tooltip>
+                )}
               </div>
               <div className="flex items-center gap-2 text-[10px] text-muted-foreground/50">
                 <span><kbd className="px-1 py-0.5 rounded bg-muted text-[10px]">Ctrl+F</kbd> Search</span>
