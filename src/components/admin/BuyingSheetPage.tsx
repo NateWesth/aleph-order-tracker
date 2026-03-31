@@ -46,6 +46,8 @@ interface BuyingSheetRow {
   prevMonthQty: number;
   stockoutRiskDays: number | null;
   lastPurchasedDate: string | null;
+  seasonalPattern: "peak" | "low" | "normal" | null;
+  avgLeadTimeDays: number | null;
 }
 
 interface SuggestedRestockRow {
