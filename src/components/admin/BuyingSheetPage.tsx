@@ -872,6 +872,55 @@ export default function BuyingSheetPage() {
           </div>
         )}
 
+        {/* Auto-refresh & last refreshed status */}
+        {(autoRefreshInterval > 0 || lastRefreshedAt) && (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            {lastRefreshedAt && <span>Last refreshed: {lastRefreshedAt.toLocaleTimeString()}</span>}
+            {autoRefreshInterval > 0 && <span className="flex items-center gap-1"><RotateCw className="h-3 w-3 animate-spin" style={{ animationDuration: "3s" }} />Next in {Math.floor(autoRefreshCountdown / 60)}:{String(autoRefreshCountdown % 60).padStart(2, "0")}</span>}
+          </div>
+        )}
+
+        {/* Supplier Quick-Filter Chips */}
+        {topSupplierChips.length > 1 && (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-[10px] text-muted-foreground uppercase tracking-wider mr-1">Suppliers:</span>
+            <button onClick={() => setSupplierFilter("all")} className={`px-2 py-0.5 rounded-full text-xs transition-colors border ${supplierFilter === "all" ? "bg-primary text-primary-foreground border-primary" : "bg-muted/50 text-muted-foreground border-border hover:bg-muted"}`}>All</button>
+            {topSupplierChips.map(([name, info]) => (
+              <button key={name} onClick={() => { if (info.id) setSupplierFilter(info.id); }} className={`px-2 py-0.5 rounded-full text-xs transition-colors border ${info.id && supplierFilter === info.id ? "bg-primary text-primary-foreground border-primary" : "bg-muted/50 text-muted-foreground border-border hover:bg-muted"}`}>
+                {name} <span className="opacity-60">({info.toOrder})</span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Recently Ordered Today */}
+        {todayOrdered.length > 0 && (
+          <Collapsible open={showRecentlyOrdered} onOpenChange={setShowRecentlyOrdered}>
+            <Card className="border-dashed border-emerald-500/30 bg-emerald-500/5">
+              <CollapsibleTrigger asChild>
+                <button className="w-full flex items-center justify-between p-3 hover:bg-emerald-500/10 transition-colors rounded-t-lg">
+                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-emerald-500" /><span className="font-semibold text-sm text-foreground">Ordered Today</span><Badge className="text-xs bg-emerald-500/20 text-emerald-700 border-emerald-500/30">{todayOrdered.length}</Badge></div>
+                  {showRecentlyOrdered ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                </button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <CardContent className="p-0 divide-y divide-border/50">
+                  {todayOrdered.map((item, i) => (
+                    <div key={`${item.sku}-${i}`} className="flex items-center justify-between px-4 py-2 text-sm">
+                      <div><span className="font-mono text-xs text-muted-foreground mr-2">{item.sku}</span><span className="font-medium">{item.itemName}</span></div>
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                        <span>{item.supplier}</span>
+                        <Badge variant="outline">{item.quantity}</Badge>
+                        <span>{new Date(item.orderedAt).toLocaleTimeString()}</span>
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </CollapsibleContent>
+            </Card>
+          </Collapsible>
+        )}
+
         {/* Summary Cards */}
         <BuyingSheetSummary totals={totals} avgDaysWaiting={avgDaysWaiting} supplierCount={uniqueSuppliers.length} />
 
