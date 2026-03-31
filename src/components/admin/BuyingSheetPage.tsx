@@ -1326,8 +1326,32 @@ export default function BuyingSheetPage() {
             <Button variant="outline" size="sm" onClick={handleExportBySupplier} className="gap-2">
               <FileSpreadsheet className="h-4 w-4" />
             </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant={snapshotSaved ? "default" : "outline"} size="sm" onClick={saveSnapshot} className="gap-2">
+                  <Save className="h-4 w-4" />{snapshotSaved && "✓"}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent><p className="text-xs">Save snapshot for comparison</p></TooltipContent>
+            </Tooltip>
+            {snapshotData && (
+              <Button variant={showSnapshot ? "default" : "outline"} size="sm" onClick={() => setShowSnapshot(!showSnapshot)} className="gap-2">
+                <History className="h-4 w-4" />
+                {showSnapshot ? "Hide" : "Compare"}
+              </Button>
+            )}
           </div>
         </div>
+
+        {/* Snapshot comparison bar */}
+        {showSnapshot && snapshotData && (
+          <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/50 border border-border text-xs">
+            <History className="h-3.5 w-3.5 text-muted-foreground" />
+            <span className="text-muted-foreground">Comparing to snapshot from <strong>{new Date(snapshotData.date).toLocaleString()}</strong></span>
+            <span className="text-muted-foreground">({snapshotData.rows.length} items)</span>
+            <Button variant="ghost" size="sm" className="ml-auto h-6 text-xs" onClick={() => setShowSnapshot(false)}>Hide</Button>
+          </div>
+        )}
 
         {/* Priority Filter Tabs */}
         <Tabs value={priorityFilter} onValueChange={(v) => setPriorityFilter(v as PriorityFilter)}>
