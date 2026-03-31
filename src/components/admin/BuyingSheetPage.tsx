@@ -566,8 +566,8 @@ export default function BuyingSheetPage() {
 
   const handleExportCSV = () => {
     const target = selectedSkus.size > 0 ? sortedRows.filter(r => selectedSkus.has(r.sku)) : sortedRows;
-    const headers = ["SKU","Item Name","Total Needed","In Stock","On PO","To Order","Coverage %","Days Waiting","Stockout Risk","Priority","Supplier","Trend","Notes","Orders"];
-    const csvRows = target.map(r => [r.sku, r.itemName, r.totalNeeded, r.stockOnHand, r.onPurchaseOrder, r.toOrder, r.coveragePercent, r.daysWaiting, r.stockoutRiskDays ?? "N/A", r.priorityScore, r.supplierName, r.demandTrend, notes[r.sku] || "", r.orders.map(o => `${o.orderNumber}(${o.customerName}:${o.quantity})`).join("; ")]);
+    const headers = ["SKU","Item Name","Total Needed","In Stock","On PO","To Order","Safety Stock","Recommended Qty","Coverage %","Days Waiting","Stockout Risk Days","Daily Burn Rate","Demand Variability","Distinct Customers","Priority","Supplier","Lead Time","Trend","Season","Notes","Orders"];
+    const csvRows = target.map(r => [r.sku, r.itemName, r.totalNeeded, r.stockOnHand, r.onPurchaseOrder, r.toOrder, r.safetyStock, r.recommendedOrderQty, r.coveragePercent, r.daysWaiting, r.stockoutRiskDays ?? "N/A", r.dailyBurnRate.toFixed(1), r.demandVariability, r.distinctCustomers, r.priorityScore, r.supplierName, r.avgLeadTimeDays ?? "N/A", r.demandTrend, r.seasonalPattern || "N/A", notes[r.sku] || "", r.orders.map(o => `${o.orderNumber}(${o.customerName}:${o.quantity})`).join("; ")]);
     const csv = [headers, ...csvRows].map(r => r.map(c => `"${c}"`).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" }); const url = URL.createObjectURL(blob);
     const a = document.createElement("a"); a.href = url; a.download = `buying-sheet-${new Date().toISOString().split("T")[0]}.csv`; a.click(); URL.revokeObjectURL(url);
