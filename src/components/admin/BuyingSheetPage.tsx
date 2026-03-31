@@ -15,8 +15,10 @@ import {
   ArrowUpDown, ArrowUp, ArrowDown, Layers, Clock, Flame, CheckCircle2,
   FileSpreadsheet, Users, Printer, Mail, StickyNote, Copy, X,
   BarChart3, Filter, Maximize2, Minimize2, ClipboardCopy, Timer,
-  ChevronUp, Eye, PieChart
+  ChevronUp, Eye, PieChart, Send, History, Truck, CalendarDays,
+  CheckSquare, Snowflake, Sun, Leaf, Cloud, Zap, Save, RotateCcw
 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
