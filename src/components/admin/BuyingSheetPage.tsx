@@ -1646,7 +1646,10 @@ export default function BuyingSheetPage() {
                                   <span className="text-xs text-muted-foreground">({items[0].supplierEmail})</span>
                                 )}
                               </div>
-                              <div className="flex items-center gap-3 text-sm">
+                              <div className="flex items-center gap-2 text-sm">
+                                <Button variant="ghost" size="sm" className="h-6 text-xs gap-1" onClick={() => generateEmailDraft(supplier)}>
+                                  <Send className="h-3 w-3" />Email
+                                </Button>
                                 <span className="text-muted-foreground">To Order: <strong className="text-primary">{items.reduce((s, r) => s + r.toOrder, 0)}</strong></span>
                               </div>
                             </div>
