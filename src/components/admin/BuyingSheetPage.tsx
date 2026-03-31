@@ -710,35 +710,46 @@ export default function BuyingSheetPage() {
 
   const renderRow = (row: BuyingSheetRow) => {
     const isExpanded = expandedSkus.has(row.sku);
+    const isPinned = pinnedSkus.includes(row.sku);
+    const isMultiSupplier = multiSupplierSkus.has(row.sku);
+    const densityPy = viewDensity === "compact" ? "py-1" : "py-2";
     return (
       <Fragment key={row.sku}>
-        <TableRow className={`cursor-pointer transition-colors ${row.toOrder > 0 ? "" : "opacity-60"} ${selectedSkus.has(row.sku) ? "bg-primary/5" : ""} ${row.hasUrgent ? "border-l-2 border-l-destructive" : ""} ${isExpanded ? "bg-muted/20" : ""}`}>
-          <TableCell className="w-8" onClick={e => e.stopPropagation()}><Checkbox checked={selectedSkus.has(row.sku)} onCheckedChange={() => toggleSelect(row.sku)} /></TableCell>
-          <TableCell onClick={() => toggleExpand(row.sku)}><div className="flex items-center gap-1">{isExpanded ? <ChevronUp className="h-3 w-3 text-muted-foreground" /> : <ChevronDown className="h-3 w-3 text-muted-foreground/40" />}<PriorityBadge score={row.priorityScore} /></div></TableCell>
-          <TableCell className="font-mono text-xs text-muted-foreground" onClick={() => toggleExpand(row.sku)}>{row.sku}</TableCell>
-          <TableCell className="font-medium max-w-[180px] truncate" onClick={() => toggleExpand(row.sku)}>{row.itemName}</TableCell>
-          <TableCell className="text-right font-semibold" onClick={() => toggleExpand(row.sku)}>{row.totalNeeded}</TableCell>
-          <TableCell className="text-right font-medium" onClick={() => toggleExpand(row.sku)}>{row.stockOnHand}</TableCell>
-          <TableCell className="text-right font-medium" onClick={() => toggleExpand(row.sku)}>{row.onPurchaseOrder}</TableCell>
-          <TableCell onClick={() => toggleExpand(row.sku)}><CoverageBar percent={row.coveragePercent} /></TableCell>
-          <TableCell className="text-right" onClick={() => toggleExpand(row.sku)}>
+        <TableRow className={`cursor-pointer transition-colors ${getWaitHeatColor(row.daysWaiting)} ${row.toOrder > 0 ? "" : "opacity-60"} ${selectedSkus.has(row.sku) ? "bg-primary/5" : ""} ${row.hasUrgent ? "border-l-2 border-l-destructive" : ""} ${isExpanded ? "bg-muted/20" : ""} ${isPinned ? "border-l-2 border-l-primary bg-primary/[0.02]" : ""}`}>
+          <TableCell className={`w-8 ${densityPy}`} onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-0.5">
+              <Checkbox checked={selectedSkus.has(row.sku)} onCheckedChange={() => toggleSelect(row.sku)} />
+              <button onClick={() => togglePin(row.sku)} className={`p-0.5 rounded hover:bg-muted transition-colors ${isPinned ? "text-primary" : "text-muted-foreground/20 hover:text-muted-foreground"}`}>
+                {isPinned ? <Pin className="h-3 w-3" /> : <PinOff className="h-3 w-3" />}
+              </button>
+            </div>
+          </TableCell>
+          <TableCell className={densityPy} onClick={() => toggleExpand(row.sku)}><div className="flex items-center gap-1">{isExpanded ? <ChevronUp className="h-3 w-3 text-muted-foreground" /> : <ChevronDown className="h-3 w-3 text-muted-foreground/40" />}<PriorityBadge score={row.priorityScore} /></div></TableCell>
+          <TableCell className={`font-mono text-xs text-muted-foreground ${densityPy}`} onClick={() => toggleExpand(row.sku)}>{highlightText(row.sku)}</TableCell>
+          <TableCell className={`font-medium max-w-[180px] truncate ${densityPy}`} onClick={() => toggleExpand(row.sku)}>{highlightText(row.itemName)}</TableCell>
+          <TableCell className={`text-right font-semibold ${densityPy}`} onClick={() => toggleExpand(row.sku)}>{row.totalNeeded}</TableCell>
+          <TableCell className={`text-right font-medium ${densityPy}`} onClick={() => toggleExpand(row.sku)}>{row.stockOnHand}</TableCell>
+          <TableCell className={`text-right font-medium ${densityPy}`} onClick={() => toggleExpand(row.sku)}>{row.onPurchaseOrder}</TableCell>
+          <TableCell className={densityPy} onClick={() => toggleExpand(row.sku)}><CoverageBar percent={row.coveragePercent} /></TableCell>
+          <TableCell className={`text-right ${densityPy}`} onClick={() => toggleExpand(row.sku)}>
             <div className="flex items-center justify-end gap-1">
               {row.toOrder > 0 ? <Badge variant="destructive" className="font-bold">{row.toOrder}</Badge> : <Badge variant="outline" className="text-accent-foreground">0</Badge>}
               {(() => { const diff = getSnapshotDiff(row.sku, row.toOrder); if (!diff) return null; if (diff.isNew) return <span className="text-[10px] text-primary font-medium">NEW</span>; return <span className={`text-[10px] font-medium ${diff.diff > 0 ? "text-destructive" : "text-emerald-600"}`}>{diff.diff > 0 ? "+" : ""}{diff.diff}</span>; })()}
             </div>
           </TableCell>
-          <TableCell className="text-center" onClick={() => toggleExpand(row.sku)}><StockoutRiskBadge days={row.stockoutRiskDays} /></TableCell>
-          <TableCell className="text-center" onClick={() => toggleExpand(row.sku)}><DemandTrendIcon trend={row.demandTrend} lastMonth={row.lastMonthQty} prevMonth={row.prevMonthQty} /></TableCell>
-          <TableCell className="text-center" onClick={() => toggleExpand(row.sku)}><span className={`text-sm font-medium ${row.daysWaiting > 7 ? "text-destructive" : row.daysWaiting > 3 ? "text-orange-500" : "text-muted-foreground"}`}>{row.daysWaiting}d</span></TableCell>
-          <TableCell className="text-sm" onClick={() => toggleExpand(row.sku)}>
+          <TableCell className={`text-center ${densityPy}`} onClick={() => toggleExpand(row.sku)}><StockoutRiskBadge days={row.stockoutRiskDays} /></TableCell>
+          <TableCell className={`text-center ${densityPy}`} onClick={() => toggleExpand(row.sku)}><DemandTrendIcon trend={row.demandTrend} lastMonth={row.lastMonthQty} prevMonth={row.prevMonthQty} /></TableCell>
+          <TableCell className={`text-center ${densityPy}`} onClick={() => toggleExpand(row.sku)}><span className={`text-sm font-medium ${row.daysWaiting > 7 ? "text-destructive" : row.daysWaiting > 3 ? "text-orange-500" : "text-muted-foreground"}`}>{row.daysWaiting}d</span></TableCell>
+          <TableCell className={`text-sm ${densityPy}`} onClick={() => toggleExpand(row.sku)}>
             <div className="flex items-center gap-1.5">
-              <span>{row.supplierName}</span>
+              <span>{highlightText(row.supplierName)}</span>
+              {isMultiSupplier && <Tooltip><TooltipTrigger asChild><Sparkles className="h-3 w-3 text-amber-500" /></TooltipTrigger><TooltipContent><p className="text-xs">⚠️ This item appears with multiple suppliers</p></TooltipContent></Tooltip>}
               {row.avgLeadTimeDays !== null && <Tooltip><TooltipTrigger asChild><span className="text-[10px] text-muted-foreground bg-muted px-1 rounded">{row.avgLeadTimeDays}d</span></TooltipTrigger><TooltipContent><p className="text-xs">Avg lead time: {row.avgLeadTimeDays} days</p></TooltipContent></Tooltip>}
               {row.seasonalPattern === "peak" && <Tooltip><TooltipTrigger asChild><Sun className="h-3 w-3 text-orange-500" /></TooltipTrigger><TooltipContent><p className="text-xs">🔥 Peak season</p></TooltipContent></Tooltip>}
               {row.seasonalPattern === "low" && <Tooltip><TooltipTrigger asChild><Snowflake className="h-3 w-3 text-blue-500" /></TooltipTrigger><TooltipContent><p className="text-xs">❄️ Low season</p></TooltipContent></Tooltip>}
             </div>
           </TableCell>
-          <TableCell onClick={() => toggleExpand(row.sku)}><span className="text-xs text-muted-foreground">{row.orders.length} order{row.orders.length !== 1 ? "s" : ""}</span></TableCell>
+          <TableCell className={densityPy} onClick={() => toggleExpand(row.sku)}><span className="text-xs text-muted-foreground">{row.orders.length} order{row.orders.length !== 1 ? "s" : ""}</span></TableCell>
           <TableCell className="w-8" onClick={e => e.stopPropagation()}>
             <div className="flex items-center gap-0.5">
               <Popover open={editingNote === row.sku} onOpenChange={open => { if (!open) setEditingNote(null); }}>
