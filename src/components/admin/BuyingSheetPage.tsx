@@ -594,6 +594,30 @@ export default function BuyingSheetPage() {
   const toggleSelect = (sku: string) => setSelectedSkus(prev => { const next = new Set(prev); if (next.has(sku)) next.delete(sku); else next.add(sku); return next; });
   const toggleSelectAll = () => setSelectedSkus(selectedSkus.size === sortedRows.length ? new Set() : new Set(sortedRows.map(r => r.sku)));
   const toggleExpand = (sku: string) => setExpandedSkus(prev => { const next = new Set(prev); if (next.has(sku)) next.delete(sku); else next.add(sku); return next; });
+  const togglePin = (sku: string) => {
+    const updated = pinnedSkus.includes(sku) ? pinnedSkus.filter(s => s !== sku) : [...pinnedSkus, sku];
+    setPinnedSkus(updated); savePinned(updated);
+    toast({ title: pinnedSkus.includes(sku) ? "Unpinned" : "Pinned", description: `${sku} ${pinnedSkus.includes(sku) ? "removed from" : "pinned to"} top` });
+  };
+
+  const getWaitHeatColor = (days: number) => {
+    if (days > 14) return "bg-destructive/10";
+    if (days > 7) return "bg-orange-500/5";
+    if (days > 3) return "bg-amber-500/5";
+    return "";
+  };
+
+  const highlightText = (text: string) => {
+    if (!search) return text;
+    const idx = text.toLowerCase().indexOf(search.toLowerCase());
+    if (idx === -1) return text;
+    return <>{text.slice(0, idx)}<mark className="bg-primary/20 text-foreground rounded px-0.5">{text.slice(idx, idx + search.length)}</mark>{text.slice(idx + search.length)}</>;
+  };
+
+  const todayOrdered = useMemo(() => {
+    const today = new Date().toISOString().split("T")[0];
+    return recentlyOrdered.filter(r => r.orderedAt.startsWith(today));
+  }, [recentlyOrdered]);
 
   const SortableHeader = ({ field, children, className = "" }: { field: SortField; children: React.ReactNode; className?: string }) => (
     <TableHead className={`cursor-pointer select-none hover:bg-muted/50 transition-colors ${className}`} onClick={() => handleSort(field)}>
