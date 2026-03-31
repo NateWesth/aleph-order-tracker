@@ -287,6 +287,7 @@ export default function BuyingSheetPage() {
             <ShoppingCart className="h-5 w-5 text-primary" />
             <h2 className="text-lg sm:text-xl font-bold text-foreground">Buying Sheet</h2>
             <Badge variant="outline" className="ml-2">{filteredRows.length} SKUs</Badge>
+            {zohoLoading && <Badge variant="secondary" className="ml-1 gap-1"><Loader2 className="h-3 w-3 animate-spin" />Loading Zoho...</Badge>}
           </div>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={handleRefreshZoho} disabled={zohoLoading} className="gap-2">
