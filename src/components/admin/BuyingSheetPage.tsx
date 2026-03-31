@@ -6,10 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Search, Download, ShoppingCart, Filter, Package, RefreshCw, Loader2, AlertTriangle } from "lucide-react";
+import { Search, Download, ShoppingCart, Package, RefreshCw, Loader2, AlertTriangle, TrendingUp, ChevronDown, ChevronRight } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 interface BuyingSheetRow {
   sku: string;
@@ -23,6 +24,15 @@ interface BuyingSheetRow {
   supplierId: string | null;
 }
 
+interface SuggestedRestockRow {
+  sku: string;
+  itemName: string;
+  monthsAppeared: number;
+  avgMonthlyQty: number;
+  totalOrders: number;
+  lastOrderedDate: string;
+}
+
 interface ZohoStockData {
   [sku: string]: { stockOnHand: number; onPurchaseOrder: number; vendorName?: string };
 }
@@ -30,6 +40,8 @@ interface ZohoStockData {
 export default function BuyingSheetPage() {
   const { toast } = useToast();
   const [rows, setRows] = useState<BuyingSheetRow[]>([]);
+  const [suggestedRows, setSuggestedRows] = useState<SuggestedRestockRow[]>([]);
+  const [suggestedOpen, setSuggestedOpen] = useState(true);
   const [loading, setLoading] = useState(true);
   const [zohoLoading, setZohoLoading] = useState(false);
   const [zohoData, setZohoData] = useState<ZohoStockData | null>(null);
@@ -77,6 +89,81 @@ export default function BuyingSheetPage() {
     }
   };
 
+  const fetchSuggestedRestock = async (activeSkus: Set<string>) => {
+    try {
+      const threeMonthsAgo = new Date();
+      threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+
+      // Fetch completed order items from last 3 months
+      const { data: completedItems, error } = await supabase
+        .from("order_items")
+        .select("code, name, quantity, completed_at, order_id")
+        .eq("progress_stage", "completed")
+        .not("code", "is", null)
+        .gte("completed_at", threeMonthsAgo.toISOString())
+        .order("completed_at", { ascending: false });
+
+      if (error || !completedItems?.length) return;
+
+      // Group by SKU and month
+      const skuMonthMap = new Map<string, {
+        itemName: string;
+        months: Map<string, number>; // "YYYY-MM" -> total qty
+        totalOrders: number;
+        lastDate: string;
+      }>();
+
+      for (const item of completedItems) {
+        const sku = (item.code || "").toUpperCase();
+        if (!sku || activeSkus.has(sku)) continue; // skip items already on buying sheet
+
+        const monthKey = (item.completed_at || "").substring(0, 7); // "YYYY-MM"
+        if (!monthKey) continue;
+
+        const existing = skuMonthMap.get(sku);
+        if (existing) {
+          const currentMonthQty = existing.months.get(monthKey) || 0;
+          existing.months.set(monthKey, currentMonthQty + (item.quantity || 1));
+          existing.totalOrders++;
+        } else {
+          const months = new Map<string, number>();
+          months.set(monthKey, item.quantity || 1);
+          skuMonthMap.set(sku, {
+            itemName: item.name,
+            months,
+            totalOrders: 1,
+            lastDate: item.completed_at || "",
+          });
+        }
+      }
+
+      // Build suggested rows - only items that appeared in 2+ months
+      const suggested: SuggestedRestockRow[] = [];
+      for (const [sku, data] of skuMonthMap.entries()) {
+        const monthsAppeared = data.months.size;
+        if (monthsAppeared < 2) continue; // must appear in at least 2 of the 3 months
+
+        const totalQty = Array.from(data.months.values()).reduce((a, b) => a + b, 0);
+        const avgMonthlyQty = Math.round(totalQty / monthsAppeared);
+
+        suggested.push({
+          sku,
+          itemName: data.itemName,
+          monthsAppeared,
+          avgMonthlyQty,
+          totalOrders: data.totalOrders,
+          lastOrderedDate: data.lastDate,
+        });
+      }
+
+      // Sort by frequency (months appeared) then by avg qty
+      suggested.sort((a, b) => b.monthsAppeared - a.monthsAppeared || b.avgMonthlyQty - a.avgMonthlyQty);
+      setSuggestedRows(suggested);
+    } catch (err) {
+      console.error("Failed to fetch suggested restock:", err);
+    }
+  };
+
   const fetchLocalData = async () => {
     setLoading(true);
     try {
@@ -88,7 +175,16 @@ export default function BuyingSheetPage() {
         .order("created_at", { ascending: false });
 
       if (itemsError) throw itemsError;
-      if (!orderItems?.length) { setRows([]); setLoading(false); return; }
+
+      const activeSkus = new Set<string>();
+
+      if (!orderItems?.length) {
+        setRows([]);
+        setLoading(false);
+        // Still fetch suggested even if no active items
+        fetchSuggestedRestock(activeSkus);
+        return;
+      }
 
       const orderIds = [...new Set(orderItems.map((i) => i.order_id))];
 
@@ -139,6 +235,7 @@ export default function BuyingSheetPage() {
 
       for (const item of orderItems) {
         const sku = (item.code || "NO-SKU").toUpperCase();
+        activeSkus.add(sku);
         const order = ordersMap.get(item.order_id);
         const customerName = order?.company_id ? companiesMap.get(order.company_id) || "Unknown" : "Unknown";
         
@@ -183,6 +280,9 @@ export default function BuyingSheetPage() {
 
       buyingRows.sort((a, b) => b.toOrder - a.toOrder);
       setRows(buyingRows);
+
+      // Fetch suggested restock excluding active SKUs
+      fetchSuggestedRestock(activeSkus);
     } catch (error) {
       console.error("Failed to fetch buying sheet data:", error);
     } finally {
@@ -312,13 +412,13 @@ export default function BuyingSheetPage() {
           <Card className="bg-card/60">
             <CardContent className="p-3">
               <p className="text-xs text-muted-foreground">In Stock (Zoho)</p>
-              <p className="text-xl font-bold text-green-600">{totals.inStock.toLocaleString()}</p>
+              <p className="text-xl font-bold text-accent-foreground">{totals.inStock.toLocaleString()}</p>
             </CardContent>
           </Card>
           <Card className="bg-card/60">
             <CardContent className="p-3">
               <p className="text-xs text-muted-foreground">On PO (Zoho)</p>
-              <p className="text-xl font-bold text-blue-600">{totals.onPO.toLocaleString()}</p>
+              <p className="text-xl font-bold text-primary">{totals.onPO.toLocaleString()}</p>
             </CardContent>
           </Card>
           <Card className="bg-primary/10 border-primary/20">
@@ -328,6 +428,63 @@ export default function BuyingSheetPage() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Suggested Restock Section */}
+        {suggestedRows.length > 0 && (
+          <Collapsible open={suggestedOpen} onOpenChange={setSuggestedOpen}>
+            <Card className="border-dashed border-primary/30 bg-primary/5">
+              <CollapsibleTrigger asChild>
+                <button className="w-full flex items-center justify-between p-4 hover:bg-primary/10 transition-colors rounded-t-lg">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4 text-primary" />
+                    <span className="font-semibold text-foreground">Suggested Restock</span>
+                    <Badge variant="secondary" className="text-xs">{suggestedRows.length} items</Badge>
+                    <span className="text-xs text-muted-foreground ml-2">
+                      Based on 3 months of order history — avg monthly qty shown
+                    </span>
+                  </div>
+                  {suggestedOpen ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                </button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <CardContent className="p-0 pt-0">
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>SKU</TableHead>
+                          <TableHead>Item Name</TableHead>
+                          <TableHead className="text-right">Avg Monthly Qty</TableHead>
+                          <TableHead className="text-right">Months Active</TableHead>
+                          <TableHead className="text-right">Total Orders</TableHead>
+                          <TableHead>Last Ordered</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {suggestedRows.map((row) => (
+                          <TableRow key={row.sku} className="bg-primary/5">
+                            <TableCell className="font-mono text-xs text-muted-foreground">{row.sku}</TableCell>
+                            <TableCell className="font-medium max-w-[200px] truncate">{row.itemName}</TableCell>
+                            <TableCell className="text-right">
+                              <Badge variant="outline" className="font-bold">{row.avgMonthlyQty}</Badge>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <span className="text-sm">{row.monthsAppeared}/3</span>
+                            </TableCell>
+                            <TableCell className="text-right text-sm text-muted-foreground">{row.totalOrders}</TableCell>
+                            <TableCell className="text-xs text-muted-foreground">
+                              {row.lastOrderedDate ? new Date(row.lastOrderedDate).toLocaleDateString() : "—"}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </CollapsibleContent>
+            </Card>
+          </Collapsible>
+        )}
 
         {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-2">
@@ -388,13 +545,13 @@ export default function BuyingSheetPage() {
                         <TableCell className="font-mono text-xs text-muted-foreground">{row.sku}</TableCell>
                         <TableCell className="font-medium max-w-[200px] truncate">{row.itemName}</TableCell>
                         <TableCell className="text-right font-semibold">{row.totalNeeded}</TableCell>
-                        <TableCell className="text-right text-green-600 font-medium">{row.stockOnHand}</TableCell>
-                        <TableCell className="text-right text-blue-600 font-medium">{row.onPurchaseOrder}</TableCell>
+                        <TableCell className="text-right text-accent-foreground font-medium">{row.stockOnHand}</TableCell>
+                        <TableCell className="text-right text-primary font-medium">{row.onPurchaseOrder}</TableCell>
                         <TableCell className="text-right">
                           {row.toOrder > 0 ? (
                             <Badge variant="destructive" className="font-bold">{row.toOrder}</Badge>
                           ) : (
-                            <Badge variant="outline" className="text-green-600">0</Badge>
+                            <Badge variant="outline" className="text-accent-foreground">0</Badge>
                           )}
                         </TableCell>
                         <TableCell className="text-sm">{row.supplierName}</TableCell>
