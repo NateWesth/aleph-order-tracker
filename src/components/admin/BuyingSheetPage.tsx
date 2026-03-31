@@ -113,6 +113,9 @@ export default function BuyingSheetPage() {
   useEffect(() => {
     fetchDemandHistory();
     fetchLastPurchaseDates();
+    fetchLeadTimes();
+    fetchSeasonalPatterns();
+    loadSnapshot();
     fetchLocalData();
   }, []);
 
