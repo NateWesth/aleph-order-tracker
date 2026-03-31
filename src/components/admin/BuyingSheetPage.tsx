@@ -38,7 +38,7 @@ export default function BuyingSheetPage() {
   const [showOnlyNeedOrder, setShowOnlyNeedOrder] = useState(true);
 
   useEffect(() => {
-    fetchData();
+    fetchLocalData();
   }, []);
 
   const getAuthHeaders = async () => {
