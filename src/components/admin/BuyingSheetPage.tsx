@@ -170,10 +170,15 @@ export default function BuyingSheetPage() {
       // Build rows with Zoho data
       const zohoStock = zoho || zohoData || {};
       const buyingRows: BuyingSheetRow[] = Array.from(skuMap.values()).map((entry) => {
-        const zohoEntry = zohoStock[entry.sku] || { stockOnHand: 0, onPurchaseOrder: 0 };
+        const zohoEntry = zohoStock[entry.sku] || { stockOnHand: 0, onPurchaseOrder: 0, vendorName: '' };
         const toOrder = Math.max(0, entry.totalNeeded - zohoEntry.stockOnHand - zohoEntry.onPurchaseOrder);
+        // Use Zoho vendor name as fallback if no local supplier found
+        const supplierName = entry.supplierName === "No Supplier" && zohoEntry.vendorName
+          ? zohoEntry.vendorName
+          : entry.supplierName;
         return {
           ...entry,
+          supplierName,
           stockOnHand: zohoEntry.stockOnHand,
           onPurchaseOrder: zohoEntry.onPurchaseOrder,
           toOrder,
