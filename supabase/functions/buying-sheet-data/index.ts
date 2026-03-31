@@ -70,6 +70,7 @@ Deno.serve(async (req) => {
           stockMap.set(sku.toUpperCase(), {
             stockOnHand: item.stock_on_hand ?? item.available_stock ?? 0,
             itemName: item.name || item.description || '',
+            vendorName: item.vendor_name || item.manufacturer || '',
           })
         }
       }
