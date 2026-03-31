@@ -431,7 +431,11 @@ export default function BuyingSheetPage() {
         if (coveragePercent < 25) priorityScore += 15; else if (coveragePercent < 50) priorityScore += 10;
         priorityScore += Math.min(20, row.orders.length * 5);
         if (stockoutRiskDays !== null && stockoutRiskDays <= 7) priorityScore += 15;
-        return { ...row, supplierName, stockOnHand: z.stockOnHand, onPurchaseOrder: z.onPurchaseOrder, toOrder, coveragePercent, priorityScore, stockoutRiskDays };
+        if (row.distinctCustomers >= 3) priorityScore += 10;
+        if (row.avgLeadTimeDays !== null && row.daysWaiting > row.avgLeadTimeDays) priorityScore += 10;
+        const safetyStock = getSafetyStock(row.sku, row.avgLeadTimeDays);
+        const recommendedOrderQty = toOrder > 0 ? toOrder + safetyStock : 0;
+        return { ...row, supplierName, stockOnHand: z.stockOnHand, onPurchaseOrder: z.onPurchaseOrder, toOrder, coveragePercent, priorityScore, stockoutRiskDays, safetyStock, recommendedOrderQty };
       }));
       toast({ title: "Updated", description: "Stock & PO data refreshed from Zoho Books" });
     }
