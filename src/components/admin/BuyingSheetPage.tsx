@@ -184,6 +184,147 @@ export default function BuyingSheetPage() {
     }
   };
 
+  // Fetch lead times per supplier (avg days from order creation to completion)
+  const fetchLeadTimes = async () => {
+    try {
+      const { data } = await supabase
+        .from("order_items")
+        .select("code, created_at, completed_at, order_id")
+        .eq("progress_stage", "completed")
+        .not("code", "is", null)
+        .not("completed_at", "is", null);
+      
+      const skuLeadTimes = new Map<string, number[]>();
+      (data || []).forEach(item => {
+        if (!item.created_at || !item.completed_at) return;
+        const sku = (item.code || "").toUpperCase();
+        const days = Math.max(0, Math.round((new Date(item.completed_at).getTime() - new Date(item.created_at).getTime()) / (1000 * 60 * 60 * 24)));
+        const arr = skuLeadTimes.get(sku) || [];
+        arr.push(days);
+        skuLeadTimes.set(sku, arr);
+      });
+
+      const map = new Map<string, number>();
+      skuLeadTimes.forEach((days, sku) => {
+        map.set(sku, Math.round(days.reduce((a, b) => a + b, 0) / days.length));
+      });
+      setLeadTimeMap(map);
+    } catch (err) {
+      console.error("Failed to fetch lead times:", err);
+    }
+  };
+
+  // Fetch seasonal patterns (compare current month historically)
+  const fetchSeasonalPatterns = async () => {
+    try {
+      const now = new Date();
+      const currentMonth = now.getMonth();
+      const { data } = await supabase
+        .from("order_items")
+        .select("code, quantity, created_at")
+        .not("code", "is", null);
+
+      const skuMonthlyTotals = new Map<string, Map<number, number[]>>();
+      (data || []).forEach(item => {
+        const sku = (item.code || "").toUpperCase();
+        const month = new Date(item.created_at).getMonth();
+        if (!skuMonthlyTotals.has(sku)) skuMonthlyTotals.set(sku, new Map());
+        const monthMap = skuMonthlyTotals.get(sku)!;
+        const arr = monthMap.get(month) || [];
+        arr.push(item.quantity || 1);
+        monthMap.set(month, arr);
+      });
+
+      const map = new Map<string, "peak" | "low" | "normal">();
+      skuMonthlyTotals.forEach((monthMap, sku) => {
+        const allMonthAvgs: number[] = [];
+        monthMap.forEach((qtys) => {
+          allMonthAvgs.push(qtys.reduce((a, b) => a + b, 0) / qtys.length);
+        });
+        const overallAvg = allMonthAvgs.length > 0 ? allMonthAvgs.reduce((a, b) => a + b, 0) / allMonthAvgs.length : 0;
+        const currentMonthQtys = monthMap.get(currentMonth) || [];
+        const currentAvg = currentMonthQtys.length > 0 ? currentMonthQtys.reduce((a, b) => a + b, 0) / currentMonthQtys.length : 0;
+        
+        if (overallAvg > 0 && currentAvg > overallAvg * 1.3) map.set(sku, "peak");
+        else if (overallAvg > 0 && currentAvg < overallAvg * 0.7) map.set(sku, "low");
+        else if (monthMap.size >= 2) map.set(sku, "normal");
+      });
+      setSeasonalMap(map);
+    } catch (err) {
+      console.error("Failed to fetch seasonal patterns:", err);
+    }
+  };
+
+  // Snapshot management
+  const SNAPSHOT_KEY = "buying-sheet-snapshot";
+  const loadSnapshot = () => {
+    try {
+      const raw = localStorage.getItem(SNAPSHOT_KEY);
+      if (raw) setSnapshotData(JSON.parse(raw));
+    } catch { /* ignore */ }
+  };
+  const saveSnapshot = () => {
+    const snapshot = { date: new Date().toISOString(), rows: sortedRows.map(r => ({ sku: r.sku, toOrder: r.toOrder })) };
+    localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(snapshot));
+    setSnapshotData(snapshot);
+    setSnapshotSaved(true);
+    setTimeout(() => setSnapshotSaved(false), 2000);
+    toast({ title: "Snapshot Saved", description: `${snapshot.rows.length} items saved for comparison` });
+  };
+  const getSnapshotDiff = (sku: string, currentToOrder: number): { diff: number; isNew: boolean } | null => {
+    if (!snapshotData || !showSnapshot) return null;
+    const prev = snapshotData.rows.find(r => r.sku === sku);
+    if (!prev) return { diff: currentToOrder, isNew: true };
+    const diff = currentToOrder - prev.toOrder;
+    if (diff === 0) return null;
+    return { diff, isNew: false };
+  };
+
+  // Bulk mark as ordered
+  const handleBulkMarkOrdered = async () => {
+    if (selectedSkus.size === 0) return;
+    setBulkOrdering(true);
+    try {
+      const targetRows = sortedRows.filter(r => selectedSkus.has(r.sku));
+      const orderItemIds: string[] = [];
+      for (const row of targetRows) {
+        const { data } = await supabase
+          .from("order_items")
+          .select("id")
+          .eq("progress_stage", "awaiting-stock")
+          .ilike("code", row.sku);
+        if (data) orderItemIds.push(...data.map(d => d.id));
+      }
+      if (orderItemIds.length > 0) {
+        const { error } = await supabase
+          .from("order_items")
+          .update({ stock_status: "ordered" as any, notes: `Marked ordered from buying sheet on ${new Date().toLocaleDateString()}` })
+          .in("id", orderItemIds);
+        if (error) throw error;
+        toast({ title: "Updated", description: `${orderItemIds.length} items marked as ordered` });
+        setSelectedSkus(new Set());
+        fetchLocalData();
+      }
+    } catch (err) {
+      console.error("Bulk order failed:", err);
+      toast({ title: "Error", description: "Failed to update items", variant: "destructive" });
+    } finally {
+      setBulkOrdering(false);
+    }
+  };
+
+  // Email draft generator
+  const generateEmailDraft = (supplierName: string) => {
+    const items = sortedRows.filter(r => r.supplierName === supplierName && r.toOrder > 0);
+    if (items.length === 0) return;
+    const itemLines = items.map(r => `  • ${r.sku} — ${r.itemName} — Qty: ${r.toOrder}`).join("\n");
+    const totalQty = items.reduce((s, r) => s + r.toOrder, 0);
+    const body = `Dear ${supplierName},\n\nPlease find below our purchase order requirements:\n\n${itemLines}\n\nTotal items: ${items.length}\nTotal quantity: ${totalQty}\n\nPlease confirm availability and expected delivery date.\n\nKind regards`;
+    setEmailDraftBody(body);
+    setEmailDraftSupplier(supplierName);
+    setEmailDraftOpen(true);
+  };
+
   const fetchLastPurchaseDates = async () => {
     try {
       const { data } = await supabase
