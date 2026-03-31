@@ -99,6 +99,15 @@ export default function BuyingSheetPage() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showSupplierChart, setShowSupplierChart] = useState(false);
   const [lastPurchaseMap, setLastPurchaseMap] = useState<Map<string, string>>(new Map());
+  const [leadTimeMap, setLeadTimeMap] = useState<Map<string, number>>(new Map());
+  const [seasonalMap, setSeasonalMap] = useState<Map<string, "peak" | "low" | "normal">>(new Map());
+  const [emailDraftOpen, setEmailDraftOpen] = useState(false);
+  const [emailDraftSupplier, setEmailDraftSupplier] = useState<string | null>(null);
+  const [emailDraftBody, setEmailDraftBody] = useState("");
+  const [snapshotSaved, setSnapshotSaved] = useState(false);
+  const [showSnapshot, setShowSnapshot] = useState(false);
+  const [snapshotData, setSnapshotData] = useState<{ date: string; rows: { sku: string; toOrder: number }[] } | null>(null);
+  const [bulkOrdering, setBulkOrdering] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
