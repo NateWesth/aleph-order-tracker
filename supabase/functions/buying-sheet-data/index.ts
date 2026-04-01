@@ -8,6 +8,23 @@ const corsHeaders = {
 const ZOHO_AUTH_URL = 'https://accounts.zoho.com/oauth/v2'
 const ZOHO_API_URL = 'https://www.zohoapis.com'
 
+type StockEntry = {
+  stockOnHand: number
+  itemName: string
+  vendorName: string
+}
+
+type VendorSummary = {
+  vendorName: string
+  vendorEmail: string
+}
+
+type VendorStat = VendorSummary & {
+  count: number
+  totalQty: number
+  latestDate: string
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -23,222 +40,279 @@ Deno.serve(async (req) => {
 
   if (!clientId || !clientSecret) {
     return new Response(JSON.stringify({ error: 'Zoho credentials not configured' }), {
-      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }
 
   try {
-    // Verify auth
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
     const token = authHeader.replace('Bearer ', '')
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser(token)
+
     if (authError || !user) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    const activeSkus = await getActiveBuyingSheetSkus(supabase)
+    console.log(`Resolved ${activeSkus.size} active buying sheet SKUs`)
+
+    if (activeSkus.size === 0) {
+      return new Response(JSON.stringify({ success: true, data: {}, itemCount: 0 }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
     const accessToken = await getValidAccessToken(supabase, clientId, clientSecret)
     const orgId = await getOrgId(supabase)
 
-    // 1. Fetch all items with stock from Zoho Books
-    const stockMap = new Map<string, { stockOnHand: number; itemName: string; vendorName: string }>()
-    let page = 1
-    let hasMore = true
+    const stockMap = await fetchRelevantItemStock(accessToken, orgId, activeSkus)
+    console.log(`Fetched stock for ${stockMap.size} active SKUs from Zoho`)
 
-    while (hasMore) {
-      const resp = await fetch(
-        `${ZOHO_API_URL}/books/v3/items?organization_id=${orgId}&page=${page}&per_page=200`,
-        { headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` } }
-      )
-      const data = await resp.json()
+    const { poQtyMap, poVendorMap } = await fetchOpenPurchaseOrderData(accessToken, orgId, activeSkus)
+    console.log(`Fetched open PO quantities for ${poQtyMap.size} active SKUs and open PO vendors for ${poVendorMap.size} active SKUs`)
 
-      if (data.code !== 0 || !data.items?.length) {
-        hasMore = false
-        break
-      }
+    const historicalVendorMap = await fetchHistoricalVendorData(accessToken, orgId, activeSkus)
+    console.log(`Fetched historical vendor suggestions for ${historicalVendorMap.size} active SKUs from Zoho`)
 
-      for (const item of data.items) {
-        const sku = item.sku || item.item_id
-        if (sku) {
-          stockMap.set(sku.toUpperCase(), {
-            stockOnHand: item.stock_on_hand ?? item.available_stock ?? 0,
-            itemName: item.name || item.description || '',
-            vendorName: item.vendor_name || item.manufacturer || '',
-          })
-        }
-      }
-
-      hasMore = data.page_context?.has_more_page ?? false
-      page++
-    }
-
-    console.log(`Fetched stock for ${stockMap.size} items from Zoho`)
-
-    // 2. Fetch purchase orders NOT yet fully invoiced/billed from Zoho
-    const poQtyMap = new Map<string, number>() // SKU -> total qty on uninvoiced POs
-    const poVendorMap = new Map<string, { vendorName: string; vendorEmail: string }>() // SKU -> vendor from PO
-    const poStatuses = ['open', 'draft']
-
-    for (const poStatus of poStatuses) {
-      page = 1
-      hasMore = true
-
-      while (hasMore) {
-        const resp = await fetch(
-          `${ZOHO_API_URL}/books/v3/purchaseorders?organization_id=${orgId}&status=${poStatus}&page=${page}&per_page=200`,
-          { headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` } }
-        )
-        const data = await resp.json()
-
-        if (data.code !== 0 || !data.purchaseorders?.length) {
-          hasMore = false
-          break
-        }
-
-        // For each PO, fetch its line items and capture vendor info
-        for (const po of data.purchaseorders) {
-          const poVendorName = po.vendor_name || ''
-          const poVendorEmail = po.vendor_email || ''
-
-          const detailResp = await fetch(
-            `${ZOHO_API_URL}/books/v3/purchaseorders/${po.purchaseorder_id}?organization_id=${orgId}`,
-            { headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` } }
-          )
-          const detailData = await detailResp.json()
-
-          if (detailData.code === 0 && detailData.purchaseorder?.line_items) {
-            // Use vendor from PO detail if available, fallback to list-level
-            const detailVendor = detailData.purchaseorder.vendor_name || poVendorName
-            const detailEmail = detailData.purchaseorder.vendor_email || poVendorEmail
-
-            for (const lineItem of detailData.purchaseorder.line_items) {
-              const sku = (lineItem.sku || lineItem.item_id || '').toUpperCase()
-              if (sku) {
-                const existing = poQtyMap.get(sku) || 0
-                poQtyMap.set(sku, existing + (lineItem.quantity || 0))
-                // Store vendor info from PO (latest PO wins)
-                if (detailVendor && !poVendorMap.has(sku)) {
-                  poVendorMap.set(sku, { vendorName: detailVendor, vendorEmail: detailEmail })
-                }
-              }
-            }
-          }
-        }
-
-        hasMore = data.page_context?.has_more_page ?? false
-        page++
-      }
-    }
-
-    console.log(`Fetched PO quantities for ${poQtyMap.size} SKUs, vendor info for ${poVendorMap.size} SKUs from Zoho`)
-
-    // 3. Fetch HISTORICAL purchase orders (closed/billed) to find preferred suppliers per SKU
-    const historicalVendorMap = new Map<string, Map<string, { count: number; vendorName: string; vendorEmail: string }>>() // SKU -> vendorId -> stats
-    const historicalStatuses = ['closed', 'billed']
-
-    for (const hStatus of historicalStatuses) {
-      page = 1
-      hasMore = true
-
-      while (hasMore) {
-        const resp = await fetch(
-          `${ZOHO_API_URL}/books/v3/purchaseorders?organization_id=${orgId}&status=${hStatus}&page=${page}&per_page=200`,
-          { headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` } }
-        )
-        const data = await resp.json()
-
-        if (data.code !== 0 || !data.purchaseorders?.length) {
-          hasMore = false
-          break
-        }
-
-        for (const po of data.purchaseorders) {
-          const vendorName = po.vendor_name || ''
-          const vendorEmail = po.vendor_email || ''
-          const vendorKey = vendorName.toLowerCase()
-          if (!vendorName) continue
-
-          const detailResp = await fetch(
-            `${ZOHO_API_URL}/books/v3/purchaseorders/${po.purchaseorder_id}?organization_id=${orgId}`,
-            { headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` } }
-          )
-          const detailData = await detailResp.json()
-
-          if (detailData.code === 0 && detailData.purchaseorder?.line_items) {
-            const detailVendor = detailData.purchaseorder.vendor_name || vendorName
-            const detailEmail = detailData.purchaseorder.vendor_email || vendorEmail
-
-            for (const lineItem of detailData.purchaseorder.line_items) {
-              const sku = (lineItem.sku || lineItem.item_id || '').toUpperCase()
-              if (!sku) continue
-              if (!historicalVendorMap.has(sku)) historicalVendorMap.set(sku, new Map())
-              const skuVendors = historicalVendorMap.get(sku)!
-              const existing = skuVendors.get(vendorKey) || { count: 0, vendorName: detailVendor, vendorEmail: detailEmail }
-              existing.count++
-              skuVendors.set(vendorKey, existing)
-            }
-          }
-        }
-
-        hasMore = data.page_context?.has_more_page ?? false
-        page++
-      }
-    }
-
-    console.log(`Fetched historical vendor data for ${historicalVendorMap.size} SKUs from Zoho`)
-
-    // Helper: get best historical vendor for a SKU (most frequently used)
-    const getBestHistoricalVendor = (sku: string): { vendorName: string; vendorEmail: string } | null => {
-      const vendors = historicalVendorMap.get(sku)
-      if (!vendors || vendors.size === 0) return null
-      let best: { vendorName: string; vendorEmail: string; count: number } | null = null
-      for (const [_, stats] of vendors) {
-        if (!best || stats.count > best.count) best = { ...stats }
-      }
-      return best ? { vendorName: best.vendorName, vendorEmail: best.vendorEmail } : null
-    }
-
-    // Return combined data
     const result: Record<string, { stockOnHand: number; onPurchaseOrder: number; vendorName: string; vendorEmail: string }> = {}
 
-    // Merge stock, PO data, and vendor info by SKU — use historical vendor as final fallback
-    const allSkus = new Set([...stockMap.keys(), ...poQtyMap.keys(), ...historicalVendorMap.keys()])
-    for (const sku of allSkus) {
+    for (const sku of activeSkus) {
       const itemVendor = stockMap.get(sku)?.vendorName ?? ''
-      const poVendor = poVendorMap.get(sku)
-      const histVendor = getBestHistoricalVendor(sku)
+      const openPoVendor = poVendorMap.get(sku)
+      const historicalVendor = getBestHistoricalVendor(historicalVendorMap, sku)
+
       result[sku] = {
         stockOnHand: stockMap.get(sku)?.stockOnHand ?? 0,
         onPurchaseOrder: poQtyMap.get(sku) ?? 0,
-        vendorName: itemVendor || poVendor?.vendorName || histVendor?.vendorName || '',
-        vendorEmail: poVendor?.vendorEmail || histVendor?.vendorEmail || '',
+        vendorName: historicalVendor?.vendorName || openPoVendor?.vendorName || itemVendor || '',
+        vendorEmail: historicalVendor?.vendorEmail || openPoVendor?.vendorEmail || '',
       }
     }
 
-    return new Response(JSON.stringify({ 
-      success: true, 
+    return new Response(JSON.stringify({
+      success: true,
       data: result,
-      itemCount: allSkus.size,
+      itemCount: activeSkus.size,
     }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
-
   } catch (error) {
     console.error('Buying sheet data error:', error)
     return new Response(JSON.stringify({
       error: error instanceof Error ? error.message : 'Failed to fetch Zoho data',
     }), {
-      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }
 })
+
+async function getActiveBuyingSheetSkus(supabase: any): Promise<Set<string>> {
+  const { data, error } = await supabase
+    .from('order_items')
+    .select('code')
+    .eq('progress_stage', 'awaiting-stock')
+    .not('code', 'is', null)
+
+  if (error) {
+    throw new Error(`Failed to load active buying sheet SKUs: ${error.message}`)
+  }
+
+  return new Set(
+    (data || [])
+      .map((row: { code: string | null }) => normalizeSku(row.code))
+      .filter(Boolean)
+  )
+}
+
+async function fetchRelevantItemStock(accessToken: string, orgId: string, activeSkus: Set<string>): Promise<Map<string, StockEntry>> {
+  const stockMap = new Map<string, StockEntry>()
+  let page = 1
+  let hasMore = true
+
+  while (hasMore) {
+    const data = await fetchZohoPage(accessToken, `${ZOHO_API_URL}/books/v3/items?organization_id=${orgId}&page=${page}&per_page=200`)
+
+    if (!data.items?.length) {
+      hasMore = false
+      break
+    }
+
+    for (const item of data.items) {
+      const sku = normalizeSku(item.sku || item.item_id)
+      if (!sku || !activeSkus.has(sku)) continue
+
+      stockMap.set(sku, {
+        stockOnHand: item.stock_on_hand ?? item.available_stock ?? 0,
+        itemName: item.name || item.description || '',
+        vendorName: item.vendor_name || item.manufacturer || '',
+      })
+    }
+
+    hasMore = data.page_context?.has_more_page ?? false
+    page++
+  }
+
+  return stockMap
+}
+
+async function fetchOpenPurchaseOrderData(accessToken: string, orgId: string, activeSkus: Set<string>) {
+  const poQtyMap = new Map<string, number>()
+  const poVendorMap = new Map<string, VendorSummary>()
+
+  await forEachPurchaseOrder(accessToken, orgId, ['open', 'draft'], (po) => {
+    const vendorName = po.vendor_name || ''
+    const vendorEmail = po.vendor_email || ''
+    const lineItems = Array.isArray(po.line_items) ? po.line_items : []
+
+    for (const lineItem of lineItems) {
+      const sku = normalizeSku(lineItem.sku || lineItem.item_id)
+      if (!sku || !activeSkus.has(sku)) continue
+
+      poQtyMap.set(sku, (poQtyMap.get(sku) || 0) + Number(lineItem.quantity || 0))
+
+      if (vendorName && !poVendorMap.has(sku)) {
+        poVendorMap.set(sku, { vendorName, vendorEmail })
+      }
+    }
+  })
+
+  return { poQtyMap, poVendorMap }
+}
+
+async function fetchHistoricalVendorData(accessToken: string, orgId: string, activeSkus: Set<string>) {
+  const historicalVendorMap = new Map<string, Map<string, VendorStat>>()
+
+  await forEachPurchaseOrder(accessToken, orgId, ['closed', 'billed'], (po) => {
+    const vendorName = po.vendor_name || ''
+    const vendorEmail = po.vendor_email || ''
+    const vendorKey = String(po.vendor_id || vendorName).toLowerCase()
+    const poDate = String(po.date || po.purchaseorder_date || po.created_time || '')
+    const lineItems = Array.isArray(po.line_items) ? po.line_items : []
+
+    if (!vendorName || lineItems.length === 0) return
+
+    for (const lineItem of lineItems) {
+      const sku = normalizeSku(lineItem.sku || lineItem.item_id)
+      if (!sku || !activeSkus.has(sku)) continue
+
+      if (!historicalVendorMap.has(sku)) {
+        historicalVendorMap.set(sku, new Map())
+      }
+
+      const skuVendors = historicalVendorMap.get(sku)!
+      const existing = skuVendors.get(vendorKey) || {
+        vendorName,
+        vendorEmail,
+        count: 0,
+        totalQty: 0,
+        latestDate: poDate,
+      }
+
+      existing.count += 1
+      existing.totalQty += Number(lineItem.quantity || 0)
+      if (poDate && poDate > existing.latestDate) {
+        existing.latestDate = poDate
+      }
+      if (vendorEmail) {
+        existing.vendorEmail = vendorEmail
+      }
+      if (vendorName) {
+        existing.vendorName = vendorName
+      }
+
+      skuVendors.set(vendorKey, existing)
+    }
+  })
+
+  return historicalVendorMap
+}
+
+function getBestHistoricalVendor(
+  historicalVendorMap: Map<string, Map<string, VendorStat>>,
+  sku: string
+): VendorSummary | null {
+  const vendors = historicalVendorMap.get(sku)
+  if (!vendors || vendors.size === 0) return null
+
+  let best: VendorStat | null = null
+
+  for (const stats of vendors.values()) {
+    if (
+      !best ||
+      stats.totalQty > best.totalQty ||
+      (stats.totalQty === best.totalQty && stats.count > best.count) ||
+      (stats.totalQty === best.totalQty && stats.count === best.count && stats.latestDate > best.latestDate)
+    ) {
+      best = stats
+    }
+  }
+
+  return best ? { vendorName: best.vendorName, vendorEmail: best.vendorEmail } : null
+}
+
+async function forEachPurchaseOrder(
+  accessToken: string,
+  orgId: string,
+  statuses: string[],
+  handlePo: (po: any) => void | Promise<void>
+) {
+  for (const status of statuses) {
+    let page = 1
+    let hasMore = true
+
+    while (hasMore) {
+      const data = await fetchZohoPage(
+        accessToken,
+        `${ZOHO_API_URL}/books/v3/purchaseorders?organization_id=${orgId}&status=${status}&page=${page}&per_page=200`
+      )
+
+      const purchaseOrders = data.purchaseorders || []
+      if (!purchaseOrders.length) {
+        hasMore = false
+        break
+      }
+
+      for (const po of purchaseOrders) {
+        await handlePo(po)
+      }
+
+      hasMore = data.page_context?.has_more_page ?? false
+      page++
+    }
+  }
+}
+
+async function fetchZohoPage(accessToken: string, url: string) {
+  const resp = await fetch(url, {
+    headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` },
+  })
+
+  const data = await resp.json()
+  if (!resp.ok || data.code !== 0) {
+    throw new Error(data.message || `Zoho request failed for ${url}`)
+  }
+
+  return data
+}
+
+function normalizeSku(value: unknown): string {
+  return String(value || '').trim().toUpperCase()
+}
 
 async function getOrgId(supabase: any): Promise<string> {
   const { data } = await supabase
