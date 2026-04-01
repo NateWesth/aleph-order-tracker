@@ -300,7 +300,120 @@ export default function BuyingSheetPage() {
     return "stable";
   };
 
-  const fetchLocalData = async () => {
+  // Supplier reliability: % of items delivered within expected lead time
+  const fetchSupplierReliability = async () => {
+    try {
+      const { data } = await supabase.from("order_items").select("code, created_at, completed_at, order_id").eq("progress_stage", "completed").not("code", "is", null).not("completed_at", "is", null);
+      if (!data?.length) return;
+      const supplierDeliveries = new Map<string, { onTime: number; total: number }>();
+      // We approximate by SKU lead time vs actual
+      for (const item of data) {
+        const sku = (item.code || "").toUpperCase();
+        const days = Math.max(0, Math.round((new Date(item.completed_at!).getTime() - new Date(item.created_at).getTime()) / (1000 * 60 * 60 * 24)));
+        const avgLead = leadTimeMap.get(sku) || 14;
+        const existing = supplierDeliveries.get(sku) || { onTime: 0, total: 0 };
+        existing.total++;
+        if (days <= avgLead * 1.2) existing.onTime++;
+        supplierDeliveries.set(sku, existing);
+      }
+      const map = new Map<string, number>();
+      supplierDeliveries.forEach((stats, sku) => {
+        map.set(sku, Math.round((stats.onTime / stats.total) * 100));
+      });
+      setSupplierReliabilityMap(map);
+    } catch (err) { console.error("Failed to fetch supplier reliability:", err); }
+  };
+
+  // Weekly velocity history
+  const fetchWeeklyHistory = async () => {
+    try {
+      const now = new Date();
+      const thisWeekStart = new Date(now); thisWeekStart.setDate(now.getDate() - now.getDay());
+      const lastWeekStart = new Date(thisWeekStart); lastWeekStart.setDate(lastWeekStart.getDate() - 7);
+      const [thisRes, lastRes] = await Promise.all([
+        supabase.from("order_items").select("code, quantity").not("code", "is", null).gte("created_at", thisWeekStart.toISOString()),
+        supabase.from("order_items").select("code, quantity").not("code", "is", null).gte("created_at", lastWeekStart.toISOString()).lt("created_at", thisWeekStart.toISOString()),
+      ]);
+      const thisMap = new Map<string, number>();
+      const lastMap = new Map<string, number>();
+      (thisRes.data || []).forEach(i => { const sku = (i.code || "").toUpperCase(); thisMap.set(sku, (thisMap.get(sku) || 0) + (i.quantity || 1)); });
+      (lastRes.data || []).forEach(i => { const sku = (i.code || "").toUpperCase(); lastMap.set(sku, (lastMap.get(sku) || 0) + (i.quantity || 1)); });
+      const map = new Map<string, { thisWeek: number; lastWeek: number }>();
+      new Set([...thisMap.keys(), ...lastMap.keys()]).forEach(sku => {
+        map.set(sku, { thisWeek: thisMap.get(sku) || 0, lastWeek: lastMap.get(sku) || 0 });
+      });
+      setWeeklyHistory(map);
+    } catch (err) { console.error("Failed to fetch weekly history:", err); }
+  };
+
+  // Cost estimation from historical order amounts
+  const fetchCostHistory = async () => {
+    try {
+      const { data } = await supabase.from("orders").select("id, total_amount").not("total_amount", "is", null).gt("total_amount", 0);
+      if (!data?.length) return;
+      const orderAmounts = new Map(data.map(o => [o.id, o.total_amount as number]));
+      const { data: items } = await supabase.from("order_items").select("code, quantity, order_id").not("code", "is", null);
+      if (!items?.length) return;
+      // Rough unit cost: order total / total items in order
+      const skuCosts = new Map<string, number[]>();
+      const orderItemCounts = new Map<string, number>();
+      items.forEach(i => { orderItemCounts.set(i.order_id, (orderItemCounts.get(i.order_id) || 0) + (i.quantity || 1)); });
+      items.forEach(i => {
+        const orderTotal = orderAmounts.get(i.order_id);
+        const itemCount = orderItemCounts.get(i.order_id) || 1;
+        if (orderTotal && itemCount > 0) {
+          const sku = (i.code || "").toUpperCase();
+          const unitCost = (orderTotal / itemCount) * (i.quantity || 1) / (i.quantity || 1);
+          const arr = skuCosts.get(sku) || []; arr.push(unitCost); skuCosts.set(sku, arr);
+        }
+      });
+      const map = new Map<string, number>();
+      skuCosts.forEach((costs, sku) => { map.set(sku, Math.round(costs.reduce((a, b) => a + b, 0) / costs.length * 100) / 100); });
+      setCostHistory(map);
+    } catch (err) { console.error("Failed to fetch cost history:", err); }
+  };
+
+  // Helper: compute new analytical fields for a row
+  const computeAnalyticalFields = (sku: string, toOrder: number, daysWaiting: number, avgLeadTimeDays: number | null, orders: { urgency?: string }[], recommendedOrderQty: number) => {
+    // Age escalation
+    const leadRef = avgLeadTimeDays || 14;
+    const ageRatio = daysWaiting / leadRef;
+    const ageEscalation: "green" | "yellow" | "orange" | "red" = ageRatio > 2 ? "red" : ageRatio > 1.5 ? "orange" : ageRatio > 1 ? "yellow" : "green";
+
+    // Conflicting urgency
+    const urgencies = new Set(orders.map(o => o.urgency || "normal"));
+    const conflictingUrgency = urgencies.size > 1 && (urgencies.has("urgent") || urgencies.has("critical"));
+
+    // Forecast next month (linear extrapolation)
+    const h = demandHistory.get(sku);
+    const forecastNextMonth = h ? Math.max(0, Math.round(h.lastMonth + (h.lastMonth - h.prevMonth))) : 0;
+
+    // Reorder point: (daily burn × lead time) + safety stock
+    const dailyBurn = getDailyBurnRate(sku);
+    const safetyStock = getSafetyStock(sku, avgLeadTimeDays);
+    const reorderPoint = Math.ceil(dailyBurn * (avgLeadTimeDays || 14)) + safetyStock;
+
+    // Supplier reliability
+    const supplierReliability = supplierReliabilityMap.get(sku) ?? null;
+
+    // Velocity score (orders per week)
+    const wh = weeklyHistory.get(sku);
+    const velocityScore = wh ? Math.round(((wh.thisWeek + wh.lastWeek) / 2) * 10) / 10 : 0;
+
+    // Weekly trend %
+    const weeklyTrend = wh && wh.lastWeek > 0 ? Math.round(((wh.thisWeek - wh.lastWeek) / wh.lastWeek) * 100) : 0;
+
+    // Cost estimation
+    const unitCost = costHistory.get(sku) ?? null;
+    const estimatedCost = unitCost !== null ? Math.round(unitCost * toOrder * 100) / 100 : null;
+
+    // Adjusted qty (user override or recommended)
+    const adjustedOrderQty = adjustedQtys[sku] ?? recommendedOrderQty;
+
+    return { ageEscalation, conflictingUrgency, forecastNextMonth, reorderPoint, supplierReliability, velocityScore, weeklyTrend, estimatedCost, adjustedOrderQty, abcClass: "C" as "A" | "B" | "C" };
+  };
+
+
     setLoading(true);
     try {
       const { data: orderItems, error: itemsError } = await supabase.from("order_items").select("id, name, code, quantity, progress_stage, order_id, created_at").in("progress_stage", ["awaiting-stock"]).order("created_at", { ascending: false });
