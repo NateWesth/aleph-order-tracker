@@ -413,7 +413,7 @@ export default function BuyingSheetPage() {
     return { ageEscalation, conflictingUrgency, forecastNextMonth, reorderPoint, supplierReliability, velocityScore, weeklyTrend, estimatedCost, adjustedOrderQty, abcClass: "C" as "A" | "B" | "C" };
   };
 
-
+  const fetchLocalData = async () => {
     setLoading(true);
     try {
       const { data: orderItems, error: itemsError } = await supabase.from("order_items").select("id, name, code, quantity, progress_stage, order_id, created_at").in("progress_stage", ["awaiting-stock"]).order("created_at", { ascending: false });
