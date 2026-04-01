@@ -907,23 +907,38 @@ export default function BuyingSheetPage() {
           <div>
             <p className="text-xs font-semibold text-muted-foreground mb-1.5">Stock & Demand Analysis</p>
             <div className="space-y-1.5 text-xs">
+              <div className="flex justify-between"><span className="text-muted-foreground">ABC Class:</span><Badge variant={row.abcClass === "A" ? "destructive" : row.abcClass === "B" ? "secondary" : "outline"} className="text-[10px]">{row.abcClass}</Badge></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Last Month:</span><span className="font-medium">{row.lastMonthQty}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Previous:</span><span className="font-medium">{row.prevMonthQty}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Forecast Next:</span><span className="font-bold text-primary">{row.forecastNextMonth}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Daily Burn Rate:</span><span className="font-medium">{row.dailyBurnRate.toFixed(1)}/day</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Weekly Velocity:</span><span className="font-medium">{row.velocityScore}/wk {row.weeklyTrend !== 0 && <span className={row.weeklyTrend > 0 ? "text-emerald-600" : "text-destructive"}>({row.weeklyTrend > 0 ? "+" : ""}{row.weeklyTrend}%)</span>}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Demand Pattern:</span><span className={`font-medium ${row.demandVariability === "erratic" ? "text-destructive" : row.demandVariability === "moderate" ? "text-orange-500" : "text-emerald-500"}`}>{row.demandVariability}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Reorder Point:</span><span className="font-medium">{row.reorderPoint}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Safety Stock:</span><span className="font-medium">{row.safetyStock > 0 ? `+${row.safetyStock} buffer` : "—"}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Recommended Qty:</span><span className="font-bold text-primary">{row.recommendedOrderQty}</span></div>
+              {row.estimatedCost !== null && <div className="flex justify-between"><span className="text-muted-foreground">Est. Cost:</span><span className="font-bold">R{row.estimatedCost.toLocaleString()}</span></div>}
               <div className="flex justify-between"><span className="text-muted-foreground">Coverage:</span><CoverageBar percent={row.coveragePercent} /></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Stockout Risk:</span><StockoutRiskBadge days={row.stockoutRiskDays} /></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Customers Affected:</span><span className="font-medium">{row.distinctCustomers}</span></div>
+              {row.supplierReliability !== null && <div className="flex justify-between"><span className="text-muted-foreground">Supplier Reliability:</span><span className={`font-medium ${row.supplierReliability >= 80 ? "text-emerald-600" : row.supplierReliability >= 60 ? "text-orange-500" : "text-destructive"}`}>{row.supplierReliability}%</span></div>}
               {row.avgLeadTimeDays !== null && <div className="flex justify-between"><span className="text-muted-foreground">Avg Lead Time:</span><span className={`font-medium ${row.daysWaiting > row.avgLeadTimeDays ? "text-destructive" : ""}`}>{row.avgLeadTimeDays}d {row.daysWaiting > row.avgLeadTimeDays ? "(overdue!)" : ""}</span></div>}
               {row.seasonalPattern && <div className="flex justify-between"><span className="text-muted-foreground">Season:</span><span className="flex items-center gap-1 font-medium">{row.seasonalPattern === "peak" ? <><Sun className="h-3 w-3 text-orange-500" />Peak</> : row.seasonalPattern === "low" ? <><Snowflake className="h-3 w-3 text-blue-500" />Low</> : "Normal"}</span></div>}
               {row.lastPurchasedDate && <div className="flex justify-between"><span className="text-muted-foreground">Last Purchased:</span><span className="font-medium">{new Date(row.lastPurchasedDate).toLocaleDateString()}</span></div>}
+              {row.conflictingUrgency && <div className="p-1.5 rounded bg-destructive/10 border border-destructive/20 text-[10px] text-destructive font-medium">⚠️ Mixed urgency levels across orders</div>}
             </div>
           </div>
           <div>
             <p className="text-xs font-semibold text-muted-foreground mb-1.5">Quick Actions</p>
             <div className="space-y-1.5">
+              {/* Inline qty adjustment */}
+              <div className="flex items-center gap-2 p-1.5 rounded bg-background/60 border border-border">
+                <span className="text-[10px] text-muted-foreground">Order Qty:</span>
+                <Input type="number" min={0} value={adjustedQtys[row.sku] ?? row.recommendedOrderQty} onChange={e => setAdjustedQtys(prev => ({ ...prev, [row.sku]: Math.max(0, parseInt(e.target.value) || 0) }))} className="h-6 w-16 text-xs text-center p-0" />
+                {adjustedQtys[row.sku] !== undefined && adjustedQtys[row.sku] !== row.recommendedOrderQty && (
+                  <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={() => setAdjustedQtys(prev => { const n = { ...prev }; delete n[row.sku]; return n; })}><X className="h-3 w-3" /></Button>
+                )}
+              </div>
               <Button variant="outline" size="sm" className="w-full justify-start gap-2 text-xs" onClick={() => handleCopyPOLine(row)}><ClipboardCopy className="h-3 w-3" />Copy PO Line</Button>
               <Button variant="outline" size="sm" className="w-full justify-start gap-2 text-xs" onClick={() => generateEmailDraft(row.supplierName)}><Send className="h-3 w-3" />Draft Email to {row.supplierName}</Button>
               {row.supplierEmail && <Button variant="outline" size="sm" className="w-full justify-start gap-2 text-xs" onClick={() => { navigator.clipboard.writeText(row.supplierEmail!); toast({ title: "Copied", description: `${row.supplierEmail} copied` }); }}><Mail className="h-3 w-3" />Copy Email</Button>}
