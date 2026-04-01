@@ -1,14 +1,14 @@
 import { Card, CardContent } from "@/components/ui/card";
 
 interface SummaryProps {
-  totals: { needed: number; inStock: number; onPO: number; toOrder: number; urgent: number; stockoutRisk: number };
+  totals: { needed: number; inStock: number; onPO: number; toOrder: number; urgent: number; stockoutRisk: number; estimatedCost: number; abcA: number };
   avgDaysWaiting: number;
   supplierCount: number;
 }
 
 export function BuyingSheetSummary({ totals, avgDaysWaiting, supplierCount }: SummaryProps) {
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
+    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-10 gap-2">
       <Card className="bg-card/60">
         <CardContent className="p-3">
           <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Total Needed</p>
@@ -59,6 +59,20 @@ export function BuyingSheetSummary({ totals, avgDaysWaiting, supplierCount }: Su
           <p className="text-lg font-bold text-foreground mt-0.5">{supplierCount}</p>
         </CardContent>
       </Card>
+      <Card className="bg-card/60">
+        <CardContent className="p-3">
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Class A Items</p>
+          <p className="text-lg font-bold text-destructive mt-0.5">{totals.abcA}</p>
+        </CardContent>
+      </Card>
+      {totals.estimatedCost > 0 && (
+        <Card className="bg-card/60">
+          <CardContent className="p-3">
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Est. Cost</p>
+            <p className="text-lg font-bold text-foreground mt-0.5">R{totals.estimatedCost.toLocaleString()}</p>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

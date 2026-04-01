@@ -20,12 +20,23 @@ export interface BuyingSheetRow {
   lastPurchasedDate: string | null;
   seasonalPattern: "peak" | "low" | "normal" | null;
   avgLeadTimeDays: number | null;
-  // New functional fields
+  // Functional fields
   safetyStock: number;
   dailyBurnRate: number;
   demandVariability: "stable" | "moderate" | "erratic";
   distinctCustomers: number;
-  recommendedOrderQty: number; // toOrder + safetyStock buffer
+  recommendedOrderQty: number;
+  // New analytical fields
+  abcClass: "A" | "B" | "C";
+  reorderPoint: number;
+  forecastNextMonth: number;
+  supplierReliability: number | null; // 0-100%
+  velocityScore: number; // orders per week
+  ageEscalation: "green" | "yellow" | "orange" | "red";
+  conflictingUrgency: boolean; // same SKU has both normal & urgent orders
+  adjustedOrderQty: number; // user-adjustable qty (defaults to recommendedOrderQty)
+  estimatedCost: number | null; // estimated cost from historical data
+  weeklyTrend: number; // % change week over week
 }
 
 export interface SuggestedRestockRow {

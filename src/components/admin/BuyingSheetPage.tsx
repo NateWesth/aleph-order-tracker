@@ -70,10 +70,14 @@ export default function BuyingSheetPage() {
   const [pinnedSkus, setPinnedSkus] = useState<string[]>(loadPinned);
   const [viewDensity, setViewDensity] = useState<ViewDensity>(loadDensity);
   const [recentlyOrdered, setRecentlyOrdered] = useState<RecentlyOrderedItem[]>(loadRecentlyOrdered);
-  const [autoRefreshInterval, setAutoRefreshInterval] = useState<number>(0); // minutes, 0 = off
+  const [autoRefreshInterval, setAutoRefreshInterval] = useState<number>(0);
   const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(null);
   const [autoRefreshCountdown, setAutoRefreshCountdown] = useState(0);
   const [showRecentlyOrdered, setShowRecentlyOrdered] = useState(false);
+  const [adjustedQtys, setAdjustedQtys] = useState<Record<string, number>>({});
+  const [supplierReliabilityMap, setSupplierReliabilityMap] = useState<Map<string, number>>(new Map());
+  const [weeklyHistory, setWeeklyHistory] = useState<Map<string, { thisWeek: number; lastWeek: number }>>(new Map());
+  const [costHistory, setCostHistory] = useState<Map<string, number>>(new Map());
   const printRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -81,6 +85,9 @@ export default function BuyingSheetPage() {
     fetchLastPurchaseDates();
     fetchLeadTimes();
     fetchSeasonalPatterns();
+    fetchSupplierReliability();
+    fetchWeeklyHistory();
+    fetchCostHistory();
     loadSnapshot();
     fetchLocalData();
   }, []);
@@ -293,6 +300,119 @@ export default function BuyingSheetPage() {
     return "stable";
   };
 
+  // Supplier reliability: % of items delivered within expected lead time
+  const fetchSupplierReliability = async () => {
+    try {
+      const { data } = await supabase.from("order_items").select("code, created_at, completed_at, order_id").eq("progress_stage", "completed").not("code", "is", null).not("completed_at", "is", null);
+      if (!data?.length) return;
+      const supplierDeliveries = new Map<string, { onTime: number; total: number }>();
+      // We approximate by SKU lead time vs actual
+      for (const item of data) {
+        const sku = (item.code || "").toUpperCase();
+        const days = Math.max(0, Math.round((new Date(item.completed_at!).getTime() - new Date(item.created_at).getTime()) / (1000 * 60 * 60 * 24)));
+        const avgLead = leadTimeMap.get(sku) || 14;
+        const existing = supplierDeliveries.get(sku) || { onTime: 0, total: 0 };
+        existing.total++;
+        if (days <= avgLead * 1.2) existing.onTime++;
+        supplierDeliveries.set(sku, existing);
+      }
+      const map = new Map<string, number>();
+      supplierDeliveries.forEach((stats, sku) => {
+        map.set(sku, Math.round((stats.onTime / stats.total) * 100));
+      });
+      setSupplierReliabilityMap(map);
+    } catch (err) { console.error("Failed to fetch supplier reliability:", err); }
+  };
+
+  // Weekly velocity history
+  const fetchWeeklyHistory = async () => {
+    try {
+      const now = new Date();
+      const thisWeekStart = new Date(now); thisWeekStart.setDate(now.getDate() - now.getDay());
+      const lastWeekStart = new Date(thisWeekStart); lastWeekStart.setDate(lastWeekStart.getDate() - 7);
+      const [thisRes, lastRes] = await Promise.all([
+        supabase.from("order_items").select("code, quantity").not("code", "is", null).gte("created_at", thisWeekStart.toISOString()),
+        supabase.from("order_items").select("code, quantity").not("code", "is", null).gte("created_at", lastWeekStart.toISOString()).lt("created_at", thisWeekStart.toISOString()),
+      ]);
+      const thisMap = new Map<string, number>();
+      const lastMap = new Map<string, number>();
+      (thisRes.data || []).forEach(i => { const sku = (i.code || "").toUpperCase(); thisMap.set(sku, (thisMap.get(sku) || 0) + (i.quantity || 1)); });
+      (lastRes.data || []).forEach(i => { const sku = (i.code || "").toUpperCase(); lastMap.set(sku, (lastMap.get(sku) || 0) + (i.quantity || 1)); });
+      const map = new Map<string, { thisWeek: number; lastWeek: number }>();
+      new Set([...thisMap.keys(), ...lastMap.keys()]).forEach(sku => {
+        map.set(sku, { thisWeek: thisMap.get(sku) || 0, lastWeek: lastMap.get(sku) || 0 });
+      });
+      setWeeklyHistory(map);
+    } catch (err) { console.error("Failed to fetch weekly history:", err); }
+  };
+
+  // Cost estimation from historical order amounts
+  const fetchCostHistory = async () => {
+    try {
+      const { data } = await supabase.from("orders").select("id, total_amount").not("total_amount", "is", null).gt("total_amount", 0);
+      if (!data?.length) return;
+      const orderAmounts = new Map(data.map(o => [o.id, o.total_amount as number]));
+      const { data: items } = await supabase.from("order_items").select("code, quantity, order_id").not("code", "is", null);
+      if (!items?.length) return;
+      // Rough unit cost: order total / total items in order
+      const skuCosts = new Map<string, number[]>();
+      const orderItemCounts = new Map<string, number>();
+      items.forEach(i => { orderItemCounts.set(i.order_id, (orderItemCounts.get(i.order_id) || 0) + (i.quantity || 1)); });
+      items.forEach(i => {
+        const orderTotal = orderAmounts.get(i.order_id);
+        const itemCount = orderItemCounts.get(i.order_id) || 1;
+        if (orderTotal && itemCount > 0) {
+          const sku = (i.code || "").toUpperCase();
+          const unitCost = (orderTotal / itemCount) * (i.quantity || 1) / (i.quantity || 1);
+          const arr = skuCosts.get(sku) || []; arr.push(unitCost); skuCosts.set(sku, arr);
+        }
+      });
+      const map = new Map<string, number>();
+      skuCosts.forEach((costs, sku) => { map.set(sku, Math.round(costs.reduce((a, b) => a + b, 0) / costs.length * 100) / 100); });
+      setCostHistory(map);
+    } catch (err) { console.error("Failed to fetch cost history:", err); }
+  };
+
+  // Helper: compute new analytical fields for a row
+  const computeAnalyticalFields = (sku: string, toOrder: number, daysWaiting: number, avgLeadTimeDays: number | null, orders: { urgency?: string }[], recommendedOrderQty: number) => {
+    // Age escalation
+    const leadRef = avgLeadTimeDays || 14;
+    const ageRatio = daysWaiting / leadRef;
+    const ageEscalation: "green" | "yellow" | "orange" | "red" = ageRatio > 2 ? "red" : ageRatio > 1.5 ? "orange" : ageRatio > 1 ? "yellow" : "green";
+
+    // Conflicting urgency
+    const urgencies = new Set(orders.map(o => o.urgency || "normal"));
+    const conflictingUrgency = urgencies.size > 1 && (urgencies.has("urgent") || urgencies.has("critical"));
+
+    // Forecast next month (linear extrapolation)
+    const h = demandHistory.get(sku);
+    const forecastNextMonth = h ? Math.max(0, Math.round(h.lastMonth + (h.lastMonth - h.prevMonth))) : 0;
+
+    // Reorder point: (daily burn × lead time) + safety stock
+    const dailyBurn = getDailyBurnRate(sku);
+    const safetyStock = getSafetyStock(sku, avgLeadTimeDays);
+    const reorderPoint = Math.ceil(dailyBurn * (avgLeadTimeDays || 14)) + safetyStock;
+
+    // Supplier reliability
+    const supplierReliability = supplierReliabilityMap.get(sku) ?? null;
+
+    // Velocity score (orders per week)
+    const wh = weeklyHistory.get(sku);
+    const velocityScore = wh ? Math.round(((wh.thisWeek + wh.lastWeek) / 2) * 10) / 10 : 0;
+
+    // Weekly trend %
+    const weeklyTrend = wh && wh.lastWeek > 0 ? Math.round(((wh.thisWeek - wh.lastWeek) / wh.lastWeek) * 100) : 0;
+
+    // Cost estimation
+    const unitCost = costHistory.get(sku) ?? null;
+    const estimatedCost = unitCost !== null ? Math.round(unitCost * toOrder * 100) / 100 : null;
+
+    // Adjusted qty (user override or recommended)
+    const adjustedOrderQty = adjustedQtys[sku] ?? recommendedOrderQty;
+
+    return { ageEscalation, conflictingUrgency, forecastNextMonth, reorderPoint, supplierReliability, velocityScore, weeklyTrend, estimatedCost, adjustedOrderQty, abcClass: "C" as "A" | "B" | "C" };
+  };
+
   const fetchLocalData = async () => {
     setLoading(true);
     try {
@@ -379,9 +499,19 @@ export default function BuyingSheetPage() {
         const safetyStock = getSafetyStock(entry.sku, avgLeadTimeDays);
         const dailyBurn = getDailyBurnRate(entry.sku);
         const recommendedOrderQty = toOrder > 0 ? toOrder + safetyStock : 0;
-        return { ...entry, supplierName, supplierEmail, stockOnHand: z.stockOnHand, onPurchaseOrder: z.onPurchaseOrder, toOrder, daysWaiting, priorityScore, coveragePercent, demandTrend: trend, lastMonthQty: lastMonth, prevMonthQty: prevMonth, stockoutRiskDays, lastPurchasedDate, seasonalPattern, avgLeadTimeDays, safetyStock, dailyBurnRate: dailyBurn, demandVariability: demandVar, distinctCustomers, recommendedOrderQty };
+        const analytical = computeAnalyticalFields(entry.sku, toOrder, daysWaiting, avgLeadTimeDays, entry.orders, recommendedOrderQty);
+        return { ...entry, supplierName, supplierEmail, stockOnHand: z.stockOnHand, onPurchaseOrder: z.onPurchaseOrder, toOrder, daysWaiting, priorityScore, coveragePercent, demandTrend: trend, lastMonthQty: lastMonth, prevMonthQty: prevMonth, stockoutRiskDays, lastPurchasedDate, seasonalPattern, avgLeadTimeDays, safetyStock, dailyBurnRate: dailyBurn, demandVariability: demandVar, distinctCustomers, recommendedOrderQty, ...analytical };
       });
       buyingRows.sort((a, b) => b.priorityScore - a.priorityScore);
+      // ABC classification: top 80% of total demand = A, next 15% = B, rest = C
+      const totalDemand = buyingRows.reduce((s, r) => s + r.totalNeeded, 0);
+      let cumulative = 0;
+      const sortedByDemand = [...buyingRows].sort((a, b) => b.totalNeeded - a.totalNeeded);
+      for (const row of sortedByDemand) {
+        cumulative += row.totalNeeded;
+        const pct = totalDemand > 0 ? cumulative / totalDemand : 1;
+        row.abcClass = pct <= 0.8 ? "A" : pct <= 0.95 ? "B" : "C";
+      }
       setRows(buyingRows);
       fetchSuggestedRestock(activeSkus);
     } catch (error) { console.error("Failed to fetch buying sheet data:", error); } finally { setLoading(false); }
@@ -408,7 +538,8 @@ export default function BuyingSheetPage() {
           if (row.avgLeadTimeDays !== null && row.daysWaiting > row.avgLeadTimeDays) priorityScore += 10;
           const safetyStock = getSafetyStock(row.sku, row.avgLeadTimeDays);
           const recommendedOrderQty = toOrder > 0 ? toOrder + safetyStock : 0;
-          return { ...row, supplierName, supplierEmail, stockOnHand: z.stockOnHand, onPurchaseOrder: z.onPurchaseOrder, toOrder, coveragePercent, priorityScore, stockoutRiskDays, safetyStock, recommendedOrderQty };
+          const analytical = computeAnalyticalFields(row.sku, toOrder, row.daysWaiting, row.avgLeadTimeDays, row.orders, recommendedOrderQty);
+          return { ...row, supplierName, supplierEmail, stockOnHand: z.stockOnHand, onPurchaseOrder: z.onPurchaseOrder, toOrder, coveragePercent, priorityScore, stockoutRiskDays, safetyStock, recommendedOrderQty, ...analytical };
         }));
         toast({ title: "Updated", description: "Zoho stock & PO data loaded" });
       }
@@ -435,7 +566,8 @@ export default function BuyingSheetPage() {
         if (row.avgLeadTimeDays !== null && row.daysWaiting > row.avgLeadTimeDays) priorityScore += 10;
         const safetyStock = getSafetyStock(row.sku, row.avgLeadTimeDays);
         const recommendedOrderQty = toOrder > 0 ? toOrder + safetyStock : 0;
-        return { ...row, supplierName, stockOnHand: z.stockOnHand, onPurchaseOrder: z.onPurchaseOrder, toOrder, coveragePercent, priorityScore, stockoutRiskDays, safetyStock, recommendedOrderQty };
+        const analytical = computeAnalyticalFields(row.sku, toOrder, row.daysWaiting, row.avgLeadTimeDays, row.orders, recommendedOrderQty);
+        return { ...row, supplierName, stockOnHand: z.stockOnHand, onPurchaseOrder: z.onPurchaseOrder, toOrder, coveragePercent, priorityScore, stockoutRiskDays, safetyStock, recommendedOrderQty, ...analytical };
       }));
       toast({ title: "Updated", description: "Stock & PO data refreshed from Zoho Books" });
     }
@@ -672,7 +804,9 @@ export default function BuyingSheetPage() {
     needed: acc.needed + r.totalNeeded, inStock: acc.inStock + r.stockOnHand, onPO: acc.onPO + r.onPurchaseOrder,
     toOrder: acc.toOrder + r.toOrder, urgent: acc.urgent + (r.hasUrgent ? 1 : 0), avgDays: acc.avgDays + r.daysWaiting,
     stockoutRisk: acc.stockoutRisk + (r.stockoutRiskDays !== null && r.stockoutRiskDays <= 7 ? 1 : 0),
-  }), { needed: 0, inStock: 0, onPO: 0, toOrder: 0, urgent: 0, avgDays: 0, stockoutRisk: 0 }), [filteredRows]);
+    estimatedCost: acc.estimatedCost + (r.estimatedCost || 0),
+    abcA: acc.abcA + (r.abcClass === "A" ? 1 : 0),
+  }), { needed: 0, inStock: 0, onPO: 0, toOrder: 0, urgent: 0, avgDays: 0, stockoutRisk: 0, estimatedCost: 0, abcA: 0 }), [filteredRows]);
 
   const avgDaysWaiting = filteredRows.length > 0 ? Math.round(totals.avgDays / filteredRows.length) : 0;
 
@@ -775,23 +909,38 @@ export default function BuyingSheetPage() {
           <div>
             <p className="text-xs font-semibold text-muted-foreground mb-1.5">Stock & Demand Analysis</p>
             <div className="space-y-1.5 text-xs">
+              <div className="flex justify-between"><span className="text-muted-foreground">ABC Class:</span><Badge variant={row.abcClass === "A" ? "destructive" : row.abcClass === "B" ? "secondary" : "outline"} className="text-[10px]">{row.abcClass}</Badge></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Last Month:</span><span className="font-medium">{row.lastMonthQty}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Previous:</span><span className="font-medium">{row.prevMonthQty}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Forecast Next:</span><span className="font-bold text-primary">{row.forecastNextMonth}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Daily Burn Rate:</span><span className="font-medium">{row.dailyBurnRate.toFixed(1)}/day</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Weekly Velocity:</span><span className="font-medium">{row.velocityScore}/wk {row.weeklyTrend !== 0 && <span className={row.weeklyTrend > 0 ? "text-emerald-600" : "text-destructive"}>({row.weeklyTrend > 0 ? "+" : ""}{row.weeklyTrend}%)</span>}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Demand Pattern:</span><span className={`font-medium ${row.demandVariability === "erratic" ? "text-destructive" : row.demandVariability === "moderate" ? "text-orange-500" : "text-emerald-500"}`}>{row.demandVariability}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Reorder Point:</span><span className="font-medium">{row.reorderPoint}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Safety Stock:</span><span className="font-medium">{row.safetyStock > 0 ? `+${row.safetyStock} buffer` : "—"}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Recommended Qty:</span><span className="font-bold text-primary">{row.recommendedOrderQty}</span></div>
+              {row.estimatedCost !== null && <div className="flex justify-between"><span className="text-muted-foreground">Est. Cost:</span><span className="font-bold">R{row.estimatedCost.toLocaleString()}</span></div>}
               <div className="flex justify-between"><span className="text-muted-foreground">Coverage:</span><CoverageBar percent={row.coveragePercent} /></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Stockout Risk:</span><StockoutRiskBadge days={row.stockoutRiskDays} /></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Customers Affected:</span><span className="font-medium">{row.distinctCustomers}</span></div>
+              {row.supplierReliability !== null && <div className="flex justify-between"><span className="text-muted-foreground">Supplier Reliability:</span><span className={`font-medium ${row.supplierReliability >= 80 ? "text-emerald-600" : row.supplierReliability >= 60 ? "text-orange-500" : "text-destructive"}`}>{row.supplierReliability}%</span></div>}
               {row.avgLeadTimeDays !== null && <div className="flex justify-between"><span className="text-muted-foreground">Avg Lead Time:</span><span className={`font-medium ${row.daysWaiting > row.avgLeadTimeDays ? "text-destructive" : ""}`}>{row.avgLeadTimeDays}d {row.daysWaiting > row.avgLeadTimeDays ? "(overdue!)" : ""}</span></div>}
               {row.seasonalPattern && <div className="flex justify-between"><span className="text-muted-foreground">Season:</span><span className="flex items-center gap-1 font-medium">{row.seasonalPattern === "peak" ? <><Sun className="h-3 w-3 text-orange-500" />Peak</> : row.seasonalPattern === "low" ? <><Snowflake className="h-3 w-3 text-blue-500" />Low</> : "Normal"}</span></div>}
               {row.lastPurchasedDate && <div className="flex justify-between"><span className="text-muted-foreground">Last Purchased:</span><span className="font-medium">{new Date(row.lastPurchasedDate).toLocaleDateString()}</span></div>}
+              {row.conflictingUrgency && <div className="p-1.5 rounded bg-destructive/10 border border-destructive/20 text-[10px] text-destructive font-medium">⚠️ Mixed urgency levels across orders</div>}
             </div>
           </div>
           <div>
             <p className="text-xs font-semibold text-muted-foreground mb-1.5">Quick Actions</p>
             <div className="space-y-1.5">
+              {/* Inline qty adjustment */}
+              <div className="flex items-center gap-2 p-1.5 rounded bg-background/60 border border-border">
+                <span className="text-[10px] text-muted-foreground">Order Qty:</span>
+                <Input type="number" min={0} value={adjustedQtys[row.sku] ?? row.recommendedOrderQty} onChange={e => setAdjustedQtys(prev => ({ ...prev, [row.sku]: Math.max(0, parseInt(e.target.value) || 0) }))} className="h-6 w-16 text-xs text-center p-0" />
+                {adjustedQtys[row.sku] !== undefined && adjustedQtys[row.sku] !== row.recommendedOrderQty && (
+                  <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={() => setAdjustedQtys(prev => { const n = { ...prev }; delete n[row.sku]; return n; })}><X className="h-3 w-3" /></Button>
+                )}
+              </div>
               <Button variant="outline" size="sm" className="w-full justify-start gap-2 text-xs" onClick={() => handleCopyPOLine(row)}><ClipboardCopy className="h-3 w-3" />Copy PO Line</Button>
               <Button variant="outline" size="sm" className="w-full justify-start gap-2 text-xs" onClick={() => generateEmailDraft(row.supplierName)}><Send className="h-3 w-3" />Draft Email to {row.supplierName}</Button>
               {row.supplierEmail && <Button variant="outline" size="sm" className="w-full justify-start gap-2 text-xs" onClick={() => { navigator.clipboard.writeText(row.supplierEmail!); toast({ title: "Copied", description: `${row.supplierEmail} copied` }); }}><Mail className="h-3 w-3" />Copy Email</Button>}
@@ -821,7 +970,13 @@ export default function BuyingSheetPage() {
           </TableCell>
           <TableCell className={densityPy} onClick={() => toggleExpand(row.sku)}><div className="flex items-center gap-1">{isExpanded ? <ChevronUp className="h-3 w-3 text-muted-foreground" /> : <ChevronDown className="h-3 w-3 text-muted-foreground/40" />}<PriorityBadge score={row.priorityScore} /></div></TableCell>
           <TableCell className={`font-mono text-xs text-muted-foreground ${densityPy}`} onClick={() => toggleExpand(row.sku)}>{highlightText(row.sku)}</TableCell>
-          <TableCell className={`font-medium max-w-[180px] truncate ${densityPy}`} onClick={() => toggleExpand(row.sku)}>{highlightText(row.itemName)}</TableCell>
+          <TableCell className={`font-medium max-w-[180px] ${densityPy}`} onClick={() => toggleExpand(row.sku)}>
+            <div className="flex items-center gap-1 min-w-0">
+              <span className="truncate">{highlightText(row.itemName)}</span>
+              <span className={`text-[9px] font-bold px-1 rounded shrink-0 ${row.abcClass === "A" ? "bg-destructive/15 text-destructive" : row.abcClass === "B" ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"}`}>{row.abcClass}</span>
+              {row.conflictingUrgency && <Tooltip><TooltipTrigger asChild><AlertTriangle className="h-3 w-3 text-amber-500 shrink-0" /></TooltipTrigger><TooltipContent><p className="text-xs">⚠️ Mixed urgency levels across orders</p></TooltipContent></Tooltip>}
+            </div>
+          </TableCell>
           <TableCell className={`text-right font-semibold ${densityPy}`} onClick={() => toggleExpand(row.sku)}>{row.totalNeeded}</TableCell>
           <TableCell className={`text-right font-medium ${densityPy}`} onClick={() => toggleExpand(row.sku)}>{row.stockOnHand}</TableCell>
           <TableCell className={`text-right font-medium ${densityPy}`} onClick={() => toggleExpand(row.sku)}>{row.onPurchaseOrder}</TableCell>
@@ -834,7 +989,12 @@ export default function BuyingSheetPage() {
           </TableCell>
           <TableCell className={`text-center ${densityPy}`} onClick={() => toggleExpand(row.sku)}><StockoutRiskBadge days={row.stockoutRiskDays} /></TableCell>
           <TableCell className={`text-center ${densityPy}`} onClick={() => toggleExpand(row.sku)}><DemandTrendIcon trend={row.demandTrend} lastMonth={row.lastMonthQty} prevMonth={row.prevMonthQty} /></TableCell>
-          <TableCell className={`text-center ${densityPy}`} onClick={() => toggleExpand(row.sku)}><span className={`text-sm font-medium ${row.daysWaiting > 7 ? "text-destructive" : row.daysWaiting > 3 ? "text-orange-500" : "text-muted-foreground"}`}>{row.daysWaiting}d</span></TableCell>
+          <TableCell className={`text-center ${densityPy}`} onClick={() => toggleExpand(row.sku)}>
+            <div className="flex items-center justify-center gap-1">
+              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${row.ageEscalation === "red" ? "bg-destructive" : row.ageEscalation === "orange" ? "bg-orange-500" : row.ageEscalation === "yellow" ? "bg-amber-400" : "bg-emerald-500"}`} />
+              <span className={`text-sm font-medium ${row.daysWaiting > 7 ? "text-destructive" : row.daysWaiting > 3 ? "text-orange-500" : "text-muted-foreground"}`}>{row.daysWaiting}d</span>
+            </div>
+          </TableCell>
           <TableCell className={`text-sm ${densityPy}`} onClick={() => toggleExpand(row.sku)}>
             <div className="flex items-center gap-1.5">
               <span>{highlightText(row.supplierName)}</span>
