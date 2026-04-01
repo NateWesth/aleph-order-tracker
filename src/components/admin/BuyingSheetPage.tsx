@@ -499,7 +499,8 @@ export default function BuyingSheetPage() {
         const safetyStock = getSafetyStock(entry.sku, avgLeadTimeDays);
         const dailyBurn = getDailyBurnRate(entry.sku);
         const recommendedOrderQty = toOrder > 0 ? toOrder + safetyStock : 0;
-        return { ...entry, supplierName, supplierEmail, stockOnHand: z.stockOnHand, onPurchaseOrder: z.onPurchaseOrder, toOrder, daysWaiting, priorityScore, coveragePercent, demandTrend: trend, lastMonthQty: lastMonth, prevMonthQty: prevMonth, stockoutRiskDays, lastPurchasedDate, seasonalPattern, avgLeadTimeDays, safetyStock, dailyBurnRate: dailyBurn, demandVariability: demandVar, distinctCustomers, recommendedOrderQty };
+        const analytical = computeAnalyticalFields(entry.sku, toOrder, daysWaiting, avgLeadTimeDays, entry.orders, recommendedOrderQty);
+        return { ...entry, supplierName, supplierEmail, stockOnHand: z.stockOnHand, onPurchaseOrder: z.onPurchaseOrder, toOrder, daysWaiting, priorityScore, coveragePercent, demandTrend: trend, lastMonthQty: lastMonth, prevMonthQty: prevMonth, stockoutRiskDays, lastPurchasedDate, seasonalPattern, avgLeadTimeDays, safetyStock, dailyBurnRate: dailyBurn, demandVariability: demandVar, distinctCustomers, recommendedOrderQty, ...analytical };
       });
       buyingRows.sort((a, b) => b.priorityScore - a.priorityScore);
       setRows(buyingRows);
