@@ -139,19 +139,86 @@ Deno.serve(async (req) => {
 
     console.log(`Fetched PO quantities for ${poQtyMap.size} SKUs, vendor info for ${poVendorMap.size} SKUs from Zoho`)
 
+    // 3. Fetch HISTORICAL purchase orders (closed/billed) to find preferred suppliers per SKU
+    const historicalVendorMap = new Map<string, Map<string, { count: number; vendorName: string; vendorEmail: string }>>() // SKU -> vendorId -> stats
+    const historicalStatuses = ['closed', 'billed']
+
+    for (const hStatus of historicalStatuses) {
+      page = 1
+      hasMore = true
+
+      while (hasMore) {
+        const resp = await fetch(
+          `${ZOHO_API_URL}/books/v3/purchaseorders?organization_id=${orgId}&status=${hStatus}&page=${page}&per_page=200`,
+          { headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` } }
+        )
+        const data = await resp.json()
+
+        if (data.code !== 0 || !data.purchaseorders?.length) {
+          hasMore = false
+          break
+        }
+
+        for (const po of data.purchaseorders) {
+          const vendorName = po.vendor_name || ''
+          const vendorEmail = po.vendor_email || ''
+          const vendorKey = vendorName.toLowerCase()
+          if (!vendorName) continue
+
+          const detailResp = await fetch(
+            `${ZOHO_API_URL}/books/v3/purchaseorders/${po.purchaseorder_id}?organization_id=${orgId}`,
+            { headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` } }
+          )
+          const detailData = await detailResp.json()
+
+          if (detailData.code === 0 && detailData.purchaseorder?.line_items) {
+            const detailVendor = detailData.purchaseorder.vendor_name || vendorName
+            const detailEmail = detailData.purchaseorder.vendor_email || vendorEmail
+
+            for (const lineItem of detailData.purchaseorder.line_items) {
+              const sku = (lineItem.sku || lineItem.item_id || '').toUpperCase()
+              if (!sku) continue
+              if (!historicalVendorMap.has(sku)) historicalVendorMap.set(sku, new Map())
+              const skuVendors = historicalVendorMap.get(sku)!
+              const existing = skuVendors.get(vendorKey) || { count: 0, vendorName: detailVendor, vendorEmail: detailEmail }
+              existing.count++
+              skuVendors.set(vendorKey, existing)
+            }
+          }
+        }
+
+        hasMore = data.page_context?.has_more_page ?? false
+        page++
+      }
+    }
+
+    console.log(`Fetched historical vendor data for ${historicalVendorMap.size} SKUs from Zoho`)
+
+    // Helper: get best historical vendor for a SKU (most frequently used)
+    const getBestHistoricalVendor = (sku: string): { vendorName: string; vendorEmail: string } | null => {
+      const vendors = historicalVendorMap.get(sku)
+      if (!vendors || vendors.size === 0) return null
+      let best: { vendorName: string; vendorEmail: string; count: number } | null = null
+      for (const [_, stats] of vendors) {
+        if (!best || stats.count > best.count) best = { ...stats }
+      }
+      return best ? { vendorName: best.vendorName, vendorEmail: best.vendorEmail } : null
+    }
+
     // Return combined data
     const result: Record<string, { stockOnHand: number; onPurchaseOrder: number; vendorName: string; vendorEmail: string }> = {}
 
-    // Merge stock, PO data, and vendor info by SKU
-    const allSkus = new Set([...stockMap.keys(), ...poQtyMap.keys()])
+    // Merge stock, PO data, and vendor info by SKU — use historical vendor as final fallback
+    const allSkus = new Set([...stockMap.keys(), ...poQtyMap.keys(), ...historicalVendorMap.keys()])
     for (const sku of allSkus) {
       const itemVendor = stockMap.get(sku)?.vendorName ?? ''
       const poVendor = poVendorMap.get(sku)
+      const histVendor = getBestHistoricalVendor(sku)
       result[sku] = {
         stockOnHand: stockMap.get(sku)?.stockOnHand ?? 0,
         onPurchaseOrder: poQtyMap.get(sku) ?? 0,
-        vendorName: itemVendor || poVendor?.vendorName || '',
-        vendorEmail: poVendor?.vendorEmail || '',
+        vendorName: itemVendor || poVendor?.vendorName || histVendor?.vendorName || '',
+        vendorEmail: poVendor?.vendorEmail || histVendor?.vendorEmail || '',
       }
     }
 
