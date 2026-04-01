@@ -503,6 +503,15 @@ export default function BuyingSheetPage() {
         return { ...entry, supplierName, supplierEmail, stockOnHand: z.stockOnHand, onPurchaseOrder: z.onPurchaseOrder, toOrder, daysWaiting, priorityScore, coveragePercent, demandTrend: trend, lastMonthQty: lastMonth, prevMonthQty: prevMonth, stockoutRiskDays, lastPurchasedDate, seasonalPattern, avgLeadTimeDays, safetyStock, dailyBurnRate: dailyBurn, demandVariability: demandVar, distinctCustomers, recommendedOrderQty, ...analytical };
       });
       buyingRows.sort((a, b) => b.priorityScore - a.priorityScore);
+      // ABC classification: top 80% of total demand = A, next 15% = B, rest = C
+      const totalDemand = buyingRows.reduce((s, r) => s + r.totalNeeded, 0);
+      let cumulative = 0;
+      const sortedByDemand = [...buyingRows].sort((a, b) => b.totalNeeded - a.totalNeeded);
+      for (const row of sortedByDemand) {
+        cumulative += row.totalNeeded;
+        const pct = totalDemand > 0 ? cumulative / totalDemand : 1;
+        row.abcClass = pct <= 0.8 ? "A" : pct <= 0.95 ? "B" : "C";
+      }
       setRows(buyingRows);
       fetchSuggestedRestock(activeSkus);
     } catch (error) { console.error("Failed to fetch buying sheet data:", error); } finally { setLoading(false); }
