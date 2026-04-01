@@ -83,6 +83,7 @@ Deno.serve(async (req) => {
 
     // 2. Fetch purchase orders NOT yet fully invoiced/billed from Zoho
     const poQtyMap = new Map<string, number>() // SKU -> total qty on uninvoiced POs
+    const poVendorMap = new Map<string, { vendorName: string; vendorEmail: string }>() // SKU -> vendor from PO
     const poStatuses = ['open', 'draft']
 
     for (const poStatus of poStatuses) {
@@ -101,8 +102,11 @@ Deno.serve(async (req) => {
           break
         }
 
-        // For each PO, fetch its line items
+        // For each PO, fetch its line items and capture vendor info
         for (const po of data.purchaseorders) {
+          const poVendorName = po.vendor_name || ''
+          const poVendorEmail = po.vendor_email || ''
+
           const detailResp = await fetch(
             `${ZOHO_API_URL}/books/v3/purchaseorders/${po.purchaseorder_id}?organization_id=${orgId}`,
             { headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` } }
@@ -110,11 +114,19 @@ Deno.serve(async (req) => {
           const detailData = await detailResp.json()
 
           if (detailData.code === 0 && detailData.purchaseorder?.line_items) {
+            // Use vendor from PO detail if available, fallback to list-level
+            const detailVendor = detailData.purchaseorder.vendor_name || poVendorName
+            const detailEmail = detailData.purchaseorder.vendor_email || poVendorEmail
+
             for (const lineItem of detailData.purchaseorder.line_items) {
               const sku = (lineItem.sku || lineItem.item_id || '').toUpperCase()
               if (sku) {
                 const existing = poQtyMap.get(sku) || 0
                 poQtyMap.set(sku, existing + (lineItem.quantity || 0))
+                // Store vendor info from PO (latest PO wins)
+                if (detailVendor && !poVendorMap.has(sku)) {
+                  poVendorMap.set(sku, { vendorName: detailVendor, vendorEmail: detailEmail })
+                }
               }
             }
           }
@@ -125,18 +137,21 @@ Deno.serve(async (req) => {
       }
     }
 
-    console.log(`Fetched PO quantities for ${poQtyMap.size} SKUs from Zoho`)
+    console.log(`Fetched PO quantities for ${poQtyMap.size} SKUs, vendor info for ${poVendorMap.size} SKUs from Zoho`)
 
     // Return combined data
-    const result: Record<string, { stockOnHand: number; onPurchaseOrder: number; vendorName: string }> = {}
+    const result: Record<string, { stockOnHand: number; onPurchaseOrder: number; vendorName: string; vendorEmail: string }> = {}
 
-    // Merge stock and PO data by SKU
+    // Merge stock, PO data, and vendor info by SKU
     const allSkus = new Set([...stockMap.keys(), ...poQtyMap.keys()])
     for (const sku of allSkus) {
+      const itemVendor = stockMap.get(sku)?.vendorName ?? ''
+      const poVendor = poVendorMap.get(sku)
       result[sku] = {
         stockOnHand: stockMap.get(sku)?.stockOnHand ?? 0,
         onPurchaseOrder: poQtyMap.get(sku) ?? 0,
-        vendorName: stockMap.get(sku)?.vendorName ?? '',
+        vendorName: itemVendor || poVendor?.vendorName || '',
+        vendorEmail: poVendor?.vendorEmail || '',
       }
     }
 
