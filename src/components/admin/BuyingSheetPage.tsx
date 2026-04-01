@@ -804,7 +804,9 @@ export default function BuyingSheetPage() {
     needed: acc.needed + r.totalNeeded, inStock: acc.inStock + r.stockOnHand, onPO: acc.onPO + r.onPurchaseOrder,
     toOrder: acc.toOrder + r.toOrder, urgent: acc.urgent + (r.hasUrgent ? 1 : 0), avgDays: acc.avgDays + r.daysWaiting,
     stockoutRisk: acc.stockoutRisk + (r.stockoutRiskDays !== null && r.stockoutRiskDays <= 7 ? 1 : 0),
-  }), { needed: 0, inStock: 0, onPO: 0, toOrder: 0, urgent: 0, avgDays: 0, stockoutRisk: 0 }), [filteredRows]);
+    estimatedCost: acc.estimatedCost + (r.estimatedCost || 0),
+    abcA: acc.abcA + (r.abcClass === "A" ? 1 : 0),
+  }), { needed: 0, inStock: 0, onPO: 0, toOrder: 0, urgent: 0, avgDays: 0, stockoutRisk: 0, estimatedCost: 0, abcA: 0 }), [filteredRows]);
 
   const avgDaysWaiting = filteredRows.length > 0 ? Math.round(totals.avgDays / filteredRows.length) : 0;
 
