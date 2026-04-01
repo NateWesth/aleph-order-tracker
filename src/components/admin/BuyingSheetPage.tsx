@@ -85,6 +85,9 @@ export default function BuyingSheetPage() {
     fetchLastPurchaseDates();
     fetchLeadTimes();
     fetchSeasonalPatterns();
+    fetchSupplierReliability();
+    fetchWeeklyHistory();
+    fetchCostHistory();
     loadSnapshot();
     fetchLocalData();
   }, []);
