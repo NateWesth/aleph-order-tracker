@@ -968,7 +968,13 @@ export default function BuyingSheetPage() {
           </TableCell>
           <TableCell className={densityPy} onClick={() => toggleExpand(row.sku)}><div className="flex items-center gap-1">{isExpanded ? <ChevronUp className="h-3 w-3 text-muted-foreground" /> : <ChevronDown className="h-3 w-3 text-muted-foreground/40" />}<PriorityBadge score={row.priorityScore} /></div></TableCell>
           <TableCell className={`font-mono text-xs text-muted-foreground ${densityPy}`} onClick={() => toggleExpand(row.sku)}>{highlightText(row.sku)}</TableCell>
-          <TableCell className={`font-medium max-w-[180px] truncate ${densityPy}`} onClick={() => toggleExpand(row.sku)}>{highlightText(row.itemName)}</TableCell>
+          <TableCell className={`font-medium max-w-[180px] ${densityPy}`} onClick={() => toggleExpand(row.sku)}>
+            <div className="flex items-center gap-1 min-w-0">
+              <span className="truncate">{highlightText(row.itemName)}</span>
+              <span className={`text-[9px] font-bold px-1 rounded shrink-0 ${row.abcClass === "A" ? "bg-destructive/15 text-destructive" : row.abcClass === "B" ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"}`}>{row.abcClass}</span>
+              {row.conflictingUrgency && <Tooltip><TooltipTrigger asChild><AlertTriangle className="h-3 w-3 text-amber-500 shrink-0" /></TooltipTrigger><TooltipContent><p className="text-xs">⚠️ Mixed urgency levels across orders</p></TooltipContent></Tooltip>}
+            </div>
+          </TableCell>
           <TableCell className={`text-right font-semibold ${densityPy}`} onClick={() => toggleExpand(row.sku)}>{row.totalNeeded}</TableCell>
           <TableCell className={`text-right font-medium ${densityPy}`} onClick={() => toggleExpand(row.sku)}>{row.stockOnHand}</TableCell>
           <TableCell className={`text-right font-medium ${densityPy}`} onClick={() => toggleExpand(row.sku)}>{row.onPurchaseOrder}</TableCell>
