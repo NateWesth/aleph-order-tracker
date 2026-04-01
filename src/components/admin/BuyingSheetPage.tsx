@@ -211,8 +211,8 @@ export default function BuyingSheetPage() {
       const headers = await getAuthHeaders();
       const response = await fetch(`https://${projectId}.supabase.co/functions/v1/buying-sheet-data`, { headers });
       const result = await response.json();
-      if (result.success && result.data) { setZohoData(result.data); setLastRefreshedAt(new Date()); return result.data; }
-      toast({ title: "Zoho Data", description: result.error || "Could not fetch stock data from Zoho", variant: "destructive" });
+      if (response.ok && result.success && result.data) { setZohoData(result.data); setLastRefreshedAt(new Date()); return result.data; }
+      toast({ title: "Zoho Data", description: result.error || result.message || "Could not fetch supplier and stock data from Zoho", variant: "destructive" });
       return null;
     } catch (error) {
       toast({ title: "Error", description: "Failed to connect to Zoho Books", variant: "destructive" });
