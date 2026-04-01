@@ -538,7 +538,8 @@ export default function BuyingSheetPage() {
           if (row.avgLeadTimeDays !== null && row.daysWaiting > row.avgLeadTimeDays) priorityScore += 10;
           const safetyStock = getSafetyStock(row.sku, row.avgLeadTimeDays);
           const recommendedOrderQty = toOrder > 0 ? toOrder + safetyStock : 0;
-          return { ...row, supplierName, supplierEmail, stockOnHand: z.stockOnHand, onPurchaseOrder: z.onPurchaseOrder, toOrder, coveragePercent, priorityScore, stockoutRiskDays, safetyStock, recommendedOrderQty };
+          const analytical = computeAnalyticalFields(row.sku, toOrder, row.daysWaiting, row.avgLeadTimeDays, row.orders, recommendedOrderQty);
+          return { ...row, supplierName, supplierEmail, stockOnHand: z.stockOnHand, onPurchaseOrder: z.onPurchaseOrder, toOrder, coveragePercent, priorityScore, stockoutRiskDays, safetyStock, recommendedOrderQty, ...analytical };
         }));
         toast({ title: "Updated", description: "Zoho stock & PO data loaded" });
       }
