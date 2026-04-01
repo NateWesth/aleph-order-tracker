@@ -465,8 +465,9 @@ export default function BuyingSheetPage() {
       const buyingRows: BuyingSheetRow[] = Array.from(skuMap.values()).map(entry => {
         const z = zohoStock[entry.sku] || { stockOnHand: 0, onPurchaseOrder: 0, vendorName: '', vendorEmail: '' };
         const toOrder = Math.max(0, entry.totalNeeded - z.stockOnHand - z.onPurchaseOrder);
-        const supplierName = entry.supplierName === "No Supplier" && z.vendorName ? z.vendorName : entry.supplierName;
-        const supplierEmail = entry.supplierEmail || z.vendorEmail || undefined;
+        // Zoho vendor (from historical POs) takes priority as the suggested supplier
+        const supplierName = z.vendorName || entry.supplierName;
+        const supplierEmail = z.vendorEmail || entry.supplierEmail || undefined;
         const daysWaiting = Math.floor((now - new Date(entry.oldestCreatedAt).getTime()) / (1000 * 60 * 60 * 24));
         const covered = z.stockOnHand + z.onPurchaseOrder;
         const coveragePercent = entry.totalNeeded > 0 ? Math.min(100, Math.round((covered / entry.totalNeeded) * 100)) : 100;
