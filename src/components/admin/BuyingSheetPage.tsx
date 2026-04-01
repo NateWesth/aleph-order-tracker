@@ -554,7 +554,7 @@ export default function BuyingSheetPage() {
       setRows(prev => prev.map(row => {
         const z = zoho[row.sku] || { stockOnHand: 0, onPurchaseOrder: 0, vendorName: '', vendorEmail: '' };
         const toOrder = Math.max(0, row.totalNeeded - z.stockOnHand - z.onPurchaseOrder);
-        const supplierName = row.supplierName === "No Supplier" && z.vendorName ? z.vendorName : row.supplierName;
+        const supplierName = z.vendorName || row.supplierName;
         const covered = z.stockOnHand + z.onPurchaseOrder;
         const coveragePercent = row.totalNeeded > 0 ? Math.min(100, Math.round((covered / row.totalNeeded) * 100)) : 100;
         const stockoutRiskDays = getStockoutRiskDays(row.sku, z.stockOnHand, z.onPurchaseOrder);
