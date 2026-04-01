@@ -987,7 +987,12 @@ export default function BuyingSheetPage() {
           </TableCell>
           <TableCell className={`text-center ${densityPy}`} onClick={() => toggleExpand(row.sku)}><StockoutRiskBadge days={row.stockoutRiskDays} /></TableCell>
           <TableCell className={`text-center ${densityPy}`} onClick={() => toggleExpand(row.sku)}><DemandTrendIcon trend={row.demandTrend} lastMonth={row.lastMonthQty} prevMonth={row.prevMonthQty} /></TableCell>
-          <TableCell className={`text-center ${densityPy}`} onClick={() => toggleExpand(row.sku)}><span className={`text-sm font-medium ${row.daysWaiting > 7 ? "text-destructive" : row.daysWaiting > 3 ? "text-orange-500" : "text-muted-foreground"}`}>{row.daysWaiting}d</span></TableCell>
+          <TableCell className={`text-center ${densityPy}`} onClick={() => toggleExpand(row.sku)}>
+            <div className="flex items-center justify-center gap-1">
+              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${row.ageEscalation === "red" ? "bg-destructive" : row.ageEscalation === "orange" ? "bg-orange-500" : row.ageEscalation === "yellow" ? "bg-amber-400" : "bg-emerald-500"}`} />
+              <span className={`text-sm font-medium ${row.daysWaiting > 7 ? "text-destructive" : row.daysWaiting > 3 ? "text-orange-500" : "text-muted-foreground"}`}>{row.daysWaiting}d</span>
+            </div>
+          </TableCell>
           <TableCell className={`text-sm ${densityPy}`} onClick={() => toggleExpand(row.sku)}>
             <div className="flex items-center gap-1.5">
               <span>{highlightText(row.supplierName)}</span>
