@@ -423,7 +423,7 @@ const CommissionPage = () => {
                             ))}
                           </div>
                         ) : (
-                          <p className="text-xs text-amber-500 mt-1">No companies assigned</p>
+                          <p className="text-xs text-destructive mt-1">No companies assigned</p>
                         )}
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
