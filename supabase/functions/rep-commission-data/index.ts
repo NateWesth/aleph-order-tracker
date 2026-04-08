@@ -29,7 +29,6 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Auth check
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
@@ -47,7 +46,6 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Parse request body
     const body = await req.json().catch(() => ({}))
     const { date_start, date_end, rep_id } = body as {
       date_start?: string
@@ -62,7 +60,7 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Fetch reps and their company assignments
+    // Fetch reps
     let repsQuery = supabase.from('reps').select('*')
     if (rep_id) repsQuery = repsQuery.eq('id', rep_id)
     const { data: reps, error: repsError } = await repsQuery
@@ -73,19 +71,19 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Fetch all rep-company assignments
+    // Fetch assignments WITH commission_rate override
     const { data: assignments, error: assignError } = await supabase
       .from('rep_company_assignments')
-      .select('rep_id, company_id')
+      .select('rep_id, company_id, commission_rate')
     if (assignError) throw new Error(`Failed to fetch assignments: ${assignError.message}`)
 
-    // Fetch all companies for name matching
+    // Fetch companies
     const { data: companies, error: compError } = await supabase
       .from('companies')
       .select('id, name, code')
     if (compError) throw new Error(`Failed to fetch companies: ${compError.message}`)
 
-    // Build company lookup maps
+    // Build lookup maps
     const companyNameToId = new Map<string, string>()
     const companyIdToName = new Map<string, string>()
     for (const c of companies || []) {
@@ -100,18 +98,21 @@ Deno.serve(async (req) => {
       repCompanies.get(a.rep_id)!.add(a.company_id)
     }
 
-    // Build company_id -> rep_id map
-    const companyToRep = new Map<string, string>()
+    // Build company_id -> { rep_id, commission_rate_override } map
+    const companyToRep = new Map<string, { rep_id: string; commission_rate: number | null }>()
     for (const a of assignments || []) {
-      companyToRep.set(a.company_id, a.rep_id)
+      companyToRep.set(a.company_id, { rep_id: a.rep_id, commission_rate: a.commission_rate })
     }
 
-    // Fetch Zoho invoices for the date range
+    // Fetch Zoho invoices and bills
     const accessToken = await getValidAccessToken(supabase, clientId, clientSecret)
     const orgId = await getOrgId(supabase)
 
-    const invoices = await fetchZohoInvoices(accessToken, orgId, date_start, date_end)
-    console.log(`Fetched ${invoices.length} Zoho invoices for ${date_start} to ${date_end}`)
+    const [invoices, costMap] = await Promise.all([
+      fetchZohoInvoices(accessToken, orgId, date_start, date_end),
+      fetchCostPricesFromBills(accessToken, orgId),
+    ])
+    console.log(`Fetched ${invoices.length} invoices, ${costMap.size} SKU cost prices`)
 
     // Map invoices to reps
     type RepResult = {
@@ -123,8 +124,10 @@ Deno.serve(async (req) => {
         invoice_number: string
         customer_name: string
         date: string
+        sub_total: number
         total: number
         commission: number
+        commission_rate: number
       }>
     }
 
@@ -144,24 +147,30 @@ Deno.serve(async (req) => {
       const companyId = companyNameToId.get(customerName)
       if (!companyId) continue
 
-      const repId = companyToRep.get(companyId)
-      if (!repId) continue
+      const repInfo = companyToRep.get(companyId)
+      if (!repInfo) continue
 
-      const result = repResults.get(repId)
+      const result = repResults.get(repInfo.rep_id)
       if (!result) continue
 
-      const invTotal = Number(inv.total) || 0
-      const commission = invTotal * (result.rep.commission_rate / 100)
+      // Use sub_total (excl. VAT) instead of total
+      const invSubTotal = Number(inv.sub_total) || 0
 
-      result.totalInvoiced += invTotal
+      // Use per-company override rate if set, otherwise rep default
+      const effectiveRate = repInfo.commission_rate ?? result.rep.commission_rate
+      const commission = invSubTotal * (effectiveRate / 100)
+
+      result.totalInvoiced += invSubTotal
       result.commissionEarned += commission
       result.invoiceCount++
       result.invoices.push({
         invoice_number: inv.invoice_number || inv.number || '',
         customer_name: inv.customer_name || '',
         date: inv.date || inv.invoice_date || '',
-        total: invTotal,
+        sub_total: invSubTotal,
+        total: Number(inv.total) || 0,
         commission,
+        commission_rate: effectiveRate,
       })
     }
 
@@ -183,7 +192,7 @@ Deno.serve(async (req) => {
       totalInvoices: data.reduce((s, d) => s + d.invoice_count, 0),
     }
 
-    return new Response(JSON.stringify({ success: true, data, summary }), {
+    return new Response(JSON.stringify({ success: true, data, summary, cost_prices: Object.fromEntries(costMap) }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (error) {
@@ -222,6 +231,49 @@ async function fetchZohoInvoices(accessToken: string, orgId: string, dateStart: 
   }
 
   return allInvoices
+}
+
+// Fetch cost prices from recent vendor bills (last 100) by SKU
+async function fetchCostPricesFromBills(accessToken: string, orgId: string): Promise<Map<string, number>> {
+  const costMap = new Map<string, number>()
+  try {
+    // Get recent bills
+    const url = `${ZOHO_API_URL}/books/v3/bills?organization_id=${orgId}&per_page=50&sort_column=date&sort_order=descending`
+    const resp = await fetch(url, {
+      headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` },
+    })
+    const data = await resp.json()
+    if (!resp.ok || data.code !== 0) {
+      console.error('Zoho bills fetch error:', data.message)
+      return costMap
+    }
+
+    const bills = data.bills || []
+    // Fetch line items for up to 20 recent bills to avoid timeout
+    const billsToFetch = bills.slice(0, 20)
+    for (const bill of billsToFetch) {
+      try {
+        const detailUrl = `${ZOHO_API_URL}/books/v3/bills/${bill.bill_id}?organization_id=${orgId}`
+        const detailResp = await fetch(detailUrl, {
+          headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` },
+        })
+        const detailData = await detailResp.json()
+        if (detailResp.ok && detailData.code === 0 && detailData.bill?.line_items) {
+          for (const item of detailData.bill.line_items) {
+            const sku = (item.sku || item.item_id || '').toString().trim()
+            if (sku) {
+              costMap.set(sku.toLowerCase(), Number(item.rate) || 0)
+            }
+          }
+        }
+      } catch (e) {
+        console.error('Error fetching bill detail:', e)
+      }
+    }
+  } catch (e) {
+    console.error('Error fetching bills:', e)
+  }
+  return costMap
 }
 
 async function getOrgId(supabase: any): Promise<string> {

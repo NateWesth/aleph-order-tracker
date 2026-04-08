@@ -687,18 +687,21 @@ export type Database = {
       }
       rep_company_assignments: {
         Row: {
+          commission_rate: number | null
           company_id: string
           created_at: string
           id: string
           rep_id: string
         }
         Insert: {
+          commission_rate?: number | null
           company_id: string
           created_at?: string
           id?: string
           rep_id: string
         }
         Update: {
+          commission_rate?: number | null
           company_id?: string
           created_at?: string
           id?: string
