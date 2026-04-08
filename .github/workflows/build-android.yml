@@ -22,6 +22,13 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
+      - name: Show dependency versions
+        run: |
+          node -v
+          npm -v
+          node -e "const p=require('./package.json'); console.log('package.json jspdf:', p.dependencies.jspdf, 'autotable:', p.dependencies['jspdf-autotable'])"
+          node -e "const p=require('./package-lock.json'); console.log('package-lock root jspdf:', p.packages[''].dependencies.jspdf, 'locked jspdf:', p.packages['node_modules/jspdf']?.version)"
+
       - name: Install dependencies
         run: npm ci
 
