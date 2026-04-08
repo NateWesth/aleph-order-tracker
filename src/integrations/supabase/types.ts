@@ -685,6 +685,69 @@ export type Database = {
         }
         Relationships: []
       }
+      rep_company_assignments: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          rep_id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          rep_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          rep_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rep_company_assignments_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rep_company_assignments_rep_id_fkey"
+            columns: ["rep_id"]
+            isOneToOne: false
+            referencedRelation: "reps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reps: {
+        Row: {
+          commission_rate: number
+          created_at: string
+          email: string | null
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          commission_rate?: number
+          created_at?: string
+          email?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          commission_rate?: number
+          created_at?: string
+          email?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       suppliers: {
         Row: {
           address: string | null

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Package, History, BarChart3, Settings, LogOut, Building2, Home, Box, Users, Truck, FileText, Command, ShoppingCart } from "lucide-react";
+import { Package, History, BarChart3, Settings, LogOut, Building2, Home, Box, Users, Truck, FileText, Command, ShoppingCart, Percent } from "lucide-react";
 import { playClick, playWhoosh } from "@/utils/ambientSounds";
 import NotificationCenter from "@/components/NotificationCenter";
 import FloatingAIChat from "@/components/admin/FloatingAIChat";
@@ -27,6 +27,7 @@ import UsersManagementPage from "@/components/admin/UsersManagementPage";
 import SuppliersPage from "@/components/admin/SuppliersPage";
 import POTrackingPage from "@/components/admin/POTrackingPage";
 import BuyingSheetPage from "@/components/admin/BuyingSheetPage";
+import CommissionPage from "@/components/admin/CommissionPage";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useGlobalUnreadCount } from "@/hooks/useGlobalUnreadCount";
 import { cn } from "@/lib/utils";
@@ -151,6 +152,7 @@ const AdminDashboard = () => {
     { id: "po-tracking", label: "PO Tracking", icon: FileText, badge: 0 },
     { id: "buying-sheet", label: "Buying", icon: ShoppingCart, badge: 0 },
     { id: "items", label: "Items", icon: Box, badge: 0 },
+    { id: "commission", label: "Commission", icon: Percent, badge: 0 },
     ...(isAdmin ? [{ id: "users", label: "Users", icon: Users, badge: 0 }] : []),
   ];
 
@@ -290,6 +292,7 @@ const AdminDashboard = () => {
               {activeView === "po-tracking" && <POTrackingPage />}
               {activeView === "items" && <ItemsPage />}
               {activeView === "buying-sheet" && <BuyingSheetPage />}
+              {activeView === "commission" && <CommissionPage />}
               {activeView === "users" && isAdmin && <UsersManagementPage />}
               {activeView === "stats" && <StatsPage />}
             </PageTransition>
