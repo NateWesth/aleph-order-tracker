@@ -90,7 +90,15 @@ Deno.serve(async (req) => {
     const companyNameToId = new Map<string, string>()
     const companyIdToName = new Map<string, string>()
     for (const c of companies || []) {
-      companyNameToId.set(normalizeCompanyName(c.name), c.id)
+      const normalizedName = normalizeCompanyName(c.name)
+      const existingCompanyId = companyNameToId.get(normalizedName)
+      const existingCompany = companies?.find(company => company.id === existingCompanyId)
+      const shouldPreferCurrent = c.code?.startsWith('ZOHO-') || !existingCompany?.code?.startsWith('ZOHO-')
+
+      if (!existingCompanyId || shouldPreferCurrent) {
+        companyNameToId.set(normalizedName, c.id)
+      }
+
       companyIdToName.set(c.id, c.name)
     }
 
