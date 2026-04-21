@@ -29,10 +29,18 @@ import {
   rectSortingStrategy,
   useSortable,
 } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
 import { cn } from "@/lib/utils";
 
 const LAYOUT_KEY = "dashboard-widget-layout";
+
+const toTransformString = (
+  transform: { x: number; y: number; scaleX?: number; scaleY?: number } | null
+) => {
+  if (!transform) return undefined;
+
+  const { x, y, scaleX = 1, scaleY = 1 } = transform;
+  return `translate3d(${x}px, ${y}px, 0) scaleX(${scaleX}) scaleY(${scaleY})`;
+};
 
 type WidgetId = "stats" | "quickStats" | "recentActivity" | "urgentAlerts" | "predictive" | "analytics" | "leaderboard";
 
@@ -84,7 +92,7 @@ interface UrgentOrder {
 function SortableWidget({ id, children, isEditing }: { id: string; children: React.ReactNode; isEditing: boolean }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
   const style = {
-    transform: CSS.Transform.toString(transform),
+    transform: toTransformString(transform),
     transition,
   };
 
