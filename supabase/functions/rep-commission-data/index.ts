@@ -86,43 +86,82 @@ Deno.serve(async (req) => {
       .select('id, name, code')
     if (compError) throw new Error(`Failed to fetch companies: ${compError.message}`)
 
-    // Build lookup maps
-    const companyNameToId = new Map<string, string>()
     const companyIdToName = new Map<string, string>()
-    for (const c of companies || []) {
-      const normalizedName = normalizeCompanyName(c.name)
-      const existingCompanyId = companyNameToId.get(normalizedName)
-      const existingCompany = companies?.find(company => company.id === existingCompanyId)
-      const shouldPreferCurrent = c.code?.startsWith('ZOHO-') || !existingCompany?.code?.startsWith('ZOHO-')
-
-      if (!existingCompanyId || shouldPreferCurrent) {
-        companyNameToId.set(normalizedName, c.id)
-      }
-
-      companyIdToName.set(c.id, c.name)
-    }
-
     const companyById = new Map<string, { id: string; name: string; code: string }>()
+    for (const c of companies || []) {
+      companyIdToName.set(c.id, c.name)
+      companyById.set(c.id, c)
+    }
 
     // Build rep -> company_ids map
     const repCompanies = new Map<string, Set<string>>()
-    for (const c of companies || []) {
-      companyById.set(c.id, c)
-    }
     for (const a of assignments || []) {
       if (!repCompanies.has(a.rep_id)) repCompanies.set(a.rep_id, new Set())
       repCompanies.get(a.rep_id)!.add(a.company_id)
     }
 
-    // Build company_id -> { rep_id, commission_rate_override } map
-    const companyToRep = new Map<string, { rep_id: string; commission_rate: number | null }>()
-    const companyNameToRep = new Map<string, { rep_id: string; commission_rate: number | null }>()
+    // Each assignment becomes a fuzzy-matchable target.
+    // We tokenize assigned company names and compare against invoice customer names,
+    // matching when either side contains the other or they share enough tokens.
+    type AssignmentTarget = {
+      rep_id: string
+      commission_rate: number | null
+      company_id: string
+      name: string
+      norm: string
+      tokens: Set<string>
+    }
+    const STOP_TOKENS = new Set(['pty', 'ltd', 'cc', 't/a', 'ta', 'the', '&', 'and', '(pty)', '(ltd)'])
+    const tokenize = (s: string) =>
+      new Set(
+        normalizeCompanyName(s)
+          .replace(/[().,/\\]/g, ' ')
+          .split(/\s+/)
+          .filter((t) => t.length > 1 && !STOP_TOKENS.has(t))
+      )
+
+    const assignmentTargets: AssignmentTarget[] = []
     for (const a of assignments || []) {
-      companyToRep.set(a.company_id, { rep_id: a.rep_id, commission_rate: a.commission_rate })
       const company = companyById.get(a.company_id)
-      if (company) {
-        companyNameToRep.set(normalizeCompanyName(company.name), { rep_id: a.rep_id, commission_rate: a.commission_rate })
+      if (!company) continue
+      assignmentTargets.push({
+        rep_id: a.rep_id,
+        commission_rate: a.commission_rate,
+        company_id: a.company_id,
+        name: company.name,
+        norm: normalizeCompanyName(company.name),
+        tokens: tokenize(company.name),
+      })
+    }
+
+    const matchInvoiceToAssignment = (
+      customerName: string
+    ): AssignmentTarget | null => {
+      const norm = normalizeCompanyName(customerName)
+      if (!norm) return null
+      const tokens = tokenize(customerName)
+
+      // 1) exact normalized match
+      const exact = assignmentTargets.find((t) => t.norm === norm)
+      if (exact) return exact
+
+      // 2) substring match either direction
+      const sub = assignmentTargets.find(
+        (t) => t.norm && (norm.includes(t.norm) || t.norm.includes(norm))
+      )
+      if (sub) return sub
+
+      // 3) token overlap (need at least 2 shared meaningful tokens, or 1 if assignment only has 1)
+      let best: { target: AssignmentTarget; score: number } | null = null
+      for (const t of assignmentTargets) {
+        let shared = 0
+        for (const tok of tokens) if (t.tokens.has(tok)) shared++
+        const minRequired = Math.min(2, t.tokens.size, tokens.size)
+        if (shared >= minRequired && shared > 0) {
+          if (!best || shared > best.score) best = { target: t, score: shared }
+        }
       }
+      return best?.target ?? null
     }
 
     // Fetch Zoho invoices and bills
@@ -163,22 +202,28 @@ Deno.serve(async (req) => {
       })
     }
 
+    let matched = 0
+    let unmatched = 0
+    const unmatchedSamples: string[] = []
     for (const inv of invoices) {
-      const customerName = normalizeCompanyName(inv.customer_name || '')
-      const companyId = companyNameToId.get(customerName)
-      if (!companyId) continue
+      const target = matchInvoiceToAssignment(inv.customer_name || '')
+      if (!target) {
+        unmatched++
+        if (unmatchedSamples.length < 10 && inv.customer_name) {
+          unmatchedSamples.push(inv.customer_name)
+        }
+        continue
+      }
+      matched++
 
-      const repInfo = companyToRep.get(companyId) || companyNameToRep.get(customerName)
-      if (!repInfo) continue
-
-      const result = repResults.get(repInfo.rep_id)
+      const result = repResults.get(target.rep_id)
       if (!result) continue
 
       // Use sub_total (excl. VAT) instead of total
       const invSubTotal = Number(inv.sub_total) || 0
 
       // Use per-company override rate if set, otherwise rep default
-      const effectiveRate = repInfo.commission_rate ?? result.rep.commission_rate
+      const effectiveRate = target.commission_rate ?? result.rep.commission_rate
       const commission = invSubTotal * (effectiveRate / 100)
 
       result.totalInvoiced += invSubTotal
@@ -194,6 +239,7 @@ Deno.serve(async (req) => {
         commission_rate: effectiveRate,
       })
     }
+    console.log(`Matched ${matched}/${invoices.length} invoices to reps. Unmatched samples:`, unmatchedSamples)
 
     const data = Array.from(repResults.values()).map(r => ({
       rep_id: r.rep.id,
