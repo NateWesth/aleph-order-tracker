@@ -7,6 +7,9 @@ const corsHeaders = {
 
 const ZOHO_AUTH_URL = 'https://accounts.zoho.com/oauth/v2'
 const ZOHO_API_URL = 'https://www.zohoapis.com'
+const ZOHO_ALLOWED_INVOICE_STATUSES = ['paid', 'sent', 'overdue', 'partially_paid'] as const
+
+const normalizeCompanyName = (value: string) => value.toLowerCase().trim().replace(/\s+/g, ' ')
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -87,7 +90,7 @@ Deno.serve(async (req) => {
     const companyNameToId = new Map<string, string>()
     const companyIdToName = new Map<string, string>()
     for (const c of companies || []) {
-      companyNameToId.set(c.name.toLowerCase().trim(), c.id)
+      companyNameToId.set(normalizeCompanyName(c.name), c.id)
       companyIdToName.set(c.id, c.name)
     }
 
@@ -143,7 +146,7 @@ Deno.serve(async (req) => {
     }
 
     for (const inv of invoices) {
-      const customerName = (inv.customer_name || '').toLowerCase().trim()
+      const customerName = normalizeCompanyName(inv.customer_name || '')
       const companyId = companyNameToId.get(customerName)
       if (!companyId) continue
 
@@ -208,29 +211,45 @@ Deno.serve(async (req) => {
 
 async function fetchZohoInvoices(accessToken: string, orgId: string, dateStart: string, dateEnd: string) {
   const allInvoices: any[] = []
-  let page = 1
-  let hasMore = true
+  for (const status of ZOHO_ALLOWED_INVOICE_STATUSES) {
+    let page = 1
+    let hasMore = true
 
-  while (hasMore && page <= 10) {
-    const url = `${ZOHO_API_URL}/books/v3/invoices?organization_id=${orgId}&date_start=${dateStart}&date_end=${dateEnd}&page=${page}&per_page=200&status=paid,sent,overdue,partially_paid`
-    const resp = await fetch(url, {
-      headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` },
-    })
-    const data = await resp.json()
-    if (!resp.ok || data.code !== 0) {
-      console.error('Zoho invoice fetch error:', data.message)
-      break
+    while (hasMore && page <= 10) {
+      const params = new URLSearchParams({
+        organization_id: orgId,
+        date_start: dateStart,
+        date_end: dateEnd,
+        page: String(page),
+        per_page: '200',
+        status,
+      })
+
+      const resp = await fetch(`${ZOHO_API_URL}/books/v3/invoices?${params.toString()}`, {
+        headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` },
+      })
+      const data = await resp.json()
+      if (!resp.ok || data.code !== 0) {
+        console.error(`Zoho invoice fetch error for status ${status}:`, data.message)
+        break
+      }
+
+      const invoices = data.invoices || []
+      if (!invoices.length) break
+
+      allInvoices.push(...invoices)
+      hasMore = data.page_context?.has_more_page ?? false
+      page++
     }
-
-    const invoices = data.invoices || []
-    if (!invoices.length) break
-
-    allInvoices.push(...invoices)
-    hasMore = data.page_context?.has_more_page ?? false
-    page++
   }
 
-  return allInvoices
+  const uniqueInvoices = new Map<string, any>()
+  for (const invoice of allInvoices) {
+    const invoiceId = invoice.invoice_id || invoice.invoice_number || invoice.number
+    if (invoiceId) uniqueInvoices.set(String(invoiceId), invoice)
+  }
+
+  return Array.from(uniqueInvoices.values())
 }
 
 // Fetch cost prices from recent vendor bills (last 100) by SKU
@@ -238,7 +257,7 @@ async function fetchCostPricesFromBills(accessToken: string, orgId: string): Pro
   const costMap = new Map<string, number>()
   try {
     // Get recent bills
-    const url = `${ZOHO_API_URL}/books/v3/bills?organization_id=${orgId}&per_page=50&sort_column=date&sort_order=descending`
+    const url = `${ZOHO_API_URL}/books/v3/bills?organization_id=${orgId}&per_page=50&sort_column=date&sort_order=D`
     const resp = await fetch(url, {
       headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` },
     })
