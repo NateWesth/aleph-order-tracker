@@ -102,8 +102,13 @@ Deno.serve(async (req) => {
       companyIdToName.set(c.id, c.name)
     }
 
+    const companyById = new Map<string, { id: string; name: string; code: string }>()
+
     // Build rep -> company_ids map
     const repCompanies = new Map<string, Set<string>>()
+    for (const c of companies || []) {
+      companyById.set(c.id, c)
+    }
     for (const a of assignments || []) {
       if (!repCompanies.has(a.rep_id)) repCompanies.set(a.rep_id, new Set())
       repCompanies.get(a.rep_id)!.add(a.company_id)
@@ -111,8 +116,13 @@ Deno.serve(async (req) => {
 
     // Build company_id -> { rep_id, commission_rate_override } map
     const companyToRep = new Map<string, { rep_id: string; commission_rate: number | null }>()
+    const companyNameToRep = new Map<string, { rep_id: string; commission_rate: number | null }>()
     for (const a of assignments || []) {
       companyToRep.set(a.company_id, { rep_id: a.rep_id, commission_rate: a.commission_rate })
+      const company = companyById.get(a.company_id)
+      if (company) {
+        companyNameToRep.set(normalizeCompanyName(company.name), { rep_id: a.rep_id, commission_rate: a.commission_rate })
+      }
     }
 
     // Fetch Zoho invoices and bills
@@ -158,7 +168,7 @@ Deno.serve(async (req) => {
       const companyId = companyNameToId.get(customerName)
       if (!companyId) continue
 
-      const repInfo = companyToRep.get(companyId)
+      const repInfo = companyToRep.get(companyId) || companyNameToRep.get(customerName)
       if (!repInfo) continue
 
       const result = repResults.get(repInfo.rep_id)
