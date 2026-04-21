@@ -28,6 +28,10 @@ type Company = {
   code: string;
 };
 
+const normalizeCompanyName = (value: string) => value.trim().replace(/\s+/g, " ").toLowerCase();
+
+const isZohoCompany = (company: Company) => company.code.startsWith("ZOHO-");
+
 type RepAssignment = {
   rep_id: string;
   company_id: string;
@@ -99,7 +103,20 @@ const CommissionPage = () => {
         supabase.from("rep_company_assignments").select("rep_id, company_id, commission_rate"),
       ]);
       if (repsRes.data) setReps(repsRes.data);
-      if (companiesRes.data) setCompanies(companiesRes.data);
+      if (companiesRes.data) {
+        const zohoCompanies = companiesRes.data.filter(isZohoCompany);
+        const dedupedCompanies = Array.from(
+          zohoCompanies.reduce((map, company) => {
+            const normalizedName = normalizeCompanyName(company.name);
+            if (!map.has(normalizedName)) {
+              map.set(normalizedName, company);
+            }
+            return map;
+          }, new Map<string, Company>()).values()
+        );
+
+        setCompanies(dedupedCompanies);
+      }
       if (assignRes.data) setAssignments(assignRes.data as RepAssignment[]);
     } catch (e) {
       console.error("Error fetching commission data:", e);
