@@ -77,6 +77,16 @@ export default defineConfig(({ mode }) => ({
       }
     })
   ].filter(Boolean),
+  optimizeDeps: {
+    include: [
+      'react',
+      'react-dom',
+      'react-dom/client',
+      '@capacitor/core',
+      '@dnd-kit/core',
+      '@dnd-kit/sortable',
+    ],
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
