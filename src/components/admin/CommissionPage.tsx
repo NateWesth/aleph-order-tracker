@@ -576,7 +576,7 @@ const CommissionPage = () => {
                                     </tr>
                                     {isOpen && hasLines && (
                                       <tr className="bg-muted/20">
-                                        <td colSpan={7} className="p-0">
+                                        <td colSpan={6} className="p-0">
                                           <div className="px-4 py-3">
                                             <p className="text-xs font-medium text-muted-foreground mb-2">Line items ({lines.length})</p>
                                             <table className="w-full text-xs">
