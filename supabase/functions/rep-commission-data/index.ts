@@ -365,6 +365,17 @@ Deno.serve(async (req) => {
       let lineCommission = 0
       let coveredLineSubTotal = 0
       let weightedRateNumerator = 0
+      const lineDetails: Array<{
+        name: string
+        code: string
+        quantity: number
+        rate: number
+        cost: number | null
+        sub_total: number
+        margin_percent: number | null
+        commission_rate: number
+        commission: number
+      }> = []
 
       for (const li of lineItems) {
         const qty = toNumber(li.quantity) ?? 0
@@ -390,6 +401,22 @@ Deno.serve(async (req) => {
         lineCommission += lc
         coveredLineSubTotal += lineSubTotal
         weightedRateNumerator += lineSubTotal * effectiveRate
+
+        const marginPct = (cost !== null && cost > 0 && sellRate > 0)
+          ? ((sellRate - cost) / cost) * 100
+          : null
+
+        lineDetails.push({
+          name: String(li.name || li.description || '').trim(),
+          code: String(li.sku || li.item_code || '').trim(),
+          quantity: qty,
+          rate: sellRate,
+          cost,
+          sub_total: lineSubTotal,
+          margin_percent: marginPct === null ? null : Math.round(marginPct * 10) / 10,
+          commission_rate: Math.round(effectiveRate * 100) / 100,
+          commission: Math.round(lc * 100) / 100,
+        })
       }
 
       // If we couldn't get any line items, fall back to invoice-level full rate
@@ -419,6 +446,7 @@ Deno.serve(async (req) => {
         total: invTotal,
         commission,
         commission_rate: Math.round(displayRate * 100) / 100,
+        line_items: lineDetails,
       })
     }
     console.log(`Matched ${matched}/${invoiceList.length} invoices to reps. Skipped ${duplicatesSkipped} duplicates. Unmatched samples:`, unmatchedSamples)
