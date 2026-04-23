@@ -369,7 +369,7 @@ Deno.serve(async (req) => {
         commission_rate: Math.round(displayRate * 100) / 100,
       })
     }
-    console.log(`Matched ${matched}/${invoiceList.length} invoices to reps. Unmatched samples:`, unmatchedSamples)
+    console.log(`Matched ${matched}/${invoiceList.length} invoices to reps. Skipped ${duplicatesSkipped} duplicates. Unmatched samples:`, unmatchedSamples)
 
     const data = Array.from(repResults.values()).map(r => ({
       rep_id: r.rep.id,
