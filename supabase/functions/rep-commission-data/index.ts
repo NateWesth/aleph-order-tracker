@@ -292,13 +292,31 @@ Deno.serve(async (req) => {
     const costMap = await fetchCostPricesFromItems(accessToken, orgId, skuKeys)
     console.log(`Resolved cost prices for ${costMap.size}/${skuKeys.size} unique items`)
 
+    // Fetch existing locked payouts for this period so we can flag/skip them.
+    // A payout is keyed by (rep_id, invoice_id). Locked invoices are returned
+    // for transparency but excluded from the "due" totals.
+    const periodMonth = `${date_start.slice(0, 7)}-01`
+    const { data: existingPayouts } = await supabase
+      .from('commission_payouts')
+      .select('rep_id, invoice_id, commission_amount, sub_total, locked_at')
+      .eq('period_month', periodMonth)
+    const lockedKey = (repId: string, invoiceId: string) => `${repId}::${invoiceId}`
+    const lockedSet = new Set<string>()
+    for (const p of existingPayouts || []) {
+      lockedSet.add(lockedKey(p.rep_id, p.invoice_id))
+    }
+
     // Map invoices to reps
     type RepResult = {
       rep: typeof reps[0]
       totalInvoiced: number
       commissionEarned: number
       invoiceCount: number
+      lockedCommission: number
+      lockedInvoiceCount: number
+      isLocked: boolean
       invoices: Array<{
+        invoice_id: string
         invoice_number: string
         customer_name: string
         date: string
@@ -306,6 +324,7 @@ Deno.serve(async (req) => {
         total: number
         commission: number
         commission_rate: number
+        locked: boolean
       }>
     }
 
@@ -316,6 +335,9 @@ Deno.serve(async (req) => {
         totalInvoiced: 0,
         commissionEarned: 0,
         invoiceCount: 0,
+        lockedCommission: 0,
+        lockedInvoiceCount: 0,
+        isLocked: false,
         invoices: [],
       })
     }
@@ -435,10 +457,19 @@ Deno.serve(async (req) => {
           : fullRate
       }
 
-      result.totalInvoiced += invSubTotal
-      result.commissionEarned += commission
-      result.invoiceCount++
+      const invoiceIdStr = String(inv.invoice_id || inv.invoice_number || inv.number || '').trim()
+      const isLocked = lockedSet.has(lockedKey(target.rep_id, invoiceIdStr))
+
+      if (isLocked) {
+        result.lockedCommission += commission
+        result.lockedInvoiceCount++
+      } else {
+        result.totalInvoiced += invSubTotal
+        result.commissionEarned += commission
+        result.invoiceCount++
+      }
       result.invoices.push({
+        invoice_id: invoiceIdStr,
         invoice_number: inv.invoice_number || inv.number || '',
         customer_name: inv.customer_name || '',
         date: inv.date || inv.invoice_date || '',
@@ -447,9 +478,16 @@ Deno.serve(async (req) => {
         commission,
         commission_rate: Math.round(displayRate * 100) / 100,
         line_items: lineDetails,
+        locked: isLocked,
       })
     }
     console.log(`Matched ${matched}/${invoiceList.length} invoices to reps. Skipped ${duplicatesSkipped} duplicates. Unmatched samples:`, unmatchedSamples)
+
+    // A rep is considered "fully locked" for the period when they have at least one
+    // locked invoice and zero unlocked invoices remaining.
+    for (const r of repResults.values()) {
+      r.isLocked = r.lockedInvoiceCount > 0 && r.invoiceCount === 0
+    }
 
     const data = Array.from(repResults.values()).map(r => ({
       rep_id: r.rep.id,
@@ -459,6 +497,9 @@ Deno.serve(async (req) => {
       total_invoiced: Math.round(r.totalInvoiced * 100) / 100,
       commission_earned: Math.round(r.commissionEarned * 100) / 100,
       invoice_count: r.invoiceCount,
+      locked_commission: Math.round(r.lockedCommission * 100) / 100,
+      locked_invoice_count: r.lockedInvoiceCount,
+      is_locked: r.isLocked,
       invoices: r.invoices,
       companies: Array.from(repCompanies.get(r.rep.id) || []).map(cid => companyIdToName.get(cid) || cid),
     }))

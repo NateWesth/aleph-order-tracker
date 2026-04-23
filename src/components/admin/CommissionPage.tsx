@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
-  Plus, Pencil, Trash2, Users, DollarSign, FileText, Download, ChevronDown, ChevronRight, Loader2, RefreshCw, AlertCircle
+  Plus, Pencil, Trash2, Users, DollarSign, FileText, Download, ChevronDown, ChevronRight, Loader2, RefreshCw, AlertCircle, Lock, Unlock
 } from "lucide-react";
 import { format, startOfMonth, endOfMonth, subMonths } from "date-fns";
 
@@ -55,6 +55,7 @@ type CommissionLineItem = {
 };
 
 type CommissionInvoice = {
+  invoice_id: string;
   invoice_number: string;
   customer_name: string;
   date: string;
@@ -63,6 +64,7 @@ type CommissionInvoice = {
   commission: number;
   commission_rate: number;
   line_items?: CommissionLineItem[];
+  locked: boolean;
 };
 
 type CommissionRepData = {
@@ -73,6 +75,9 @@ type CommissionRepData = {
   total_invoiced: number;
   commission_earned: number;
   invoice_count: number;
+  locked_commission: number;
+  locked_invoice_count: number;
+  is_locked: boolean;
   invoices: CommissionInvoice[];
   companies: string[];
 };
@@ -248,8 +253,9 @@ const CommissionPage = () => {
     fetchData();
   };
 
-  // Commission report - uses previous month by default
-  const fetchCommissionReport = async () => {
+  // Commission report - uses previous month by default. Auto-runs whenever the
+  // Report tab is opened OR the selected month changes.
+  const fetchCommissionReport = useCallback(async () => {
     setLoadingReport(true);
     try {
       const [year, month] = selectedMonth.split("-").map(Number);
@@ -271,6 +277,65 @@ const CommissionPage = () => {
     } finally {
       setLoadingReport(false);
     }
+  }, [selectedMonth, toast]);
+
+  // Auto-fetch whenever the Report tab is the active tab or the month changes.
+  useEffect(() => {
+    if (activeTab === "report") {
+      fetchCommissionReport();
+    }
+  }, [activeTab, selectedMonth, fetchCommissionReport]);
+
+  // Lock all currently-unlocked invoices for a single rep into commission_payouts.
+  const lockRepPayout = async (rep: CommissionRepData) => {
+    const unlocked = rep.invoices.filter(i => !i.locked);
+    if (unlocked.length === 0) {
+      toast({ title: "Nothing to lock", description: "All invoices for this rep are already locked." });
+      return;
+    }
+    if (!confirm(`Lock ${unlocked.length} invoice(s) totalling ${formatCurrency(rep.commission_earned)} commission for ${rep.rep_name}? This marks the payout as paid and excludes these invoices from future calculations.`)) {
+      return;
+    }
+    const { data: { user } } = await supabase.auth.getUser();
+    const periodMonth = `${selectedMonth}-01`;
+    const rows = unlocked.map(inv => ({
+      rep_id: rep.rep_id,
+      period_month: periodMonth,
+      invoice_id: inv.invoice_id,
+      invoice_number: inv.invoice_number,
+      customer_name: inv.customer_name,
+      invoice_date: inv.date || null,
+      sub_total: inv.sub_total,
+      commission_rate: inv.commission_rate,
+      commission_amount: inv.commission,
+      line_items: inv.line_items || [],
+      locked_by: user?.id ?? null,
+    }));
+    const { error } = await supabase.from("commission_payouts").insert(rows);
+    if (error) {
+      toast({ title: "Lock failed", description: error.message, variant: "destructive" });
+      return;
+    }
+    toast({ title: "Payout locked", description: `${unlocked.length} invoice(s) locked for ${rep.rep_name}.` });
+    fetchCommissionReport();
+  };
+
+  const unlockRepPayout = async (rep: CommissionRepData) => {
+    const locked = rep.invoices.filter(i => i.locked);
+    if (locked.length === 0) return;
+    if (!confirm(`Unlock ${locked.length} invoice(s) for ${rep.rep_name}? They will be re-included in the calculation.`)) return;
+    const periodMonth = `${selectedMonth}-01`;
+    const { error } = await supabase
+      .from("commission_payouts")
+      .delete()
+      .eq("rep_id", rep.rep_id)
+      .eq("period_month", periodMonth);
+    if (error) {
+      toast({ title: "Unlock failed", description: error.message, variant: "destructive" });
+      return;
+    }
+    toast({ title: "Payout unlocked" });
+    fetchCommissionReport();
   };
 
   const toggleExpanded = (repId: string) => {
@@ -338,9 +403,9 @@ const CommissionPage = () => {
               onChange={(e) => setSelectedMonth(e.target.value)}
               className="w-48"
             />
-            <Button onClick={fetchCommissionReport} disabled={loadingReport}>
+            <Button onClick={fetchCommissionReport} disabled={loadingReport} variant="outline">
               {loadingReport ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <RefreshCw className="h-4 w-4 mr-1.5" />}
-              Calculate
+              {loadingReport ? "Calculating..." : "Refresh"}
             </Button>
             {commissionData && (
               <Button variant="outline" onClick={exportCsv}>
@@ -379,18 +444,49 @@ const CommissionPage = () => {
               {/* Per-rep cards */}
               <div className="space-y-3">
                 {commissionData.data.map((d) => (
-                  <Card key={d.rep_id}>
-                    <CardHeader className="pb-2 cursor-pointer" onClick={() => toggleExpanded(d.rep_id)}>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          {expandedReps.has(d.rep_id) ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                          <CardTitle className="text-base">{d.rep_name}</CardTitle>
+                  <Card key={d.rep_id} className={cn(d.is_locked && "opacity-70")}>
+                    <CardHeader className="pb-2">
+                      <div className="flex items-center justify-between gap-3 flex-wrap">
+                        <div
+                          className="flex items-center gap-2 cursor-pointer flex-1 min-w-0"
+                          onClick={() => toggleExpanded(d.rep_id)}
+                        >
+                          {expandedReps.has(d.rep_id) ? <ChevronDown className="h-4 w-4 shrink-0" /> : <ChevronRight className="h-4 w-4 shrink-0" />}
+                          <CardTitle className="text-base truncate">{d.rep_name}</CardTitle>
                           <Badge variant="secondary">{d.commission_rate}% default</Badge>
+                          {d.locked_invoice_count > 0 && (
+                            <Badge variant="outline" className="gap-1 text-xs">
+                              <Lock className="h-3 w-3" />
+                              {d.locked_invoice_count} paid ({formatCurrency(d.locked_commission)})
+                            </Badge>
+                          )}
                         </div>
-                        <div className="flex items-center gap-4 text-sm">
-                          <span className="text-muted-foreground">{d.invoice_count} invoices</span>
-                          <span className="font-medium">{formatCurrency(d.total_invoiced)}</span>
-                          <span className="font-bold text-primary">{formatCurrency(d.commission_earned)}</span>
+                        <div className="flex items-center gap-3 text-sm">
+                          <div className="text-right">
+                            <div className="text-xs text-muted-foreground">{d.invoice_count} due • {formatCurrency(d.total_invoiced)}</div>
+                            <div className="font-bold text-primary">{formatCurrency(d.commission_earned)}</div>
+                          </div>
+                          {d.invoice_count > 0 ? (
+                            <Button
+                              size="sm"
+                              variant="default"
+                              onClick={(e) => { e.stopPropagation(); lockRepPayout(d); }}
+                              className="gap-1"
+                            >
+                              <Lock className="h-3.5 w-3.5" />
+                              Mark paid
+                            </Button>
+                          ) : d.locked_invoice_count > 0 ? (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={(e) => { e.stopPropagation(); unlockRepPayout(d); }}
+                              className="gap-1 text-muted-foreground"
+                            >
+                              <Unlock className="h-3.5 w-3.5" />
+                              Unlock
+                            </Button>
+                          ) : null}
                         </div>
                       </div>
                       {d.companies.length > 0 && (
@@ -423,7 +519,11 @@ const CommissionPage = () => {
                                 return (
                                   <Fragment key={invKey}>
                                     <tr
-                                      className={cn("border-t", hasLines && "cursor-pointer hover:bg-muted/40")}
+                                      className={cn(
+                                        "border-t",
+                                        hasLines && "cursor-pointer hover:bg-muted/40",
+                                        inv.locked && "opacity-60"
+                                      )}
                                       onClick={() => {
                                         if (!hasLines) return;
                                         setExpandedInvoices(prev => {
@@ -439,6 +539,7 @@ const CommissionPage = () => {
                                             ? <ChevronDown className="h-3 w-3 text-muted-foreground" />
                                             : <ChevronRight className="h-3 w-3 text-muted-foreground" />)}
                                           {inv.invoice_number}
+                                          {inv.locked && <Lock className="h-3 w-3 text-muted-foreground ml-1" />}
                                         </span>
                                       </td>
                                       <td className="p-2">{inv.customer_name}</td>
@@ -525,12 +626,11 @@ const CommissionPage = () => {
             </>
           )}
 
-          {!commissionData && !loadingReport && (
+          {!commissionData && loadingReport && (
             <Card>
               <CardContent className="py-12 text-center text-muted-foreground">
-                <DollarSign className="h-12 w-12 mx-auto mb-3 opacity-30" />
-                <p className="text-lg font-medium">Select a month and click Calculate</p>
-                <p className="text-sm">Commission calculated on excl. VAT amounts from Zoho invoices for previous month's sales</p>
+                <Loader2 className="h-8 w-8 mx-auto mb-3 animate-spin opacity-60" />
+                <p className="text-sm">Fetching invoices and calculating commissions...</p>
               </CardContent>
             </Card>
           )}
