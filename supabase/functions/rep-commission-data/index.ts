@@ -439,8 +439,13 @@ async function fetchZohoInvoices(accessToken: string, orgId: string, dateStart: 
 
   const uniqueInvoices = new Map<string, any>()
   for (const invoice of allInvoices) {
+    // Prefer the stable Zoho invoice_id; fall back to number only if missing.
     const invoiceId = invoice.invoice_id || invoice.invoice_number || invoice.number
-    if (invoiceId) uniqueInvoices.set(String(invoiceId), invoice)
+    if (!invoiceId) continue
+    const key = String(invoiceId).trim()
+    if (!key) continue
+    // First write wins — subsequent statuses for the same invoice are ignored.
+    if (!uniqueInvoices.has(key)) uniqueInvoices.set(key, invoice)
   }
 
   return Array.from(uniqueInvoices.values())
