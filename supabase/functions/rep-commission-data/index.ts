@@ -292,13 +292,31 @@ Deno.serve(async (req) => {
     const costMap = await fetchCostPricesFromItems(accessToken, orgId, skuKeys)
     console.log(`Resolved cost prices for ${costMap.size}/${skuKeys.size} unique items`)
 
+    // Fetch existing locked payouts for this period so we can flag/skip them.
+    // A payout is keyed by (rep_id, invoice_id). Locked invoices are returned
+    // for transparency but excluded from the "due" totals.
+    const periodMonth = `${date_start.slice(0, 7)}-01`
+    const { data: existingPayouts } = await supabase
+      .from('commission_payouts')
+      .select('rep_id, invoice_id, commission_amount, sub_total, locked_at')
+      .eq('period_month', periodMonth)
+    const lockedKey = (repId: string, invoiceId: string) => `${repId}::${invoiceId}`
+    const lockedSet = new Set<string>()
+    for (const p of existingPayouts || []) {
+      lockedSet.add(lockedKey(p.rep_id, p.invoice_id))
+    }
+
     // Map invoices to reps
     type RepResult = {
       rep: typeof reps[0]
       totalInvoiced: number
       commissionEarned: number
       invoiceCount: number
+      lockedCommission: number
+      lockedInvoiceCount: number
+      isLocked: boolean
       invoices: Array<{
+        invoice_id: string
         invoice_number: string
         customer_name: string
         date: string
@@ -306,6 +324,7 @@ Deno.serve(async (req) => {
         total: number
         commission: number
         commission_rate: number
+        locked: boolean
       }>
     }
 
@@ -316,6 +335,9 @@ Deno.serve(async (req) => {
         totalInvoiced: 0,
         commissionEarned: 0,
         invoiceCount: 0,
+        lockedCommission: 0,
+        lockedInvoiceCount: 0,
+        isLocked: false,
         invoices: [],
       })
     }
