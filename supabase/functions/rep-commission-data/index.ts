@@ -11,6 +11,39 @@ const ZOHO_ALLOWED_INVOICE_STATUSES = ['paid', 'sent', 'overdue', 'partially_pai
 
 const normalizeCompanyName = (value: string) => value.toLowerCase().trim().replace(/\s+/g, ' ')
 
+const toNumber = (value: unknown): number | null => {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value === 'string') {
+    const cleaned = value.replace(/[^\d.-]/g, '')
+    if (!cleaned) return null
+    const parsed = Number(cleaned)
+    return Number.isFinite(parsed) ? parsed : null
+  }
+  return null
+}
+
+const getInvoiceSubTotal = (invoice: Record<string, unknown>): number => {
+  const directSubTotal =
+    toNumber(invoice.sub_total) ??
+    toNumber(invoice.subtotal) ??
+    toNumber(invoice.total_before_tax) ??
+    toNumber(invoice.total_before_tax_formatted)
+
+  if (directSubTotal !== null) return directSubTotal
+
+  const total = toNumber(invoice.total)
+  const taxTotal =
+    toNumber(invoice.tax_total) ??
+    toNumber(invoice.tax_amount) ??
+    toNumber(invoice.vat_total)
+
+  if (total !== null && taxTotal !== null) {
+    return Math.max(total - taxTotal, 0)
+  }
+
+  return total ?? 0
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -204,7 +237,9 @@ Deno.serve(async (req) => {
 
     let matched = 0
     let unmatched = 0
+    let zeroAmountMatches = 0
     const unmatchedSamples: string[] = []
+    const zeroAmountSamples: string[] = []
     for (const inv of invoices) {
       const target = matchInvoiceToAssignment(inv.customer_name || '')
       if (!target) {
@@ -219,8 +254,26 @@ Deno.serve(async (req) => {
       const result = repResults.get(target.rep_id)
       if (!result) continue
 
-      // Use sub_total (excl. VAT) instead of total
-      const invSubTotal = Number(inv.sub_total) || 0
+      const invSubTotal = getInvoiceSubTotal(inv)
+      const invTotal = toNumber(inv.total) ?? invSubTotal
+      if (invSubTotal === 0) {
+        zeroAmountMatches++
+        if (zeroAmountSamples.length < 10) {
+          zeroAmountSamples.push(
+            JSON.stringify({
+              invoice_number: inv.invoice_number || inv.number || '',
+              customer_name: inv.customer_name || '',
+              amount_fields: {
+                sub_total: inv.sub_total ?? null,
+                subtotal: inv.subtotal ?? null,
+                total_before_tax: inv.total_before_tax ?? null,
+                tax_total: inv.tax_total ?? null,
+                total: inv.total ?? null,
+              },
+            })
+          )
+        }
+      }
 
       // Use per-company override rate if set, otherwise rep default
       const effectiveRate = target.commission_rate ?? result.rep.commission_rate
@@ -234,12 +287,13 @@ Deno.serve(async (req) => {
         customer_name: inv.customer_name || '',
         date: inv.date || inv.invoice_date || '',
         sub_total: invSubTotal,
-        total: Number(inv.total) || 0,
+        total: invTotal,
         commission,
         commission_rate: effectiveRate,
       })
     }
     console.log(`Matched ${matched}/${invoices.length} invoices to reps. Unmatched samples:`, unmatchedSamples)
+    console.log(`Matched invoices with zero extracted amount: ${zeroAmountMatches}. Samples:`, zeroAmountSamples)
 
     const data = Array.from(repResults.values()).map(r => ({
       rep_id: r.rep.id,
