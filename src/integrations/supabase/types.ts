@@ -58,6 +58,65 @@ export type Database = {
           },
         ]
       }
+      commission_payouts: {
+        Row: {
+          commission_amount: number
+          commission_rate: number
+          created_at: string
+          customer_name: string | null
+          id: string
+          invoice_date: string | null
+          invoice_id: string
+          invoice_number: string | null
+          line_items: Json
+          locked_at: string
+          locked_by: string | null
+          period_month: string
+          rep_id: string
+          sub_total: number
+        }
+        Insert: {
+          commission_amount?: number
+          commission_rate?: number
+          created_at?: string
+          customer_name?: string | null
+          id?: string
+          invoice_date?: string | null
+          invoice_id: string
+          invoice_number?: string | null
+          line_items?: Json
+          locked_at?: string
+          locked_by?: string | null
+          period_month: string
+          rep_id: string
+          sub_total?: number
+        }
+        Update: {
+          commission_amount?: number
+          commission_rate?: number
+          created_at?: string
+          customer_name?: string | null
+          id?: string
+          invoice_date?: string | null
+          invoice_id?: string
+          invoice_number?: string | null
+          line_items?: Json
+          locked_at?: string
+          locked_by?: string | null
+          period_month?: string
+          rep_id?: string
+          sub_total?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commission_payouts_rep_id_fkey"
+            columns: ["rep_id"]
+            isOneToOne: false
+            referencedRelation: "reps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       companies: {
         Row: {
           account_manager: string | null
