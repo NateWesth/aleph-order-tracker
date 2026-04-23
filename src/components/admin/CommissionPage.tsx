@@ -519,7 +519,11 @@ const CommissionPage = () => {
                                 return (
                                   <Fragment key={invKey}>
                                     <tr
-                                      className={cn("border-t", hasLines && "cursor-pointer hover:bg-muted/40")}
+                                      className={cn(
+                                        "border-t",
+                                        hasLines && "cursor-pointer hover:bg-muted/40",
+                                        inv.locked && "opacity-60"
+                                      )}
                                       onClick={() => {
                                         if (!hasLines) return;
                                         setExpandedInvoices(prev => {
@@ -535,6 +539,7 @@ const CommissionPage = () => {
                                             ? <ChevronDown className="h-3 w-3 text-muted-foreground" />
                                             : <ChevronRight className="h-3 w-3 text-muted-foreground" />)}
                                           {inv.invoice_number}
+                                          {inv.locked && <Lock className="h-3 w-3 text-muted-foreground ml-1" />}
                                         </span>
                                       </td>
                                       <td className="p-2">{inv.customer_name}</td>
