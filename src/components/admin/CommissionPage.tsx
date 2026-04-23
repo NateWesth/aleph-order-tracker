@@ -84,7 +84,7 @@ const CommissionPage = () => {
   const [assignments, setAssignments] = useState<RepAssignment[]>([]);
   const [repDialogOpen, setRepDialogOpen] = useState(false);
   const [editingRep, setEditingRep] = useState<Rep | null>(null);
-  const [repForm, setRepForm] = useState({ name: "", email: "", commission_rate: "5" });
+  const [repForm, setRepForm] = useState({ name: "", email: "", commission_rate: "5", commission_method: "margin_scaled" as CommissionMethod });
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [assignRepId, setAssignRepId] = useState<string | null>(null);
   const [selectedCompanies, setSelectedCompanies] = useState<Set<string>>(new Set());
@@ -143,6 +143,7 @@ const CommissionPage = () => {
         name: repForm.name.trim(),
         email: repForm.email.trim() || null,
         commission_rate: rate,
+        commission_method: repForm.commission_method,
       }).eq("id", editingRep.id);
       if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
       toast({ title: "Rep updated" });
@@ -151,6 +152,7 @@ const CommissionPage = () => {
         name: repForm.name.trim(),
         email: repForm.email.trim() || null,
         commission_rate: rate,
+        commission_method: repForm.commission_method,
       });
       if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
       toast({ title: "Rep added" });
@@ -158,7 +160,7 @@ const CommissionPage = () => {
 
     setRepDialogOpen(false);
     setEditingRep(null);
-    setRepForm({ name: "", email: "", commission_rate: "5" });
+    setRepForm({ name: "", email: "", commission_rate: "5", commission_method: "margin_scaled" });
     fetchData();
   };
 
@@ -171,7 +173,12 @@ const CommissionPage = () => {
 
   const openEditRep = (rep: Rep) => {
     setEditingRep(rep);
-    setRepForm({ name: rep.name, email: rep.email || "", commission_rate: String(rep.commission_rate) });
+    setRepForm({
+      name: rep.name,
+      email: rep.email || "",
+      commission_rate: String(rep.commission_rate),
+      commission_method: (rep.commission_method as CommissionMethod) || "margin_scaled",
+    });
     setRepDialogOpen(true);
   };
 
