@@ -44,11 +44,24 @@ const getInvoiceSubTotal = (invoice: Record<string, unknown>): number => {
   return total ?? 0
 }
 
-// Margin-based commission rule:
-// - margin >= 25%  -> full rate (e.g. 15%)
-// - margin <  25%  -> rate decreases 1% per 1% margin shortfall, floored at 0
-// - negative margin (selling below cost) -> 0% commission
-// - unknown cost -> use full rate
+// Commission methods (per rep):
+//
+// 'margin_scaled' (default):
+//   - margin >= 25%  -> full rate (e.g. 15%)
+//   - margin <  25%  -> rate decreases 1% per 1% margin shortfall, floored at 0
+//   - negative margin (selling below cost) -> 0% commission
+//   - unknown cost -> use full rate
+//
+// 'half_markup_below_25':
+//   - margin >= 25%  -> full rate on the line subtotal (same as above)
+//   - 0 <= margin < 25%  -> commission = 50% of the markup amount (sell - cost) for the line
+//     (i.e. an effective rate of margin% / 2 expressed against the line subtotal,
+//      because markup = lineSubTotal * margin/(100+margin) when margin is on cost...
+//      we compute it directly from cost so it's exact)
+//   - negative margin -> 0% commission
+//   - unknown cost -> use full rate
+type CommissionMethod = 'margin_scaled' | 'half_markup_below_25'
+
 const computeEffectiveRate = (
   fullRate: number,
   marginPct: number | null,
@@ -58,6 +71,41 @@ const computeEffectiveRate = (
   if (marginPct >= 25) return fullRate
   const reduced = fullRate - (25 - marginPct)
   return Math.max(0, reduced)
+}
+
+// Returns commission AMOUNT for a single line, given the chosen method.
+const computeLineCommission = (
+  method: CommissionMethod,
+  fullRate: number,
+  lineSubTotal: number,
+  qty: number,
+  sellRate: number,
+  cost: number | null,
+): { commission: number; effectiveRate: number } => {
+  let marginPct: number | null = null
+  if (cost !== null && cost > 0 && sellRate > 0) {
+    marginPct = ((sellRate - cost) / cost) * 100
+  }
+
+  if (method === 'half_markup_below_25') {
+    if (marginPct === null) {
+      // unknown cost -> full rate fallback
+      return { commission: lineSubTotal * (fullRate / 100), effectiveRate: fullRate }
+    }
+    if (marginPct < 0) return { commission: 0, effectiveRate: 0 }
+    if (marginPct >= 25) {
+      return { commission: lineSubTotal * (fullRate / 100), effectiveRate: fullRate }
+    }
+    // 50% of the markup (profit) for the whole line
+    const markup = (sellRate - (cost as number)) * qty
+    const commission = Math.max(0, markup * 0.5)
+    const effectiveRate = lineSubTotal > 0 ? (commission / lineSubTotal) * 100 : 0
+    return { commission, effectiveRate }
+  }
+
+  // default: margin_scaled
+  const rate = computeEffectiveRate(fullRate, marginPct)
+  return { commission: lineSubTotal * (rate / 100), effectiveRate: rate }
 }
 
 Deno.serve(async (req) => {
