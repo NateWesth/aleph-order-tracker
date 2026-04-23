@@ -726,6 +726,7 @@ export type Database = {
       }
       reps: {
         Row: {
+          commission_method: string
           commission_rate: number
           created_at: string
           email: string | null
@@ -734,6 +735,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          commission_method?: string
           commission_rate?: number
           created_at?: string
           email?: string | null
@@ -742,6 +744,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          commission_method?: string
           commission_rate?: number
           created_at?: string
           email?: string | null

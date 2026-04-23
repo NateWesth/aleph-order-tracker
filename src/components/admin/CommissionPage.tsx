@@ -14,11 +14,14 @@ import {
 } from "lucide-react";
 import { format, startOfMonth, endOfMonth, subMonths } from "date-fns";
 
+type CommissionMethod = "margin_scaled" | "half_markup_below_25";
+
 type Rep = {
   id: string;
   name: string;
   email: string | null;
   commission_rate: number;
+  commission_method: CommissionMethod;
   created_at: string;
 };
 
@@ -81,7 +84,7 @@ const CommissionPage = () => {
   const [assignments, setAssignments] = useState<RepAssignment[]>([]);
   const [repDialogOpen, setRepDialogOpen] = useState(false);
   const [editingRep, setEditingRep] = useState<Rep | null>(null);
-  const [repForm, setRepForm] = useState({ name: "", email: "", commission_rate: "5" });
+  const [repForm, setRepForm] = useState({ name: "", email: "", commission_rate: "5", commission_method: "margin_scaled" as CommissionMethod });
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [assignRepId, setAssignRepId] = useState<string | null>(null);
   const [selectedCompanies, setSelectedCompanies] = useState<Set<string>>(new Set());
@@ -102,7 +105,7 @@ const CommissionPage = () => {
         supabase.from("companies").select("id, name, code").order("name"),
         supabase.from("rep_company_assignments").select("rep_id, company_id, commission_rate"),
       ]);
-      if (repsRes.data) setReps(repsRes.data);
+      if (repsRes.data) setReps(repsRes.data as Rep[]);
       if (companiesRes.data) {
         const zohoCompanies = companiesRes.data.filter(isZohoCompany);
         const dedupedCompanies = Array.from(
@@ -140,6 +143,7 @@ const CommissionPage = () => {
         name: repForm.name.trim(),
         email: repForm.email.trim() || null,
         commission_rate: rate,
+        commission_method: repForm.commission_method,
       }).eq("id", editingRep.id);
       if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
       toast({ title: "Rep updated" });
@@ -148,6 +152,7 @@ const CommissionPage = () => {
         name: repForm.name.trim(),
         email: repForm.email.trim() || null,
         commission_rate: rate,
+        commission_method: repForm.commission_method,
       });
       if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
       toast({ title: "Rep added" });
@@ -155,7 +160,7 @@ const CommissionPage = () => {
 
     setRepDialogOpen(false);
     setEditingRep(null);
-    setRepForm({ name: "", email: "", commission_rate: "5" });
+    setRepForm({ name: "", email: "", commission_rate: "5", commission_method: "margin_scaled" });
     fetchData();
   };
 
@@ -168,7 +173,12 @@ const CommissionPage = () => {
 
   const openEditRep = (rep: Rep) => {
     setEditingRep(rep);
-    setRepForm({ name: rep.name, email: rep.email || "", commission_rate: String(rep.commission_rate) });
+    setRepForm({
+      name: rep.name,
+      email: rep.email || "",
+      commission_rate: String(rep.commission_rate),
+      commission_method: (rep.commission_method as CommissionMethod) || "margin_scaled",
+    });
     setRepDialogOpen(true);
   };
 
@@ -436,7 +446,7 @@ const CommissionPage = () => {
         <TabsContent value="reps" className="space-y-4">
           <div className="flex justify-between items-center">
             <h2 className="text-lg font-semibold">Sales Reps</h2>
-            <Button onClick={() => { setEditingRep(null); setRepForm({ name: "", email: "", commission_rate: "5" }); setRepDialogOpen(true); }}>
+            <Button onClick={() => { setEditingRep(null); setRepForm({ name: "", email: "", commission_rate: "5", commission_method: "margin_scaled" }); setRepDialogOpen(true); }}>
               <Plus className="h-4 w-4 mr-1.5" />Add Rep
             </Button>
           </div>
@@ -513,6 +523,41 @@ const CommissionPage = () => {
               <Label>Default Commission Rate (%)</Label>
               <Input type="number" step="0.5" min="0" max="100" value={repForm.commission_rate} onChange={e => setRepForm(f => ({ ...f, commission_rate: e.target.value }))} />
               <p className="text-xs text-muted-foreground mt-1">This is the default rate. You can override per-company in assignments.</p>
+            </div>
+            <div>
+              <Label>Commission Calculation Method</Label>
+              <div className="space-y-2 mt-2">
+                <label className="flex items-start gap-2 p-2 rounded-md border cursor-pointer hover:bg-muted/50">
+                  <input
+                    type="radio"
+                    name="commission_method"
+                    className="mt-1"
+                    checked={repForm.commission_method === "margin_scaled"}
+                    onChange={() => setRepForm(f => ({ ...f, commission_method: "margin_scaled" }))}
+                  />
+                  <div className="text-sm">
+                    <div className="font-medium">Margin-scaled rate</div>
+                    <div className="text-xs text-muted-foreground">
+                      Full rate at 25%+ margin. Below 25%, rate drops 1% per 1% margin shortfall (floored at 0).
+                    </div>
+                  </div>
+                </label>
+                <label className="flex items-start gap-2 p-2 rounded-md border cursor-pointer hover:bg-muted/50">
+                  <input
+                    type="radio"
+                    name="commission_method"
+                    className="mt-1"
+                    checked={repForm.commission_method === "half_markup_below_25"}
+                    onChange={() => setRepForm(f => ({ ...f, commission_method: "half_markup_below_25" }))}
+                  />
+                  <div className="text-sm">
+                    <div className="font-medium">Half-markup below 25%</div>
+                    <div className="text-xs text-muted-foreground">
+                      Full rate at 25%+ margin. Below 25%, rep earns 50% of the markup (sell − cost) for that line.
+                    </div>
+                  </div>
+                </label>
+              </div>
             </div>
           </div>
           <DialogFooter>
