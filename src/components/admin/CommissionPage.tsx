@@ -91,6 +91,8 @@ const CommissionPage = () => {
   const [companyRateOverrides, setCompanyRateOverrides] = useState<Map<string, string>>(new Map());
   const [loadingReps, setLoadingReps] = useState(true);
 
+  const [methodFilter, setMethodFilter] = useState<"all" | CommissionMethod>("all");
+
   // Commission report state - default to PREVIOUS month
   const [selectedMonth, setSelectedMonth] = useState(() => format(subMonths(new Date(), 1), "yyyy-MM"));
   const [commissionData, setCommissionData] = useState<CommissionResult | null>(null);
@@ -444,11 +446,39 @@ const CommissionPage = () => {
 
         {/* Manage Reps Tab */}
         <TabsContent value="reps" className="space-y-4">
-          <div className="flex justify-between items-center">
+          <div className="flex justify-between items-center flex-wrap gap-2">
             <h2 className="text-lg font-semibold">Sales Reps</h2>
-            <Button onClick={() => { setEditingRep(null); setRepForm({ name: "", email: "", commission_rate: "5", commission_method: "margin_scaled" }); setRepDialogOpen(true); }}>
-              <Plus className="h-4 w-4 mr-1.5" />Add Rep
-            </Button>
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-1 rounded-lg border p-0.5">
+                <Button
+                  size="sm"
+                  variant={methodFilter === "all" ? "secondary" : "ghost"}
+                  className="h-7 text-xs"
+                  onClick={() => setMethodFilter("all")}
+                >
+                  All ({reps.length})
+                </Button>
+                <Button
+                  size="sm"
+                  variant={methodFilter === "margin_scaled" ? "secondary" : "ghost"}
+                  className="h-7 text-xs"
+                  onClick={() => setMethodFilter("margin_scaled")}
+                >
+                  Margin-scaled ({reps.filter(r => (r.commission_method || "margin_scaled") === "margin_scaled").length})
+                </Button>
+                <Button
+                  size="sm"
+                  variant={methodFilter === "half_markup_below_25" ? "secondary" : "ghost"}
+                  className="h-7 text-xs"
+                  onClick={() => setMethodFilter("half_markup_below_25")}
+                >
+                  Half-markup ({reps.filter(r => r.commission_method === "half_markup_below_25").length})
+                </Button>
+              </div>
+              <Button onClick={() => { setEditingRep(null); setRepForm({ name: "", email: "", commission_rate: "5", commission_method: "margin_scaled" }); setRepDialogOpen(true); }}>
+                <Plus className="h-4 w-4 mr-1.5" />Add Rep
+              </Button>
+            </div>
           </div>
 
           {loadingReps ? (
@@ -461,15 +491,21 @@ const CommissionPage = () => {
             </Card>
           ) : (
             <div className="grid gap-3">
-              {reps.map((rep) => {
+              {reps
+                .filter(rep => methodFilter === "all" || (rep.commission_method || "margin_scaled") === methodFilter)
+                .map((rep) => {
                 const assignedCompanies = getRepAssignedCompanies(rep.id);
+                const method = (rep.commission_method || "margin_scaled") as CommissionMethod;
                 return (
                   <Card key={rep.id}>
                     <CardContent className="py-4 flex items-center justify-between gap-3">
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-medium">{rep.name}</span>
                           <Badge variant="secondary">{rep.commission_rate}% default</Badge>
+                          <Badge variant="outline" className="text-xs">
+                            {method === "margin_scaled" ? "Margin-scaled" : "Half-markup <25%"}
+                          </Badge>
                         </div>
                         {rep.email && <p className="text-xs text-muted-foreground">{rep.email}</p>}
                         {assignedCompanies.length > 0 ? (
