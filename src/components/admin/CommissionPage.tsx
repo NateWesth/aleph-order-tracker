@@ -446,7 +446,7 @@ const CommissionPage = () => {
         <TabsContent value="reps" className="space-y-4">
           <div className="flex justify-between items-center">
             <h2 className="text-lg font-semibold">Sales Reps</h2>
-            <Button onClick={() => { setEditingRep(null); setRepForm({ name: "", email: "", commission_rate: "5" }); setRepDialogOpen(true); }}>
+            <Button onClick={() => { setEditingRep(null); setRepForm({ name: "", email: "", commission_rate: "5", commission_method: "margin_scaled" }); setRepDialogOpen(true); }}>
               <Plus className="h-4 w-4 mr-1.5" />Add Rep
             </Button>
           </div>
