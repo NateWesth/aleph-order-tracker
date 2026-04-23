@@ -444,18 +444,49 @@ const CommissionPage = () => {
               {/* Per-rep cards */}
               <div className="space-y-3">
                 {commissionData.data.map((d) => (
-                  <Card key={d.rep_id}>
-                    <CardHeader className="pb-2 cursor-pointer" onClick={() => toggleExpanded(d.rep_id)}>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          {expandedReps.has(d.rep_id) ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                          <CardTitle className="text-base">{d.rep_name}</CardTitle>
+                  <Card key={d.rep_id} className={cn(d.is_locked && "opacity-70")}>
+                    <CardHeader className="pb-2">
+                      <div className="flex items-center justify-between gap-3 flex-wrap">
+                        <div
+                          className="flex items-center gap-2 cursor-pointer flex-1 min-w-0"
+                          onClick={() => toggleExpanded(d.rep_id)}
+                        >
+                          {expandedReps.has(d.rep_id) ? <ChevronDown className="h-4 w-4 shrink-0" /> : <ChevronRight className="h-4 w-4 shrink-0" />}
+                          <CardTitle className="text-base truncate">{d.rep_name}</CardTitle>
                           <Badge variant="secondary">{d.commission_rate}% default</Badge>
+                          {d.locked_invoice_count > 0 && (
+                            <Badge variant="outline" className="gap-1 text-xs">
+                              <Lock className="h-3 w-3" />
+                              {d.locked_invoice_count} paid ({formatCurrency(d.locked_commission)})
+                            </Badge>
+                          )}
                         </div>
-                        <div className="flex items-center gap-4 text-sm">
-                          <span className="text-muted-foreground">{d.invoice_count} invoices</span>
-                          <span className="font-medium">{formatCurrency(d.total_invoiced)}</span>
-                          <span className="font-bold text-primary">{formatCurrency(d.commission_earned)}</span>
+                        <div className="flex items-center gap-3 text-sm">
+                          <div className="text-right">
+                            <div className="text-xs text-muted-foreground">{d.invoice_count} due • {formatCurrency(d.total_invoiced)}</div>
+                            <div className="font-bold text-primary">{formatCurrency(d.commission_earned)}</div>
+                          </div>
+                          {d.invoice_count > 0 ? (
+                            <Button
+                              size="sm"
+                              variant="default"
+                              onClick={(e) => { e.stopPropagation(); lockRepPayout(d); }}
+                              className="gap-1"
+                            >
+                              <Lock className="h-3.5 w-3.5" />
+                              Mark paid
+                            </Button>
+                          ) : d.locked_invoice_count > 0 ? (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={(e) => { e.stopPropagation(); unlockRepPayout(d); }}
+                              className="gap-1 text-muted-foreground"
+                            >
+                              <Unlock className="h-3.5 w-3.5" />
+                              Unlock
+                            </Button>
+                          ) : null}
                         </div>
                       </div>
                       {d.companies.length > 0 && (
