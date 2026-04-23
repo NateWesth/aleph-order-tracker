@@ -528,7 +528,6 @@ const CommissionPage = () => {
                                 <th className="text-left p-2 font-medium">Customer</th>
                                 <th className="text-left p-2 font-medium">Date</th>
                                 <th className="text-right p-2 font-medium">Excl. VAT</th>
-                                <th className="text-right p-2 font-medium">Incl. VAT</th>
                                 <th className="text-right p-2 font-medium">Rate</th>
                                 <th className="text-right p-2 font-medium">Commission</th>
                               </tr>
