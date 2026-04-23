@@ -91,6 +91,8 @@ const CommissionPage = () => {
   const [companyRateOverrides, setCompanyRateOverrides] = useState<Map<string, string>>(new Map());
   const [loadingReps, setLoadingReps] = useState(true);
 
+  const [methodFilter, setMethodFilter] = useState<"all" | CommissionMethod>("all");
+
   // Commission report state - default to PREVIOUS month
   const [selectedMonth, setSelectedMonth] = useState(() => format(subMonths(new Date(), 1), "yyyy-MM"));
   const [commissionData, setCommissionData] = useState<CommissionResult | null>(null);
