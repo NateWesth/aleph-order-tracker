@@ -14,11 +14,14 @@ import {
 } from "lucide-react";
 import { format, startOfMonth, endOfMonth, subMonths } from "date-fns";
 
+type CommissionMethod = "margin_scaled" | "half_markup_below_25";
+
 type Rep = {
   id: string;
   name: string;
   email: string | null;
   commission_rate: number;
+  commission_method: CommissionMethod;
   created_at: string;
 };
 
