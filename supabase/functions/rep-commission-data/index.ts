@@ -44,6 +44,22 @@ const getInvoiceSubTotal = (invoice: Record<string, unknown>): number => {
   return total ?? 0
 }
 
+// Margin-based commission rule:
+// - margin >= 25%  -> full rate (e.g. 15%)
+// - margin <  25%  -> rate decreases 1% per 1% margin shortfall, floored at 0
+// - negative margin (selling below cost) -> 0% commission
+// - unknown cost -> use full rate
+const computeEffectiveRate = (
+  fullRate: number,
+  marginPct: number | null,
+): number => {
+  if (marginPct === null) return fullRate
+  if (marginPct < 0) return 0
+  if (marginPct >= 25) return fullRate
+  const reduced = fullRate - (25 - marginPct)
+  return Math.max(0, reduced)
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
