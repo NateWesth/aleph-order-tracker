@@ -567,7 +567,6 @@ const CommissionPage = () => {
                                       <td className="p-2">{inv.customer_name}</td>
                                       <td className="p-2">{inv.date}</td>
                                       <td className="p-2 text-right">{formatCurrency(inv.sub_total)}</td>
-                                      <td className="p-2 text-right text-muted-foreground">{formatCurrency(inv.total)}</td>
                                       <td className="p-2 text-right">
                                         <Badge variant={inv.commission_rate !== d.commission_rate ? "outline" : "secondary"} className="text-xs">
                                           {inv.commission_rate}%
