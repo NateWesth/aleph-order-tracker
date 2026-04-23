@@ -626,12 +626,11 @@ const CommissionPage = () => {
             </>
           )}
 
-          {!commissionData && !loadingReport && (
+          {!commissionData && loadingReport && (
             <Card>
               <CardContent className="py-12 text-center text-muted-foreground">
-                <DollarSign className="h-12 w-12 mx-auto mb-3 opacity-30" />
-                <p className="text-lg font-medium">Select a month and click Calculate</p>
-                <p className="text-sm">Commission calculated on excl. VAT amounts from Zoho invoices for previous month's sales</p>
+                <Loader2 className="h-8 w-8 mx-auto mb-3 animate-spin opacity-60" />
+                <p className="text-sm">Fetching invoices and calculating commissions...</p>
               </CardContent>
             </Card>
           )}
