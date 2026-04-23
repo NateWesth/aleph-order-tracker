@@ -105,7 +105,7 @@ const CommissionPage = () => {
         supabase.from("companies").select("id, name, code").order("name"),
         supabase.from("rep_company_assignments").select("rep_id, company_id, commission_rate"),
       ]);
-      if (repsRes.data) setReps(repsRes.data);
+      if (repsRes.data) setReps(repsRes.data as Rep[]);
       if (companiesRes.data) {
         const zohoCompanies = companiesRes.data.filter(isZohoCompany);
         const dedupedCompanies = Array.from(
