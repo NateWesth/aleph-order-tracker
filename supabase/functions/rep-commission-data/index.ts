@@ -352,6 +352,8 @@ Deno.serve(async (req) => {
 
       // Use per-company override rate if set, otherwise rep default
       const fullRate = target.commission_rate ?? result.rep.commission_rate
+      const method: CommissionMethod =
+        (result.rep.commission_method as CommissionMethod) || 'margin_scaled'
 
       // Use detailed invoice (with line items) if available, else header-only
       const detailed = invoicesWithLines.find(d => d.invoice_id === inv.invoice_id) || inv
@@ -377,15 +379,17 @@ Deno.serve(async (req) => {
         const costKey = lineItemCostKey(li)
         const cost = costKey ? costMap.get(costKey) ?? null : null
 
-        let marginPct: number | null = null
-        if (cost !== null && cost > 0 && sellRate > 0) {
-          marginPct = ((sellRate - cost) / cost) * 100
-        }
-
-        const lineRate = computeEffectiveRate(fullRate, marginPct)
-        lineCommission += lineSubTotal * (lineRate / 100)
+        const { commission: lc, effectiveRate } = computeLineCommission(
+          method,
+          fullRate,
+          lineSubTotal,
+          qty,
+          sellRate,
+          cost,
+        )
+        lineCommission += lc
         coveredLineSubTotal += lineSubTotal
-        weightedRateNumerator += lineSubTotal * lineRate
+        weightedRateNumerator += lineSubTotal * effectiveRate
       }
 
       // If we couldn't get any line items, fall back to invoice-level full rate
