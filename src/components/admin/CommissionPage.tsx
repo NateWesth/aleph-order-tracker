@@ -111,6 +111,7 @@ const CommissionPage = () => {
   const [commissionData, setCommissionData] = useState<CommissionResult | null>(null);
   const [loadingReport, setLoadingReport] = useState(false);
   const [expandedReps, setExpandedReps] = useState<Set<string>>(new Set());
+  const [expandedInvoices, setExpandedInvoices] = useState<Set<string>>(new Set());
 
   const fetchData = useCallback(async () => {
     setLoadingReps(true);
