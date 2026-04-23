@@ -441,20 +441,19 @@ Deno.serve(async (req) => {
         })
       }
 
-      // If we couldn't get any line items, fall back to invoice-level full rate
+      // Commission is computed strictly per line item (excluding VAT).
+      // If an invoice has no line items at all, fall back to the invoice
+      // subtotal at the rep's full rate so we don't silently drop it.
       let commission: number
       let displayRate: number
-      if (coveredLineSubTotal === 0) {
+      if (lineDetails.length === 0) {
         commission = invSubTotal * (fullRate / 100)
         displayRate = fullRate
       } else {
-        // Cover any uncovered remainder of subtotal at full rate
-        const uncovered = Math.max(invSubTotal - coveredLineSubTotal, 0)
-        commission = lineCommission + uncovered * (fullRate / 100)
-        const totalForRate = coveredLineSubTotal + uncovered
-        displayRate = totalForRate > 0
-          ? (weightedRateNumerator + uncovered * fullRate) / totalForRate
-          : fullRate
+        commission = lineCommission
+        displayRate = coveredLineSubTotal > 0
+          ? weightedRateNumerator / coveredLineSubTotal
+          : 0
       }
 
       const invoiceIdStr = String(inv.invoice_id || inv.invoice_number || inv.number || '').trim()
