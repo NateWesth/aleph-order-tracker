@@ -431,46 +431,136 @@ async function fetchZohoInvoices(accessToken: string, orgId: string, dateStart: 
   return Array.from(uniqueInvoices.values())
 }
 
-// Fetch cost prices from recent vendor bills (last 100) by SKU
-async function fetchCostPricesFromBills(accessToken: string, orgId: string): Promise<Map<string, number>> {
-  const costMap = new Map<string, number>()
+// Build a stable key for an invoice line item used to look up cost.
+// Prefers item_id (most reliable), then SKU, then lowercased name.
+function lineItemCostKey(li: Record<string, unknown>): string | null {
+  const itemId = li.item_id ? String(li.item_id).trim() : ''
+  if (itemId) return `id:${itemId}`
+  const sku = li.sku ? String(li.sku).trim() : ''
+  if (sku) return `sku:${sku.toLowerCase()}`
+  const name = li.name ? String(li.name).trim() : ''
+  if (name) return `name:${name.toLowerCase()}`
+  return null
+}
+
+// Fetch a single invoice with full line items
+async function fetchInvoiceDetail(accessToken: string, orgId: string, invoiceId: string): Promise<any | null> {
   try {
-    // Get recent bills
-    const url = `${ZOHO_API_URL}/books/v3/bills?organization_id=${orgId}&per_page=50&sort_column=date&sort_order=D`
+    const url = `${ZOHO_API_URL}/books/v3/invoices/${invoiceId}?organization_id=${orgId}`
     const resp = await fetch(url, {
       headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` },
     })
     const data = await resp.json()
-    if (!resp.ok || data.code !== 0) {
-      console.error('Zoho bills fetch error:', data.message)
-      return costMap
-    }
+    if (!resp.ok || data.code !== 0) return null
+    return data.invoice || null
+  } catch (e) {
+    console.error('Error fetching invoice detail:', e)
+    return null
+  }
+}
 
-    const bills = data.bills || []
-    // Fetch line items for up to 20 recent bills to avoid timeout
-    const billsToFetch = bills.slice(0, 20)
-    for (const bill of billsToFetch) {
+// Fetch line items for many invoices in parallel (capped concurrency)
+async function fetchInvoicesWithLineItems(
+  accessToken: string,
+  orgId: string,
+  invoices: any[],
+): Promise<any[]> {
+  const results: any[] = []
+  const concurrency = 8
+  for (let i = 0; i < invoices.length; i += concurrency) {
+    const batch = invoices.slice(i, i + concurrency)
+    const detailed = await Promise.all(
+      batch.map(async (inv) => {
+        const id = inv.invoice_id
+        if (!id) return inv
+        const detail = await fetchInvoiceDetail(accessToken, orgId, id)
+        return detail || inv
+      }),
+    )
+    results.push(...detailed)
+  }
+  return results
+}
+
+// Fetch cost (purchase rate) for given Zoho item_ids using the Items API.
+// Falls back to listing items if needed. Keys used:
+//   id:<item_id>  ->  purchase_rate
+//   sku:<sku>     ->  purchase_rate (resolved via items list)
+async function fetchCostPricesFromItems(
+  accessToken: string,
+  orgId: string,
+  keys: Set<string>,
+): Promise<Map<string, number>> {
+  const costMap = new Map<string, number>()
+  if (keys.size === 0) return costMap
+
+  const itemIds = [...keys].filter(k => k.startsWith('id:')).map(k => k.slice(3))
+  const otherKeys = [...keys].filter(k => !k.startsWith('id:'))
+
+  // 1) Fetch each item by ID in parallel batches
+  const concurrency = 10
+  for (let i = 0; i < itemIds.length; i += concurrency) {
+    const batch = itemIds.slice(i, i + concurrency)
+    await Promise.all(batch.map(async (itemId) => {
       try {
-        const detailUrl = `${ZOHO_API_URL}/books/v3/bills/${bill.bill_id}?organization_id=${orgId}`
-        const detailResp = await fetch(detailUrl, {
+        const url = `${ZOHO_API_URL}/books/v3/items/${itemId}?organization_id=${orgId}`
+        const resp = await fetch(url, {
           headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` },
         })
-        const detailData = await detailResp.json()
-        if (detailResp.ok && detailData.code === 0 && detailData.bill?.line_items) {
-          for (const item of detailData.bill.line_items) {
-            const sku = (item.sku || item.item_id || '').toString().trim()
-            if (sku) {
-              costMap.set(sku.toLowerCase(), Number(item.rate) || 0)
-            }
-          }
+        const data = await resp.json()
+        if (!resp.ok || data.code !== 0) return
+        const item = data.item
+        if (!item) return
+        const cost =
+          toNumber(item.purchase_rate) ??
+          toNumber(item.last_purchase_rate) ??
+          toNumber(item.cost_price) ??
+          0
+        if (cost > 0) {
+          costMap.set(`id:${itemId}`, cost)
+          if (item.sku) costMap.set(`sku:${String(item.sku).toLowerCase()}`, cost)
+          if (item.name) costMap.set(`name:${String(item.name).toLowerCase()}`, cost)
         }
       } catch (e) {
-        console.error('Error fetching bill detail:', e)
+        // ignore per-item errors
+      }
+    }))
+  }
+
+  // 2) For SKU-only / name-only keys we couldn't resolve via item_id, do a best-effort
+  //    items list lookup (limited pages to stay within timeout)
+  const stillMissing = otherKeys.filter(k => !costMap.has(k))
+  if (stillMissing.length > 0) {
+    let page = 1
+    let hasMore = true
+    while (hasMore && page <= 5) {
+      try {
+        const url = `${ZOHO_API_URL}/books/v3/items?organization_id=${orgId}&page=${page}&per_page=200`
+        const resp = await fetch(url, {
+          headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` },
+        })
+        const data = await resp.json()
+        if (!resp.ok || data.code !== 0) break
+        for (const item of data.items || []) {
+          const cost =
+            toNumber(item.purchase_rate) ??
+            toNumber(item.last_purchase_rate) ??
+            toNumber(item.cost_price) ??
+            0
+          if (cost > 0) {
+            if (item.item_id) costMap.set(`id:${String(item.item_id)}`, cost)
+            if (item.sku) costMap.set(`sku:${String(item.sku).toLowerCase()}`, cost)
+            if (item.name) costMap.set(`name:${String(item.name).toLowerCase()}`, cost)
+          }
+        }
+        hasMore = data.page_context?.has_more_page ?? false
+        page++
+      } catch (e) {
+        break
       }
     }
-  } catch (e) {
-    console.error('Error fetching bills:', e)
   }
+
   return costMap
 }
 
