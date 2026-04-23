@@ -528,7 +528,6 @@ const CommissionPage = () => {
                                 <th className="text-left p-2 font-medium">Customer</th>
                                 <th className="text-left p-2 font-medium">Date</th>
                                 <th className="text-right p-2 font-medium">Excl. VAT</th>
-                                <th className="text-right p-2 font-medium">Incl. VAT</th>
                                 <th className="text-right p-2 font-medium">Rate</th>
                                 <th className="text-right p-2 font-medium">Commission</th>
                               </tr>
@@ -568,7 +567,6 @@ const CommissionPage = () => {
                                       <td className="p-2">{inv.customer_name}</td>
                                       <td className="p-2">{inv.date}</td>
                                       <td className="p-2 text-right">{formatCurrency(inv.sub_total)}</td>
-                                      <td className="p-2 text-right text-muted-foreground">{formatCurrency(inv.total)}</td>
                                       <td className="p-2 text-right">
                                         <Badge variant={inv.commission_rate !== d.commission_rate ? "outline" : "secondary"} className="text-xs">
                                           {inv.commission_rate}%
@@ -578,7 +576,7 @@ const CommissionPage = () => {
                                     </tr>
                                     {isOpen && hasLines && (
                                       <tr className="bg-muted/20">
-                                        <td colSpan={7} className="p-0">
+                                        <td colSpan={6} className="p-0">
                                           <div className="px-4 py-3">
                                             <p className="text-xs font-medium text-muted-foreground mb-2">Line items ({lines.length})</p>
                                             <table className="w-full text-xs">
