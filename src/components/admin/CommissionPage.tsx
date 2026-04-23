@@ -403,9 +403,9 @@ const CommissionPage = () => {
               onChange={(e) => setSelectedMonth(e.target.value)}
               className="w-48"
             />
-            <Button onClick={fetchCommissionReport} disabled={loadingReport}>
+            <Button onClick={fetchCommissionReport} disabled={loadingReport} variant="outline">
               {loadingReport ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <RefreshCw className="h-4 w-4 mr-1.5" />}
-              Calculate
+              {loadingReport ? "Calculating..." : "Refresh"}
             </Button>
             {commissionData && (
               <Button variant="outline" onClick={exportCsv}>
