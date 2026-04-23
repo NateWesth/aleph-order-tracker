@@ -55,6 +55,7 @@ type CommissionLineItem = {
 };
 
 type CommissionInvoice = {
+  invoice_id: string;
   invoice_number: string;
   customer_name: string;
   date: string;
@@ -63,6 +64,7 @@ type CommissionInvoice = {
   commission: number;
   commission_rate: number;
   line_items?: CommissionLineItem[];
+  locked: boolean;
 };
 
 type CommissionRepData = {
@@ -73,6 +75,9 @@ type CommissionRepData = {
   total_invoiced: number;
   commission_earned: number;
   invoice_count: number;
+  locked_commission: number;
+  locked_invoice_count: number;
+  is_locked: boolean;
   invoices: CommissionInvoice[];
   companies: string[];
 };
