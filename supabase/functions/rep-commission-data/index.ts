@@ -457,10 +457,19 @@ Deno.serve(async (req) => {
           : fullRate
       }
 
-      result.totalInvoiced += invSubTotal
-      result.commissionEarned += commission
-      result.invoiceCount++
+      const invoiceIdStr = String(inv.invoice_id || inv.invoice_number || inv.number || '').trim()
+      const isLocked = lockedSet.has(lockedKey(target.rep_id, invoiceIdStr))
+
+      if (isLocked) {
+        result.lockedCommission += commission
+        result.lockedInvoiceCount++
+      } else {
+        result.totalInvoiced += invSubTotal
+        result.commissionEarned += commission
+        result.invoiceCount++
+      }
       result.invoices.push({
+        invoice_id: invoiceIdStr,
         invoice_number: inv.invoice_number || inv.number || '',
         customer_name: inv.customer_name || '',
         date: inv.date || inv.invoice_date || '',
@@ -469,9 +478,16 @@ Deno.serve(async (req) => {
         commission,
         commission_rate: Math.round(displayRate * 100) / 100,
         line_items: lineDetails,
+        locked: isLocked,
       })
     }
     console.log(`Matched ${matched}/${invoiceList.length} invoices to reps. Skipped ${duplicatesSkipped} duplicates. Unmatched samples:`, unmatchedSamples)
+
+    // A rep is considered "fully locked" for the period when they have at least one
+    // locked invoice and zero unlocked invoices remaining.
+    for (const r of repResults.values()) {
+      r.isLocked = r.lockedInvoiceCount > 0 && r.invoiceCount === 0
+    }
 
     const data = Array.from(repResults.values()).map(r => ({
       rep_id: r.rep.id,
@@ -481,6 +497,9 @@ Deno.serve(async (req) => {
       total_invoiced: Math.round(r.totalInvoiced * 100) / 100,
       commission_earned: Math.round(r.commissionEarned * 100) / 100,
       invoice_count: r.invoiceCount,
+      locked_commission: Math.round(r.lockedCommission * 100) / 100,
+      locked_invoice_count: r.lockedInvoiceCount,
+      is_locked: r.isLocked,
       invoices: r.invoices,
       companies: Array.from(repCompanies.get(r.rep.id) || []).map(cid => companyIdToName.get(cid) || cid),
     }))
