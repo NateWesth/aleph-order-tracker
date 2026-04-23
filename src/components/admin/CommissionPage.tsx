@@ -490,9 +490,31 @@ const CommissionPage = () => {
                         </div>
                       </div>
                       {d.companies.length > 0 && (
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Clients: {d.companies.join(", ")}
-                        </p>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 px-2 mt-1 text-xs text-muted-foreground hover:text-foreground gap-1"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <Users className="h-3 w-3" />
+                              {d.companies.length} {d.companies.length === 1 ? "client" : "clients"}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent
+                            align="start"
+                            className="w-80 max-h-72 overflow-y-auto"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <p className="text-xs font-medium mb-2 text-muted-foreground">Assigned clients</p>
+                            <ul className="space-y-1 text-sm">
+                              {d.companies.map((c, idx) => (
+                                <li key={idx} className="truncate">{c}</li>
+                              ))}
+                            </ul>
+                          </PopoverContent>
+                        </Popover>
                       )}
                     </CardHeader>
                     {expandedReps.has(d.rep_id) && d.invoices.length > 0 && (
