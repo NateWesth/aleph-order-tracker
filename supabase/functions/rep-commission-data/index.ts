@@ -273,8 +273,23 @@ Deno.serve(async (req) => {
     }
 
     let matched = 0
+    let duplicatesSkipped = 0
     const unmatchedSamples: string[] = []
+    const processedInvoiceIds = new Set<string>()
     for (const inv of invoiceList) {
+      // Hard dedup: never process the same invoice twice (defense-in-depth
+      // beyond the Map-based dedup in fetchZohoInvoices).
+      const dedupKey = String(
+        inv.invoice_id || inv.invoice_number || inv.number || ''
+      ).trim()
+      if (dedupKey) {
+        if (processedInvoiceIds.has(dedupKey)) {
+          duplicatesSkipped++
+          continue
+        }
+        processedInvoiceIds.add(dedupKey)
+      }
+
       const target = matchInvoiceToAssignment(inv.customer_name || '')
       if (!target) {
         if (unmatchedSamples.length < 10 && inv.customer_name) {
