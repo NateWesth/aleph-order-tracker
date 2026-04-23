@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Fragment } from "react";
+import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -41,6 +42,18 @@ type RepAssignment = {
   commission_rate: number | null;
 };
 
+type CommissionLineItem = {
+  name: string;
+  code: string;
+  quantity: number;
+  rate: number;
+  cost: number | null;
+  sub_total: number;
+  margin_percent: number | null;
+  commission_rate: number;
+  commission: number;
+};
+
 type CommissionInvoice = {
   invoice_number: string;
   customer_name: string;
@@ -49,6 +62,7 @@ type CommissionInvoice = {
   total: number;
   commission: number;
   commission_rate: number;
+  line_items?: CommissionLineItem[];
 };
 
 type CommissionRepData = {
@@ -98,6 +112,7 @@ const CommissionPage = () => {
   const [commissionData, setCommissionData] = useState<CommissionResult | null>(null);
   const [loadingReport, setLoadingReport] = useState(false);
   const [expandedReps, setExpandedReps] = useState<Set<string>>(new Set());
+  const [expandedInvoices, setExpandedInvoices] = useState<Set<string>>(new Set());
 
   const fetchData = useCallback(async () => {
     setLoadingReps(true);
@@ -400,21 +415,98 @@ const CommissionPage = () => {
                               </tr>
                             </thead>
                             <tbody>
-                              {d.invoices.map((inv, i) => (
-                                <tr key={i} className="border-t">
-                                  <td className="p-2">{inv.invoice_number}</td>
-                                  <td className="p-2">{inv.customer_name}</td>
-                                  <td className="p-2">{inv.date}</td>
-                                  <td className="p-2 text-right">{formatCurrency(inv.sub_total)}</td>
-                                  <td className="p-2 text-right text-muted-foreground">{formatCurrency(inv.total)}</td>
-                                  <td className="p-2 text-right">
-                                    <Badge variant={inv.commission_rate !== d.commission_rate ? "outline" : "secondary"} className="text-xs">
-                                      {inv.commission_rate}%
-                                    </Badge>
-                                  </td>
-                                  <td className="p-2 text-right font-medium text-primary">{formatCurrency(inv.commission)}</td>
-                                </tr>
-                              ))}
+                              {d.invoices.map((inv, i) => {
+                                const invKey = `${d.rep_id}::${inv.invoice_number}::${i}`;
+                                const isOpen = expandedInvoices.has(invKey);
+                                const lines = inv.line_items || [];
+                                const hasLines = lines.length > 0;
+                                return (
+                                  <Fragment key={invKey}>
+                                    <tr
+                                      className={cn("border-t", hasLines && "cursor-pointer hover:bg-muted/40")}
+                                      onClick={() => {
+                                        if (!hasLines) return;
+                                        setExpandedInvoices(prev => {
+                                          const next = new Set(prev);
+                                          if (next.has(invKey)) next.delete(invKey); else next.add(invKey);
+                                          return next;
+                                        });
+                                      }}
+                                    >
+                                      <td className="p-2">
+                                        <span className="inline-flex items-center gap-1">
+                                          {hasLines && (isOpen
+                                            ? <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                                            : <ChevronRight className="h-3 w-3 text-muted-foreground" />)}
+                                          {inv.invoice_number}
+                                        </span>
+                                      </td>
+                                      <td className="p-2">{inv.customer_name}</td>
+                                      <td className="p-2">{inv.date}</td>
+                                      <td className="p-2 text-right">{formatCurrency(inv.sub_total)}</td>
+                                      <td className="p-2 text-right text-muted-foreground">{formatCurrency(inv.total)}</td>
+                                      <td className="p-2 text-right">
+                                        <Badge variant={inv.commission_rate !== d.commission_rate ? "outline" : "secondary"} className="text-xs">
+                                          {inv.commission_rate}%
+                                        </Badge>
+                                      </td>
+                                      <td className="p-2 text-right font-medium text-primary">{formatCurrency(inv.commission)}</td>
+                                    </tr>
+                                    {isOpen && hasLines && (
+                                      <tr className="bg-muted/20">
+                                        <td colSpan={7} className="p-0">
+                                          <div className="px-4 py-3">
+                                            <p className="text-xs font-medium text-muted-foreground mb-2">Line items ({lines.length})</p>
+                                            <table className="w-full text-xs">
+                                              <thead className="text-muted-foreground">
+                                                <tr>
+                                                  <th className="text-left py-1 font-medium">Item</th>
+                                                  <th className="text-right py-1 font-medium">Qty</th>
+                                                  <th className="text-right py-1 font-medium">Sell</th>
+                                                  <th className="text-right py-1 font-medium">Cost</th>
+                                                  <th className="text-right py-1 font-medium">Margin</th>
+                                                  <th className="text-right py-1 font-medium">Sub-total</th>
+                                                  <th className="text-right py-1 font-medium">Comm. %</th>
+                                                  <th className="text-right py-1 font-medium">Commission</th>
+                                                </tr>
+                                              </thead>
+                                              <tbody>
+                                                {lines.map((li, j) => (
+                                                  <tr key={j} className="border-t border-border/40">
+                                                    <td className="py-1.5 pr-2">
+                                                      <div className="font-medium text-foreground">{li.name || "—"}</div>
+                                                      {li.code && <div className="text-[10px] text-muted-foreground">{li.code}</div>}
+                                                    </td>
+                                                    <td className="py-1.5 text-right">{li.quantity}</td>
+                                                    <td className="py-1.5 text-right">{formatCurrency(li.rate)}</td>
+                                                    <td className="py-1.5 text-right text-muted-foreground">
+                                                      {li.cost !== null ? formatCurrency(li.cost) : "—"}
+                                                    </td>
+                                                    <td className="py-1.5 text-right">
+                                                      {li.margin_percent !== null ? (
+                                                        <span className={cn(
+                                                          li.margin_percent >= 25 ? "text-primary" : "text-destructive"
+                                                        )}>
+                                                          {li.margin_percent}%
+                                                        </span>
+                                                      ) : <span className="text-muted-foreground">—</span>}
+                                                    </td>
+                                                    <td className="py-1.5 text-right">{formatCurrency(li.sub_total)}</td>
+                                                    <td className="py-1.5 text-right">
+                                                      <Badge variant="outline" className="text-[10px] px-1 py-0">{li.commission_rate}%</Badge>
+                                                    </td>
+                                                    <td className="py-1.5 text-right font-medium text-primary">{formatCurrency(li.commission)}</td>
+                                                  </tr>
+                                                ))}
+                                              </tbody>
+                                            </table>
+                                          </div>
+                                        </td>
+                                      </tr>
+                                    )}
+                                  </Fragment>
+                                );
+                              })}
                             </tbody>
                           </table>
                         </div>
