@@ -273,8 +273,23 @@ Deno.serve(async (req) => {
     }
 
     let matched = 0
+    let duplicatesSkipped = 0
     const unmatchedSamples: string[] = []
+    const processedInvoiceIds = new Set<string>()
     for (const inv of invoiceList) {
+      // Hard dedup: never process the same invoice twice (defense-in-depth
+      // beyond the Map-based dedup in fetchZohoInvoices).
+      const dedupKey = String(
+        inv.invoice_id || inv.invoice_number || inv.number || ''
+      ).trim()
+      if (dedupKey) {
+        if (processedInvoiceIds.has(dedupKey)) {
+          duplicatesSkipped++
+          continue
+        }
+        processedInvoiceIds.add(dedupKey)
+      }
+
       const target = matchInvoiceToAssignment(inv.customer_name || '')
       if (!target) {
         if (unmatchedSamples.length < 10 && inv.customer_name) {
@@ -354,7 +369,7 @@ Deno.serve(async (req) => {
         commission_rate: Math.round(displayRate * 100) / 100,
       })
     }
-    console.log(`Matched ${matched}/${invoiceList.length} invoices to reps. Unmatched samples:`, unmatchedSamples)
+    console.log(`Matched ${matched}/${invoiceList.length} invoices to reps. Skipped ${duplicatesSkipped} duplicates. Unmatched samples:`, unmatchedSamples)
 
     const data = Array.from(repResults.values()).map(r => ({
       rep_id: r.rep.id,
@@ -424,8 +439,13 @@ async function fetchZohoInvoices(accessToken: string, orgId: string, dateStart: 
 
   const uniqueInvoices = new Map<string, any>()
   for (const invoice of allInvoices) {
+    // Prefer the stable Zoho invoice_id; fall back to number only if missing.
     const invoiceId = invoice.invoice_id || invoice.invoice_number || invoice.number
-    if (invoiceId) uniqueInvoices.set(String(invoiceId), invoice)
+    if (!invoiceId) continue
+    const key = String(invoiceId).trim()
+    if (!key) continue
+    // First write wins — subsequent statuses for the same invoice are ignored.
+    if (!uniqueInvoices.has(key)) uniqueInvoices.set(key, invoice)
   }
 
   return Array.from(uniqueInvoices.values())
