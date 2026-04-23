@@ -213,15 +213,36 @@ Deno.serve(async (req) => {
       return best?.target ?? null
     }
 
-    // Fetch Zoho invoices and bills
+    // Fetch Zoho invoices
     const accessToken = await getValidAccessToken(supabase, clientId, clientSecret)
     const orgId = await getOrgId(supabase)
 
-    const [invoices, costMap] = await Promise.all([
-      fetchZohoInvoices(accessToken, orgId, date_start, date_end),
-      fetchCostPricesFromBills(accessToken, orgId),
-    ])
-    console.log(`Fetched ${invoices.length} invoices, ${costMap.size} SKU cost prices`)
+    const invoiceList = await fetchZohoInvoices(accessToken, orgId, date_start, date_end)
+    console.log(`Fetched ${invoiceList.length} invoices`)
+
+    // Pre-filter: only fetch line-item details for invoices belonging to assigned reps
+    const relevantInvoices = invoiceList.filter(inv =>
+      matchInvoiceToAssignment(inv.customer_name || '') !== null
+    )
+    console.log(`${relevantInvoices.length} invoices match assigned customers; fetching line items...`)
+
+    // Fetch line items for matched invoices in parallel batches
+    const invoicesWithLines = await fetchInvoicesWithLineItems(
+      accessToken,
+      orgId,
+      relevantInvoices,
+    )
+
+    // Build cost map from item_ids/SKUs that appear in these invoices using Zoho Items API
+    const skuKeys = new Set<string>()
+    for (const inv of invoicesWithLines) {
+      for (const li of inv.line_items || []) {
+        const key = lineItemCostKey(li)
+        if (key) skuKeys.add(key)
+      }
+    }
+    const costMap = await fetchCostPricesFromItems(accessToken, orgId, skuKeys)
+    console.log(`Resolved cost prices for ${costMap.size}/${skuKeys.size} unique items`)
 
     // Map invoices to reps
     type RepResult = {
@@ -252,14 +273,10 @@ Deno.serve(async (req) => {
     }
 
     let matched = 0
-    let unmatched = 0
-    let zeroAmountMatches = 0
     const unmatchedSamples: string[] = []
-    const zeroAmountSamples: string[] = []
-    for (const inv of invoices) {
+    for (const inv of invoiceList) {
       const target = matchInvoiceToAssignment(inv.customer_name || '')
       if (!target) {
-        unmatched++
         if (unmatchedSamples.length < 10 && inv.customer_name) {
           unmatchedSamples.push(inv.customer_name)
         }
@@ -270,30 +287,59 @@ Deno.serve(async (req) => {
       const result = repResults.get(target.rep_id)
       if (!result) continue
 
-      const invSubTotal = getInvoiceSubTotal(inv)
-      const invTotal = toNumber(inv.total) ?? invSubTotal
-      if (invSubTotal === 0) {
-        zeroAmountMatches++
-        if (zeroAmountSamples.length < 10) {
-          zeroAmountSamples.push(
-            JSON.stringify({
-              invoice_number: inv.invoice_number || inv.number || '',
-              customer_name: inv.customer_name || '',
-              amount_fields: {
-                sub_total: inv.sub_total ?? null,
-                subtotal: inv.subtotal ?? null,
-                total_before_tax: inv.total_before_tax ?? null,
-                tax_total: inv.tax_total ?? null,
-                total: inv.total ?? null,
-              },
-            })
-          )
+      // Use per-company override rate if set, otherwise rep default
+      const fullRate = target.commission_rate ?? result.rep.commission_rate
+
+      // Use detailed invoice (with line items) if available, else header-only
+      const detailed = invoicesWithLines.find(d => d.invoice_id === inv.invoice_id) || inv
+      const lineItems: any[] = detailed.line_items || []
+
+      const invSubTotal = getInvoiceSubTotal(detailed)
+      const invTotal = toNumber(detailed.total) ?? invSubTotal
+
+      let lineCommission = 0
+      let coveredLineSubTotal = 0
+      let weightedRateNumerator = 0
+
+      for (const li of lineItems) {
+        const qty = toNumber(li.quantity) ?? 0
+        const lineSubTotal =
+          toNumber(li.item_total) ??
+          toNumber(li.item_sub_total) ??
+          ((toNumber(li.rate) ?? 0) * qty)
+
+        if (lineSubTotal <= 0) continue
+
+        const sellRate = toNumber(li.rate) ?? (qty > 0 ? lineSubTotal / qty : 0)
+        const costKey = lineItemCostKey(li)
+        const cost = costKey ? costMap.get(costKey) ?? null : null
+
+        let marginPct: number | null = null
+        if (cost !== null && cost > 0 && sellRate > 0) {
+          marginPct = ((sellRate - cost) / cost) * 100
         }
+
+        const lineRate = computeEffectiveRate(fullRate, marginPct)
+        lineCommission += lineSubTotal * (lineRate / 100)
+        coveredLineSubTotal += lineSubTotal
+        weightedRateNumerator += lineSubTotal * lineRate
       }
 
-      // Use per-company override rate if set, otherwise rep default
-      const effectiveRate = target.commission_rate ?? result.rep.commission_rate
-      const commission = invSubTotal * (effectiveRate / 100)
+      // If we couldn't get any line items, fall back to invoice-level full rate
+      let commission: number
+      let displayRate: number
+      if (coveredLineSubTotal === 0) {
+        commission = invSubTotal * (fullRate / 100)
+        displayRate = fullRate
+      } else {
+        // Cover any uncovered remainder of subtotal at full rate
+        const uncovered = Math.max(invSubTotal - coveredLineSubTotal, 0)
+        commission = lineCommission + uncovered * (fullRate / 100)
+        const totalForRate = coveredLineSubTotal + uncovered
+        displayRate = totalForRate > 0
+          ? (weightedRateNumerator + uncovered * fullRate) / totalForRate
+          : fullRate
+      }
 
       result.totalInvoiced += invSubTotal
       result.commissionEarned += commission
@@ -305,11 +351,10 @@ Deno.serve(async (req) => {
         sub_total: invSubTotal,
         total: invTotal,
         commission,
-        commission_rate: effectiveRate,
+        commission_rate: Math.round(displayRate * 100) / 100,
       })
     }
-    console.log(`Matched ${matched}/${invoices.length} invoices to reps. Unmatched samples:`, unmatchedSamples)
-    console.log(`Matched invoices with zero extracted amount: ${zeroAmountMatches}. Samples:`, zeroAmountSamples)
+    console.log(`Matched ${matched}/${invoiceList.length} invoices to reps. Unmatched samples:`, unmatchedSamples)
 
     const data = Array.from(repResults.values()).map(r => ({
       rep_id: r.rep.id,
