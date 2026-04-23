@@ -41,6 +41,18 @@ type RepAssignment = {
   commission_rate: number | null;
 };
 
+type CommissionLineItem = {
+  name: string;
+  code: string;
+  quantity: number;
+  rate: number;
+  cost: number | null;
+  sub_total: number;
+  margin_percent: number | null;
+  commission_rate: number;
+  commission: number;
+};
+
 type CommissionInvoice = {
   invoice_number: string;
   customer_name: string;
@@ -49,6 +61,7 @@ type CommissionInvoice = {
   total: number;
   commission: number;
   commission_rate: number;
+  line_items?: CommissionLineItem[];
 };
 
 type CommissionRepData = {
