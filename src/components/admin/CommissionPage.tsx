@@ -253,8 +253,9 @@ const CommissionPage = () => {
     fetchData();
   };
 
-  // Commission report - uses previous month by default
-  const fetchCommissionReport = async () => {
+  // Commission report - uses previous month by default. Auto-runs whenever the
+  // Report tab is opened OR the selected month changes.
+  const fetchCommissionReport = useCallback(async () => {
     setLoadingReport(true);
     try {
       const [year, month] = selectedMonth.split("-").map(Number);
@@ -276,6 +277,65 @@ const CommissionPage = () => {
     } finally {
       setLoadingReport(false);
     }
+  }, [selectedMonth, toast]);
+
+  // Auto-fetch whenever the Report tab is the active tab or the month changes.
+  useEffect(() => {
+    if (activeTab === "report") {
+      fetchCommissionReport();
+    }
+  }, [activeTab, selectedMonth, fetchCommissionReport]);
+
+  // Lock all currently-unlocked invoices for a single rep into commission_payouts.
+  const lockRepPayout = async (rep: CommissionRepData) => {
+    const unlocked = rep.invoices.filter(i => !i.locked);
+    if (unlocked.length === 0) {
+      toast({ title: "Nothing to lock", description: "All invoices for this rep are already locked." });
+      return;
+    }
+    if (!confirm(`Lock ${unlocked.length} invoice(s) totalling ${formatCurrency(rep.commission_earned)} commission for ${rep.rep_name}? This marks the payout as paid and excludes these invoices from future calculations.`)) {
+      return;
+    }
+    const { data: { user } } = await supabase.auth.getUser();
+    const periodMonth = `${selectedMonth}-01`;
+    const rows = unlocked.map(inv => ({
+      rep_id: rep.rep_id,
+      period_month: periodMonth,
+      invoice_id: inv.invoice_id,
+      invoice_number: inv.invoice_number,
+      customer_name: inv.customer_name,
+      invoice_date: inv.date || null,
+      sub_total: inv.sub_total,
+      commission_rate: inv.commission_rate,
+      commission_amount: inv.commission,
+      line_items: inv.line_items || [],
+      locked_by: user?.id ?? null,
+    }));
+    const { error } = await supabase.from("commission_payouts").insert(rows);
+    if (error) {
+      toast({ title: "Lock failed", description: error.message, variant: "destructive" });
+      return;
+    }
+    toast({ title: "Payout locked", description: `${unlocked.length} invoice(s) locked for ${rep.rep_name}.` });
+    fetchCommissionReport();
+  };
+
+  const unlockRepPayout = async (rep: CommissionRepData) => {
+    const locked = rep.invoices.filter(i => i.locked);
+    if (locked.length === 0) return;
+    if (!confirm(`Unlock ${locked.length} invoice(s) for ${rep.rep_name}? They will be re-included in the calculation.`)) return;
+    const periodMonth = `${selectedMonth}-01`;
+    const { error } = await supabase
+      .from("commission_payouts")
+      .delete()
+      .eq("rep_id", rep.rep_id)
+      .eq("period_month", periodMonth);
+    if (error) {
+      toast({ title: "Unlock failed", description: error.message, variant: "destructive" });
+      return;
+    }
+    toast({ title: "Payout unlocked" });
+    fetchCommissionReport();
   };
 
   const toggleExpanded = (repId: string) => {
