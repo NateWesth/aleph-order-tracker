@@ -524,6 +524,41 @@ const CommissionPage = () => {
               <Input type="number" step="0.5" min="0" max="100" value={repForm.commission_rate} onChange={e => setRepForm(f => ({ ...f, commission_rate: e.target.value }))} />
               <p className="text-xs text-muted-foreground mt-1">This is the default rate. You can override per-company in assignments.</p>
             </div>
+            <div>
+              <Label>Commission Calculation Method</Label>
+              <div className="space-y-2 mt-2">
+                <label className="flex items-start gap-2 p-2 rounded-md border cursor-pointer hover:bg-muted/50">
+                  <input
+                    type="radio"
+                    name="commission_method"
+                    className="mt-1"
+                    checked={repForm.commission_method === "margin_scaled"}
+                    onChange={() => setRepForm(f => ({ ...f, commission_method: "margin_scaled" }))}
+                  />
+                  <div className="text-sm">
+                    <div className="font-medium">Margin-scaled rate</div>
+                    <div className="text-xs text-muted-foreground">
+                      Full rate at 25%+ margin. Below 25%, rate drops 1% per 1% margin shortfall (floored at 0).
+                    </div>
+                  </div>
+                </label>
+                <label className="flex items-start gap-2 p-2 rounded-md border cursor-pointer hover:bg-muted/50">
+                  <input
+                    type="radio"
+                    name="commission_method"
+                    className="mt-1"
+                    checked={repForm.commission_method === "half_markup_below_25"}
+                    onChange={() => setRepForm(f => ({ ...f, commission_method: "half_markup_below_25" }))}
+                  />
+                  <div className="text-sm">
+                    <div className="font-medium">Half-markup below 25%</div>
+                    <div className="text-xs text-muted-foreground">
+                      Full rate at 25%+ margin. Below 25%, rep earns 50% of the markup (sell − cost) for that line.
+                    </div>
+                  </div>
+                </label>
+              </div>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setRepDialogOpen(false)}>Cancel</Button>
