@@ -485,7 +485,7 @@ const CommissionPage = () => {
                                                     <td className="py-1.5 text-right">
                                                       {li.margin_percent !== null ? (
                                                         <span className={cn(
-                                                          li.margin_percent >= 25 ? "text-emerald-500" : "text-amber-500"
+                                                          li.margin_percent >= 25 ? "text-primary" : "text-destructive"
                                                         )}>
                                                           {li.margin_percent}%
                                                         </span>
