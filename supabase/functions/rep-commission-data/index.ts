@@ -53,13 +53,11 @@ const getInvoiceSubTotal = (invoice: Record<string, unknown>): number => {
 //   - unknown cost -> use full rate
 //
 // 'half_markup_below_25':
-//   - margin >= 25%  -> full rate on the line subtotal (same as above)
-//   - 0 <= margin < 25%  -> commission = 50% of the markup amount (sell - cost) for the line
-//     (i.e. an effective rate of margin% / 2 expressed against the line subtotal,
-//      because markup = lineSubTotal * margin/(100+margin) when margin is on cost...
-//      we compute it directly from cost so it's exact)
+//   Commission is ALWAYS calculated on PROFIT (sell - cost) * qty, never on subtotal.
+//   - margin >= 25%  -> commission = fullRate% of the profit
+//   - 0 <= margin < 25%  -> commission = 50% of the profit (split in half)
 //   - negative margin -> 0% commission
-//   - unknown cost -> use full rate
+//   - unknown cost -> 0% commission (skip line, never overpay)
 type CommissionMethod = 'margin_scaled' | 'half_markup_below_25'
 
 const computeEffectiveRate = (
@@ -94,12 +92,13 @@ const computeLineCommission = (
       return { commission: 0, effectiveRate: 0 }
     }
     if (marginPct < 0) return { commission: 0, effectiveRate: 0 }
-    if (marginPct >= 25) {
-      return { commission: lineSubTotal * (fullRate / 100), effectiveRate: fullRate }
-    }
-    // < 25% margin -> 50% of the profit (sell - cost) * qty
+
+    // Commission is ALWAYS computed on PROFIT, not subtotal.
     const profit = (sellRate - (cost as number)) * qty
-    const commission = Math.max(0, profit * 0.5)
+    // >= 25% margin -> rep's full rate applied to the profit
+    // <  25% margin -> half of the profit (50/50 split)
+    const payoutFraction = marginPct >= 25 ? (fullRate / 100) : 0.5
+    const commission = Math.max(0, profit * payoutFraction)
     const effectiveRate = lineSubTotal > 0 ? (commission / lineSubTotal) * 100 : 0
     return { commission, effectiveRate }
   }
