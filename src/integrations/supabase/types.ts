@@ -165,6 +165,45 @@ export type Database = {
           },
         ]
       }
+      commission_report_cache: {
+        Row: {
+          created_at: string
+          date_end: string
+          date_start: string
+          id: string
+          period_month: string
+          refreshed_at: string
+          rep_id: string | null
+          report: Json
+          updated_at: string
+          zoho_cost_prices: Json
+        }
+        Insert: {
+          created_at?: string
+          date_end: string
+          date_start: string
+          id?: string
+          period_month: string
+          refreshed_at?: string
+          rep_id?: string | null
+          report: Json
+          updated_at?: string
+          zoho_cost_prices?: Json
+        }
+        Update: {
+          created_at?: string
+          date_end?: string
+          date_start?: string
+          id?: string
+          period_month?: string
+          refreshed_at?: string
+          rep_id?: string | null
+          report?: Json
+          updated_at?: string
+          zoho_cost_prices?: Json
+        }
+        Relationships: []
+      }
       companies: {
         Row: {
           account_manager: string | null
