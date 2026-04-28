@@ -794,11 +794,7 @@ async function fetchCostPricesFromBills(
           const rate = toNumber(li.rate) ?? toNumber(li.item_rate)
           if (rate === null || rate <= 0) continue
 
-          const idKey = li.item_id ? `id:${String(li.item_id).trim()}` : null
-          const skuKey = li.sku ? `sku:${String(li.sku).trim().toLowerCase()}` : null
-          const nameKey = li.name ? `name:${String(li.name).trim().toLowerCase()}` : null
-
-          for (const k of [idKey, skuKey, nameKey]) {
+          for (const k of lineItemCostKeys(li)) {
             if (k && remaining.has(k) && !costMap.has(k)) {
               costMap.set(k, rate)
               remaining.delete(k)
