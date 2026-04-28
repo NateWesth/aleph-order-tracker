@@ -54,6 +54,7 @@ type CommissionLineItem = {
   cost: number | null;
   sub_total: number;
   margin_percent: number | null;
+  base_commission_rate?: number;
   commission_rate: number;
   commission: number;
 };
@@ -304,25 +305,32 @@ const CommissionPage = () => {
           const cost = ov.cost != null ? Number(ov.cost) : li.cost;
           const qty = li.quantity ?? 0;
           const sub_total = ov.sub_total != null ? Number(ov.sub_total) : sell * qty;
-          const commission_rate = ov.commission_rate != null ? Number(ov.commission_rate) : li.commission_rate;
+          const isManualCommissionRate = ov.commission_rate != null;
+          const commission_rate = isManualCommissionRate ? Number(ov.commission_rate) : (li.base_commission_rate ?? li.commission_rate);
           const margin_percent = (cost != null && cost > 0) ? Number((((sell - cost) / cost) * 100).toFixed(2)) : null;
 
           let commission: number;
           if (ov.commission != null) {
             commission = Number(ov.commission);
+          } else if (isManualCommissionRate) {
+            commission = sub_total * (commission_rate / 100);
           } else if (method === "half_markup_below_25") {
             if (cost == null) commission = 0;
             else {
               const profit = (sell - cost) * qty;
               if (profit <= 0) commission = 0;
-              else if (margin_percent != null && margin_percent >= 25) commission = profit * (commission_rate / 100);
+              else if (margin_percent != null && margin_percent >= 25) commission = sub_total * (commission_rate / 100);
               else commission = profit * 0.5;
             }
           } else {
             commission = sub_total * (commission_rate / 100);
           }
 
-          return { ...li, rate: sell, cost, sub_total, commission_rate, margin_percent, commission: Number(commission.toFixed(2)) };
+          const displayCommissionRate = sub_total > 0 && !isManualCommissionRate
+            ? Number(((commission / sub_total) * 100).toFixed(2))
+            : commission_rate;
+
+          return { ...li, rate: sell, cost, sub_total, commission_rate: displayCommissionRate, margin_percent, commission: Number(commission.toFixed(2)) };
         });
 
         if (!invTouched) return inv;
