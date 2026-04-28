@@ -954,33 +954,83 @@ const CommissionPage = () => {
                                                 </tr>
                                               </thead>
                                               <tbody>
-                                                {lines.map((li, j) => (
-                                                  <tr key={j} className="border-t border-border/40">
-                                                    <td className="py-1.5 pr-2">
-                                                      <div className="font-medium text-foreground">{li.name || "—"}</div>
-                                                      {li.code && <div className="text-[10px] text-muted-foreground">{li.code}</div>}
-                                                    </td>
-                                                    <td className="py-1.5 text-right">{li.quantity}</td>
-                                                    <td className="py-1.5 text-right">{formatCurrency(li.rate)}</td>
-                                                    <td className="py-1.5 text-right text-muted-foreground">
-                                                      {li.cost !== null ? formatCurrency(li.cost) : "—"}
-                                                    </td>
-                                                    <td className="py-1.5 text-right">
-                                                      {li.margin_percent !== null ? (
-                                                        <span className={cn(
-                                                          li.margin_percent >= 25 ? "text-primary" : "text-destructive"
-                                                        )}>
-                                                          {li.margin_percent}%
-                                                        </span>
-                                                      ) : <span className="text-muted-foreground">—</span>}
-                                                    </td>
-                                                    <td className="py-1.5 text-right">{formatCurrency(li.sub_total)}</td>
-                                                    <td className="py-1.5 text-right">
-                                                      <Badge variant="outline" className="text-[10px] px-1 py-0">{li.commission_rate}%</Badge>
-                                                    </td>
-                                                    <td className="py-1.5 text-right font-medium text-primary">{formatCurrency(li.commission)}</td>
-                                                  </tr>
-                                                ))}
+                                                {lines.map((li, j) => {
+                                                  const editDisabled = inv.locked;
+                                                  const cellInputClass = "w-24 ml-auto h-7 text-xs text-right px-1.5 bg-transparent border border-transparent hover:border-border focus:border-primary focus:bg-background rounded transition-colors disabled:opacity-60 disabled:cursor-not-allowed";
+                                                  const handleBlur = (
+                                                    field: "sell_rate" | "cost" | "sub_total" | "commission_rate" | "commission",
+                                                    original: number | null,
+                                                  ) => (e: React.FocusEvent<HTMLInputElement>) => {
+                                                    const newVal = e.target.value.trim();
+                                                    const orig = original == null ? "" : String(original);
+                                                    if (newVal === orig) return;
+                                                    saveLineOverride(d.rep_id, inv.invoice_id, j, field, newVal);
+                                                  };
+                                                  return (
+                                                    <tr key={j} className="border-t border-border/40">
+                                                      <td className="py-1.5 pr-2">
+                                                        <div className="font-medium text-foreground">{li.name || "—"}</div>
+                                                        {li.code && <div className="text-[10px] text-muted-foreground">{li.code}</div>}
+                                                      </td>
+                                                      <td className="py-1.5 text-right">{li.quantity}</td>
+                                                      <td className="py-1.5 text-right">
+                                                        <input
+                                                          type="number" step="0.01" disabled={editDisabled}
+                                                          defaultValue={li.rate ?? ""}
+                                                          onBlur={handleBlur("sell_rate", li.rate)}
+                                                          className={cellInputClass}
+                                                          title="Sell rate (per unit, excl. VAT)"
+                                                        />
+                                                      </td>
+                                                      <td className="py-1.5 text-right text-muted-foreground">
+                                                        <input
+                                                          type="number" step="0.01" disabled={editDisabled}
+                                                          defaultValue={li.cost ?? ""}
+                                                          placeholder="—"
+                                                          onBlur={handleBlur("cost", li.cost)}
+                                                          className={cellInputClass}
+                                                          title="Cost (per unit). Leave blank to clear override."
+                                                        />
+                                                      </td>
+                                                      <td className="py-1.5 text-right">
+                                                        {li.margin_percent !== null ? (
+                                                          <span className={cn(
+                                                            li.margin_percent >= 25 ? "text-primary" : "text-destructive"
+                                                          )}>
+                                                            {li.margin_percent}%
+                                                          </span>
+                                                        ) : <span className="text-muted-foreground">—</span>}
+                                                      </td>
+                                                      <td className="py-1.5 text-right">
+                                                        <input
+                                                          type="number" step="0.01" disabled={editDisabled}
+                                                          defaultValue={li.sub_total ?? ""}
+                                                          onBlur={handleBlur("sub_total", li.sub_total)}
+                                                          className={cellInputClass}
+                                                          title="Line sub-total (excl. VAT). Override only — leave blank to auto-calc from sell × qty."
+                                                        />
+                                                      </td>
+                                                      <td className="py-1.5 text-right">
+                                                        <input
+                                                          type="number" step="0.01" disabled={editDisabled}
+                                                          defaultValue={li.commission_rate ?? ""}
+                                                          onBlur={handleBlur("commission_rate", li.commission_rate)}
+                                                          className={cellInputClass + " text-foreground"}
+                                                          title="Commission % for this line"
+                                                        />
+                                                      </td>
+                                                      <td className="py-1.5 text-right font-medium text-primary">
+                                                        <input
+                                                          type="number" step="0.01" disabled={editDisabled}
+                                                          defaultValue={li.commission ?? ""}
+                                                          onBlur={handleBlur("commission", li.commission)}
+                                                          className={cellInputClass + " text-primary font-medium"}
+                                                          title="Commission amount. Override only — leave blank to auto-calc."
+                                                        />
+                                                      </td>
+                                                    </tr>
+                                                  );
+                                                })}
                                               </tbody>
                                             </table>
                                           </div>
