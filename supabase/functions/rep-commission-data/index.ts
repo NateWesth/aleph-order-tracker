@@ -801,6 +801,8 @@ async function fetchCostPricesFromBills(
 
   return costMap
 }
+
+async function getOrgId(supabase: any): Promise<string> {
   const { data } = await supabase
     .from('zoho_tokens')
     .select('organization_id')
