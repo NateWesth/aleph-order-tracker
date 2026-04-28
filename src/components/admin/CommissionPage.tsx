@@ -17,7 +17,7 @@ import {
 import { format, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { Printer } from "lucide-react";
+import { Printer, AlertTriangle } from "lucide-react";
 
 type CommissionMethod = "margin_scaled" | "half_markup_below_25";
 
@@ -552,7 +552,122 @@ const CommissionPage = () => {
                 </Card>
               </div>
 
-              {/* Per-rep cards */}
+              {/* Missing Costs Panel — line items where vendor-bill cost couldn't be resolved */}
+              {(() => {
+                type MissingRow = {
+                  rep_name: string;
+                  invoice_number: string;
+                  customer_name: string;
+                  date: string;
+                  code: string;
+                  name: string;
+                  quantity: number;
+                  sub_total: number;
+                };
+                const missing: MissingRow[] = [];
+                for (const rep of commissionData.data) {
+                  for (const inv of rep.invoices) {
+                    for (const li of inv.line_items || []) {
+                      if (li.cost == null) {
+                        missing.push({
+                          rep_name: rep.rep_name,
+                          invoice_number: inv.invoice_number,
+                          customer_name: inv.customer_name,
+                          date: inv.date,
+                          code: li.code || "—",
+                          name: li.name || "—",
+                          quantity: li.quantity,
+                          sub_total: li.sub_total,
+                        });
+                      }
+                    }
+                  }
+                }
+                // Aggregate per SKU for the summary header
+                const bySku = new Map<string, { code: string; name: string; count: number; value: number }>();
+                for (const m of missing) {
+                  const key = m.code;
+                  const cur = bySku.get(key) || { code: m.code, name: m.name, count: 0, value: 0 };
+                  cur.count += 1;
+                  cur.value += m.sub_total;
+                  bySku.set(key, cur);
+                }
+                const skuRows = Array.from(bySku.values()).sort((a, b) => b.value - a.value);
+                const totalValue = missing.reduce((s, m) => s + m.sub_total, 0);
+
+                const downloadMissingCsv = () => {
+                  const rows = [["Rep", "Invoice", "Customer", "Date", "SKU", "Item", "Qty", "Sub-total (excl. VAT)"]];
+                  for (const m of missing) {
+                    rows.push([m.rep_name, m.invoice_number, m.customer_name, m.date, m.code, m.name, String(m.quantity), String(m.sub_total)]);
+                  }
+                  const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+                  const blob = new Blob([csv], { type: "text/csv" });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = `missing-costs-${selectedMonth}.csv`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                };
+
+                return (
+                  <Card className="border-amber-500/40">
+                    <CardHeader className="pb-2">
+                      <div className="flex items-center justify-between gap-3 flex-wrap">
+                        <div className="flex items-center gap-2">
+                          <AlertTriangle className="h-4 w-4 text-amber-500" />
+                          <CardTitle className="text-base">Items with Missing Cost</CardTitle>
+                          <Badge variant="outline" className="text-xs">
+                            {missing.length} line{missing.length === 1 ? "" : "s"} · {skuRows.length} unique SKU{skuRows.length === 1 ? "" : "s"} · {formatCurrency(totalValue)}
+                          </Badge>
+                        </div>
+                        {missing.length > 0 && (
+                          <Button size="sm" variant="outline" onClick={downloadMissingCsv}>
+                            <Download className="h-4 w-4 mr-1.5" />Export CSV
+                          </Button>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        These items had no last vendor-bill cost found in Zoho, so commission was set to R 0.00. Add a vendor bill in Zoho with these SKUs to include them.
+                      </p>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      {missing.length === 0 ? (
+                        <p className="text-sm text-muted-foreground py-3">All line items had a resolved cost. 🎉</p>
+                      ) : (
+                        <div className="space-y-3">
+                          {/* Per-SKU summary */}
+                          <div className="rounded-md border overflow-x-auto">
+                            <table className="w-full text-xs">
+                              <thead className="bg-muted/50">
+                                <tr className="text-left">
+                                  <th className="p-2 font-medium">SKU</th>
+                                  <th className="p-2 font-medium">Item</th>
+                                  <th className="p-2 font-medium text-right">Occurrences</th>
+                                  <th className="p-2 font-medium text-right">Total Value (excl. VAT)</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {skuRows.slice(0, 50).map((s) => (
+                                  <tr key={s.code} className="border-t">
+                                    <td className="p-2 font-mono">{s.code}</td>
+                                    <td className="p-2">{s.name}</td>
+                                    <td className="p-2 text-right">{s.count}</td>
+                                    <td className="p-2 text-right">{formatCurrency(s.value)}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                          {skuRows.length > 50 && (
+                            <p className="text-xs text-muted-foreground">Showing top 50 SKUs by value. Export CSV for the full list.</p>
+                          )}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })()}
               <div className="space-y-3">
                 {commissionData.data.map((d) => (
                   <Card key={d.rep_id} className={cn(d.is_locked && "opacity-70")}>
