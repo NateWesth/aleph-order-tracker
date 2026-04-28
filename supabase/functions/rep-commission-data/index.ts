@@ -532,9 +532,25 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to calculate commission'
+    const isRateLimit = message.toLowerCase().includes('rate limit')
+    if (isRateLimit) {
+      console.warn('Rep commission data paused:', message)
+      return new Response(JSON.stringify({
+        success: false,
+        error: message,
+        rate_limited: true,
+        data: null,
+        summary: null,
+      }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
     console.error('Rep commission data error:', error)
     return new Response(JSON.stringify({
-      error: error instanceof Error ? error.message : 'Failed to calculate commission',
+      error: message,
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
