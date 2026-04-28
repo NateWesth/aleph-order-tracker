@@ -317,7 +317,6 @@ Deno.serve(async (req) => {
     // Fetch existing locked payouts for this period so we can flag/skip them.
     // A payout is keyed by (rep_id, invoice_id). Locked invoices are returned
     // for transparency but excluded from the "due" totals.
-    const periodMonth = `${date_start.slice(0, 7)}-01`
     const { data: existingPayouts } = await supabase
       .from('commission_payouts')
       .select('rep_id, invoice_id, commission_amount, sub_total, locked_at')
@@ -544,7 +543,17 @@ Deno.serve(async (req) => {
       totalInvoices: data.reduce((s, d) => s + d.invoice_count, 0),
     }
 
-    return new Response(JSON.stringify({ success: true, data, summary, cost_prices: Object.fromEntries(costMap) }), {
+    const report = { success: true, data, summary }
+    await upsertCachedCommissionReport(supabase, {
+      periodMonth,
+      repId: rep_id ?? null,
+      dateStart: date_start,
+      dateEnd: date_end,
+      report,
+      costPrices: Object.fromEntries(costMap),
+    })
+
+    return new Response(JSON.stringify({ ...report, cost_prices: Object.fromEntries(costMap), cached: false, refreshed_at: new Date().toISOString() }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (error) {
