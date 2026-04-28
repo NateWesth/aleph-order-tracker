@@ -576,15 +576,26 @@ async function fetchZohoInvoices(accessToken: string, orgId: string, dateStart: 
   return Array.from(uniqueInvoices.values())
 }
 
-// Build a stable key for an invoice line item used to look up cost.
-// Prefers item_id (most reliable), then SKU, then lowercased name.
-function lineItemCostKey(li: Record<string, unknown>): string | null {
-  const itemId = li.item_id ? String(li.item_id).trim() : ''
-  if (itemId) return `id:${itemId}`
-  const sku = li.sku ? String(li.sku).trim() : ''
-  if (sku) return `sku:${sku.toLowerCase()}`
-  const name = li.name ? String(li.name).trim() : ''
-  if (name) return `name:${name.toLowerCase()}`
+// Build stable keys for an invoice/bill line item used to look up cost.
+// Keep all possible identifiers because Zoho does not always expose the same
+// fields on invoice lines and vendor bill lines.
+function lineItemCostKeys(li: Record<string, unknown>): string[] {
+  const keys: string[] = []
+  const add = (prefix: string, value: unknown, lower = false) => {
+    const normalized = value == null ? '' : String(value).trim()
+    if (normalized) keys.push(`${prefix}:${lower ? normalized.toLowerCase() : normalized}`)
+  }
+  add('id', li.item_id)
+  add('sku', li.sku ?? li.item_code ?? li.code, true)
+  add('name', li.name ?? li.description, true)
+  return Array.from(new Set(keys))
+}
+
+function getLineItemCost(li: Record<string, unknown>, costMap: Map<string, number>): number | null {
+  for (const key of lineItemCostKeys(li)) {
+    const cost = costMap.get(key)
+    if (cost !== undefined) return cost
+  }
   return null
 }
 
