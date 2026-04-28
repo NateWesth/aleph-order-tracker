@@ -330,6 +330,18 @@ Deno.serve(async (req) => {
         total: number
         commission: number
         commission_rate: number
+        line_items: Array<{
+          name: string
+          code: string
+          quantity: number
+          rate: number
+          cost: number | null
+          sub_total: number
+          margin_percent: number | null
+          base_commission_rate: number
+          commission_rate: number
+          commission: number
+        }>
         locked: boolean
       }>
     }
