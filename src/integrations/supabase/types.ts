@@ -58,6 +58,54 @@ export type Database = {
           },
         ]
       }
+      commission_line_overrides: {
+        Row: {
+          commission: number | null
+          commission_rate: number | null
+          cost: number | null
+          created_at: string
+          created_by: string | null
+          id: string
+          invoice_id: string
+          line_index: number
+          note: string | null
+          rep_id: string
+          sell_rate: number | null
+          sub_total: number | null
+          updated_at: string
+        }
+        Insert: {
+          commission?: number | null
+          commission_rate?: number | null
+          cost?: number | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          invoice_id: string
+          line_index: number
+          note?: string | null
+          rep_id: string
+          sell_rate?: number | null
+          sub_total?: number | null
+          updated_at?: string
+        }
+        Update: {
+          commission?: number | null
+          commission_rate?: number | null
+          cost?: number | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          invoice_id?: string
+          line_index?: number
+          note?: string | null
+          rep_id?: string
+          sell_rate?: number | null
+          sub_total?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       commission_payouts: {
         Row: {
           commission_amount: number

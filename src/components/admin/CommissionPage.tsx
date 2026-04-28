@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, Fragment } from "react";
+import { useState, useEffect, useCallback, Fragment, type FocusEvent } from "react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -258,6 +258,106 @@ const CommissionPage = () => {
     fetchData();
   };
 
+  // Apply manual line overrides (admin edits) on top of edge-function result, recomputing all dependent values.
+  const applyLineOverrides = useCallback(async (result: CommissionResult): Promise<CommissionResult> => {
+    if (!result?.data?.length) return result;
+    const invoiceIds = Array.from(new Set(result.data.flatMap(r => r.invoices.map(i => i.invoice_id)).filter(Boolean)));
+    if (invoiceIds.length === 0) return result;
+
+    const { data: ovRows } = await supabase
+      .from("commission_line_overrides")
+      .select("rep_id, invoice_id, line_index, sell_rate, cost, sub_total, commission_rate, commission")
+      .in("invoice_id", invoiceIds);
+
+    if (!ovRows || ovRows.length === 0) return result;
+
+    // Index overrides by rep::invoice::lineIndex
+    const ovMap = new Map<string, any>();
+    for (const r of ovRows) {
+      ovMap.set(`${r.rep_id}::${r.invoice_id}::${r.line_index}`, r);
+    }
+
+    // Look up each rep's commission method from local state
+    const repMethodById = new Map(reps.map(r => [r.id, r.commission_method] as const));
+
+    let summaryInvoiced = 0;
+    let summaryCommission = 0;
+
+    const newData = result.data.map(rep => {
+      const method = repMethodById.get(rep.rep_id) || "half_markup_below_25";
+      let repInvoiced = 0;
+      let repCommissionUnlocked = 0;
+      let repInvoicedUnlocked = 0;
+      let repLockedCommission = 0;
+
+      const newInvoices = rep.invoices.map(inv => {
+        const newLines = (inv.line_items || []).map((li, idx) => {
+          const ov = ovMap.get(`${rep.rep_id}::${inv.invoice_id}::${idx}`);
+          if (!ov) return li;
+
+          const sell = ov.sell_rate != null ? Number(ov.sell_rate) : li.rate;
+          const cost = ov.cost != null ? Number(ov.cost) : li.cost;
+          const qty = li.quantity ?? 0;
+          const sub_total = ov.sub_total != null ? Number(ov.sub_total) : sell * qty;
+          const commission_rate = ov.commission_rate != null ? Number(ov.commission_rate) : li.commission_rate;
+          const margin_percent = (cost != null && sell > 0) ? Number((((sell - cost) / sell) * 100).toFixed(2)) : null;
+
+          let commission: number;
+          if (ov.commission != null) {
+            commission = Number(ov.commission);
+          } else if (method === "half_markup_below_25") {
+            if (cost == null) commission = 0;
+            else {
+              const profit = (sell - cost) * qty;
+              if (profit <= 0) commission = 0;
+              else if (margin_percent != null && margin_percent >= 25) commission = profit * (commission_rate / 100);
+              else commission = profit * 0.5;
+            }
+          } else {
+            commission = sub_total * (commission_rate / 100);
+          }
+
+          return { ...li, rate: sell, cost, sub_total, commission_rate, margin_percent, commission: Number(commission.toFixed(2)) };
+        });
+
+        // Recompute invoice totals from line items
+        const invSubtotal = newLines.reduce((s, l) => s + Number(l.sub_total || 0), 0);
+        const invCommission = newLines.reduce((s, l) => s + Number(l.commission || 0), 0);
+
+        repInvoiced += invSubtotal;
+        if (inv.locked) {
+          repLockedCommission += invCommission;
+        } else {
+          repInvoicedUnlocked += invSubtotal;
+          repCommissionUnlocked += invCommission;
+        }
+
+        return { ...inv, line_items: newLines, sub_total: invSubtotal, commission: Number(invCommission.toFixed(2)) };
+      });
+
+      summaryInvoiced += repInvoiced;
+      summaryCommission += repCommissionUnlocked;
+
+      return {
+        ...rep,
+        invoices: newInvoices,
+        total_invoiced: repInvoicedUnlocked,
+        commission_earned: Number(repCommissionUnlocked.toFixed(2)),
+        locked_commission: Number(repLockedCommission.toFixed(2)),
+      };
+    });
+
+    return {
+      ...result,
+      data: newData,
+      summary: {
+        ...result.summary,
+        totalInvoiced: summaryInvoiced,
+        totalCommission: Number(summaryCommission.toFixed(2)),
+      },
+    };
+  }, [reps]);
+
   // Commission report - uses previous month by default. Auto-runs whenever the
   // Report tab is opened OR the selected month changes.
   const fetchCommissionReport = useCallback(async () => {
@@ -275,14 +375,63 @@ const CommissionPage = () => {
       });
 
       if (response.error) throw new Error(response.error.message || "Failed to fetch commission data");
-      setCommissionData(response.data as CommissionResult);
+      const withOverrides = await applyLineOverrides(response.data as CommissionResult);
+      setCommissionData(withOverrides);
     } catch (e: any) {
       console.error("Commission report error:", e);
       toast({ title: "Error", description: e.message, variant: "destructive" });
     } finally {
       setLoadingReport(false);
     }
-  }, [selectedMonth, toast]);
+  }, [selectedMonth, toast, applyLineOverrides]);
+
+  // Save (or clear) a single line-item field override, then refresh the report.
+  const saveLineOverride = useCallback(async (
+    repId: string,
+    invoiceId: string,
+    lineIndex: number,
+    field: "sell_rate" | "cost" | "sub_total" | "commission_rate" | "commission",
+    rawValue: string,
+  ) => {
+    const trimmed = rawValue.trim();
+    const value = trimmed === "" ? null : Number(trimmed);
+    if (value !== null && Number.isNaN(value)) {
+      toast({ title: "Invalid number", variant: "destructive" });
+      return;
+    }
+    const { data: existing } = await supabase
+      .from("commission_line_overrides")
+      .select("id, sell_rate, cost, sub_total, commission_rate, commission")
+      .eq("rep_id", repId)
+      .eq("invoice_id", invoiceId)
+      .eq("line_index", lineIndex)
+      .maybeSingle();
+
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (existing) {
+      const updated: Record<string, any> = { [field]: value };
+      // If clearing every override field, delete the row.
+      const remaining = { ...existing, ...updated } as Record<string, any>;
+      const allNull = ["sell_rate","cost","sub_total","commission_rate","commission"].every(k => remaining[k] == null);
+      if (allNull) {
+        const { error } = await supabase.from("commission_line_overrides").delete().eq("id", existing.id);
+        if (error) { toast({ title: "Failed to clear override", description: error.message, variant: "destructive" }); return; }
+      } else {
+        const { error } = await supabase.from("commission_line_overrides").update(updated).eq("id", existing.id);
+        if (error) { toast({ title: "Save failed", description: error.message, variant: "destructive" }); return; }
+      }
+    } else {
+      if (value === null) return; // nothing to insert
+      const { error } = await supabase.from("commission_line_overrides").insert({
+        rep_id: repId, invoice_id: invoiceId, line_index: lineIndex,
+        [field]: value, created_by: user?.id ?? null,
+      });
+      if (error) { toast({ title: "Save failed", description: error.message, variant: "destructive" }); return; }
+    }
+    toast({ title: "Updated" });
+    fetchCommissionReport();
+  }, [fetchCommissionReport, toast]);
 
   // Auto-fetch whenever the Report tab is the active tab or the month changes.
   useEffect(() => {
@@ -805,33 +954,83 @@ const CommissionPage = () => {
                                                 </tr>
                                               </thead>
                                               <tbody>
-                                                {lines.map((li, j) => (
-                                                  <tr key={j} className="border-t border-border/40">
-                                                    <td className="py-1.5 pr-2">
-                                                      <div className="font-medium text-foreground">{li.name || "—"}</div>
-                                                      {li.code && <div className="text-[10px] text-muted-foreground">{li.code}</div>}
-                                                    </td>
-                                                    <td className="py-1.5 text-right">{li.quantity}</td>
-                                                    <td className="py-1.5 text-right">{formatCurrency(li.rate)}</td>
-                                                    <td className="py-1.5 text-right text-muted-foreground">
-                                                      {li.cost !== null ? formatCurrency(li.cost) : "—"}
-                                                    </td>
-                                                    <td className="py-1.5 text-right">
-                                                      {li.margin_percent !== null ? (
-                                                        <span className={cn(
-                                                          li.margin_percent >= 25 ? "text-primary" : "text-destructive"
-                                                        )}>
-                                                          {li.margin_percent}%
-                                                        </span>
-                                                      ) : <span className="text-muted-foreground">—</span>}
-                                                    </td>
-                                                    <td className="py-1.5 text-right">{formatCurrency(li.sub_total)}</td>
-                                                    <td className="py-1.5 text-right">
-                                                      <Badge variant="outline" className="text-[10px] px-1 py-0">{li.commission_rate}%</Badge>
-                                                    </td>
-                                                    <td className="py-1.5 text-right font-medium text-primary">{formatCurrency(li.commission)}</td>
-                                                  </tr>
-                                                ))}
+                                                {lines.map((li, j) => {
+                                                  const editDisabled = inv.locked;
+                                                  const cellInputClass = "w-24 ml-auto h-7 text-xs text-right px-1.5 bg-transparent border border-transparent hover:border-border focus:border-primary focus:bg-background rounded transition-colors disabled:opacity-60 disabled:cursor-not-allowed";
+                                                  const handleBlur = (
+                                                    field: "sell_rate" | "cost" | "sub_total" | "commission_rate" | "commission",
+                                                    original: number | null,
+                                                  ) => (e: FocusEvent<HTMLInputElement>) => {
+                                                    const newVal = e.target.value.trim();
+                                                    const orig = original == null ? "" : String(original);
+                                                    if (newVal === orig) return;
+                                                    saveLineOverride(d.rep_id, inv.invoice_id, j, field, newVal);
+                                                  };
+                                                  return (
+                                                    <tr key={j} className="border-t border-border/40">
+                                                      <td className="py-1.5 pr-2">
+                                                        <div className="font-medium text-foreground">{li.name || "—"}</div>
+                                                        {li.code && <div className="text-[10px] text-muted-foreground">{li.code}</div>}
+                                                      </td>
+                                                      <td className="py-1.5 text-right">{li.quantity}</td>
+                                                      <td className="py-1.5 text-right">
+                                                        <input
+                                                          type="number" step="0.01" disabled={editDisabled}
+                                                          defaultValue={li.rate ?? ""}
+                                                          onBlur={handleBlur("sell_rate", li.rate)}
+                                                          className={cellInputClass}
+                                                          title="Sell rate (per unit, excl. VAT)"
+                                                        />
+                                                      </td>
+                                                      <td className="py-1.5 text-right text-muted-foreground">
+                                                        <input
+                                                          type="number" step="0.01" disabled={editDisabled}
+                                                          defaultValue={li.cost ?? ""}
+                                                          placeholder="—"
+                                                          onBlur={handleBlur("cost", li.cost)}
+                                                          className={cellInputClass}
+                                                          title="Cost (per unit). Leave blank to clear override."
+                                                        />
+                                                      </td>
+                                                      <td className="py-1.5 text-right">
+                                                        {li.margin_percent !== null ? (
+                                                          <span className={cn(
+                                                            li.margin_percent >= 25 ? "text-primary" : "text-destructive"
+                                                          )}>
+                                                            {li.margin_percent}%
+                                                          </span>
+                                                        ) : <span className="text-muted-foreground">—</span>}
+                                                      </td>
+                                                      <td className="py-1.5 text-right">
+                                                        <input
+                                                          type="number" step="0.01" disabled={editDisabled}
+                                                          defaultValue={li.sub_total ?? ""}
+                                                          onBlur={handleBlur("sub_total", li.sub_total)}
+                                                          className={cellInputClass}
+                                                          title="Line sub-total (excl. VAT). Override only — leave blank to auto-calc from sell × qty."
+                                                        />
+                                                      </td>
+                                                      <td className="py-1.5 text-right">
+                                                        <input
+                                                          type="number" step="0.01" disabled={editDisabled}
+                                                          defaultValue={li.commission_rate ?? ""}
+                                                          onBlur={handleBlur("commission_rate", li.commission_rate)}
+                                                          className={cellInputClass + " text-foreground"}
+                                                          title="Commission % for this line"
+                                                        />
+                                                      </td>
+                                                      <td className="py-1.5 text-right font-medium text-primary">
+                                                        <input
+                                                          type="number" step="0.01" disabled={editDisabled}
+                                                          defaultValue={li.commission ?? ""}
+                                                          onBlur={handleBlur("commission", li.commission)}
+                                                          className={cellInputClass + " text-primary font-medium"}
+                                                          title="Commission amount. Override only — leave blank to auto-calc."
+                                                        />
+                                                      </td>
+                                                    </tr>
+                                                  );
+                                                })}
                                               </tbody>
                                             </table>
                                           </div>
