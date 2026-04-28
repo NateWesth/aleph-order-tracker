@@ -163,6 +163,20 @@ Deno.serve(async (req) => {
       })
     }
 
+    if (force_refresh) {
+      const { data: isAdmin, error: roleError } = await supabase.rpc('has_role', {
+        _user_id: user.id,
+        _role: 'admin',
+      })
+      if (roleError) throw new Error(`Failed to verify admin access: ${roleError.message}`)
+      if (!isAdmin) {
+        return new Response(JSON.stringify({ error: 'Only admins can refresh Zoho commission data' }), {
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+    }
+
     const periodMonth = `${date_start.slice(0, 7)}-01`
     cacheFallback = { periodMonth, repId: rep_id }
     if (!force_refresh) {
