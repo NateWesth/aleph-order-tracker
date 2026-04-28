@@ -442,14 +442,14 @@ Deno.serve(async (req) => {
         })
       }
 
-      // Commission is computed strictly per line item (excluding VAT).
-      // If an invoice has no line items at all, fall back to the invoice
-      // subtotal at the rep's full rate so we don't silently drop it.
+      // Commission is computed strictly per line item (excluding VAT) using
+      // the latest vendor-bill cost. If we have no line items, or no costs
+      // could be resolved, we skip the invoice rather than overpay.
       let commission: number
       let displayRate: number
       if (lineDetails.length === 0) {
-        commission = invSubTotal * (fullRate / 100)
-        displayRate = fullRate
+        commission = 0
+        displayRate = 0
       } else {
         commission = lineCommission
         displayRate = coveredLineSubTotal > 0
