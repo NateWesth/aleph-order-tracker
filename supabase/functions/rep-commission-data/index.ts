@@ -544,6 +544,7 @@ Deno.serve(async (req) => {
 
 async function fetchZohoInvoices(accessToken: string, orgId: string, dateStart: string, dateEnd: string) {
   const allInvoices: any[] = []
+  const rateLimitErrors: string[] = []
   for (const status of ZOHO_ALLOWED_INVOICE_STATUSES) {
     let page = 1
     let hasMore = true
@@ -564,6 +565,9 @@ async function fetchZohoInvoices(accessToken: string, orgId: string, dateStart: 
       const data = await resp.json()
       if (!resp.ok || data.code !== 0) {
         console.error(`Zoho invoice fetch error for status ${status}:`, data.message)
+        if (String(data.message || '').toLowerCase().includes('rate limit') || String(data.message || '').includes('maximum call rate limit')) {
+          rateLimitErrors.push(`${status}: ${data.message}`)
+        }
         break
       }
 
@@ -574,6 +578,10 @@ async function fetchZohoInvoices(accessToken: string, orgId: string, dateStart: 
       hasMore = data.page_context?.has_more_page ?? false
       page++
     }
+  }
+
+  if (rateLimitErrors.length > 0 && allInvoices.length === 0) {
+    throw new Error('Zoho API rate limit reached. Please wait for the Zoho limit to reset, then refresh the commission report.')
   }
 
   const uniqueInvoices = new Map<string, any>()

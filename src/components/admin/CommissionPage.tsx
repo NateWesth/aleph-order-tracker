@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, type FocusEvent } from "react";
+import { useState, useEffect, useCallback, useRef, type FocusEvent } from "react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -124,6 +124,7 @@ const CommissionPage = () => {
   const [loadingReport, setLoadingReport] = useState(false);
   const [expandedReps, setExpandedReps] = useState<Set<string>>(new Set());
   const [expandedInvoices, setExpandedInvoices] = useState<Set<string>>(new Set());
+  const reportRequestRef = useRef<string | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoadingReps(true);
@@ -387,6 +388,9 @@ const CommissionPage = () => {
   // Commission report - uses previous month by default. Auto-runs whenever the
   // Report tab is opened OR the selected month changes.
   const fetchCommissionReport = useCallback(async () => {
+    const requestKey = selectedMonth;
+    if (reportRequestRef.current === requestKey) return;
+    reportRequestRef.current = requestKey;
     setLoadingReport(true);
     try {
       const [year, month] = selectedMonth.split("-").map(Number);
@@ -407,6 +411,7 @@ const CommissionPage = () => {
       console.error("Commission report error:", e);
       toast({ title: "Error", description: e.message, variant: "destructive" });
     } finally {
+      if (reportRequestRef.current === requestKey) reportRequestRef.current = null;
       setLoadingReport(false);
     }
   }, [selectedMonth, toast, applyLineOverrides]);
