@@ -701,6 +701,13 @@ const CommissionPage = () => {
             </div>
           </div>
 
+          {reportNotice && (
+            <div className="flex items-start gap-2 p-3 rounded-lg border border-amber-500/40 bg-amber-500/10 text-sm text-amber-700 dark:text-amber-300">
+              <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+              <p>{reportNotice}</p>
+            </div>
+          )}
+
           <div className="flex flex-wrap items-center gap-3">
             <Input
               type="month"
