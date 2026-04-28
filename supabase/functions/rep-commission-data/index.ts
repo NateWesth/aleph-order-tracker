@@ -281,18 +281,22 @@ Deno.serve(async (req) => {
       relevantInvoices,
     )
 
-    // Build cost map from the LATEST vendor bill line for each item_id/SKU
-    // that appears in these invoices. Uses Zoho Books "bills" API and keeps
-    // the most recent bill_date's rate per item.
+    // Build cost map from the LATEST vendor bill line for every available
+    // item identifier on invoice lines. Important: do not keep only item_id —
+    // some Zoho invoice lines and bill lines only line up by SKU/name/code.
     const skuKeys = new Set<string>()
     for (const inv of invoicesWithLines) {
       for (const li of inv.line_items || []) {
-        const key = lineItemCostKey(li)
-        if (key) skuKeys.add(key)
+        for (const key of lineItemCostKeys(li)) skuKeys.add(key)
       }
     }
-    const costMap = await fetchCostPricesFromBills(accessToken, orgId, skuKeys, date_end)
-    console.log(`Resolved last vendor-bill cost for ${costMap.size}/${skuKeys.size} unique items`)
+    const billCostMap = await fetchCostPricesFromBills(accessToken, orgId, skuKeys, date_end)
+    const itemCostMap = await fetchCostPricesFromItems(accessToken, orgId, skuKeys)
+    const costMap = new Map(billCostMap)
+    for (const [key, value] of itemCostMap) {
+      if (!costMap.has(key)) costMap.set(key, value)
+    }
+    console.log(`Resolved Zoho costs for ${costMap.size}/${skuKeys.size} identifiers (${billCostMap.size} from latest bills, ${itemCostMap.size} item fallbacks)`)
 
     // Fetch existing locked payouts for this period so we can flag/skip them.
     // A payout is keyed by (rep_id, invoice_id). Locked invoices are returned
@@ -411,8 +415,7 @@ Deno.serve(async (req) => {
         if (lineSubTotal <= 0) continue
 
         const sellRate = toNumber(li.rate) ?? (qty > 0 ? lineSubTotal / qty : 0)
-        const costKey = lineItemCostKey(li)
-        const cost = costKey ? costMap.get(costKey) ?? null : null
+        const cost = getLineItemCost(li, costMap)
 
         const { commission: lc, effectiveRate } = computeLineCommission(
           method,
@@ -573,15 +576,26 @@ async function fetchZohoInvoices(accessToken: string, orgId: string, dateStart: 
   return Array.from(uniqueInvoices.values())
 }
 
-// Build a stable key for an invoice line item used to look up cost.
-// Prefers item_id (most reliable), then SKU, then lowercased name.
-function lineItemCostKey(li: Record<string, unknown>): string | null {
-  const itemId = li.item_id ? String(li.item_id).trim() : ''
-  if (itemId) return `id:${itemId}`
-  const sku = li.sku ? String(li.sku).trim() : ''
-  if (sku) return `sku:${sku.toLowerCase()}`
-  const name = li.name ? String(li.name).trim() : ''
-  if (name) return `name:${name.toLowerCase()}`
+// Build stable keys for an invoice/bill line item used to look up cost.
+// Keep all possible identifiers because Zoho does not always expose the same
+// fields on invoice lines and vendor bill lines.
+function lineItemCostKeys(li: Record<string, unknown>): string[] {
+  const keys: string[] = []
+  const add = (prefix: string, value: unknown, lower = false) => {
+    const normalized = value == null ? '' : String(value).trim()
+    if (normalized) keys.push(`${prefix}:${lower ? normalized.toLowerCase() : normalized}`)
+  }
+  add('id', li.item_id)
+  add('sku', li.sku ?? li.item_code ?? li.code, true)
+  add('name', li.name ?? li.description, true)
+  return Array.from(new Set(keys))
+}
+
+function getLineItemCost(li: Record<string, unknown>, costMap: Map<string, number>): number | null {
+  for (const key of lineItemCostKeys(li)) {
+    const cost = costMap.get(key)
+    if (cost !== undefined) return cost
+  }
   return null
 }
 
@@ -736,8 +750,8 @@ async function fetchCostPricesFromBills(
       per_page: '200',
       sort_column: 'date',
       sort_order: 'D',
-      date_before: invoiceDateEnd,
     })
+    if (invoiceDateEnd) params.set('date_before', invoiceDateEnd)
     let listData: any
     try {
       const resp = await fetch(`${ZOHO_API_URL}/books/v3/bills?${params.toString()}`, {
@@ -780,11 +794,7 @@ async function fetchCostPricesFromBills(
           const rate = toNumber(li.rate) ?? toNumber(li.item_rate)
           if (rate === null || rate <= 0) continue
 
-          const idKey = li.item_id ? `id:${String(li.item_id).trim()}` : null
-          const skuKey = li.sku ? `sku:${String(li.sku).trim().toLowerCase()}` : null
-          const nameKey = li.name ? `name:${String(li.name).trim().toLowerCase()}` : null
-
-          for (const k of [idKey, skuKey, nameKey]) {
+          for (const k of lineItemCostKeys(li)) {
             if (k && remaining.has(k) && !costMap.has(k)) {
               costMap.set(k, rate)
               remaining.delete(k)
