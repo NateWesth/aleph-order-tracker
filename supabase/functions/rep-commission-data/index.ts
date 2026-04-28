@@ -88,17 +88,18 @@ const computeLineCommission = (
   }
 
   if (method === 'half_markup_below_25') {
+    // Unknown cost -> SKIP (no commission) so we never overpay on items
+    // we can't verify a vendor cost for.
     if (marginPct === null) {
-      // unknown cost -> full rate fallback
-      return { commission: lineSubTotal * (fullRate / 100), effectiveRate: fullRate }
+      return { commission: 0, effectiveRate: 0 }
     }
     if (marginPct < 0) return { commission: 0, effectiveRate: 0 }
     if (marginPct >= 25) {
       return { commission: lineSubTotal * (fullRate / 100), effectiveRate: fullRate }
     }
-    // 50% of the markup (profit) for the whole line
-    const markup = (sellRate - (cost as number)) * qty
-    const commission = Math.max(0, markup * 0.5)
+    // < 25% margin -> 50% of the profit (sell - cost) * qty
+    const profit = (sellRate - (cost as number)) * qty
+    const commission = Math.max(0, profit * 0.5)
     const effectiveRate = lineSubTotal > 0 ? (commission / lineSubTotal) * 100 : 0
     return { commission, effectiveRate }
   }
