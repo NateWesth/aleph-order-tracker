@@ -147,10 +147,11 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json().catch(() => ({}))
-    const { date_start, date_end, rep_id } = body as {
+    const { date_start, date_end, rep_id, force_refresh } = body as {
       date_start?: string
       date_end?: string
       rep_id?: string
+      force_refresh?: boolean
     }
 
     if (!date_start || !date_end) {
@@ -158,6 +159,21 @@ Deno.serve(async (req) => {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
+    }
+
+    const periodMonth = `${date_start.slice(0, 7)}-01`
+    if (!force_refresh) {
+      const cachedReport = await readCachedCommissionReport(supabase, periodMonth, rep_id)
+      if (cachedReport) {
+        const report = await applyLockedPayoutsToReport(supabase, cachedReport.report, periodMonth)
+        return new Response(JSON.stringify({
+          ...report,
+          cached: true,
+          refreshed_at: cachedReport.refreshed_at,
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
     }
 
     // Fetch reps
