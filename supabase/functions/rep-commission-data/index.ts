@@ -88,17 +88,18 @@ const computeLineCommission = (
   }
 
   if (method === 'half_markup_below_25') {
+    // Unknown cost -> SKIP (no commission) so we never overpay on items
+    // we can't verify a vendor cost for.
     if (marginPct === null) {
-      // unknown cost -> full rate fallback
-      return { commission: lineSubTotal * (fullRate / 100), effectiveRate: fullRate }
+      return { commission: 0, effectiveRate: 0 }
     }
     if (marginPct < 0) return { commission: 0, effectiveRate: 0 }
     if (marginPct >= 25) {
       return { commission: lineSubTotal * (fullRate / 100), effectiveRate: fullRate }
     }
-    // 50% of the markup (profit) for the whole line
-    const markup = (sellRate - (cost as number)) * qty
-    const commission = Math.max(0, markup * 0.5)
+    // < 25% margin -> 50% of the profit (sell - cost) * qty
+    const profit = (sellRate - (cost as number)) * qty
+    const commission = Math.max(0, profit * 0.5)
     const effectiveRate = lineSubTotal > 0 ? (commission / lineSubTotal) * 100 : 0
     return { commission, effectiveRate }
   }
@@ -281,7 +282,9 @@ Deno.serve(async (req) => {
       relevantInvoices,
     )
 
-    // Build cost map from item_ids/SKUs that appear in these invoices using Zoho Items API
+    // Build cost map from the LATEST vendor bill line for each item_id/SKU
+    // that appears in these invoices. Uses Zoho Books "bills" API and keeps
+    // the most recent bill_date's rate per item.
     const skuKeys = new Set<string>()
     for (const inv of invoicesWithLines) {
       for (const li of inv.line_items || []) {
@@ -289,8 +292,8 @@ Deno.serve(async (req) => {
         if (key) skuKeys.add(key)
       }
     }
-    const costMap = await fetchCostPricesFromItems(accessToken, orgId, skuKeys)
-    console.log(`Resolved cost prices for ${costMap.size}/${skuKeys.size} unique items`)
+    const costMap = await fetchCostPricesFromBills(accessToken, orgId, skuKeys, date_end)
+    console.log(`Resolved last vendor-bill cost for ${costMap.size}/${skuKeys.size} unique items`)
 
     // Fetch existing locked payouts for this period so we can flag/skip them.
     // A payout is keyed by (rep_id, invoice_id). Locked invoices are returned
@@ -441,14 +444,14 @@ Deno.serve(async (req) => {
         })
       }
 
-      // Commission is computed strictly per line item (excluding VAT).
-      // If an invoice has no line items at all, fall back to the invoice
-      // subtotal at the rep's full rate so we don't silently drop it.
+      // Commission is computed strictly per line item (excluding VAT) using
+      // the latest vendor-bill cost. If we have no line items, or no costs
+      // could be resolved, we skip the invoice rather than overpay.
       let commission: number
       let displayRate: number
       if (lineDetails.length === 0) {
-        commission = invSubTotal * (fullRate / 100)
-        displayRate = fullRate
+        commission = 0
+        displayRate = 0
       } else {
         commission = lineCommission
         displayRate = coveredLineSubTotal > 0
@@ -699,6 +702,101 @@ async function fetchCostPricesFromItems(
         break
       }
     }
+  }
+
+  return costMap
+}
+
+// Fetch the LATEST vendor bill cost for each item_id / SKU.
+// Walks recent bills (newest first) and records the first (= most recent)
+// rate seen per item_id and per SKU. Stops early once every requested key
+// has been resolved or page cap is reached.
+async function fetchCostPricesFromBills(
+  accessToken: string,
+  orgId: string,
+  keys: Set<string>,
+  invoiceDateEnd: string,
+): Promise<Map<string, number>> {
+  const costMap = new Map<string, number>()
+  if (keys.size === 0) return costMap
+
+  // Track which keys still need a cost
+  const remaining = new Set(keys)
+
+  // Fetch bills sorted by date desc, paginated. Bills with bill_date up to
+  // the invoice period end are most relevant; we look back further if needed.
+  const concurrency = 1 // bills endpoint sort matters, fetch sequentially
+  let page = 1
+  const maxPages = 25 // ~5,000 bills lookback cap
+  let hasMore = true
+
+  while (hasMore && page <= maxPages && remaining.size > 0) {
+    const params = new URLSearchParams({
+      organization_id: orgId,
+      page: String(page),
+      per_page: '200',
+      sort_column: 'date',
+      sort_order: 'D',
+      date_before: invoiceDateEnd,
+    })
+    let listData: any
+    try {
+      const resp = await fetch(`${ZOHO_API_URL}/books/v3/bills?${params.toString()}`, {
+        headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` },
+      })
+      listData = await resp.json()
+      if (!resp.ok || listData.code !== 0) {
+        console.error('Zoho bills list error:', listData?.message)
+        break
+      }
+    } catch (e) {
+      console.error('Zoho bills fetch error:', e)
+      break
+    }
+
+    const bills = listData.bills || []
+    if (!bills.length) break
+
+    // Bills list endpoint does NOT include line_items — fetch detail per bill
+    // (only as many as needed to resolve remaining keys).
+    for (let i = 0; i < bills.length && remaining.size > 0; i += 8) {
+      const batch = bills.slice(i, i + 8)
+      const details = await Promise.all(batch.map(async (b: any) => {
+        const id = b.bill_id
+        if (!id) return null
+        try {
+          const r = await fetch(
+            `${ZOHO_API_URL}/books/v3/bills/${id}?organization_id=${orgId}`,
+            { headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` } },
+          )
+          const d = await r.json()
+          if (!r.ok || d.code !== 0) return null
+          return d.bill || null
+        } catch { return null }
+      }))
+
+      for (const bill of details) {
+        if (!bill) continue
+        for (const li of bill.line_items || []) {
+          const rate = toNumber(li.rate) ?? toNumber(li.item_rate)
+          if (rate === null || rate <= 0) continue
+
+          const idKey = li.item_id ? `id:${String(li.item_id).trim()}` : null
+          const skuKey = li.sku ? `sku:${String(li.sku).trim().toLowerCase()}` : null
+          const nameKey = li.name ? `name:${String(li.name).trim().toLowerCase()}` : null
+
+          for (const k of [idKey, skuKey, nameKey]) {
+            if (k && remaining.has(k) && !costMap.has(k)) {
+              costMap.set(k, rate)
+              remaining.delete(k)
+            }
+          }
+        }
+      }
+    }
+
+    hasMore = listData.page_context?.has_more_page ?? false
+    page++
   }
 
   return costMap
