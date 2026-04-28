@@ -750,8 +750,8 @@ async function fetchCostPricesFromBills(
       per_page: '200',
       sort_column: 'date',
       sort_order: 'D',
-      date_before: invoiceDateEnd,
     })
+    if (invoiceDateEnd) params.set('date_before', invoiceDateEnd)
     let listData: any
     try {
       const resp = await fetch(`${ZOHO_API_URL}/books/v3/bills?${params.toString()}`, {
