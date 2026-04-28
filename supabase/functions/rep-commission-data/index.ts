@@ -707,7 +707,100 @@ async function fetchCostPricesFromItems(
   return costMap
 }
 
-async function getOrgId(supabase: any): Promise<string> {
+// Fetch the LATEST vendor bill cost for each item_id / SKU.
+// Walks recent bills (newest first) and records the first (= most recent)
+// rate seen per item_id and per SKU. Stops early once every requested key
+// has been resolved or page cap is reached.
+async function fetchCostPricesFromBills(
+  accessToken: string,
+  orgId: string,
+  keys: Set<string>,
+  invoiceDateEnd: string,
+): Promise<Map<string, number>> {
+  const costMap = new Map<string, number>()
+  if (keys.size === 0) return costMap
+
+  // Track which keys still need a cost
+  const remaining = new Set(keys)
+
+  // Fetch bills sorted by date desc, paginated. Bills with bill_date up to
+  // the invoice period end are most relevant; we look back further if needed.
+  const concurrency = 1 // bills endpoint sort matters, fetch sequentially
+  let page = 1
+  const maxPages = 25 // ~5,000 bills lookback cap
+  let hasMore = true
+
+  while (hasMore && page <= maxPages && remaining.size > 0) {
+    const params = new URLSearchParams({
+      organization_id: orgId,
+      page: String(page),
+      per_page: '200',
+      sort_column: 'date',
+      sort_order: 'D',
+      date_before: invoiceDateEnd,
+    })
+    let listData: any
+    try {
+      const resp = await fetch(`${ZOHO_API_URL}/books/v3/bills?${params.toString()}`, {
+        headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` },
+      })
+      listData = await resp.json()
+      if (!resp.ok || listData.code !== 0) {
+        console.error('Zoho bills list error:', listData?.message)
+        break
+      }
+    } catch (e) {
+      console.error('Zoho bills fetch error:', e)
+      break
+    }
+
+    const bills = listData.bills || []
+    if (!bills.length) break
+
+    // Bills list endpoint does NOT include line_items — fetch detail per bill
+    // (only as many as needed to resolve remaining keys).
+    for (let i = 0; i < bills.length && remaining.size > 0; i += 8) {
+      const batch = bills.slice(i, i + 8)
+      const details = await Promise.all(batch.map(async (b: any) => {
+        const id = b.bill_id
+        if (!id) return null
+        try {
+          const r = await fetch(
+            `${ZOHO_API_URL}/books/v3/bills/${id}?organization_id=${orgId}`,
+            { headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` } },
+          )
+          const d = await r.json()
+          if (!r.ok || d.code !== 0) return null
+          return d.bill || null
+        } catch { return null }
+      }))
+
+      for (const bill of details) {
+        if (!bill) continue
+        for (const li of bill.line_items || []) {
+          const rate = toNumber(li.rate) ?? toNumber(li.item_rate)
+          if (rate === null || rate <= 0) continue
+
+          const idKey = li.item_id ? `id:${String(li.item_id).trim()}` : null
+          const skuKey = li.sku ? `sku:${String(li.sku).trim().toLowerCase()}` : null
+          const nameKey = li.name ? `name:${String(li.name).trim().toLowerCase()}` : null
+
+          for (const k of [idKey, skuKey, nameKey]) {
+            if (k && remaining.has(k) && !costMap.has(k)) {
+              costMap.set(k, rate)
+              remaining.delete(k)
+            }
+          }
+        }
+      }
+    }
+
+    hasMore = listData.page_context?.has_more_page ?? false
+    page++
+  }
+
+  return costMap
+}
   const { data } = await supabase
     .from('zoho_tokens')
     .select('organization_id')
