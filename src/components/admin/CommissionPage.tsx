@@ -21,8 +21,6 @@ import { Printer, AlertTriangle } from "lucide-react";
 
 type CommissionMethod = "margin_scaled" | "half_markup_below_25";
 
-type CommissionMethod = "margin_scaled" | "half_markup_below_25";
-
 type Rep = {
   id: string;
   name: string;
