@@ -99,7 +99,7 @@ const computeLineCommission = (
     const commission = marginPct >= 25
       ? lineSubTotal * (fullRate / 100)
       : Math.max(0, profit * 0.5)
-    const effectiveRate = marginPct >= 25 ? fullRate : 50
+    const effectiveRate = lineSubTotal > 0 ? (commission / lineSubTotal) * 100 : 0
     return { commission, effectiveRate }
   }
 
