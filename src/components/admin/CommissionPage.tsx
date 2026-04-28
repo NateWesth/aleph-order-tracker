@@ -98,6 +98,8 @@ type CommissionResult = {
   error?: string;
   cached?: boolean;
   refreshed_at?: string;
+  stale_due_to_rate_limit?: boolean;
+  notice?: string;
 };
 
 const CommissionPage = () => {
@@ -428,7 +430,10 @@ const CommissionPage = () => {
       const withOverrides = await applyLineOverrides(response.data as CommissionResult);
       setCommissionData(withOverrides);
       if (response.data?.cached && response.data?.refreshed_at) {
-        setReportNotice(`Showing cached Zoho data from ${format(new Date(response.data.refreshed_at), "PPp")}. Use Refresh from Zoho only when you need the latest invoices.`);
+        const cachedAt = format(new Date(response.data.refreshed_at), "PPp");
+        setReportNotice(response.data.stale_due_to_rate_limit
+          ? `Zoho API rate limit reached. Showing cached data from ${cachedAt}.`
+          : `Showing cached Zoho data from ${cachedAt}. Use Refresh from Zoho only when you need the latest invoices.`);
       }
     } catch (e: any) {
       console.error("Commission report error:", e);
