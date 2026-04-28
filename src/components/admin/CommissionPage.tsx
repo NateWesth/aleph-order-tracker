@@ -316,7 +316,7 @@ const CommissionPage = () => {
               const profit = (sell - cost) * qty;
               if (profit <= 0) commission = 0;
               else if (margin_percent != null && margin_percent >= 25) commission = sub_total * (commission_rate / 100);
-              else commission = profit * (commission_rate / 100);
+              else commission = profit * 0.5;
             }
           } else {
             commission = sub_total * (commission_rate / 100);
