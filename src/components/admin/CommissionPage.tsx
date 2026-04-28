@@ -113,6 +113,7 @@ const CommissionPage = () => {
   const [selectedCompanies, setSelectedCompanies] = useState<Set<string>>(new Set());
   const [companyRateOverrides, setCompanyRateOverrides] = useState<Map<string, string>>(new Map());
   const [loadingReps, setLoadingReps] = useState(true);
+  const [missingDialogOpen, setMissingDialogOpen] = useState(false);
 
   const [methodFilter, setMethodFilter] = useState<"all" | CommissionMethod>("all");
 
