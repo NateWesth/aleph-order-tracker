@@ -121,6 +121,7 @@ const CommissionPage = () => {
   // Commission report state - default to PREVIOUS month
   const [selectedMonth, setSelectedMonth] = useState(() => format(subMonths(new Date(), 1), "yyyy-MM"));
   const [commissionData, setCommissionData] = useState<CommissionResult | null>(null);
+  const [reportNotice, setReportNotice] = useState<string | null>(null);
   const [loadingReport, setLoadingReport] = useState(false);
   const [expandedReps, setExpandedReps] = useState<Set<string>>(new Set());
   const [expandedInvoices, setExpandedInvoices] = useState<Set<string>>(new Set());
@@ -417,6 +418,11 @@ const CommissionPage = () => {
         }
         throw new Error(message);
       }
+      if (response.data?.rate_limited) {
+        setReportNotice(response.data.error || "Zoho API rate limit reached. Please refresh later.");
+        return;
+      }
+      setReportNotice(null);
       const withOverrides = await applyLineOverrides(response.data as CommissionResult);
       setCommissionData(withOverrides);
     } catch (e: any) {
@@ -694,6 +700,13 @@ const CommissionPage = () => {
               <p>This month's commission due = last month's sales. Default view shows previous month ({format(subMonths(new Date(), 1), "MMMM yyyy")}).</p>
             </div>
           </div>
+
+          {reportNotice && (
+            <div className="flex items-start gap-2 p-3 rounded-lg border border-amber-500/40 bg-amber-500/10 text-sm text-amber-700 dark:text-amber-300">
+              <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+              <p>{reportNotice}</p>
+            </div>
+          )}
 
           <div className="flex flex-wrap items-center gap-3">
             <Input
