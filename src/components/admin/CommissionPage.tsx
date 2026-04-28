@@ -471,6 +471,8 @@ const CommissionPage = () => {
     doc.save(`commission-report-${selectedMonth}.pdf`);
   };
 
+  const formatCurrency = (n: number) => `R ${n.toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
   const getRepAssignedCompanies = (repId: string) =>
     assignments.filter(a => a.rep_id === repId).map(a => {
       const company = companies.find(c => c.id === a.company_id);
