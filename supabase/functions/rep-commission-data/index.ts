@@ -282,7 +282,9 @@ Deno.serve(async (req) => {
       relevantInvoices,
     )
 
-    // Build cost map from item_ids/SKUs that appear in these invoices using Zoho Items API
+    // Build cost map from the LATEST vendor bill line for each item_id/SKU
+    // that appears in these invoices. Uses Zoho Books "bills" API and keeps
+    // the most recent bill_date's rate per item.
     const skuKeys = new Set<string>()
     for (const inv of invoicesWithLines) {
       for (const li of inv.line_items || []) {
@@ -290,8 +292,8 @@ Deno.serve(async (req) => {
         if (key) skuKeys.add(key)
       }
     }
-    const costMap = await fetchCostPricesFromItems(accessToken, orgId, skuKeys)
-    console.log(`Resolved cost prices for ${costMap.size}/${skuKeys.size} unique items`)
+    const costMap = await fetchCostPricesFromBills(accessToken, orgId, skuKeys, date_end)
+    console.log(`Resolved last vendor-bill cost for ${costMap.size}/${skuKeys.size} unique items`)
 
     // Fetch existing locked payouts for this period so we can flag/skip them.
     // A payout is keyed by (rep_id, invoice_id). Locked invoices are returned
