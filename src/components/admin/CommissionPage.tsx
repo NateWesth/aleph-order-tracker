@@ -404,7 +404,19 @@ const CommissionPage = () => {
         body: { date_start: dateStart, date_end: dateEnd },
       });
 
-      if (response.error) throw new Error(response.error.message || "Failed to fetch commission data");
+      if (response.error) {
+        let message = response.error.message || "Failed to fetch commission data";
+        const context = (response.error as any).context;
+        if (context && typeof context.json === "function") {
+          try {
+            const body = await context.json();
+            if (body?.error) message = body.error;
+          } catch {
+            // Keep the Supabase fallback message.
+          }
+        }
+        throw new Error(message);
+      }
       const withOverrides = await applyLineOverrides(response.data as CommissionResult);
       setCommissionData(withOverrides);
     } catch (e: any) {
@@ -732,7 +744,7 @@ const CommissionPage = () => {
                 URL.revokeObjectURL(url);
               };
               return (
-                <>
+                <div className="contents">
                   <Button variant="outline" onClick={exportCsv}>
                     <Download className="h-4 w-4 mr-1.5" />Export CSV
                   </Button>
@@ -802,7 +814,7 @@ const CommissionPage = () => {
                       </div>
                     </DialogContent>
                   </Dialog>
-                </>
+                </div>
               );
             })()}
             {isPreviousMonth && (
@@ -812,7 +824,7 @@ const CommissionPage = () => {
 
           {/* Summary Cards */}
           {commissionData && (
-            <>
+            <div className="contents">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <Card>
                   <CardContent className="pt-4 pb-3">
@@ -1093,7 +1105,7 @@ const CommissionPage = () => {
                   </Card>
                 )}
               </div>
-            </>
+            </div>
           )}
 
           {!commissionData && loadingReport && (
