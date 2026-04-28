@@ -128,6 +128,8 @@ Deno.serve(async (req) => {
     })
   }
 
+  let cacheFallback: { periodMonth: string; repId?: string } | null = null
+
   try {
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
@@ -162,6 +164,7 @@ Deno.serve(async (req) => {
     }
 
     const periodMonth = `${date_start.slice(0, 7)}-01`
+    cacheFallback = { periodMonth, repId: rep_id }
     if (!force_refresh) {
       const cachedReport = await readCachedCommissionReport(supabase, periodMonth, rep_id)
       if (cachedReport) {
