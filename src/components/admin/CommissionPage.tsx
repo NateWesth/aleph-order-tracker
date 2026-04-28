@@ -305,7 +305,7 @@ const CommissionPage = () => {
           const qty = li.quantity ?? 0;
           const sub_total = ov.sub_total != null ? Number(ov.sub_total) : sell * qty;
           const commission_rate = ov.commission_rate != null ? Number(ov.commission_rate) : li.commission_rate;
-          const margin_percent = (cost != null && sell > 0) ? Number((((sell - cost) / sell) * 100).toFixed(2)) : null;
+          const margin_percent = (cost != null && cost > 0) ? Number((((sell - cost) / cost) * 100).toFixed(2)) : null;
 
           let commission: number;
           if (ov.commission != null) {
