@@ -2,7 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 }
 
 const ZOHO_AUTH_URL = 'https://accounts.zoho.com/oauth/v2'
@@ -128,6 +128,8 @@ Deno.serve(async (req) => {
     })
   }
 
+  let cacheFallback: { periodMonth: string; repId?: string } | null = null
+
   try {
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
@@ -147,10 +149,11 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json().catch(() => ({}))
-    const { date_start, date_end, rep_id } = body as {
+    const { date_start, date_end, rep_id, force_refresh } = body as {
       date_start?: string
       date_end?: string
       rep_id?: string
+      force_refresh?: boolean
     }
 
     if (!date_start || !date_end) {
@@ -158,6 +161,36 @@ Deno.serve(async (req) => {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
+    }
+
+    if (force_refresh) {
+      const { data: isAdmin, error: roleError } = await supabase.rpc('has_role', {
+        _user_id: user.id,
+        _role: 'admin',
+      })
+      if (roleError) throw new Error(`Failed to verify admin access: ${roleError.message}`)
+      if (!isAdmin) {
+        return new Response(JSON.stringify({ error: 'Only admins can refresh Zoho commission data' }), {
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+    }
+
+    const periodMonth = `${date_start.slice(0, 7)}-01`
+    cacheFallback = { periodMonth, repId: rep_id }
+    if (!force_refresh) {
+      const cachedReport = await readCachedCommissionReport(supabase, periodMonth, rep_id)
+      if (cachedReport) {
+        const report = await applyLockedPayoutsToReport(supabase, cachedReport.report, periodMonth)
+        return new Response(JSON.stringify({
+          ...report,
+          cached: true,
+          refreshed_at: cachedReport.refreshed_at,
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
     }
 
     // Fetch reps
@@ -301,7 +334,6 @@ Deno.serve(async (req) => {
     // Fetch existing locked payouts for this period so we can flag/skip them.
     // A payout is keyed by (rep_id, invoice_id). Locked invoices are returned
     // for transparency but excluded from the "due" totals.
-    const periodMonth = `${date_start.slice(0, 7)}-01`
     const { data: existingPayouts } = await supabase
       .from('commission_payouts')
       .select('rep_id, invoice_id, commission_amount, sub_total, locked_at')
@@ -528,7 +560,17 @@ Deno.serve(async (req) => {
       totalInvoices: data.reduce((s, d) => s + d.invoice_count, 0),
     }
 
-    return new Response(JSON.stringify({ success: true, data, summary, cost_prices: Object.fromEntries(costMap) }), {
+    const report = { success: true, data, summary }
+    await upsertCachedCommissionReport(supabase, {
+      periodMonth,
+      repId: rep_id ?? null,
+      dateStart: date_start,
+      dateEnd: date_end,
+      report: normalizeCommissionReportForCache(report),
+      costPrices: Object.fromEntries(costMap),
+    })
+
+    return new Response(JSON.stringify({ ...report, cost_prices: Object.fromEntries(costMap), cached: false, refreshed_at: new Date().toISOString() }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (error) {
@@ -536,6 +578,26 @@ Deno.serve(async (req) => {
     const isRateLimit = message.toLowerCase().includes('rate limit')
     if (isRateLimit) {
       console.warn('Rep commission data paused:', message)
+      if (cacheFallback) {
+        try {
+          const cachedReport = await readCachedCommissionReport(supabase, cacheFallback.periodMonth, cacheFallback.repId)
+          if (cachedReport) {
+            const report = await applyLockedPayoutsToReport(supabase, cachedReport.report, cacheFallback.periodMonth)
+            return new Response(JSON.stringify({
+              ...report,
+              cached: true,
+              stale_due_to_rate_limit: true,
+              refreshed_at: cachedReport.refreshed_at,
+              notice: `Zoho API rate limit reached. Showing cached data from ${cachedReport.refreshed_at}.`,
+            }), {
+              status: 200,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            })
+          }
+        } catch (cacheError) {
+          console.warn('Failed to return cached report after rate limit:', cacheError)
+        }
+      }
       return new Response(JSON.stringify({
         success: false,
         error: message,
@@ -557,6 +619,126 @@ Deno.serve(async (req) => {
     })
   }
 })
+
+async function readCachedCommissionReport(supabase: any, periodMonth: string, repId?: string) {
+  let query = supabase
+    .from('commission_report_cache')
+    .select('report, refreshed_at')
+    .eq('period_month', periodMonth)
+    .order('refreshed_at', { ascending: false })
+    .limit(1)
+
+  query = repId ? query.eq('rep_id', repId) : query.is('rep_id', null)
+
+  const { data, error } = await query.maybeSingle()
+  if (error) throw new Error(`Failed to read cached commission report: ${error.message}`)
+  return data || null
+}
+
+async function upsertCachedCommissionReport(supabase: any, args: {
+  periodMonth: string
+  repId: string | null
+  dateStart: string
+  dateEnd: string
+  report: Record<string, unknown>
+  costPrices: Record<string, number>
+}) {
+  let deleteQuery = supabase
+    .from('commission_report_cache')
+    .delete()
+    .eq('period_month', args.periodMonth)
+  deleteQuery = args.repId ? deleteQuery.eq('rep_id', args.repId) : deleteQuery.is('rep_id', null)
+  const { error: deleteError } = await deleteQuery
+  if (deleteError) throw new Error(`Failed to replace cached commission report: ${deleteError.message}`)
+
+  const { error } = await supabase.from('commission_report_cache').insert({
+    period_month: args.periodMonth,
+    rep_id: args.repId,
+    date_start: args.dateStart,
+    date_end: args.dateEnd,
+    report: args.report,
+    zoho_cost_prices: args.costPrices,
+    refreshed_at: new Date().toISOString(),
+  })
+  if (error) throw new Error(`Failed to cache commission report: ${error.message}`)
+}
+
+function normalizeCommissionReportForCache(report: any) {
+  const data = (report.data || []).map((rep: any) => {
+    const invoices = (rep.invoices || []).map((inv: any) => ({ ...inv, locked: false }))
+    const totalInvoiced = invoices.reduce((sum: number, inv: any) => sum + Number(inv.sub_total || 0), 0)
+    const commissionEarned = invoices.reduce((sum: number, inv: any) => sum + Number(inv.commission || 0), 0)
+    return {
+      ...rep,
+      invoices,
+      total_invoiced: Math.round(totalInvoiced * 100) / 100,
+      commission_earned: Math.round(commissionEarned * 100) / 100,
+      invoice_count: invoices.length,
+      locked_commission: 0,
+      locked_invoice_count: 0,
+      is_locked: false,
+    }
+  })
+  return {
+    ...report,
+    data,
+    summary: {
+      totalInvoiced: data.reduce((s: number, d: any) => s + Number(d.total_invoiced || 0), 0),
+      totalCommission: data.reduce((s: number, d: any) => s + Number(d.commission_earned || 0), 0),
+      totalInvoices: data.reduce((s: number, d: any) => s + Number(d.invoice_count || 0), 0),
+    },
+  }
+}
+
+async function applyLockedPayoutsToReport(supabase: any, report: any, periodMonth: string) {
+  const { data: existingPayouts, error } = await supabase
+    .from('commission_payouts')
+    .select('rep_id, invoice_id')
+    .eq('period_month', periodMonth)
+  if (error) throw new Error(`Failed to apply locked payouts: ${error.message}`)
+
+  const lockedSet = new Set((existingPayouts || []).map((p: any) => `${p.rep_id}::${p.invoice_id}`))
+  const data = (report.data || []).map((rep: any) => {
+    let totalInvoiced = 0
+    let commissionEarned = 0
+    let invoiceCount = 0
+    let lockedCommission = 0
+    let lockedInvoiceCount = 0
+    const invoices = (rep.invoices || []).map((inv: any) => {
+      const isLocked = lockedSet.has(`${rep.rep_id}::${inv.invoice_id}`)
+      if (isLocked) {
+        lockedCommission += Number(inv.commission || 0)
+        lockedInvoiceCount++
+      } else {
+        totalInvoiced += Number(inv.sub_total || 0)
+        commissionEarned += Number(inv.commission || 0)
+        invoiceCount++
+      }
+      return { ...inv, locked: isLocked }
+    })
+
+    return {
+      ...rep,
+      invoices,
+      total_invoiced: Math.round(totalInvoiced * 100) / 100,
+      commission_earned: Math.round(commissionEarned * 100) / 100,
+      invoice_count: invoiceCount,
+      locked_commission: Math.round(lockedCommission * 100) / 100,
+      locked_invoice_count: lockedInvoiceCount,
+      is_locked: lockedInvoiceCount > 0 && invoiceCount === 0,
+    }
+  })
+
+  return {
+    ...report,
+    data,
+    summary: {
+      totalInvoiced: data.reduce((s: number, d: any) => s + Number(d.total_invoiced || 0), 0),
+      totalCommission: data.reduce((s: number, d: any) => s + Number(d.commission_earned || 0), 0),
+      totalInvoices: data.reduce((s: number, d: any) => s + Number(d.invoice_count || 0), 0),
+    },
+  }
+}
 
 async function fetchZohoInvoices(accessToken: string, orgId: string, dateStart: string, dateEnd: string) {
   const allInvoices: any[] = []
