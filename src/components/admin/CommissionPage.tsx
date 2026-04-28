@@ -15,6 +15,9 @@ import {
   Plus, Pencil, Trash2, Users, DollarSign, FileText, Download, ChevronDown, ChevronRight, Loader2, RefreshCw, AlertCircle, Lock, Unlock
 } from "lucide-react";
 import { format, startOfMonth, endOfMonth, subMonths } from "date-fns";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import { Printer } from "lucide-react";
 
 type CommissionMethod = "margin_scaled" | "half_markup_below_25";
 
@@ -366,6 +369,108 @@ const CommissionPage = () => {
     URL.revokeObjectURL(url);
   };
 
+  const printPdfReport = () => {
+    if (!commissionData?.data) return;
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const monthLabel = format(new Date(selectedMonth + "-01"), "MMMM yyyy");
+
+    // Header
+    doc.setFontSize(18);
+    doc.setFont("helvetica", "bold");
+    doc.text("Sales Commission Report", 14, 18);
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(100);
+    doc.text(`Period: ${monthLabel}`, 14, 25);
+    doc.text(`Generated: ${format(new Date(), "PPpp")}`, 14, 31);
+    doc.setDrawColor(200);
+    doc.line(14, 35, pageWidth - 14, 35);
+
+    // Summary
+    let y = 43;
+    doc.setTextColor(0);
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text("Summary", 14, y);
+    y += 6;
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Total Invoiced (excl. VAT): ${formatCurrency(commissionData.summary.totalInvoiced)}`, 14, y); y += 5;
+    doc.text(`Total Commission Due: ${formatCurrency(commissionData.summary.totalCommission)}`, 14, y); y += 5;
+    doc.text(`Invoices Matched: ${commissionData.summary.totalInvoices}`, 14, y); y += 8;
+
+    // Per rep
+    for (const rep of commissionData.data) {
+      if (y > 250) { doc.addPage(); y = 20; }
+      doc.setFontSize(13);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(0);
+      doc.text(rep.rep_name, 14, y); y += 5;
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(80);
+      doc.text(
+        `${rep.rep_email || "—"}  |  Rate: ${rep.commission_rate}%  |  Invoices: ${rep.invoice_count}  |  Invoiced: ${formatCurrency(rep.total_invoiced)}  |  Commission: ${formatCurrency(rep.commission_earned)}`,
+        14, y,
+      );
+      y += 5;
+
+      for (const inv of rep.invoices) {
+        if (y > 250) { doc.addPage(); y = 20; }
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(0);
+        doc.text(
+          `Invoice ${inv.invoice_number} — ${inv.customer_name}${inv.locked ? " (LOCKED)" : ""}`,
+          14, y,
+        );
+        y += 4;
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(90);
+        doc.text(
+          `Date: ${inv.date || "—"}  |  Sub-total: ${formatCurrency(inv.sub_total)}  |  Rate: ${inv.commission_rate}%  |  Commission: ${formatCurrency(inv.commission)}`,
+          14, y,
+        );
+        y += 3;
+
+        const items = inv.line_items || [];
+        if (items.length > 0) {
+          autoTable(doc, {
+            startY: y,
+            head: [["SKU", "Item", "Qty", "Rate", "Cost", "Sub-total", "Margin %", "Comm %", "Commission"]],
+            body: items.map(li => [
+              li.code || "—",
+              (li.name || "").slice(0, 40),
+              String(li.quantity ?? ""),
+              li.rate != null ? formatCurrency(Number(li.rate)) : "—",
+              li.cost != null ? formatCurrency(Number(li.cost)) : "—",
+              formatCurrency(Number(li.sub_total || 0)),
+              li.margin_percent != null ? `${Number(li.margin_percent).toFixed(1)}%` : "—",
+              `${li.commission_rate}%`,
+              formatCurrency(Number(li.commission || 0)),
+            ]),
+            styles: { fontSize: 7, cellPadding: 1.5 },
+            headStyles: { fillColor: [16, 185, 129], fontSize: 7 },
+            margin: { left: 14, right: 14 },
+            theme: "striped",
+          });
+          y = (doc as any).lastAutoTable.finalY + 4;
+        } else {
+          doc.text("(no line items returned)", 14, y + 4);
+          y += 8;
+        }
+      }
+      y += 4;
+      doc.setDrawColor(220);
+      doc.line(14, y, pageWidth - 14, y);
+      y += 4;
+    }
+
+    doc.save(`commission-report-${selectedMonth}.pdf`);
+  };
+
   const formatCurrency = (n: number) => `R ${n.toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   const getRepAssignedCompanies = (repId: string) =>
@@ -409,9 +514,14 @@ const CommissionPage = () => {
               {loadingReport ? "Calculating..." : "Refresh"}
             </Button>
             {commissionData && (
-              <Button variant="outline" onClick={exportCsv}>
-                <Download className="h-4 w-4 mr-1.5" />Export CSV
-              </Button>
+              <>
+                <Button variant="outline" onClick={exportCsv}>
+                  <Download className="h-4 w-4 mr-1.5" />Export CSV
+                </Button>
+                <Button variant="outline" onClick={printPdfReport}>
+                  <Printer className="h-4 w-4 mr-1.5" />Print Full Report
+                </Button>
+              </>
             )}
             {isPreviousMonth && (
               <Badge variant="default" className="text-xs">Commission Due This Month</Badge>
