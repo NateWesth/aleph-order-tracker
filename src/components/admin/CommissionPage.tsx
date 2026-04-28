@@ -15,6 +15,9 @@ import {
   Plus, Pencil, Trash2, Users, DollarSign, FileText, Download, ChevronDown, ChevronRight, Loader2, RefreshCw, AlertCircle, Lock, Unlock
 } from "lucide-react";
 import { format, startOfMonth, endOfMonth, subMonths } from "date-fns";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import { Printer } from "lucide-react";
 
 type CommissionMethod = "margin_scaled" | "half_markup_below_25";
 
