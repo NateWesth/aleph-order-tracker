@@ -277,23 +277,28 @@ const CommissionPage = () => {
       ovMap.set(`${r.rep_id}::${r.invoice_id}::${r.line_index}`, r);
     }
 
-    // Look up each rep's commission method from local state
+    // Look up each rep's commission method from local state (fallback keeps original commission untouched)
     const repMethodById = new Map(reps.map(r => [r.id, r.commission_method] as const));
 
-    let summaryInvoiced = 0;
-    let summaryCommission = 0;
+    let summaryInvoicedDelta = 0;
+    let summaryCommissionDelta = 0;
 
     const newData = result.data.map(rep => {
       const method = repMethodById.get(rep.rep_id) || "half_markup_below_25";
-      let repInvoiced = 0;
-      let repCommissionUnlocked = 0;
-      let repInvoicedUnlocked = 0;
-      let repLockedCommission = 0;
+      let repInvoicedDelta = 0;
+      let repCommissionDelta = 0; // unlocked only — matches what's shown as "commission_earned"
+      let repLockedCommissionDelta = 0;
+      let repTouched = false;
 
       const newInvoices = rep.invoices.map(inv => {
-        const newLines = (inv.line_items || []).map((li, idx) => {
+        const origLines = inv.line_items || [];
+        let invTouched = false;
+
+        const newLines = origLines.map((li, idx) => {
           const ov = ovMap.get(`${rep.rep_id}::${inv.invoice_id}::${idx}`);
           if (!ov) return li;
+          invTouched = true;
+          repTouched = true;
 
           const sell = ov.sell_rate != null ? Number(ov.sell_rate) : li.rate;
           const cost = ov.cost != null ? Number(ov.cost) : li.cost;
@@ -320,30 +325,43 @@ const CommissionPage = () => {
           return { ...li, rate: sell, cost, sub_total, commission_rate, margin_percent, commission: Number(commission.toFixed(2)) };
         });
 
-        // Recompute invoice totals from line items
-        const invSubtotal = newLines.reduce((s, l) => s + Number(l.sub_total || 0), 0);
-        const invCommission = newLines.reduce((s, l) => s + Number(l.commission || 0), 0);
+        if (!invTouched) return inv;
 
-        repInvoiced += invSubtotal;
+        // Compute deltas relative to original line values so non-line totals (shipping etc.) stay intact
+        const origLinesSubtotal = origLines.reduce((s, l) => s + Number(l.sub_total || 0), 0);
+        const newLinesSubtotal = newLines.reduce((s, l) => s + Number(l.sub_total || 0), 0);
+        const origLinesCommission = origLines.reduce((s, l) => s + Number(l.commission || 0), 0);
+        const newLinesCommission = newLines.reduce((s, l) => s + Number(l.commission || 0), 0);
+
+        const subDelta = newLinesSubtotal - origLinesSubtotal;
+        const commDelta = newLinesCommission - origLinesCommission;
+
+        repInvoicedDelta += subDelta;
         if (inv.locked) {
-          repLockedCommission += invCommission;
+          repLockedCommissionDelta += commDelta;
         } else {
-          repInvoicedUnlocked += invSubtotal;
-          repCommissionUnlocked += invCommission;
+          repCommissionDelta += commDelta;
         }
 
-        return { ...inv, line_items: newLines, sub_total: invSubtotal, commission: Number(invCommission.toFixed(2)) };
+        return {
+          ...inv,
+          line_items: newLines,
+          sub_total: Number((Number(inv.sub_total || 0) + subDelta).toFixed(2)),
+          commission: Number((Number(inv.commission || 0) + commDelta).toFixed(2)),
+        };
       });
 
-      summaryInvoiced += repInvoiced;
-      summaryCommission += repCommissionUnlocked;
+      if (!repTouched) return rep;
+
+      summaryInvoicedDelta += repInvoicedDelta;
+      summaryCommissionDelta += repCommissionDelta;
 
       return {
         ...rep,
         invoices: newInvoices,
-        total_invoiced: repInvoicedUnlocked,
-        commission_earned: Number(repCommissionUnlocked.toFixed(2)),
-        locked_commission: Number(repLockedCommission.toFixed(2)),
+        total_invoiced: Number((Number(rep.total_invoiced || 0) + repInvoicedDelta).toFixed(2)),
+        commission_earned: Number((Number(rep.commission_earned || 0) + repCommissionDelta).toFixed(2)),
+        locked_commission: Number((Number(rep.locked_commission || 0) + repLockedCommissionDelta).toFixed(2)),
       };
     });
 
@@ -352,8 +370,8 @@ const CommissionPage = () => {
       data: newData,
       summary: {
         ...result.summary,
-        totalInvoiced: summaryInvoiced,
-        totalCommission: Number(summaryCommission.toFixed(2)),
+        totalInvoiced: Number((result.summary.totalInvoiced + summaryInvoicedDelta).toFixed(2)),
+        totalCommission: Number((result.summary.totalCommission + summaryCommissionDelta).toFixed(2)),
       },
     };
   }, [reps]);
