@@ -121,6 +121,7 @@ const CommissionPage = () => {
   // Commission report state - default to PREVIOUS month
   const [selectedMonth, setSelectedMonth] = useState(() => format(subMonths(new Date(), 1), "yyyy-MM"));
   const [commissionData, setCommissionData] = useState<CommissionResult | null>(null);
+  const [reportNotice, setReportNotice] = useState<string | null>(null);
   const [loadingReport, setLoadingReport] = useState(false);
   const [expandedReps, setExpandedReps] = useState<Set<string>>(new Set());
   const [expandedInvoices, setExpandedInvoices] = useState<Set<string>>(new Set());
@@ -417,6 +418,11 @@ const CommissionPage = () => {
         }
         throw new Error(message);
       }
+      if (response.data?.rate_limited) {
+        setReportNotice(response.data.error || "Zoho API rate limit reached. Please refresh later.");
+        return;
+      }
+      setReportNotice(null);
       const withOverrides = await applyLineOverrides(response.data as CommissionResult);
       setCommissionData(withOverrides);
     } catch (e: any) {
