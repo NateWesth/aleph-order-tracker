@@ -564,6 +564,26 @@ Deno.serve(async (req) => {
     const isRateLimit = message.toLowerCase().includes('rate limit')
     if (isRateLimit) {
       console.warn('Rep commission data paused:', message)
+      if (cacheFallback) {
+        try {
+          const cachedReport = await readCachedCommissionReport(supabase, cacheFallback.periodMonth, cacheFallback.repId)
+          if (cachedReport) {
+            const report = await applyLockedPayoutsToReport(supabase, cachedReport.report, cacheFallback.periodMonth)
+            return new Response(JSON.stringify({
+              ...report,
+              cached: true,
+              stale_due_to_rate_limit: true,
+              refreshed_at: cachedReport.refreshed_at,
+              notice: `Zoho API rate limit reached. Showing cached data from ${cachedReport.refreshed_at}.`,
+            }), {
+              status: 200,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            })
+          }
+        } catch (cacheError) {
+          console.warn('Failed to return cached report after rate limit:', cacheError)
+        }
+      }
       return new Response(JSON.stringify({
         success: false,
         error: message,
