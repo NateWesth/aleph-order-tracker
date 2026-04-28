@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, Fragment, type FocusEvent } from "react";
+import { useState, useEffect, useCallback, type FocusEvent } from "react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -925,9 +925,10 @@ const CommissionPage = () => {
                                 const isOpen = expandedInvoices.has(invKey);
                                 const lines = inv.line_items || [];
                                 const hasLines = lines.length > 0;
-                                return (
-                                  <Fragment key={invKey}>
+                                const itemCommissionTotal = lines.reduce((sum, line) => sum + Number(line.commission || 0), 0);
+                                return [
                                     <tr
+                                      key={`${invKey}-row`}
                                       className={cn(
                                         "border-t",
                                         hasLines && "cursor-pointer hover:bg-muted/40",
@@ -960,13 +961,19 @@ const CommissionPage = () => {
                                         </Badge>
                                       </td>
                                       <td className="p-2 text-right font-medium text-primary">{formatCurrency(inv.commission)}</td>
-                                    </tr>
-                                    {isOpen && hasLines && (
-                                      <tr className="bg-muted/20">
+                                    </tr>,
+                                    isOpen && hasLines ? (
+                                      <tr key={`${invKey}-items`} className="bg-muted/20">
                                         <td colSpan={6} className="p-0">
                                           <div className="px-4 py-3">
-                                            <p className="text-xs font-medium text-muted-foreground mb-2">Line items ({lines.length})</p>
-                                            <table className="w-full text-xs">
+                                            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                                              <p className="text-xs font-medium text-muted-foreground">Line items ({lines.length})</p>
+                                              <Badge variant="secondary" className="text-xs">
+                                                Item commission total: {formatCurrency(itemCommissionTotal)}
+                                              </Badge>
+                                            </div>
+                                            <div className="overflow-x-auto">
+                                            <table className="min-w-[920px] w-full text-xs">
                                               <thead className="text-muted-foreground">
                                                 <tr>
                                                   <th className="text-left py-1 font-medium">Item</th>
@@ -1059,12 +1066,12 @@ const CommissionPage = () => {
                                                 })}
                                               </tbody>
                                             </table>
+                                            </div>
                                           </div>
                                         </td>
                                       </tr>
-                                    )}
-                                  </Fragment>
-                                );
+                                    ) : null,
+                                  ].filter(Boolean);
                               })}
                             </tbody>
                           </table>
