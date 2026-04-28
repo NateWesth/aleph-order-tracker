@@ -514,16 +514,117 @@ const CommissionPage = () => {
               {loadingReport ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <RefreshCw className="h-4 w-4 mr-1.5" />}
               {loadingReport ? "Calculating..." : "Refresh"}
             </Button>
-            {commissionData && (
-              <>
-                <Button variant="outline" onClick={exportCsv}>
-                  <Download className="h-4 w-4 mr-1.5" />Export CSV
-                </Button>
-                <Button variant="outline" onClick={printPdfReport}>
-                  <Printer className="h-4 w-4 mr-1.5" />Print Full Report
-                </Button>
-              </>
-            )}
+            {commissionData && (() => {
+              type MissingRow = {
+                rep_name: string; invoice_number: string; customer_name: string;
+                date: string; code: string; name: string; quantity: number; sub_total: number;
+              };
+              const missing: MissingRow[] = [];
+              for (const rep of commissionData.data) {
+                for (const inv of rep.invoices) {
+                  for (const li of inv.line_items || []) {
+                    if (li.cost == null) {
+                      missing.push({
+                        rep_name: rep.rep_name, invoice_number: inv.invoice_number,
+                        customer_name: inv.customer_name, date: inv.date,
+                        code: li.code || "—", name: li.name || "—",
+                        quantity: li.quantity, sub_total: li.sub_total,
+                      });
+                    }
+                  }
+                }
+              }
+              const bySku = new Map<string, { code: string; name: string; count: number; value: number }>();
+              for (const m of missing) {
+                const cur = bySku.get(m.code) || { code: m.code, name: m.name, count: 0, value: 0 };
+                cur.count += 1; cur.value += m.sub_total;
+                bySku.set(m.code, cur);
+              }
+              const skuRows = Array.from(bySku.values()).sort((a, b) => b.value - a.value);
+              const totalValue = missing.reduce((s, m) => s + m.sub_total, 0);
+              const downloadMissingCsv = () => {
+                const rows = [["Rep", "Invoice", "Customer", "Date", "SKU", "Item", "Qty", "Sub-total (excl. VAT)"]];
+                for (const m of missing) rows.push([m.rep_name, m.invoice_number, m.customer_name, m.date, m.code, m.name, String(m.quantity), String(m.sub_total)]);
+                const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+                const blob = new Blob([csv], { type: "text/csv" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a"); a.href = url; a.download = `missing-costs-${selectedMonth}.csv`; a.click();
+                URL.revokeObjectURL(url);
+              };
+              return (
+                <>
+                  <Button variant="outline" onClick={exportCsv}>
+                    <Download className="h-4 w-4 mr-1.5" />Export CSV
+                  </Button>
+                  <Button variant="outline" onClick={printPdfReport}>
+                    <Printer className="h-4 w-4 mr-1.5" />Print Full Report
+                  </Button>
+                  {missing.length > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setMissingDialogOpen(true)}
+                      className="gap-1.5 text-amber-600 hover:text-amber-700 hover:bg-amber-500/10 dark:text-amber-400 dark:hover:text-amber-300"
+                    >
+                      <span className="relative flex h-2 w-2">
+                        <span className="absolute inline-flex h-full w-full rounded-full bg-amber-500 opacity-75 animate-ping" />
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
+                      </span>
+                      <AlertTriangle className="h-3.5 w-3.5" />
+                      <span className="text-xs font-medium">{missing.length} missing cost{missing.length === 1 ? "" : "s"}</span>
+                    </Button>
+                  )}
+                  <Dialog open={missingDialogOpen} onOpenChange={setMissingDialogOpen}>
+                    <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+                      <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                          <AlertTriangle className="h-4 w-4 text-amber-500" />
+                          Items with Missing Cost
+                        </DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between gap-3 flex-wrap">
+                          <Badge variant="outline" className="text-xs">
+                            {missing.length} line{missing.length === 1 ? "" : "s"} · {skuRows.length} unique SKU{skuRows.length === 1 ? "" : "s"} · {formatCurrency(totalValue)}
+                          </Badge>
+                          <Button size="sm" variant="outline" onClick={downloadMissingCsv}>
+                            <Download className="h-4 w-4 mr-1.5" />Export CSV
+                          </Button>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          These items had no last vendor-bill cost found in Zoho, so commission was set to R 0.00. Add a vendor bill in Zoho with these SKUs to include them.
+                        </p>
+                        <div className="rounded-md border overflow-x-auto">
+                          <table className="w-full text-xs">
+                            <thead className="bg-muted/50">
+                              <tr className="text-left">
+                                <th className="p-2 font-medium">SKU</th>
+                                <th className="p-2 font-medium">Item</th>
+                                <th className="p-2 font-medium text-right">Occurrences</th>
+                                <th className="p-2 font-medium text-right">Total Value (excl. VAT)</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {skuRows.slice(0, 100).map((s) => (
+                                <tr key={s.code} className="border-t">
+                                  <td className="p-2 font-mono">{s.code}</td>
+                                  <td className="p-2">{s.name}</td>
+                                  <td className="p-2 text-right">{s.count}</td>
+                                  <td className="p-2 text-right">{formatCurrency(s.value)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                        {skuRows.length > 100 && (
+                          <p className="text-xs text-muted-foreground">Showing top 100 SKUs by value. Export CSV for the full list.</p>
+                        )}
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                </>
+              );
+            })()}
             {isPreviousMonth && (
               <Badge variant="default" className="text-xs">Commission Due This Month</Badge>
             )}
