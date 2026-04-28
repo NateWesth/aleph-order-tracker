@@ -96,6 +96,8 @@ type CommissionResult = {
     totalInvoices: number;
   };
   error?: string;
+  cached?: boolean;
+  refreshed_at?: string;
 };
 
 const CommissionPage = () => {
@@ -388,8 +390,8 @@ const CommissionPage = () => {
 
   // Commission report - uses previous month by default. Auto-runs whenever the
   // Report tab is opened OR the selected month changes.
-  const fetchCommissionReport = useCallback(async () => {
-    const requestKey = selectedMonth;
+  const fetchCommissionReport = useCallback(async (forceRefresh = false) => {
+    const requestKey = `${selectedMonth}:${forceRefresh ? "refresh" : "cache"}`;
     if (reportRequestRef.current === requestKey) return;
     reportRequestRef.current = requestKey;
     setLoadingReport(true);
@@ -402,7 +404,7 @@ const CommissionPage = () => {
       if (!session) { toast({ title: "Not authenticated", variant: "destructive" }); return; }
 
       const response = await supabase.functions.invoke("rep-commission-data", {
-        body: { date_start: dateStart, date_end: dateEnd },
+        body: { date_start: dateStart, date_end: dateEnd, force_refresh: forceRefresh },
       });
 
       if (response.error) {
@@ -425,6 +427,9 @@ const CommissionPage = () => {
       setReportNotice(null);
       const withOverrides = await applyLineOverrides(response.data as CommissionResult);
       setCommissionData(withOverrides);
+      if (response.data?.cached && response.data?.refreshed_at) {
+        setReportNotice(`Showing cached Zoho data from ${format(new Date(response.data.refreshed_at), "PPp")}. Use Refresh from Zoho only when you need the latest invoices.`);
+      }
     } catch (e: any) {
       console.error("Commission report error:", e);
       toast({ title: "Error", description: e.message, variant: "destructive" });
@@ -479,7 +484,7 @@ const CommissionPage = () => {
       if (error) { toast({ title: "Save failed", description: error.message, variant: "destructive" }); return; }
     }
     toast({ title: "Updated" });
-    fetchCommissionReport();
+    fetchCommissionReport(false);
   }, [fetchCommissionReport, toast]);
 
   // Auto-fetch whenever the Report tab is the active tab or the month changes.
@@ -520,7 +525,7 @@ const CommissionPage = () => {
       return;
     }
     toast({ title: "Payout locked", description: `${unlocked.length} invoice(s) locked for ${rep.rep_name}.` });
-    fetchCommissionReport();
+    fetchCommissionReport(false);
   };
 
   const unlockRepPayout = async (rep: CommissionRepData) => {
@@ -538,7 +543,7 @@ const CommissionPage = () => {
       return;
     }
     toast({ title: "Payout unlocked" });
-    fetchCommissionReport();
+    fetchCommissionReport(false);
   };
 
   const toggleExpanded = (repId: string) => {
