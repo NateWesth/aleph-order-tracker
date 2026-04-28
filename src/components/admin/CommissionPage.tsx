@@ -960,7 +960,7 @@ const CommissionPage = () => {
                                                   const handleBlur = (
                                                     field: "sell_rate" | "cost" | "sub_total" | "commission_rate" | "commission",
                                                     original: number | null,
-                                                  ) => (e: React.FocusEvent<HTMLInputElement>) => {
+                                                  ) => (e: FocusEvent<HTMLInputElement>) => {
                                                     const newVal = e.target.value.trim();
                                                     const orig = original == null ? "" : String(original);
                                                     if (newVal === orig) return;
