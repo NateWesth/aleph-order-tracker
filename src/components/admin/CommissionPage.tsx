@@ -514,9 +514,14 @@ const CommissionPage = () => {
               {loadingReport ? "Calculating..." : "Refresh"}
             </Button>
             {commissionData && (
-              <Button variant="outline" onClick={exportCsv}>
-                <Download className="h-4 w-4 mr-1.5" />Export CSV
-              </Button>
+              <>
+                <Button variant="outline" onClick={exportCsv}>
+                  <Download className="h-4 w-4 mr-1.5" />Export CSV
+                </Button>
+                <Button variant="outline" onClick={printPdfReport}>
+                  <Printer className="h-4 w-4 mr-1.5" />Print Full Report
+                </Button>
+              </>
             )}
             {isPreviousMonth && (
               <Badge variant="default" className="text-xs">Commission Due This Month</Badge>
