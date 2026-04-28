@@ -281,18 +281,22 @@ Deno.serve(async (req) => {
       relevantInvoices,
     )
 
-    // Build cost map from the LATEST vendor bill line for each item_id/SKU
-    // that appears in these invoices. Uses Zoho Books "bills" API and keeps
-    // the most recent bill_date's rate per item.
+    // Build cost map from the LATEST vendor bill line for every available
+    // item identifier on invoice lines. Important: do not keep only item_id —
+    // some Zoho invoice lines and bill lines only line up by SKU/name/code.
     const skuKeys = new Set<string>()
     for (const inv of invoicesWithLines) {
       for (const li of inv.line_items || []) {
-        const key = lineItemCostKey(li)
-        if (key) skuKeys.add(key)
+        for (const key of lineItemCostKeys(li)) skuKeys.add(key)
       }
     }
-    const costMap = await fetchCostPricesFromBills(accessToken, orgId, skuKeys, date_end)
-    console.log(`Resolved last vendor-bill cost for ${costMap.size}/${skuKeys.size} unique items`)
+    const billCostMap = await fetchCostPricesFromBills(accessToken, orgId, skuKeys, date_end)
+    const itemCostMap = await fetchCostPricesFromItems(accessToken, orgId, skuKeys)
+    const costMap = new Map(billCostMap)
+    for (const [key, value] of itemCostMap) {
+      if (!costMap.has(key)) costMap.set(key, value)
+    }
+    console.log(`Resolved Zoho costs for ${costMap.size}/${skuKeys.size} identifiers (${billCostMap.size} from latest bills, ${itemCostMap.size} item fallbacks)`)
 
     // Fetch existing locked payouts for this period so we can flag/skip them.
     // A payout is keyed by (rep_id, invoice_id). Locked invoices are returned
@@ -411,8 +415,7 @@ Deno.serve(async (req) => {
         if (lineSubTotal <= 0) continue
 
         const sellRate = toNumber(li.rate) ?? (qty > 0 ? lineSubTotal / qty : 0)
-        const costKey = lineItemCostKey(li)
-        const cost = costKey ? costMap.get(costKey) ?? null : null
+        const cost = getLineItemCost(li, costMap)
 
         const { commission: lc, effectiveRate } = computeLineCommission(
           method,
