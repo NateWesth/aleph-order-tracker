@@ -401,6 +401,7 @@ Deno.serve(async (req) => {
         cost: number | null
         sub_total: number
         margin_percent: number | null
+        base_commission_rate: number
         commission_rate: number
         commission: number
       }> = []
@@ -441,6 +442,7 @@ Deno.serve(async (req) => {
           cost,
           sub_total: lineSubTotal,
           margin_percent: marginPct === null ? null : Math.round(marginPct * 10) / 10,
+          base_commission_rate: fullRate,
           commission_rate: Math.round(effectiveRate * 100) / 100,
           commission: Math.round(lc * 100) / 100,
         })
