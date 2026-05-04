@@ -15,6 +15,8 @@ import AnalyticsWidgets from "./AnalyticsWidgets";
 import LeaderboardWidget from "./LeaderboardWidget";
 import CommissionForecastWidget from "./CommissionForecastWidget";
 import MarginHeatmapWidget from "./MarginHeatmapWidget";
+import WeeklyDigestWidget from "./WeeklyDigestWidget";
+import AnomalyAlertsWidget from "./AnomalyAlertsWidget";
 import {
   DndContext,
   closestCenter,
@@ -44,25 +46,41 @@ const toTransformString = (
   return `translate3d(${x}px, ${y}px, 0) scaleX(${scaleX}) scaleY(${scaleY})`;
 };
 
-type WidgetId = "stats" | "quickStats" | "recentActivity" | "urgentAlerts" | "predictive" | "analytics" | "leaderboard" | "commissionForecast" | "marginHeatmap";
+type WidgetId = "stats" | "quickStats" | "recentActivity" | "urgentAlerts" | "predictive" | "analytics" | "leaderboard" | "commissionForecast" | "marginHeatmap" | "weeklyDigest" | "anomalyAlerts";
+type WidgetSize = "full" | "half" | "third";
 
 interface WidgetConfig {
   id: WidgetId;
   label: string;
   visible: boolean;
+  size: WidgetSize;
 }
 
 const DEFAULT_LAYOUT: WidgetConfig[] = [
-  { id: "stats", label: "Stat Cards", visible: true },
-  { id: "analytics", label: "Analytics Charts", visible: true },
-  { id: "commissionForecast", label: "Commission Forecast", visible: true },
-  { id: "marginHeatmap", label: "Margin Heatmap", visible: true },
-  { id: "leaderboard", label: "Leaderboard", visible: true },
-  { id: "urgentAlerts", label: "Urgent Alerts", visible: true },
-  { id: "quickStats", label: "Quick Stats", visible: true },
-  { id: "recentActivity", label: "Recent Activity", visible: true },
-  { id: "predictive", label: "Predictive Insights", visible: true },
+  { id: "stats", label: "Stat Cards", visible: true, size: "full" },
+  { id: "weeklyDigest", label: "Weekly Digest", visible: true, size: "half" },
+  { id: "anomalyAlerts", label: "Anomaly Alerts", visible: true, size: "half" },
+  { id: "analytics", label: "Analytics Charts", visible: true, size: "full" },
+  { id: "commissionForecast", label: "Commission Forecast", visible: true, size: "half" },
+  { id: "marginHeatmap", label: "Margin Heatmap", visible: true, size: "half" },
+  { id: "leaderboard", label: "Leaderboard", visible: true, size: "full" },
+  { id: "urgentAlerts", label: "Urgent Alerts", visible: true, size: "half" },
+  { id: "quickStats", label: "Quick Stats", visible: true, size: "half" },
+  { id: "recentActivity", label: "Recent Activity", visible: true, size: "full" },
+  { id: "predictive", label: "Predictive Insights", visible: true, size: "full" },
 ];
+
+const SIZE_CLASS: Record<WidgetSize, string> = {
+  full: "col-span-12",
+  half: "col-span-12 md:col-span-6",
+  third: "col-span-12 md:col-span-6 lg:col-span-4",
+};
+
+const SIZE_LABEL: Record<WidgetSize, string> = {
+  full: "Full",
+  half: "1/2",
+  third: "1/3",
+};
 
 interface Stats {
   totalActive: number;
@@ -93,12 +111,22 @@ interface UrgentOrder {
 }
 
 // ─── Sortable Widget Wrapper ───
-function SortableWidget({ id, children, isEditing }: { id: string; children: React.ReactNode; isEditing: boolean }) {
+function SortableWidget({
+  id, size, children, isEditing, onResize,
+}: {
+  id: string;
+  size: WidgetSize;
+  children: React.ReactNode;
+  isEditing: boolean;
+  onResize: (id: WidgetId, size: WidgetSize) => void;
+}) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
   const style = {
     transform: toTransformString(transform),
     transition,
   };
+
+  const sizes: WidgetSize[] = ["full", "half", "third"];
 
   return (
     <div
@@ -106,18 +134,35 @@ function SortableWidget({ id, children, isEditing }: { id: string; children: Rea
       style={style}
       className={cn(
         "relative group",
+        SIZE_CLASS[size],
         isDragging && "z-50 opacity-80",
         isEditing && "ring-2 ring-primary/20 ring-dashed rounded-xl"
       )}
     >
       {isEditing && (
-        <div
-          {...attributes}
-          {...listeners}
-          className="absolute -top-2 -left-2 z-10 p-1.5 bg-card border border-border rounded-lg cursor-grab active:cursor-grabbing shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
-        >
-          <GripVertical className="h-3.5 w-3.5 text-muted-foreground" />
-        </div>
+        <>
+          <div
+            {...attributes}
+            {...listeners}
+            className="absolute -top-2 -left-2 z-10 p-1.5 bg-card border border-border rounded-lg cursor-grab active:cursor-grabbing shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
+          >
+            <GripVertical className="h-3.5 w-3.5 text-muted-foreground" />
+          </div>
+          <div className="absolute -top-2 -right-2 z-10 flex gap-0.5 bg-card border border-border rounded-lg shadow-sm opacity-0 group-hover:opacity-100 transition-opacity p-0.5">
+            {sizes.map(s => (
+              <button
+                key={s}
+                onClick={() => onResize(id as WidgetId, s)}
+                className={cn(
+                  "px-1.5 py-0.5 text-[10px] font-medium rounded",
+                  size === s ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
+                )}
+              >
+                {SIZE_LABEL[s]}
+              </button>
+            ))}
+          </div>
+        </>
       )}
       {children}
     </div>
@@ -179,15 +224,15 @@ export default function CustomizableDashboard({ userName, onNavigate }: Customiz
     try {
       const saved = localStorage.getItem(LAYOUT_KEY);
       if (saved) {
-        const parsed: WidgetConfig[] = JSON.parse(saved);
-        // Merge with defaults to handle new widgets
-        const merged = DEFAULT_LAYOUT.map(def => {
-          const saved = parsed.find(p => p.id === def.id);
-          return saved || def;
+        const parsed: Partial<WidgetConfig>[] = JSON.parse(saved);
+        // Merge with defaults to handle new widgets and ensure size exists
+        const merged: WidgetConfig[] = DEFAULT_LAYOUT.map(def => {
+          const s = parsed.find(p => p.id === def.id);
+          return s ? { ...def, ...s, size: (s.size as WidgetSize) || def.size } : def;
         });
         // Preserve saved order
         const ordered = parsed
-          .filter(p => merged.some(m => m.id === p.id))
+          .filter(p => p.id && merged.some(m => m.id === p.id))
           .map(p => merged.find(m => m.id === p.id)!);
         const missing = merged.filter(m => !ordered.some(o => o.id === m.id));
         setLayout([...ordered, ...missing]);
@@ -252,6 +297,10 @@ export default function CustomizableDashboard({ userName, onNavigate }: Customiz
 
   const toggleWidget = (id: WidgetId) => {
     saveLayout(layout.map(w => w.id === id ? { ...w, visible: !w.visible } : w));
+  };
+
+  const resizeWidget = (id: WidgetId, size: WidgetSize) => {
+    saveLayout(layout.map(w => w.id === id ? { ...w, size } : w));
   };
 
   const resetLayout = () => {
@@ -407,6 +456,12 @@ export default function CustomizableDashboard({ userName, onNavigate }: Customiz
       case "marginHeatmap":
         return <ParallaxWrapper speed={0.022}><MarginHeatmapWidget /></ParallaxWrapper>;
 
+      case "weeklyDigest":
+        return <ParallaxWrapper speed={0.02}><WeeklyDigestWidget /></ParallaxWrapper>;
+
+      case "anomalyAlerts":
+        return <ParallaxWrapper speed={0.02}><AnomalyAlertsWidget /></ParallaxWrapper>;
+
       default:
         return null;
     }
@@ -487,9 +542,15 @@ export default function CustomizableDashboard({ userName, onNavigate }: Customiz
       {/* Draggable widgets */}
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={visibleWidgets.map(w => w.id)} strategy={rectSortingStrategy}>
-          <div className="space-y-4">
+          <div className="grid grid-cols-12 gap-4">
             {visibleWidgets.map(widget => (
-              <SortableWidget key={widget.id} id={widget.id} isEditing={isEditing}>
+              <SortableWidget
+                key={widget.id}
+                id={widget.id}
+                size={widget.size}
+                isEditing={isEditing}
+                onResize={resizeWidget}
+              >
                 {renderWidget(widget)}
               </SortableWidget>
             ))}

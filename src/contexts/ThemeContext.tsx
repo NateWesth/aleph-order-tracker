@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 
-type Theme = 'light' | 'dark';
+type Theme = 'light' | 'dark' | 'auto';
+type ResolvedTheme = 'light' | 'dark';
 type ColorTheme = 'purple' | 'green' | 'blue' | 'rose' | 'orange' | 'teal' | 'red' | 'black';
 type BoardColorMode = 'colorful' | 'single';
 type BoardSingleColor = 'amber' | 'sky' | 'violet' | 'emerald' | 'slate' | 'rose' | 'cyan' | 'lime' | 'orange' | 'indigo' | 'pink' | 'primary' | 'custom';
@@ -13,6 +14,7 @@ export interface StockStatusColors {
 
 interface ThemeContextType {
   theme: Theme;
+  resolvedTheme: ResolvedTheme;
   colorTheme: ColorTheme;
   boardColorMode: BoardColorMode;
   boardSingleColor: BoardSingleColor;
@@ -143,6 +145,10 @@ interface ThemeProviderProps {
 
 export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
   const [theme, setTheme] = useState<Theme>('light');
+  const [systemTheme, setSystemTheme] = useState<ResolvedTheme>(() => {
+    if (typeof window === 'undefined') return 'light';
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  });
   const [colorTheme, setColorTheme] = useState<ColorTheme>('black');
   const [boardColorMode, setBoardColorMode] = useState<BoardColorMode>('colorful');
   const [boardSingleColor, setBoardSingleColor] = useState<BoardSingleColor>('primary');
@@ -154,7 +160,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
   useEffect(() => {
     try {
       const savedTheme = localStorage.getItem('theme') as Theme;
-      if (savedTheme && (savedTheme === 'light' || savedTheme === 'dark')) {
+      if (savedTheme && (savedTheme === 'light' || savedTheme === 'dark' || savedTheme === 'auto')) {
         setTheme(savedTheme);
       }
       const savedColorTheme = localStorage.getItem('colorTheme') as ColorTheme;
@@ -191,43 +197,54 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     }
   }, []);
 
+  // Track system theme changes when in 'auto' mode
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const onChange = (e: MediaQueryListEvent) => setSystemTheme(e.matches ? 'dark' : 'light');
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+
+  const resolvedTheme: ResolvedTheme = theme === 'auto' ? systemTheme : theme;
+
   useEffect(() => {
     const root = window.document.documentElement;
-    
+
     // Add transition class for smooth theme switching
     root.classList.add('theme-transition');
-    
+
     root.classList.remove('light', 'dark');
-    root.classList.add(theme);
-    
+    root.classList.add(resolvedTheme);
+
     // Remove transition class after animation completes to avoid interfering with other transitions
     const timeout = setTimeout(() => {
       root.classList.remove('theme-transition');
     }, 500);
-    
+
     // Update theme-color meta tag to match status bar
-    const themeColor = theme === 'dark' ? '#0e1117' : '#fafafa';
-    const themeColorMeta = document.querySelector('meta[name="theme-color"]:not([media])') 
+    const themeColor = resolvedTheme === 'dark' ? '#0e1117' : '#fafafa';
+    const themeColorMeta = document.querySelector('meta[name="theme-color"]:not([media])')
       || document.querySelector('meta[name="theme-color"]');
     if (themeColorMeta) {
       themeColorMeta.setAttribute('content', themeColor);
     }
-    
+
     // Update apple-mobile-web-app-status-bar-style
     const appleStatusBarMeta = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
     if (appleStatusBarMeta) {
-      appleStatusBarMeta.setAttribute('content', theme === 'dark' ? 'black-translucent' : 'default');
+      appleStatusBarMeta.setAttribute('content', resolvedTheme === 'dark' ? 'black-translucent' : 'default');
     }
-    
+
     // Save theme preference
     try {
       localStorage.setItem('theme', theme);
     } catch (error) {
       console.warn('Failed to save theme to localStorage:', error);
     }
-    
+
     return () => clearTimeout(timeout);
-  }, [theme]);
+  }, [theme, resolvedTheme]);
 
   useEffect(() => {
     // Apply color theme CSS variables
@@ -266,26 +283,27 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
   }, [boardColorMode, boardSingleColor, colorfulPreset, customBoardColor, stockStatusColors]);
 
   const toggleTheme = () => {
-    setTheme(prev => prev === 'light' ? 'dark' : 'light');
+    setTheme(prev => prev === 'light' ? 'dark' : prev === 'dark' ? 'auto' : 'light');
   };
 
   return (
-    <ThemeContext.Provider value={{ 
-      theme, 
-      colorTheme, 
-      boardColorMode, 
+    <ThemeContext.Provider value={{
+      theme,
+      resolvedTheme,
+      colorTheme,
+      boardColorMode,
       boardSingleColor,
       colorfulPreset,
       customBoardColor,
       stockStatusColors,
-      setTheme, 
-      setColorTheme, 
-      setBoardColorMode, 
+      setTheme,
+      setColorTheme,
+      setBoardColorMode,
       setBoardSingleColor,
       setColorfulPreset,
       setCustomBoardColor,
       setStockStatusColors,
-      toggleTheme 
+      toggleTheme
     }}>
       {children}
     </ThemeContext.Provider>
