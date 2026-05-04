@@ -66,7 +66,7 @@ const computeEffectiveRate = (
 ): number => {
   if (marginPct === null) return fullRate
   if (marginPct < 0) return 0
-  if (marginPct >= 25) return fullRate
+  if (marginPct >= 24.99) return fullRate
   const reduced = fullRate - (25 - marginPct)
   return Math.max(0, reduced)
 }
