@@ -1038,6 +1038,18 @@ export type Database = {
         Args: never
         Returns: Database["public"]["Enums"]["app_role"]
       }
+      get_invitation_by_token: {
+        Args: { _token: string }
+        Returns: {
+          company_code: string
+          company_id: string
+          company_name: string
+          email: string
+          expires_at: string
+          id: string
+          status: string
+        }[]
+      }
       get_unread_updates_count: {
         Args: { order_uuid: string; user_uuid: string }
         Returns: number
