@@ -930,7 +930,7 @@ async function fetchCostPricesFromItems(
             toNumber(item.last_purchase_rate) ??
             toNumber(item.cost_price) ??
             0
-          if (cost > 0) {
+          if (cost >= 1) {
             if (item.item_id) costMap.set(`id:${String(item.item_id)}`, cost)
             if (item.sku) costMap.set(`sku:${String(item.sku).toLowerCase()}`, cost)
             if (item.name) costMap.set(`name:${String(item.name).toLowerCase()}`, cost)
