@@ -13,6 +13,8 @@ import { AnimatedCounter } from "@/components/ui/AnimatedCounter";
 import PredictiveInsights from "./PredictiveInsights";
 import AnalyticsWidgets from "./AnalyticsWidgets";
 import LeaderboardWidget from "./LeaderboardWidget";
+import CommissionForecastWidget from "./CommissionForecastWidget";
+import MarginHeatmapWidget from "./MarginHeatmapWidget";
 import {
   DndContext,
   closestCenter,
@@ -42,7 +44,7 @@ const toTransformString = (
   return `translate3d(${x}px, ${y}px, 0) scaleX(${scaleX}) scaleY(${scaleY})`;
 };
 
-type WidgetId = "stats" | "quickStats" | "recentActivity" | "urgentAlerts" | "predictive" | "analytics" | "leaderboard";
+type WidgetId = "stats" | "quickStats" | "recentActivity" | "urgentAlerts" | "predictive" | "analytics" | "leaderboard" | "commissionForecast" | "marginHeatmap";
 
 interface WidgetConfig {
   id: WidgetId;
@@ -53,6 +55,8 @@ interface WidgetConfig {
 const DEFAULT_LAYOUT: WidgetConfig[] = [
   { id: "stats", label: "Stat Cards", visible: true },
   { id: "analytics", label: "Analytics Charts", visible: true },
+  { id: "commissionForecast", label: "Commission Forecast", visible: true },
+  { id: "marginHeatmap", label: "Margin Heatmap", visible: true },
   { id: "leaderboard", label: "Leaderboard", visible: true },
   { id: "urgentAlerts", label: "Urgent Alerts", visible: true },
   { id: "quickStats", label: "Quick Stats", visible: true },
@@ -396,6 +400,12 @@ export default function CustomizableDashboard({ userName, onNavigate }: Customiz
 
       case "leaderboard":
         return <ParallaxWrapper speed={0.018}><LeaderboardWidget /></ParallaxWrapper>;
+
+      case "commissionForecast":
+        return <ParallaxWrapper speed={0.02}><CommissionForecastWidget /></ParallaxWrapper>;
+
+      case "marginHeatmap":
+        return <ParallaxWrapper speed={0.022}><MarginHeatmapWidget /></ParallaxWrapper>;
 
       default:
         return null;
