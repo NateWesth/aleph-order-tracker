@@ -542,9 +542,15 @@ export default function CustomizableDashboard({ userName, onNavigate }: Customiz
       {/* Draggable widgets */}
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={visibleWidgets.map(w => w.id)} strategy={rectSortingStrategy}>
-          <div className="space-y-4">
+          <div className="grid grid-cols-12 gap-4">
             {visibleWidgets.map(widget => (
-              <SortableWidget key={widget.id} id={widget.id} isEditing={isEditing}>
+              <SortableWidget
+                key={widget.id}
+                id={widget.id}
+                size={widget.size}
+                isEditing={isEditing}
+                onResize={resizeWidget}
+              >
                 {renderWidget(widget)}
               </SortableWidget>
             ))}
