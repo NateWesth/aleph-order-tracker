@@ -820,6 +820,41 @@ const isGenericToken = (value: string): boolean => {
   return false
 }
 
+const SHARED_GENERIC_TOKENS = new Set([
+  'm-miscellaneous', 'miscellaneous', 'misc', 'm-misc', 'item', 'product',
+])
+const isSharedGenericIdentifier = (value: unknown): boolean => {
+  const lowered = value == null ? '' : String(value).trim().toLowerCase()
+  if (!lowered) return false
+  if (SHARED_GENERIC_TOKENS.has(lowered)) return true
+  if (lowered.startsWith('m-misc')) return true
+  return false
+}
+
+const getSalesDescription = (li: Record<string, unknown>): string => {
+  const descriptionFields = [
+    li.description,
+    li.sales_description,
+    li.item_description,
+    li.purchase_description,
+  ]
+  for (const value of descriptionFields) {
+    const normalized = value == null ? '' : String(value).trim()
+    if (normalized && !isGenericToken(normalized)) return normalized
+  }
+  return ''
+}
+
+const getLineDisplayName = (li: Record<string, unknown>): string => {
+  const salesDescription = getSalesDescription(li)
+  const sku = li.sku ?? li.item_code ?? li.code
+  const name = li.name
+  if ((isSharedGenericIdentifier(sku) || isSharedGenericIdentifier(name)) && salesDescription) {
+    return salesDescription
+  }
+  return String(name || salesDescription || '').trim()
+}
+
 // Build stable keys for an invoice/bill line item used to look up cost.
 // Keep all possible identifiers because Zoho does not always expose the same
 // fields on invoice lines and vendor bill lines.
@@ -829,20 +864,31 @@ function lineItemCostKeys(li: Record<string, unknown>): string[] {
     const normalized = value == null ? '' : String(value).trim()
     if (!normalized) return
     const lowered = normalized.toLowerCase()
-    // Skip truly empty placeholders for non-id keys.
-    if (prefix !== 'id' && (lowered === 'n/a' || lowered === 'na' || lowered === '-')) return
+    // Skip truly empty/generic placeholders for non-id keys.
+    if (prefix !== 'id' && isGenericToken(normalized)) return
     // For sku and name: skip generic shared identifiers like 'M-Miscellaneous'.
     // These would otherwise return a wrong shared cost from an unrelated line.
     // The desc: key still applies for exact description matches.
     if ((prefix === 'sku' || prefix === 'name') && isGenericToken(normalized)) return
     keys.push(`${prefix}:${lower ? lowered : normalized}`)
   }
-  add('id', li.item_id)
-  add('sku', li.sku ?? li.item_code ?? li.code, true)
-  add('name', li.name, true)
+  const sku = li.sku ?? li.item_code ?? li.code
+  const name = li.name
+  const sharedGenericLine = isSharedGenericIdentifier(sku) || isSharedGenericIdentifier(name)
+  // For shared generic items (M-Miscellaneous, Misc, etc.), even item_id points
+  // to the same reusable Zoho item, so it is unsafe. Match only by exact sales
+  // description against vendor bill line descriptions.
+  if (!sharedGenericLine) {
+    add('id', li.item_id)
+    add('sku', sku, true)
+    add('name', name, true)
+  }
   // ALSO key by description independently — for generic/Miscellaneous items the
   // SKU is shared but the description is what uniquely identifies the product.
   add('desc', li.description, true)
+  add('desc', li.sales_description, true)
+  add('desc', li.item_description, true)
+  add('desc', li.purchase_description, true)
   return Array.from(new Set(keys))
 }
 
