@@ -158,6 +158,21 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
   const [colorfulPreset, setColorfulPreset] = useState<ColorfulPreset>('default');
   const [customBoardColor, setCustomBoardColor] = useState<string>('#6366f1');
   const [stockStatusColors, setStockStatusColors] = useState<StockStatusColors>(defaultStockStatusColors);
+  const [uiVariant, setUiVariant] = useState<UiVariant>('standard');
+
+  // Apply / persist UI variant (e.g. glass)
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('uiVariant') as UiVariant | null;
+      if (saved === 'glass' || saved === 'standard') setUiVariant(saved);
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    const root = window.document.documentElement;
+    root.classList.toggle('ui-glass', uiVariant === 'glass');
+    try { localStorage.setItem('uiVariant', uiVariant); } catch {}
+  }, [uiVariant]);
 
   // Initialize theme from localStorage
   useEffect(() => {
