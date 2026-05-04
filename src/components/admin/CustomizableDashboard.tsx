@@ -15,6 +15,8 @@ import AnalyticsWidgets from "./AnalyticsWidgets";
 import LeaderboardWidget from "./LeaderboardWidget";
 import CommissionForecastWidget from "./CommissionForecastWidget";
 import MarginHeatmapWidget from "./MarginHeatmapWidget";
+import WeeklyDigestWidget from "./WeeklyDigestWidget";
+import AnomalyAlertsWidget from "./AnomalyAlertsWidget";
 import {
   DndContext,
   closestCenter,
@@ -44,25 +46,41 @@ const toTransformString = (
   return `translate3d(${x}px, ${y}px, 0) scaleX(${scaleX}) scaleY(${scaleY})`;
 };
 
-type WidgetId = "stats" | "quickStats" | "recentActivity" | "urgentAlerts" | "predictive" | "analytics" | "leaderboard" | "commissionForecast" | "marginHeatmap";
+type WidgetId = "stats" | "quickStats" | "recentActivity" | "urgentAlerts" | "predictive" | "analytics" | "leaderboard" | "commissionForecast" | "marginHeatmap" | "weeklyDigest" | "anomalyAlerts";
+type WidgetSize = "full" | "half" | "third";
 
 interface WidgetConfig {
   id: WidgetId;
   label: string;
   visible: boolean;
+  size: WidgetSize;
 }
 
 const DEFAULT_LAYOUT: WidgetConfig[] = [
-  { id: "stats", label: "Stat Cards", visible: true },
-  { id: "analytics", label: "Analytics Charts", visible: true },
-  { id: "commissionForecast", label: "Commission Forecast", visible: true },
-  { id: "marginHeatmap", label: "Margin Heatmap", visible: true },
-  { id: "leaderboard", label: "Leaderboard", visible: true },
-  { id: "urgentAlerts", label: "Urgent Alerts", visible: true },
-  { id: "quickStats", label: "Quick Stats", visible: true },
-  { id: "recentActivity", label: "Recent Activity", visible: true },
-  { id: "predictive", label: "Predictive Insights", visible: true },
+  { id: "stats", label: "Stat Cards", visible: true, size: "full" },
+  { id: "weeklyDigest", label: "Weekly Digest", visible: true, size: "half" },
+  { id: "anomalyAlerts", label: "Anomaly Alerts", visible: true, size: "half" },
+  { id: "analytics", label: "Analytics Charts", visible: true, size: "full" },
+  { id: "commissionForecast", label: "Commission Forecast", visible: true, size: "half" },
+  { id: "marginHeatmap", label: "Margin Heatmap", visible: true, size: "half" },
+  { id: "leaderboard", label: "Leaderboard", visible: true, size: "full" },
+  { id: "urgentAlerts", label: "Urgent Alerts", visible: true, size: "half" },
+  { id: "quickStats", label: "Quick Stats", visible: true, size: "half" },
+  { id: "recentActivity", label: "Recent Activity", visible: true, size: "full" },
+  { id: "predictive", label: "Predictive Insights", visible: true, size: "full" },
 ];
+
+const SIZE_CLASS: Record<WidgetSize, string> = {
+  full: "col-span-12",
+  half: "col-span-12 md:col-span-6",
+  third: "col-span-12 md:col-span-6 lg:col-span-4",
+};
+
+const SIZE_LABEL: Record<WidgetSize, string> = {
+  full: "Full",
+  half: "1/2",
+  third: "1/3",
+};
 
 interface Stats {
   totalActive: number;
