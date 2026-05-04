@@ -1,0 +1,1 @@
+DELETE FROM public.commission_report_cache;
