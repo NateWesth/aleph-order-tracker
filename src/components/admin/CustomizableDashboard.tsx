@@ -111,12 +111,22 @@ interface UrgentOrder {
 }
 
 // ─── Sortable Widget Wrapper ───
-function SortableWidget({ id, children, isEditing }: { id: string; children: React.ReactNode; isEditing: boolean }) {
+function SortableWidget({
+  id, size, children, isEditing, onResize,
+}: {
+  id: string;
+  size: WidgetSize;
+  children: React.ReactNode;
+  isEditing: boolean;
+  onResize: (id: WidgetId, size: WidgetSize) => void;
+}) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
   const style = {
     transform: toTransformString(transform),
     transition,
   };
+
+  const sizes: WidgetSize[] = ["full", "half", "third"];
 
   return (
     <div
@@ -124,18 +134,35 @@ function SortableWidget({ id, children, isEditing }: { id: string; children: Rea
       style={style}
       className={cn(
         "relative group",
+        SIZE_CLASS[size],
         isDragging && "z-50 opacity-80",
         isEditing && "ring-2 ring-primary/20 ring-dashed rounded-xl"
       )}
     >
       {isEditing && (
-        <div
-          {...attributes}
-          {...listeners}
-          className="absolute -top-2 -left-2 z-10 p-1.5 bg-card border border-border rounded-lg cursor-grab active:cursor-grabbing shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
-        >
-          <GripVertical className="h-3.5 w-3.5 text-muted-foreground" />
-        </div>
+        <>
+          <div
+            {...attributes}
+            {...listeners}
+            className="absolute -top-2 -left-2 z-10 p-1.5 bg-card border border-border rounded-lg cursor-grab active:cursor-grabbing shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
+          >
+            <GripVertical className="h-3.5 w-3.5 text-muted-foreground" />
+          </div>
+          <div className="absolute -top-2 -right-2 z-10 flex gap-0.5 bg-card border border-border rounded-lg shadow-sm opacity-0 group-hover:opacity-100 transition-opacity p-0.5">
+            {sizes.map(s => (
+              <button
+                key={s}
+                onClick={() => onResize(id as WidgetId, s)}
+                className={cn(
+                  "px-1.5 py-0.5 text-[10px] font-medium rounded",
+                  size === s ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
+                )}
+              >
+                {SIZE_LABEL[s]}
+              </button>
+            ))}
+          </div>
+        </>
       )}
       {children}
     </div>
