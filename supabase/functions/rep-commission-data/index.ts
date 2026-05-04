@@ -101,7 +101,10 @@ const computeLineCommission = (
     const profit = (sellRate - (cost as number)) * qty
     // >= 25% margin -> rep's full rate applied to the subtotal
     // <  25% margin -> half of the profit (50/50 split)
-    const commission = marginPct >= 25
+    // Use a small epsilon so values like 24.9999% (which round/display as 25%)
+    // are treated as meeting the threshold instead of falling into the half-profit branch.
+    const MARGIN_EPSILON = 0.01
+    const commission = marginPct >= (25 - MARGIN_EPSILON)
       ? lineSubTotal * (fullRate / 100)
       : Math.max(0, profit * 0.5)
     const effectiveRate = lineSubTotal > 0 ? (commission / lineSubTotal) * 100 : 0
