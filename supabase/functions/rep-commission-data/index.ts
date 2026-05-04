@@ -809,9 +809,10 @@ function lineItemCostKeys(li: Record<string, unknown>): string[] {
   const add = (prefix: string, value: unknown, lower = false) => {
     const normalized = value == null ? '' : String(value).trim()
     if (!normalized) return
-    // Skip generic placeholder names that would collide across unrelated items.
     const lowered = normalized.toLowerCase()
-    if (prefix !== 'id' && (lowered === 'n/a' || lowered === 'na' || lowered === '-' || lowered.startsWith('m-misc'))) return
+    // Skip only truly empty placeholders. Generic SKUs like 'M-Miscellaneous'
+    // are kept — they get disambiguated by the desc: key (description match).
+    if (prefix !== 'id' && (lowered === 'n/a' || lowered === 'na' || lowered === '-')) return
     keys.push(`${prefix}:${lower ? lowered : normalized}`)
   }
   add('id', li.item_id)
