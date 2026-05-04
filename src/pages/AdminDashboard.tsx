@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Package, History, BarChart3, Settings, LogOut, Building2, Home, Box, Users, Truck, FileText, Command, ShoppingCart, Percent } from "lucide-react";
+import { Package, History, BarChart3, Settings, LogOut, Building2, Home, Box, Users, Truck, FileText, Command, ShoppingCart, Percent, Sparkles } from "lucide-react";
+import ChangelogDialog, { hasUnreadChangelog } from "@/components/admin/ChangelogDialog";
 import { playClick, playWhoosh } from "@/utils/ambientSounds";
 import NotificationCenter from "@/components/NotificationCenter";
 import FloatingAIChat from "@/components/admin/FloatingAIChat";
@@ -43,7 +44,10 @@ const AdminDashboard = () => {
   const [userRole, setUserRole] = useState<'admin' | 'user'>('user');
   const [loading, setLoading] = useState(true);
   const [commandOpen, setCommandOpen] = useState(false);
+  const [changelogOpen, setChangelogOpen] = useState(false);
+  const [hasNewChangelog, setHasNewChangelog] = useState(false);
   const isMobile = useIsMobile();
+  useEffect(() => { setHasNewChangelog(hasUnreadChangelog()); }, []);
   const { unreadOrderUpdates, pendingOrdersCount } = useGlobalUnreadCount();
   useEffect(() => {
     if (user) {
@@ -206,6 +210,18 @@ const AdminDashboard = () => {
               >
                 <Command className="h-[18px] w-[18px]" />
               </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => { setChangelogOpen(true); setHasNewChangelog(false); }}
+                className="relative rounded-xl text-muted-foreground hover:text-foreground"
+                title="What's new"
+              >
+                <Sparkles className="h-[18px] w-[18px]" />
+                {hasNewChangelog && (
+                  <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-primary animate-pulse" />
+                )}
+              </Button>
               <NotificationCenter
                 onNavigateToOrder={(orderId) => {
                   setActiveView("orders");
@@ -355,6 +371,9 @@ const AdminDashboard = () => {
 
       {/* Floating AI Chat */}
       <FloatingAIChat />
+
+      {/* Changelog */}
+      <ChangelogDialog open={changelogOpen} onOpenChange={setChangelogOpen} />
 
       {/* Onboarding Tour */}
       <OnboardingTour />
