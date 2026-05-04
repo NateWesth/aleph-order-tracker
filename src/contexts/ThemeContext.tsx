@@ -314,6 +314,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
       colorfulPreset,
       customBoardColor,
       stockStatusColors,
+      uiVariant,
       setTheme,
       setColorTheme,
       setBoardColorMode,
@@ -321,6 +322,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
       setColorfulPreset,
       setCustomBoardColor,
       setStockStatusColors,
+      setUiVariant,
       toggleTheme
     }}>
       {children}
