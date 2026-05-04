@@ -363,6 +363,41 @@ export default function OrderRow({
           order={order}
           isAdmin={isAdmin}
         />
+
+        <ManagePOsDialog
+          open={showManagePOs}
+          onOpenChange={setShowManagePOs}
+          orderId={order.id}
+          orderNumber={order.order_number}
+        />
+
+        {/* Long-press quick actions sheet */}
+        <Sheet open={showQuickActions} onOpenChange={setShowQuickActions}>
+          <SheetContent side="bottom" className="rounded-t-2xl pb-8">
+            <SheetHeader className="text-left">
+              <SheetTitle className="text-base">{order.order_number}</SheetTitle>
+              <p className="text-xs text-muted-foreground -mt-1">{order.companyName || 'No Company'}</p>
+            </SheetHeader>
+            <div className="grid grid-cols-2 gap-2 mt-4">
+              <Button variant="outline" className="h-14 flex-col gap-1" onClick={() => { setShowQuickActions(false); setShowDetails(true); }}>
+                <Eye className="h-4 w-4" /><span className="text-xs">View details</span>
+              </Button>
+              <Button variant="outline" className="h-14 flex-col gap-1" onClick={() => { setShowQuickActions(false); setShowManagePOs(true); }}>
+                <Truck className="h-4 w-4" /><span className="text-xs">Manage POs</span>
+              </Button>
+              {isAdmin && (
+                <Button variant="outline" className="h-14 flex-col gap-1" onClick={() => { setShowQuickActions(false); onReceiveOrder(order); }}>
+                  <CheckCircle2 className="h-4 w-4" /><span className="text-xs">Receive</span>
+                </Button>
+              )}
+              {isAdmin && (
+                <Button variant="outline" className="h-14 flex-col gap-1 text-destructive" onClick={() => { setShowQuickActions(false); onDeleteOrder(order.id, order.order_number); }}>
+                  <Trash2 className="h-4 w-4" /><span className="text-xs">Delete</span>
+                </Button>
+              )}
+            </div>
+          </SheetContent>
+        </Sheet>
       </>
     );
   }
