@@ -41,3 +41,6 @@ verify_jwt = false
 
 [functions.weekly-digest]
 verify_jwt = false
+
+[functions.procurement-suggestions]
+verify_jwt = false

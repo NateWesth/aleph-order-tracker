@@ -13,6 +13,7 @@ import { OrderWithCompany, PurchaseOrderInfo } from "../types/orderTypes";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { InlineStatusEdit, InlineUrgencyEdit, InlineNotesEdit } from "./InlineQuickEdit";
+import PredictiveETABadge from "./PredictiveETABadge";
 
 interface OrderRowProps {
   order: OrderWithCompany;
@@ -224,12 +225,17 @@ export default function OrderRow({
             </div>
 
             {/* Stock & PO indicators on their own row */}
-            {(stockCounts.total > 0 || (order.purchaseOrders && order.purchaseOrders.length > 0)) && (
-              <div className="flex items-center gap-1 flex-wrap">
-                <StockStatusIndicator counts={stockCounts} />
-                <PurchaseOrdersIndicator purchaseOrders={order.purchaseOrders} />
-              </div>
-            )}
+            <div className="flex items-center gap-1 flex-wrap">
+              <StockStatusIndicator counts={stockCounts} />
+              <PurchaseOrdersIndicator purchaseOrders={order.purchaseOrders} />
+              <PredictiveETABadge
+                companyId={order.company_id}
+                urgency={order.urgency}
+                createdAt={order.created_at}
+                completed={!!order.completed_date}
+                compact
+              />
+            </div>
 
             {/* Purchase Orders display */}
             {order.purchaseOrders && order.purchaseOrders.length > 0 && (
@@ -388,6 +394,12 @@ export default function OrderRow({
             {isAdmin && <InlineUrgencyEdit orderId={order.id} currentValue={order.urgency || null} />}
             <StockStatusIndicator counts={stockCounts} />
             <PurchaseOrdersIndicator purchaseOrders={order.purchaseOrders} />
+            <PredictiveETABadge
+              companyId={order.company_id}
+              urgency={order.urgency}
+              createdAt={order.created_at}
+              completed={!!order.completed_date}
+            />
             {order.purchaseOrders && order.purchaseOrders.length > 0 && (
               <div className="flex flex-wrap gap-1">
                 {order.purchaseOrders.slice(0, 2).map((po, idx) => (
