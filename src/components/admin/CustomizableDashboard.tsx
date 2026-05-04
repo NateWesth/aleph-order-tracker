@@ -299,6 +299,10 @@ export default function CustomizableDashboard({ userName, onNavigate }: Customiz
     saveLayout(layout.map(w => w.id === id ? { ...w, visible: !w.visible } : w));
   };
 
+  const resizeWidget = (id: WidgetId, size: WidgetSize) => {
+    saveLayout(layout.map(w => w.id === id ? { ...w, size } : w));
+  };
+
   const resetLayout = () => {
     saveLayout([...DEFAULT_LAYOUT]);
   };
