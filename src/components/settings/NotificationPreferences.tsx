@@ -157,7 +157,7 @@ export default function NotificationPreferences() {
               onCheckedChange={(checked) => updateDailyReport('daily_morning_report', checked)}
             />
           </div>
-          <div className="flex items-center justify-between py-3">
+          <div className="flex items-center justify-between py-3 border-b border-border">
             <div className="flex items-center gap-3">
               <Sunset className="h-4 w-4 text-purple-500" />
               <div>
@@ -171,6 +171,22 @@ export default function NotificationPreferences() {
               disabled={loadingReports}
               checked={afternoonReport}
               onCheckedChange={(checked) => updateDailyReport('daily_afternoon_report', checked)}
+            />
+          </div>
+          <div className="flex items-center justify-between py-3">
+            <div className="flex items-center gap-3">
+              <Sparkles className="h-4 w-4 text-primary" />
+              <div>
+                <Label className="text-sm font-medium">Weekly AI Digest (Mondays)</Label>
+                <p className="text-xs text-muted-foreground">
+                  AI-generated weekly summary of order volume, revenue, and pipeline insights
+                </p>
+              </div>
+            </div>
+            <Switch
+              disabled={loadingReports}
+              checked={weeklyDigest}
+              onCheckedChange={(checked) => updateDailyReport('weekly_digest_email', checked)}
             />
           </div>
         </CardContent>
