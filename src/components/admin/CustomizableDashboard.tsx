@@ -224,15 +224,15 @@ export default function CustomizableDashboard({ userName, onNavigate }: Customiz
     try {
       const saved = localStorage.getItem(LAYOUT_KEY);
       if (saved) {
-        const parsed: WidgetConfig[] = JSON.parse(saved);
-        // Merge with defaults to handle new widgets
-        const merged = DEFAULT_LAYOUT.map(def => {
-          const saved = parsed.find(p => p.id === def.id);
-          return saved || def;
+        const parsed: Partial<WidgetConfig>[] = JSON.parse(saved);
+        // Merge with defaults to handle new widgets and ensure size exists
+        const merged: WidgetConfig[] = DEFAULT_LAYOUT.map(def => {
+          const s = parsed.find(p => p.id === def.id);
+          return s ? { ...def, ...s, size: (s.size as WidgetSize) || def.size } : def;
         });
         // Preserve saved order
         const ordered = parsed
-          .filter(p => merged.some(m => m.id === p.id))
+          .filter(p => p.id && merged.some(m => m.id === p.id))
           .map(p => merged.find(m => m.id === p.id)!);
         const missing = merged.filter(m => !ordered.some(o => o.id === m.id));
         setLayout([...ordered, ...missing]);
