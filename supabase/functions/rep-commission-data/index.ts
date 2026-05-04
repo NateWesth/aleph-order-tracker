@@ -808,11 +808,18 @@ function lineItemCostKeys(li: Record<string, unknown>): string[] {
   const keys: string[] = []
   const add = (prefix: string, value: unknown, lower = false) => {
     const normalized = value == null ? '' : String(value).trim()
-    if (normalized) keys.push(`${prefix}:${lower ? normalized.toLowerCase() : normalized}`)
+    if (!normalized) return
+    // Skip generic placeholder names that would collide across unrelated items.
+    const lowered = normalized.toLowerCase()
+    if (prefix !== 'id' && (lowered === 'n/a' || lowered === 'na' || lowered === '-' || lowered.startsWith('m-misc'))) return
+    keys.push(`${prefix}:${lower ? lowered : normalized}`)
   }
   add('id', li.item_id)
   add('sku', li.sku ?? li.item_code ?? li.code, true)
-  add('name', li.name ?? li.description, true)
+  add('name', li.name, true)
+  // ALSO key by description independently — for generic/Miscellaneous items the
+  // SKU is shared but the description is what uniquely identifies the product.
+  add('desc', li.description, true)
   return Array.from(new Set(keys))
 }
 
