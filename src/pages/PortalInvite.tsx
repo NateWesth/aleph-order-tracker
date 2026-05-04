@@ -40,11 +40,10 @@ export default function PortalInvite() {
 
   const verifyInvitation = async () => {
     try {
-      const { data: invite, error } = await supabase
-        .from("client_invitations")
-        .select("id, email, company_id, status, expires_at")
-        .eq("token", token!)
-        .single();
+      const { data, error } = await supabase
+        .rpc("get_invitation_by_token", { _token: token! });
+
+      const invite = Array.isArray(data) ? data[0] : data;
 
       if (error || !invite) {
         setExpired(true);
@@ -58,24 +57,11 @@ export default function PortalInvite() {
         return;
       }
 
-      // Get company info
-      const { data: company } = await supabase
-        .from("companies")
-        .select("name, code, id")
-        .eq("id", invite.company_id)
-        .single();
-
-      if (!company) {
-        setExpired(true);
-        setLoading(false);
-        return;
-      }
-
       setInvitation({
         email: invite.email,
-        companyName: company.name,
-        companyCode: company.code,
-        companyId: company.id,
+        companyName: invite.company_name,
+        companyCode: invite.company_code,
+        companyId: invite.company_id,
       });
     } catch (err) {
       console.error("Error verifying invitation:", err);
