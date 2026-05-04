@@ -762,6 +762,7 @@ export type Database = {
           phone: string | null
           position: string | null
           updated_at: string | null
+          weekly_digest_email: boolean
         }
         Insert: {
           approved?: boolean | null
@@ -776,6 +777,7 @@ export type Database = {
           phone?: string | null
           position?: string | null
           updated_at?: string | null
+          weekly_digest_email?: boolean
         }
         Update: {
           approved?: boolean | null
@@ -790,6 +792,7 @@ export type Database = {
           phone?: string | null
           position?: string | null
           updated_at?: string | null
+          weekly_digest_email?: boolean
         }
         Relationships: [
           {
