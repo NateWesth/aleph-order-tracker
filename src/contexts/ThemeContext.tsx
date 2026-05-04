@@ -6,6 +6,7 @@ type ColorTheme = 'purple' | 'green' | 'blue' | 'rose' | 'orange' | 'teal' | 're
 type BoardColorMode = 'colorful' | 'single';
 type BoardSingleColor = 'amber' | 'sky' | 'violet' | 'emerald' | 'slate' | 'rose' | 'cyan' | 'lime' | 'orange' | 'indigo' | 'pink' | 'primary' | 'custom';
 type ColorfulPreset = 'default' | 'sunset' | 'ocean' | 'forest' | 'berry' | 'earth' | 'neon' | 'pastel' | 'mono' | 'candy';
+type UiVariant = 'standard' | 'glass';
 
 export interface StockStatusColors {
   orderedColor: string;
@@ -21,6 +22,7 @@ interface ThemeContextType {
   colorfulPreset: ColorfulPreset;
   customBoardColor: string;
   stockStatusColors: StockStatusColors;
+  uiVariant: UiVariant;
   setTheme: (theme: Theme) => void;
   setColorTheme: (colorTheme: ColorTheme) => void;
   setBoardColorMode: (mode: BoardColorMode) => void;
@@ -28,6 +30,7 @@ interface ThemeContextType {
   setColorfulPreset: (preset: ColorfulPreset) => void;
   setCustomBoardColor: (color: string) => void;
   setStockStatusColors: (colors: StockStatusColors) => void;
+  setUiVariant: (variant: UiVariant) => void;
   toggleTheme: () => void;
 }
 
