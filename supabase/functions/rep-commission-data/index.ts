@@ -897,7 +897,9 @@ async function fetchCostPricesFromItems(
           toNumber(item.last_purchase_rate) ??
           toNumber(item.cost_price) ??
           0
-        if (cost > 0) {
+        // Ignore placeholder/stub costs (e.g. R0.01 on misc items). Anything
+        // below R1 is treated as missing so the bill-cost lookup can win.
+        if (cost >= 1) {
           costMap.set(`id:${itemId}`, cost)
           if (item.sku) costMap.set(`sku:${String(item.sku).toLowerCase()}`, cost)
           if (item.name) costMap.set(`name:${String(item.name).toLowerCase()}`, cost)
