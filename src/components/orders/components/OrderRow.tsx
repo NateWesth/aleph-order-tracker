@@ -2,8 +2,9 @@
 import { TableCell, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Eye, MoreHorizontal, Clock, ShoppingCart, Package, Truck } from "lucide-react";
+import { Eye, MoreHorizontal, Clock, ShoppingCart, Package, Truck, Trash2, MessageSquare, CheckCircle2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import OrderExportActions from "./OrderExportActions";
 import { OrderUpdatesButton } from "./OrderUpdatesButton";
 import { useState } from "react";
@@ -14,6 +15,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { InlineStatusEdit, InlineUrgencyEdit, InlineNotesEdit } from "./InlineQuickEdit";
 import PredictiveETABadge from "./PredictiveETABadge";
+import { useLongPress } from "@/hooks/useLongPress";
 
 interface OrderRowProps {
   order: OrderWithCompany;
@@ -154,8 +156,11 @@ export default function OrderRow({
 }: OrderRowProps) {
   const [showDetails, setShowDetails] = useState(false);
   const [showManagePOs, setShowManagePOs] = useState(false);
+  const [showQuickActions, setShowQuickActions] = useState(false);
+  const [showUpdatesPanel, setShowUpdatesPanel] = useState(false);
   const isMobile = useIsMobile();
   const stockCounts = parseStockStatusCounts(order.description);
+  const longPress = useLongPress({ onLongPress: () => setShowQuickActions(true) });
 
   const getStatusColor = (status: string | null) => {
     switch (status?.toLowerCase()) {
@@ -191,6 +196,7 @@ export default function OrderRow({
     if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('[role="menuitem"]')) {
       return;
     }
+    if (longPress.didLongPress()) return;
 
     // Show details dialog when clicking on any order
     setShowDetails(true);
@@ -200,7 +206,11 @@ export default function OrderRow({
     // Mobile card layout
     return (
       <>
-        <div className={`cursor-pointer order-row-hover rounded-lg transition-all duration-200 ${compact ? 'p-2' : ''}`} onClick={handleRowClick}>
+        <div
+          className={`cursor-pointer order-row-hover rounded-lg transition-all duration-200 select-none ${compact ? 'p-2' : ''}`}
+          onClick={handleRowClick}
+          {...longPress}
+        >
           <div className={compact ? 'space-y-1' : 'space-y-2'}>
             {/* Order header */}
             <div className="flex justify-between items-start gap-2">
