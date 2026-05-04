@@ -1,0 +1,12 @@
+DELETE FROM public.commission_report_cache;
+DELETE FROM public.commission_line_overrides;
+DELETE FROM public.commission_payouts;
+DELETE FROM public.order_update_reads;
+DELETE FROM public.order_updates;
+DELETE FROM public.order_activity_log;
+DELETE FROM public.order_files;
+DELETE FROM public.order_purchase_orders;
+DELETE FROM public.order_tag_assignments;
+DELETE FROM public.order_items;
+DELETE FROM public.notifications;
+DELETE FROM public.orders;
