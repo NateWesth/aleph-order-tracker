@@ -81,8 +81,13 @@ const computeLineCommission = (
   cost: number | null,
 ): { commission: number; effectiveRate: number } => {
   let marginPct: number | null = null
-  if (cost !== null && cost > 0 && sellRate > 0) {
-    marginPct = ((sellRate - cost) / cost) * 100
+  // Treat costs below R1 as placeholder/missing data (e.g. Zoho R0.01 stubs on
+  // misc items). Without this guard, those lines look like ~1,000,000% margin
+  // and pay the full rate on subtotal, massively inflating the commission.
+  const PLACEHOLDER_COST_THRESHOLD = 1
+  const hasRealCost = cost !== null && cost >= PLACEHOLDER_COST_THRESHOLD
+  if (hasRealCost && sellRate > 0) {
+    marginPct = ((sellRate - (cost as number)) / (cost as number)) * 100
   }
 
   if (method === 'half_markup_below_25') {
