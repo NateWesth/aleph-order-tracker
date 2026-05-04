@@ -456,6 +456,12 @@ export default function CustomizableDashboard({ userName, onNavigate }: Customiz
       case "marginHeatmap":
         return <ParallaxWrapper speed={0.022}><MarginHeatmapWidget /></ParallaxWrapper>;
 
+      case "weeklyDigest":
+        return <ParallaxWrapper speed={0.02}><WeeklyDigestWidget /></ParallaxWrapper>;
+
+      case "anomalyAlerts":
+        return <ParallaxWrapper speed={0.02}><AnomalyAlertsWidget /></ParallaxWrapper>;
+
       default:
         return null;
     }
