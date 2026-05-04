@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Bell, Mail, MessageSquare, Package, AlertTriangle, CheckCircle2, Sun, Sunset } from "lucide-react";
+import { Bell, Mail, MessageSquare, Package, AlertTriangle, CheckCircle2, Sun, Sunset, Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -31,6 +31,7 @@ export default function NotificationPreferences() {
   const [prefs, setPrefs] = useState<NotificationPref>(DEFAULT_PREFS);
   const [morningReport, setMorningReport] = useState(false);
   const [afternoonReport, setAfternoonReport] = useState(false);
+  const [weeklyDigest, setWeeklyDigest] = useState(false);
   const [loadingReports, setLoadingReports] = useState(true);
   const { toast } = useToast();
   const { user } = useAuth();
@@ -48,12 +49,13 @@ export default function NotificationPreferences() {
     (async () => {
       const { data } = await supabase
         .from('profiles')
-        .select('daily_morning_report, daily_afternoon_report')
+        .select('daily_morning_report, daily_afternoon_report, weekly_digest_email')
         .eq('id', user.id)
         .single();
       if (data) {
         setMorningReport(data.daily_morning_report ?? false);
         setAfternoonReport(data.daily_afternoon_report ?? false);
+        setWeeklyDigest((data as any).weekly_digest_email ?? false);
       }
       setLoadingReports(false);
     })();
@@ -69,19 +71,22 @@ export default function NotificationPreferences() {
     });
   };
 
-  const updateDailyReport = async (field: 'daily_morning_report' | 'daily_afternoon_report', value: boolean) => {
+  const updateDailyReport = async (field: 'daily_morning_report' | 'daily_afternoon_report' | 'weekly_digest_email', value: boolean) => {
     if (!user?.id) return;
-    const setter = field === 'daily_morning_report' ? setMorningReport : setAfternoonReport;
+    const setter =
+      field === 'daily_morning_report' ? setMorningReport :
+      field === 'daily_afternoon_report' ? setAfternoonReport :
+      setWeeklyDigest;
     setter(value);
     const { error } = await supabase
       .from('profiles')
-      .update({ [field]: value })
+      .update({ [field]: value } as any)
       .eq('id', user.id);
     if (error) {
       setter(!value);
-      toast({ title: "Error", description: "Failed to update report preference.", variant: "destructive" });
+      toast({ title: "Error", description: "Failed to update preference.", variant: "destructive" });
     } else {
-      toast({ title: "Preferences Updated", description: value ? "You'll receive this daily report." : "Daily report disabled." });
+      toast({ title: "Preferences Updated", description: value ? "Subscribed to this report." : "Report disabled." });
     }
   };
 
