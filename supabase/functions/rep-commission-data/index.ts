@@ -804,6 +804,22 @@ async function fetchZohoInvoices(accessToken: string, orgId: string, dateStart: 
   return Array.from(uniqueInvoices.values())
 }
 
+// Identifiers that are shared across many unrelated items (e.g. the generic
+// "M-Miscellaneous" SKU/name is reused on dozens of completely different
+// custom-priced lines). For those, looking up by SKU/name produces a wrong
+// shared cost — we only allow id: or desc: matches.
+const GENERIC_TOKENS = new Set([
+  'm-miscellaneous', 'miscellaneous', 'misc', 'm-misc',
+  'n/a', 'na', '-', 'item', 'product',
+])
+const isGenericToken = (value: string): boolean => {
+  const lowered = value.trim().toLowerCase()
+  if (!lowered) return true
+  if (GENERIC_TOKENS.has(lowered)) return true
+  if (lowered.startsWith('m-misc')) return true
+  return false
+}
+
 // Build stable keys for an invoice/bill line item used to look up cost.
 // Keep all possible identifiers because Zoho does not always expose the same
 // fields on invoice lines and vendor bill lines.
@@ -813,9 +829,12 @@ function lineItemCostKeys(li: Record<string, unknown>): string[] {
     const normalized = value == null ? '' : String(value).trim()
     if (!normalized) return
     const lowered = normalized.toLowerCase()
-    // Skip only truly empty placeholders. Generic SKUs like 'M-Miscellaneous'
-    // are kept — they get disambiguated by the desc: key (description match).
+    // Skip truly empty placeholders for non-id keys.
     if (prefix !== 'id' && (lowered === 'n/a' || lowered === 'na' || lowered === '-')) return
+    // For sku and name: skip generic shared identifiers like 'M-Miscellaneous'.
+    // These would otherwise return a wrong shared cost from an unrelated line.
+    // The desc: key still applies for exact description matches.
+    if ((prefix === 'sku' || prefix === 'name') && isGenericToken(normalized)) return
     keys.push(`${prefix}:${lower ? lowered : normalized}`)
   }
   add('id', li.item_id)
