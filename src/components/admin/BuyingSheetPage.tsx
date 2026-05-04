@@ -32,6 +32,7 @@ import { getPriorityLevel, NOTES_KEY, SNAPSHOT_KEY, loadNotes, saveNotes, loadPi
 import { BuyingSheetSummary } from "./buying-sheet/BuyingSheetSummary";
 import { SupplierCardsView } from "./buying-sheet/SupplierCardsView";
 import { QuickOrderView } from "./buying-sheet/QuickOrderView";
+import ProcurementSuggestionsPanel from "./buying-sheet/ProcurementSuggestionsPanel";
 
 export default function BuyingSheetPage() {
   const { toast } = useToast();
@@ -1180,6 +1181,23 @@ export default function BuyingSheetPage() {
 
         {/* Summary Cards */}
         <BuyingSheetSummary totals={totals} avgDaysWaiting={avgDaysWaiting} supplierCount={uniqueSuppliers.length} />
+
+        {/* AI Procurement Suggestions */}
+        <ProcurementSuggestionsPanel
+          items={rows
+            .filter((r) => r.toOrder > 0)
+            .slice(0, 80)
+            .map((r) => ({
+              sku: r.sku,
+              name: r.itemName,
+              supplier: r.supplierName,
+              stock: r.stockOnHand,
+              toOrder: r.toOrder,
+              monthlyDemand: r.lastMonthQty,
+              daysToZero: r.stockoutRiskDays ?? undefined,
+              abcClass: r.abcClass,
+            }))}
+        />
 
         {/* Priority Filter Tabs */}
         <Tabs value={priorityFilter} onValueChange={v => setPriorityFilter(v as PriorityFilter)}>
