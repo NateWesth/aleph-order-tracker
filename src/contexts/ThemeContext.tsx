@@ -6,6 +6,7 @@ type ColorTheme = 'purple' | 'green' | 'blue' | 'rose' | 'orange' | 'teal' | 're
 type BoardColorMode = 'colorful' | 'single';
 type BoardSingleColor = 'amber' | 'sky' | 'violet' | 'emerald' | 'slate' | 'rose' | 'cyan' | 'lime' | 'orange' | 'indigo' | 'pink' | 'primary' | 'custom';
 type ColorfulPreset = 'default' | 'sunset' | 'ocean' | 'forest' | 'berry' | 'earth' | 'neon' | 'pastel' | 'mono' | 'candy';
+type UiVariant = 'standard' | 'glass';
 
 export interface StockStatusColors {
   orderedColor: string;
@@ -21,6 +22,7 @@ interface ThemeContextType {
   colorfulPreset: ColorfulPreset;
   customBoardColor: string;
   stockStatusColors: StockStatusColors;
+  uiVariant: UiVariant;
   setTheme: (theme: Theme) => void;
   setColorTheme: (colorTheme: ColorTheme) => void;
   setBoardColorMode: (mode: BoardColorMode) => void;
@@ -28,6 +30,7 @@ interface ThemeContextType {
   setColorfulPreset: (preset: ColorfulPreset) => void;
   setCustomBoardColor: (color: string) => void;
   setStockStatusColors: (colors: StockStatusColors) => void;
+  setUiVariant: (variant: UiVariant) => void;
   toggleTheme: () => void;
 }
 
@@ -155,6 +158,21 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
   const [colorfulPreset, setColorfulPreset] = useState<ColorfulPreset>('default');
   const [customBoardColor, setCustomBoardColor] = useState<string>('#6366f1');
   const [stockStatusColors, setStockStatusColors] = useState<StockStatusColors>(defaultStockStatusColors);
+  const [uiVariant, setUiVariant] = useState<UiVariant>('standard');
+
+  // Apply / persist UI variant (e.g. glass)
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('uiVariant') as UiVariant | null;
+      if (saved === 'glass' || saved === 'standard') setUiVariant(saved);
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    const root = window.document.documentElement;
+    root.classList.toggle('ui-glass', uiVariant === 'glass');
+    try { localStorage.setItem('uiVariant', uiVariant); } catch {}
+  }, [uiVariant]);
 
   // Initialize theme from localStorage
   useEffect(() => {
@@ -296,6 +314,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
       colorfulPreset,
       customBoardColor,
       stockStatusColors,
+      uiVariant,
       setTheme,
       setColorTheme,
       setBoardColorMode,
@@ -303,6 +322,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
       setColorfulPreset,
       setCustomBoardColor,
       setStockStatusColors,
+      setUiVariant,
       toggleTheme
     }}>
       {children}

@@ -32,7 +32,7 @@ const Settings = () => {
   const { toast } = useToast();
   const { user } = useAuth();
   const isMobile = useIsMobile();
-  const { theme, colorTheme, boardColorMode, boardSingleColor, colorfulPreset, customBoardColor, stockStatusColors, toggleTheme, setTheme, setColorTheme, setBoardColorMode, setBoardSingleColor, setColorfulPreset, setCustomBoardColor, setStockStatusColors } = useTheme();
+  const { theme, colorTheme, boardColorMode, boardSingleColor, colorfulPreset, customBoardColor, stockStatusColors, uiVariant, toggleTheme, setTheme, setColorTheme, setBoardColorMode, setBoardSingleColor, setColorfulPreset, setCustomBoardColor, setStockStatusColors, setUiVariant } = useTheme();
   const [userProfile, setUserProfile] = useState<any>(null);
   const [companyInfo, setCompanyInfo] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -506,6 +506,24 @@ const Settings = () => {
                     id="theme-toggle"
                     checked={theme === 'dark'}
                     onCheckedChange={toggleTheme}
+                  />
+                </div>
+
+                {/* Glass UI Variant */}
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="glass-toggle" className="flex items-center gap-2">
+                      <Palette className="h-4 w-4" />
+                      Glass UI Variant
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      Apply a frosted, layered glass aesthetic to surfaces
+                    </p>
+                  </div>
+                  <Switch
+                    id="glass-toggle"
+                    checked={uiVariant === 'glass'}
+                    onCheckedChange={(checked) => setUiVariant(checked ? 'glass' : 'standard')}
                   />
                 </div>
 
