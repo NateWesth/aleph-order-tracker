@@ -882,7 +882,12 @@ async function syncOrderItems(supabase: any, orderId: string, lineItems: any[]):
       })
 
     if (itemError) {
-      console.error(`Failed to create order item ${itemName}:`, itemError)
+      // 23505 = unique_violation from order_items_dedup_idx — safe to skip (concurrent webhook)
+      if ((itemError as any).code === '23505') {
+        console.log(`Duplicate item skipped (race): ${itemName} (Qty: ${qty})`)
+      } else {
+        console.error(`Failed to create order item ${itemName}:`, itemError)
+      }
     } else {
       itemsCreated++
     }
