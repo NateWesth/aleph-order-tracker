@@ -13,7 +13,7 @@ import { AnimatedCounter } from "@/components/ui/AnimatedCounter";
 import PredictiveInsights from "./PredictiveInsights";
 import AnalyticsWidgets from "./AnalyticsWidgets";
 import LeaderboardWidget from "./LeaderboardWidget";
-import CommissionForecastWidget from "./CommissionForecastWidget";
+
 import MarginHeatmapWidget from "./MarginHeatmapWidget";
 import WeeklyDigestWidget from "./WeeklyDigestWidget";
 import AnomalyAlertsWidget from "./AnomalyAlertsWidget";
@@ -46,7 +46,7 @@ const toTransformString = (
   return `translate3d(${x}px, ${y}px, 0) scaleX(${scaleX}) scaleY(${scaleY})`;
 };
 
-type WidgetId = "stats" | "quickStats" | "recentActivity" | "urgentAlerts" | "predictive" | "analytics" | "leaderboard" | "commissionForecast" | "marginHeatmap" | "weeklyDigest" | "anomalyAlerts";
+type WidgetId = "stats" | "quickStats" | "recentActivity" | "urgentAlerts" | "predictive" | "analytics" | "leaderboard" | "marginHeatmap" | "weeklyDigest" | "anomalyAlerts";
 type WidgetSize = "full" | "half" | "third";
 
 interface WidgetConfig {
@@ -61,7 +61,7 @@ const DEFAULT_LAYOUT: WidgetConfig[] = [
   { id: "weeklyDigest", label: "Weekly Digest", visible: true, size: "half" },
   { id: "anomalyAlerts", label: "Anomaly Alerts", visible: true, size: "half" },
   { id: "analytics", label: "Analytics Charts", visible: true, size: "full" },
-  { id: "commissionForecast", label: "Commission Forecast", visible: true, size: "half" },
+  
   { id: "marginHeatmap", label: "Margin Heatmap", visible: true, size: "half" },
   { id: "leaderboard", label: "Leaderboard", visible: true, size: "full" },
   { id: "urgentAlerts", label: "Urgent Alerts", visible: true, size: "half" },
