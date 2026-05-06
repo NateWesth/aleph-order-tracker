@@ -9,6 +9,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Package, History, BarChart3, Settings, LogOut, Building2, Home, Box, Users, Truck, FileText, Command, ShoppingCart, Percent, Sparkles } from "lucide-react";
 import ChangelogDialog, { hasUnreadChangelog } from "@/components/admin/ChangelogDialog";
+import KeyboardShortcutsDialog from "@/components/admin/KeyboardShortcutsDialog";
 import { playClick, playWhoosh } from "@/utils/ambientSounds";
 import NotificationCenter from "@/components/NotificationCenter";
 import FloatingAIChat from "@/components/admin/FloatingAIChat";
