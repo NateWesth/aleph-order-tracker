@@ -7,10 +7,10 @@ import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
 
 interface Summary {
-  thisWeek: { ordersCreated: number; ordersCompleted: number; revenueCreated: number; revenueCompleted: number };
-  lastWeek: { ordersCreated: number; ordersCompleted: number; revenueCreated: number; revenueCompleted: number };
+  thisWeek: { ordersCreated: number; ordersCompleted: number };
+  lastWeek: { ordersCreated: number; ordersCompleted: number };
   pipeline: { active: number; urgent: number; agingOver14d: number };
-  topClients: { name: string; count: number; value: number }[];
+  topClients: { name: string; count: number }[];
   activityCount: number;
 }
 
@@ -56,10 +56,8 @@ export default function WeeklyDigestWidget() {
     }
   };
 
-  const formatZAR = (n: number) => new Intl.NumberFormat("en-ZA", { style: "currency", currency: "ZAR", maximumFractionDigits: 0 }).format(n);
-
   const orderDelta = summary ? summary.thisWeek.ordersCreated - summary.lastWeek.ordersCreated : 0;
-  const revenueDelta = summary ? summary.thisWeek.revenueCreated - summary.lastWeek.revenueCreated : 0;
+  const completedDelta = summary ? summary.thisWeek.ordersCompleted - summary.lastWeek.ordersCompleted : 0;
 
   return (
     <Card className="glass-card glow-border border-border/50">
@@ -93,16 +91,16 @@ export default function WeeklyDigestWidget() {
             </div>
             <div className="p-3 rounded-xl bg-secondary/40 border border-border/40">
               <div className="flex items-center justify-between">
-                <p className="text-[11px] text-muted-foreground">Revenue created</p>
-                {revenueDelta !== 0 && (
-                  revenueDelta > 0
+                <p className="text-[11px] text-muted-foreground">Orders completed</p>
+                {completedDelta !== 0 && (
+                  completedDelta > 0
                     ? <TrendingUp className="h-3 w-3 text-emerald-500" />
                     : <TrendingDown className="h-3 w-3 text-destructive" />
                 )}
               </div>
-              <p className="text-xl font-bold text-foreground mt-1">{formatZAR(summary.thisWeek.revenueCreated)}</p>
+              <p className="text-xl font-bold text-foreground mt-1">{summary.thisWeek.ordersCompleted}</p>
               <p className="text-[11px] text-muted-foreground">
-                vs {formatZAR(summary.lastWeek.revenueCreated)}
+                {completedDelta >= 0 ? "+" : ""}{completedDelta} vs last week
               </p>
             </div>
           </div>
