@@ -71,16 +71,15 @@ serve(async (req) => {
     const twCompletedRevenue = sumAmt(twc);
     const lwCompletedRevenue = sumAmt(lwc);
 
-    // Top clients this week
-    const clientCounts: Record<string, { name: string; count: number; value: number }> = {};
+    // Top clients this week (by order count, no revenue)
+    const clientCounts: Record<string, { name: string; count: number }> = {};
     for (const o of tw) {
       const name = (o as any).companies?.name || "Unknown";
       const key = o.company_id || "unknown";
-      if (!clientCounts[key]) clientCounts[key] = { name, count: 0, value: 0 };
+      if (!clientCounts[key]) clientCounts[key] = { name, count: 0 };
       clientCounts[key].count++;
-      clientCounts[key].value += Number(o.total_amount) || 0;
     }
-    const topClients = Object.values(clientCounts).sort((a, b) => b.value - a.value).slice(0, 3);
+    const topClients = Object.values(clientCounts).sort((a, b) => b.count - a.count).slice(0, 3);
 
     const urgentActive = active.filter(o => o.urgency === "urgent" || o.urgency === "high").length;
     const oldActive = active.filter(o => {
@@ -92,14 +91,10 @@ serve(async (req) => {
       thisWeek: {
         ordersCreated: tw.length,
         ordersCompleted: twc.length,
-        revenueCreated: twRevenue,
-        revenueCompleted: twCompletedRevenue,
       },
       lastWeek: {
         ordersCreated: lw.length,
         ordersCompleted: lwc.length,
-        revenueCreated: lwRevenue,
-        revenueCompleted: lwCompletedRevenue,
       },
       pipeline: {
         active: active.length,
@@ -109,8 +104,10 @@ serve(async (req) => {
       topClients,
       activityCount: (activityLog.data || []).length,
     };
+    // Keep revenue figures out of the summary entirely
+    void twRevenue; void lwRevenue; void twCompletedRevenue; void lwCompletedRevenue;
 
-    const prompt = `You are a business analyst writing a weekly digest for an order management app. Write a concise, friendly weekly summary in plain text (no markdown). Highlight: trends vs last week, wins, risks, and one clear recommendation. Keep under 180 words. End with "Bottom line:" followed by one sentence.
+    const prompt = `You are a business analyst writing a weekly digest for an order management app. Write a concise, friendly weekly summary in plain text (no markdown). Focus on order volume, throughput, pipeline health, client activity, urgency, and aging. Do NOT mention revenue, money, currency, totals, or any monetary amounts under any circumstances. Highlight: trends vs last week, wins, risks, and one clear recommendation. Keep under 180 words. End with "Bottom line:" followed by one sentence.
 
 DATA:
 ${JSON.stringify(summary, null, 2)}`;
