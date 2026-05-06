@@ -450,9 +450,6 @@ export default function CustomizableDashboard({ userName, onNavigate }: Customiz
       case "leaderboard":
         return <ParallaxWrapper speed={0.018}><LeaderboardWidget /></ParallaxWrapper>;
 
-      case "commissionForecast":
-        return <ParallaxWrapper speed={0.02}><CommissionForecastWidget /></ParallaxWrapper>;
-
       case "marginHeatmap":
         return <ParallaxWrapper speed={0.022}><MarginHeatmapWidget /></ParallaxWrapper>;
 
