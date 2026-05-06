@@ -14,7 +14,7 @@ import PredictiveInsights from "./PredictiveInsights";
 import AnalyticsWidgets from "./AnalyticsWidgets";
 import LeaderboardWidget from "./LeaderboardWidget";
 
-import MarginHeatmapWidget from "./MarginHeatmapWidget";
+
 import WeeklyDigestWidget from "./WeeklyDigestWidget";
 import AnomalyAlertsWidget from "./AnomalyAlertsWidget";
 import {
@@ -46,7 +46,7 @@ const toTransformString = (
   return `translate3d(${x}px, ${y}px, 0) scaleX(${scaleX}) scaleY(${scaleY})`;
 };
 
-type WidgetId = "stats" | "quickStats" | "recentActivity" | "urgentAlerts" | "predictive" | "analytics" | "leaderboard" | "marginHeatmap" | "weeklyDigest" | "anomalyAlerts";
+type WidgetId = "stats" | "quickStats" | "recentActivity" | "urgentAlerts" | "predictive" | "analytics" | "leaderboard" | "weeklyDigest" | "anomalyAlerts";
 type WidgetSize = "full" | "half" | "third";
 
 interface WidgetConfig {
@@ -62,7 +62,7 @@ const DEFAULT_LAYOUT: WidgetConfig[] = [
   { id: "anomalyAlerts", label: "Anomaly Alerts", visible: true, size: "half" },
   { id: "analytics", label: "Analytics Charts", visible: true, size: "full" },
   
-  { id: "marginHeatmap", label: "Margin Heatmap", visible: true, size: "half" },
+  
   { id: "leaderboard", label: "Leaderboard", visible: true, size: "full" },
   { id: "urgentAlerts", label: "Urgent Alerts", visible: true, size: "half" },
   { id: "quickStats", label: "Quick Stats", visible: true, size: "half" },
@@ -449,9 +449,6 @@ export default function CustomizableDashboard({ userName, onNavigate }: Customiz
 
       case "leaderboard":
         return <ParallaxWrapper speed={0.018}><LeaderboardWidget /></ParallaxWrapper>;
-
-      case "marginHeatmap":
-        return <ParallaxWrapper speed={0.022}><MarginHeatmapWidget /></ParallaxWrapper>;
 
       case "weeklyDigest":
         return <ParallaxWrapper speed={0.02}><WeeklyDigestWidget /></ParallaxWrapper>;
