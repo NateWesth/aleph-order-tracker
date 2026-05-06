@@ -376,6 +376,9 @@ const AdminDashboard = () => {
       {/* Changelog */}
       <ChangelogDialog open={changelogOpen} onOpenChange={setChangelogOpen} />
 
+      {/* Keyboard shortcuts (press ?) */}
+      <KeyboardShortcutsDialog onNavigate={(view) => setActiveView(view)} />
+
       {/* Onboarding Tour */}
       <OnboardingTour />
     </div>
