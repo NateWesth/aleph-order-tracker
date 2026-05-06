@@ -162,6 +162,22 @@ export default function OrderRow({
   const stockCounts = parseStockStatusCounts(order.description);
   const longPress = useLongPress({ onLongPress: () => setShowQuickActions(true) });
 
+  // Swipe-right gesture (mobile) → open quick actions sheet
+  const swipeRef = (() => {
+    let startX = 0; let startY = 0; let triggered = false;
+    return {
+      onTouchStart: (e: React.TouchEvent) => {
+        const t = e.touches[0]; startX = t.clientX; startY = t.clientY; triggered = false;
+      },
+      onTouchMove: (e: React.TouchEvent) => {
+        if (triggered) return;
+        const t = e.touches[0];
+        const dx = t.clientX - startX; const dy = Math.abs(t.clientY - startY);
+        if (dx > 70 && dy < 40) { triggered = true; setShowQuickActions(true); }
+      },
+    };
+  })();
+
   const getStatusColor = (status: string | null) => {
     switch (status?.toLowerCase()) {
       case 'delivered':
@@ -210,6 +226,7 @@ export default function OrderRow({
           className={`cursor-pointer order-row-hover rounded-lg transition-all duration-200 select-none ${compact ? 'p-2' : ''}`}
           onClick={handleRowClick}
           {...longPress}
+          {...swipeRef}
         >
           <div className={compact ? 'space-y-1' : 'space-y-2'}>
             {/* Order header */}

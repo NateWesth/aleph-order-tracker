@@ -24,6 +24,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Plus, Trash2, Edit2, X, Truck, Activity } from "lucide-react";
 import OrderActivityTimeline from "./OrderActivityTimeline";
+import PurchaseOrdersPanel from "./PurchaseOrdersPanel";
 
 interface Supplier {
   id: string;
@@ -438,8 +439,12 @@ export default function OrderDetailsDialog({
         </DialogHeader>
         
         <Tabs defaultValue="details" className="w-full">
-          <TabsList className="w-full grid grid-cols-2">
+          <TabsList className="w-full grid grid-cols-3">
             <TabsTrigger value="details">Order Details</TabsTrigger>
+            <TabsTrigger value="pos" className="gap-1.5">
+              <Truck className="h-3.5 w-3.5" />
+              Purchase Orders
+            </TabsTrigger>
             <TabsTrigger value="activity" className="gap-1.5">
               <Activity className="h-3.5 w-3.5" />
               Activity
@@ -727,6 +732,10 @@ export default function OrderDetailsDialog({
             )}
           </div>
           </div>
+          </TabsContent>
+
+          <TabsContent value="pos" className="mt-4">
+            <PurchaseOrdersPanel orderId={order.id} orderNumber={order.order_number} />
           </TabsContent>
 
           <TabsContent value="activity" className="mt-4">
