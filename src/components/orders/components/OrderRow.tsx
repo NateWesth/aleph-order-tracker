@@ -155,6 +155,7 @@ export default function OrderRow({
   compact = false
 }: OrderRowProps) {
   const [showDetails, setShowDetails] = useState(false);
+  const [detailsTab, setDetailsTab] = useState<"details" | "pos" | "activity">("details");
   const [showManagePOs, setShowManagePOs] = useState(false);
   const [showQuickActions, setShowQuickActions] = useState(false);
   const [showUpdatesPanel, setShowUpdatesPanel] = useState(false);
@@ -233,7 +234,11 @@ export default function OrderRow({
             <div className="flex justify-between items-start gap-2">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5">
-                  <span className={`font-medium truncate ${compact ? 'text-xs' : 'text-sm'}`}>{order.order_number}</span>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setDetailsTab("pos"); setShowDetails(true); }}
+                    className={`font-medium truncate text-left hover:underline text-primary ${compact ? 'text-xs' : 'text-sm'}`}
+                  >{order.order_number}</button>
                   {order.reference && (
                     <span className="inline-flex items-center rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground whitespace-nowrap">
                       SO: {order.reference}
@@ -376,9 +381,10 @@ export default function OrderRow({
 
         <OrderDetailsDialog
           open={showDetails}
-          onOpenChange={setShowDetails}
+          onOpenChange={(o) => { setShowDetails(o); if (!o) setDetailsTab("details"); }}
           order={order}
           isAdmin={isAdmin}
+          defaultTab={detailsTab}
         />
 
         <ManagePOsDialog
@@ -429,7 +435,11 @@ export default function OrderRow({
         <TableCell className={compact ? 'py-2' : ''}>
           <div>
             <div className="flex items-center gap-1.5">
-              <span className={`font-medium ${compact ? 'text-sm' : 'text-base'}`}>{order.order_number}</span>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); setDetailsTab("pos"); setShowDetails(true); }}
+                className={`font-medium text-left hover:underline text-primary ${compact ? 'text-sm' : 'text-base'}`}
+              >{order.order_number}</button>
               {order.reference && (
                 <span className="inline-flex items-center rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground whitespace-nowrap">
                   SO: {order.reference}
@@ -557,9 +567,10 @@ export default function OrderRow({
 
       <OrderDetailsDialog
         open={showDetails}
-        onOpenChange={setShowDetails}
+        onOpenChange={(o) => { setShowDetails(o); if (!o) setDetailsTab("details"); }}
         order={order}
         isAdmin={isAdmin}
+        defaultTab={detailsTab}
       />
 
       <ManagePOsDialog
