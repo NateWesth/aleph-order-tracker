@@ -176,7 +176,8 @@ function OrderStatusColumn({
       allInStock: inStock === total
     };
   };
-  return <div ref={setNodeRef} className={cn("flex flex-col w-full min-w-0", isOver && "ring-2 ring-primary/50 rounded-xl transition-all")}>
+  return <>
+    <div ref={setNodeRef} className={cn("flex flex-col w-full min-w-0", isOver && "ring-2 ring-primary/50 rounded-xl transition-all")}>
       {/* Column Header - Only clickable to toggle on mobile */}
       {isMobile ? (
         <button 
@@ -269,7 +270,17 @@ function OrderStatusColumn({
           </ScrollArea>
         </div>
       )}
-    </div>;
+    </div>
+    {detailsOrder && (
+      <OrderDetailsDialog
+        open={!!detailsOrder}
+        onOpenChange={(o) => { if (!o) { setDetailsOrder(null); setDetailsTab("details"); } }}
+        order={detailsOrder as any}
+        isAdmin={canEditItems}
+        defaultTab={detailsTab}
+      />
+    )}
+    </>;
 
   // Helper to render a single order card
   function renderOrderCard(order: Order, index: number) {
