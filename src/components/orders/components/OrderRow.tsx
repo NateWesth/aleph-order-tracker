@@ -381,9 +381,10 @@ export default function OrderRow({
 
         <OrderDetailsDialog
           open={showDetails}
-          onOpenChange={setShowDetails}
+          onOpenChange={(o) => { setShowDetails(o); if (!o) setDetailsTab("details"); }}
           order={order}
           isAdmin={isAdmin}
+          defaultTab={detailsTab}
         />
 
         <ManagePOsDialog
