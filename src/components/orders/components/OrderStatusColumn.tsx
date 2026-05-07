@@ -16,6 +16,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import SwipeableCard from "@/components/ui/SwipeableCard";
 import OrderQuickPeek from "./OrderQuickPeek";
 import OrderTags from "./OrderTags";
+import OrderDetailsDialog from "./OrderDetailsDialog";
 import CircularProgress from "@/components/ui/CircularProgress";
 interface OrderItem {
   id: string;
@@ -101,6 +102,8 @@ function OrderStatusColumn({
   const isMobile = useIsMobile();
   const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
   const [collapsedClients, setCollapsedClients] = useState<Set<string>>(new Set());
+  const [detailsOrder, setDetailsOrder] = useState<Order | null>(null);
+  const [detailsTab, setDetailsTab] = useState<"details" | "pos" | "activity">("pos");
   
   // On desktop/tablet, columns are always expanded and not collapsible
   // On mobile, use the isExpanded prop for collapsible behavior
@@ -291,14 +294,18 @@ function OrderStatusColumn({
               <div className="flex-1 min-w-0">
                 <HoverCard openDelay={400} closeDelay={100}>
                   <HoverCardTrigger asChild>
-                    <span className="font-semibold text-xs sm:text-sm text-foreground truncate cursor-help flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); setDetailsTab("pos"); setDetailsOrder(order); }}
+                      className="font-semibold text-xs sm:text-sm text-primary hover:underline truncate cursor-pointer flex items-center gap-1 text-left"
+                    >
                       {order.order_number}
                       {order.reference && (
                         <span className="inline-flex items-center rounded bg-muted px-1 py-0.5 text-[9px] font-medium text-muted-foreground whitespace-nowrap">
                           SO: {order.reference}
                         </span>
                       )}
-                    </span>
+                    </button>
                   </HoverCardTrigger>
                   <HoverCardContent side="right" align="start" className="p-0 w-auto">
                     <OrderQuickPeek
