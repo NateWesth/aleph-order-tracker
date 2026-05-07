@@ -57,6 +57,7 @@ interface OrderDetailsDialogProps {
   order: OrderWithCompany;
   isAdmin?: boolean;
   onSave?: () => void;
+  defaultTab?: "details" | "pos" | "activity";
 }
 
 // Parse stock status from description line
@@ -81,7 +82,8 @@ export default function OrderDetailsDialog({
   onOpenChange,
   order,
   isAdmin = false,
-  onSave
+  onSave,
+  defaultTab = "details",
 }: OrderDetailsDialogProps) {
   const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
@@ -438,7 +440,7 @@ export default function OrderDetailsDialog({
           </div>
         </DialogHeader>
         
-        <Tabs defaultValue="details" className="w-full">
+        <Tabs defaultValue={defaultTab} className="w-full">
           <TabsList className="w-full grid grid-cols-3">
             <TabsTrigger value="details">Order Details</TabsTrigger>
             <TabsTrigger value="pos" className="gap-1.5">
