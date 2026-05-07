@@ -155,6 +155,7 @@ export default function OrderRow({
   compact = false
 }: OrderRowProps) {
   const [showDetails, setShowDetails] = useState(false);
+  const [detailsTab, setDetailsTab] = useState<"details" | "pos" | "activity">("details");
   const [showManagePOs, setShowManagePOs] = useState(false);
   const [showQuickActions, setShowQuickActions] = useState(false);
   const [showUpdatesPanel, setShowUpdatesPanel] = useState(false);
