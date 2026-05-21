@@ -345,8 +345,8 @@ const CommissionPage = () => {
             else {
               const profit = (sell - effectiveCost) * qty;
               if (profit <= 0) commission = 0;
-              // Strict >= 25% markup-on-cost, no epsilon (matches edge function)
-              else if (margin_percent != null && margin_percent >= 25) commission = sub_total * (commission_rate / 100);
+              // Strict >= 25% markup-on-cost: full rate applies to cost × qty per line
+              else if (margin_percent != null && margin_percent >= 25) commission = (effectiveCost * qty) * (commission_rate / 100);
               else commission = profit * 0.5;
             }
           } else {
