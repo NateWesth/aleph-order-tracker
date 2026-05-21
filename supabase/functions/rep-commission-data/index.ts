@@ -507,9 +507,9 @@ Deno.serve(async (req) => {
         commission = 0
         displayRate = 0
       } else {
-        commission = lineCommission
+        commission = lineDetails.reduce((sum, line) => sum + Number(line.commission || 0), 0)
         displayRate = coveredLineSubTotal > 0
-          ? weightedRateNumerator / coveredLineSubTotal
+          ? (commission / coveredLineSubTotal) * 100
           : 0
       }
 
