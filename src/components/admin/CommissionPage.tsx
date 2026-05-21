@@ -307,24 +307,45 @@ const CommissionPage = () => {
           invTouched = true;
           repTouched = true;
 
-          const sell = ov.sell_rate != null ? Number(ov.sell_rate) : li.rate;
-          const cost = ov.cost != null ? Number(ov.cost) : li.cost;
           const qty = li.quantity ?? 0;
-          const sub_total = ov.sub_total != null ? Number(ov.sub_total) : sell * qty;
+
+          // Keep sell rate and subtotal consistent:
+          // - override sub_total only (no sell_rate) -> derive sell = sub_total / qty
+          // - override sell_rate only (no sub_total) -> derive sub_total = sell * qty
+          let sell = ov.sell_rate != null ? Number(ov.sell_rate) : li.rate;
+          let sub_total = ov.sub_total != null ? Number(ov.sub_total) : sell * qty;
+          if (ov.sub_total != null && ov.sell_rate == null && qty > 0) {
+            sell = sub_total / qty;
+          }
+
+          const cost = ov.cost != null ? Number(ov.cost) : li.cost;
+          // Mirror edge-function placeholder guard: costs below R1 are treated as
+          // unknown so we don't pay full commission on R0.01 Zoho stubs.
+          const PLACEHOLDER_COST_THRESHOLD = 1;
+          const effectiveCost = (cost != null && cost >= PLACEHOLDER_COST_THRESHOLD) ? cost : null;
+
           const isManualCommissionRate = ov.commission_rate != null;
-          const commission_rate = isManualCommissionRate ? Number(ov.commission_rate) : (li.base_commission_rate ?? li.commission_rate);
-          const margin_percent = (cost != null && cost > 0) ? Number((((sell - cost) / cost) * 100).toFixed(2)) : null;
+          const commission_rate = isManualCommissionRate
+            ? Number(ov.commission_rate)
+            : (li.base_commission_rate ?? li.commission_rate);
+          const margin_percent = (effectiveCost != null && effectiveCost > 0 && sell > 0)
+            ? Number((((sell - effectiveCost) / effectiveCost) * 100).toFixed(2))
+            : null;
 
           let commission: number;
           if (ov.commission != null) {
+            // Explicit commission amount override wins
             commission = Number(ov.commission);
           } else if (isManualCommissionRate) {
+            // Explicit rate override -> straight rate × subtotal (bypasses half-markup rule)
             commission = sub_total * (commission_rate / 100);
           } else if (method === "half_markup_below_25") {
-            if (cost == null) commission = 0;
+            // Unknown/placeholder cost -> skip (never overpay on unverifiable lines)
+            if (effectiveCost == null) commission = 0;
             else {
-              const profit = (sell - cost) * qty;
+              const profit = (sell - effectiveCost) * qty;
               if (profit <= 0) commission = 0;
+              // Strict >= 25% markup-on-cost, no epsilon (matches edge function)
               else if (margin_percent != null && margin_percent >= 25) commission = sub_total * (commission_rate / 100);
               else commission = profit * 0.5;
             }
