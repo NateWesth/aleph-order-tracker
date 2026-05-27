@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { User, Shield, Search, Check, X, Clock, UserCog } from "lucide-react";
+import { User, Shield, Search, Check, X, Clock, UserCog, Percent } from "lucide-react";
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
 
 interface UserProfile {
@@ -25,6 +25,7 @@ interface UserProfile {
   company_id: string;
   created_at: string;
   approved: boolean;
+  can_edit_commission?: boolean;
   role?: 'admin' | 'user';
   company_name?: string;
 }
@@ -155,6 +156,24 @@ export default function UsersManagementPage() {
         description: "Failed to update user role.",
         variant: "destructive",
       });
+    }
+  };
+
+  const toggleCommissionAccess = async (userId: string, value: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ can_edit_commission: value })
+        .eq('id', userId);
+      if (error) throw error;
+      setUsers(users.map(u => u.id === userId ? { ...u, can_edit_commission: value } : u));
+      toast({
+        title: "Success",
+        description: value ? "User can now edit commissions." : "Commission editing access revoked.",
+      });
+    } catch (error: any) {
+      console.error("Failed to update commission access:", error);
+      toast({ title: "Error", description: "Failed to update commission access.", variant: "destructive" });
     }
   };
 
@@ -304,17 +323,25 @@ export default function UsersManagementPage() {
                       )}
                     </TableCell>
                     <TableCell>
-                      {user.role === 'admin' ? (
-                        <Badge className="bg-primary">
-                          <Shield className="h-3 w-3 mr-1" />
-                          Admin
-                        </Badge>
-                      ) : (
-                        <Badge variant="secondary">
-                          <User className="h-3 w-3 mr-1" />
-                          User
-                        </Badge>
-                      )}
+                      <div className="flex flex-col gap-1 items-start">
+                        {user.role === 'admin' ? (
+                          <Badge className="bg-primary">
+                            <Shield className="h-3 w-3 mr-1" />
+                            Admin
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary">
+                            <User className="h-3 w-3 mr-1" />
+                            User
+                          </Badge>
+                        )}
+                        {user.can_edit_commission && (
+                          <Badge variant="outline" className="border-green-600 text-green-700 dark:text-green-400">
+                            <Percent className="h-3 w-3 mr-1" />
+                            Commission Editor
+                          </Badge>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell>
                       <div className="text-sm">
@@ -344,6 +371,17 @@ export default function UsersManagementPage() {
                             Make Admin
                           </Button>
                         )}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => toggleCommissionAccess(user.id, !user.can_edit_commission)}
+                          className={user.can_edit_commission
+                            ? "text-green-700 border-green-600 hover:bg-green-50 dark:hover:bg-green-900/20"
+                            : "text-muted-foreground border-muted-foreground/40 hover:bg-accent"}
+                        >
+                          <Percent className="h-4 w-4 mr-1" />
+                          {user.can_edit_commission ? 'Revoke Commission' : 'Allow Commission'}
+                        </Button>
                         <Button
                           size="sm"
                           variant="outline"

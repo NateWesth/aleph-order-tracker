@@ -147,6 +147,7 @@ const AdminDashboard = () => {
   }, [handleCommandAction]);
 
   const isAdmin = userRole === 'admin';
+  const canEditCommission = isAdmin || !!userProfile?.can_edit_commission;
 
   const navItems = [
     { id: "orders", label: "Orders", icon: Package, badge: pendingOrdersCount },
@@ -157,7 +158,7 @@ const AdminDashboard = () => {
     { id: "po-tracking", label: "PO Tracking", icon: FileText, badge: 0 },
     { id: "buying-sheet", label: "Buying", icon: ShoppingCart, badge: 0 },
     { id: "items", label: "Items", icon: Box, badge: 0 },
-    { id: "commission", label: "Commission", icon: Percent, badge: 0 },
+    ...(canEditCommission ? [{ id: "commission", label: "Commission", icon: Percent, badge: 0 }] : []),
     ...(isAdmin ? [{ id: "users", label: "Users", icon: Users, badge: 0 }] : []),
   ];
 

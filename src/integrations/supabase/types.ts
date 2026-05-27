@@ -751,6 +751,7 @@ export type Database = {
       profiles: {
         Row: {
           approved: boolean | null
+          can_edit_commission: boolean
           company_code: string | null
           company_id: string | null
           created_at: string | null
@@ -766,6 +767,7 @@ export type Database = {
         }
         Insert: {
           approved?: boolean | null
+          can_edit_commission?: boolean
           company_code?: string | null
           company_id?: string | null
           created_at?: string | null
@@ -781,6 +783,7 @@ export type Database = {
         }
         Update: {
           approved?: boolean | null
+          can_edit_commission?: boolean
           company_code?: string | null
           company_id?: string | null
           created_at?: string | null
@@ -1037,6 +1040,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_edit_commission: { Args: { _user_id: string }; Returns: boolean }
       get_current_user_role: {
         Args: never
         Returns: Database["public"]["Enums"]["app_role"]
