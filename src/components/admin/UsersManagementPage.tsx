@@ -159,6 +159,24 @@ export default function UsersManagementPage() {
     }
   };
 
+  const toggleCommissionAccess = async (userId: string, value: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ can_edit_commission: value })
+        .eq('id', userId);
+      if (error) throw error;
+      setUsers(users.map(u => u.id === userId ? { ...u, can_edit_commission: value } : u));
+      toast({
+        title: "Success",
+        description: value ? "User can now edit commissions." : "Commission editing access revoked.",
+      });
+    } catch (error: any) {
+      console.error("Failed to update commission access:", error);
+      toast({ title: "Error", description: "Failed to update commission access.", variant: "destructive" });
+    }
+  };
+
   const filteredUsers = users.filter(user => 
     user.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
