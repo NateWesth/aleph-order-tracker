@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { User, Shield, Search, Check, X, Clock, UserCog } from "lucide-react";
+import { User, Shield, Search, Check, X, Clock, UserCog, Percent } from "lucide-react";
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
 
 interface UserProfile {
@@ -25,6 +25,7 @@ interface UserProfile {
   company_id: string;
   created_at: string;
   approved: boolean;
+  can_edit_commission?: boolean;
   role?: 'admin' | 'user';
   company_name?: string;
 }
