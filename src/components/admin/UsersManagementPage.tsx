@@ -374,6 +374,17 @@ export default function UsersManagementPage() {
                         <Button
                           size="sm"
                           variant="outline"
+                          onClick={() => toggleCommissionAccess(user.id, !user.can_edit_commission)}
+                          className={user.can_edit_commission
+                            ? "text-green-700 border-green-600 hover:bg-green-50 dark:hover:bg-green-900/20"
+                            : "text-muted-foreground border-muted-foreground/40 hover:bg-accent"}
+                        >
+                          <Percent className="h-4 w-4 mr-1" />
+                          {user.can_edit_commission ? 'Revoke Commission' : 'Allow Commission'}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
                           onClick={() => approveUser(user.id, false)}
                           className="text-destructive border-destructive hover:bg-destructive/10"
                         >
