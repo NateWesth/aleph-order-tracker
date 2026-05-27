@@ -323,17 +323,25 @@ export default function UsersManagementPage() {
                       )}
                     </TableCell>
                     <TableCell>
-                      {user.role === 'admin' ? (
-                        <Badge className="bg-primary">
-                          <Shield className="h-3 w-3 mr-1" />
-                          Admin
-                        </Badge>
-                      ) : (
-                        <Badge variant="secondary">
-                          <User className="h-3 w-3 mr-1" />
-                          User
-                        </Badge>
-                      )}
+                      <div className="flex flex-col gap-1 items-start">
+                        {user.role === 'admin' ? (
+                          <Badge className="bg-primary">
+                            <Shield className="h-3 w-3 mr-1" />
+                            Admin
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary">
+                            <User className="h-3 w-3 mr-1" />
+                            User
+                          </Badge>
+                        )}
+                        {user.can_edit_commission && (
+                          <Badge variant="outline" className="border-green-600 text-green-700 dark:text-green-400">
+                            <Percent className="h-3 w-3 mr-1" />
+                            Commission Editor
+                          </Badge>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell>
                       <div className="text-sm">
