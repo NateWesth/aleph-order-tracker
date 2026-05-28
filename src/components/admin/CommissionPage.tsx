@@ -1149,6 +1149,7 @@ const CommissionPage = () => {
                                                         <input
                                                           type="number" step="0.01" disabled={editDisabled}
                                                           defaultValue={li.sub_total ?? ""}
+                                                          onChange={handleChange("sub_total", li.sub_total)}
                                                           onBlur={handleBlur("sub_total", li.sub_total)}
                                                           className={cellInputClass}
                                                           title="Line sub-total (excl. VAT). Override only — leave blank to auto-calc from sell × qty."
