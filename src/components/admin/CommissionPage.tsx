@@ -1119,6 +1119,7 @@ const CommissionPage = () => {
                                                         <input
                                                           type="number" step="0.01" disabled={editDisabled}
                                                           defaultValue={li.rate ?? ""}
+                                                          onChange={handleChange("sell_rate", li.rate)}
                                                           onBlur={handleBlur("sell_rate", li.rate)}
                                                           className={cellInputClass}
                                                           title="Sell rate (per unit, excl. VAT)"
