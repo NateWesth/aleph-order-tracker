@@ -130,6 +130,28 @@ const CommissionPage = () => {
   const [expandedReps, setExpandedReps] = useState<Set<string>>(new Set());
   const [expandedInvoices, setExpandedInvoices] = useState<Set<string>>(new Set());
   const reportRequestRef = useRef<string | null>(null);
+  const saveTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const pendingSavesRef = useRef<Map<string, () => Promise<void> | void>>(new Map());
+
+  // Flush any pending debounced overrides on unmount / page hide so values
+  // are not lost if the user closes the tab while still focused in a cell.
+  useEffect(() => {
+    const flushAll = () => {
+      saveTimersRef.current.forEach((t) => clearTimeout(t));
+      saveTimersRef.current.clear();
+      const pending = Array.from(pendingSavesRef.current.values());
+      pendingSavesRef.current.clear();
+      pending.forEach((fn) => { try { fn(); } catch {} });
+    };
+    const onHide = () => { if (document.visibilityState === "hidden") flushAll(); };
+    window.addEventListener("pagehide", flushAll);
+    document.addEventListener("visibilitychange", onHide);
+    return () => {
+      window.removeEventListener("pagehide", flushAll);
+      document.removeEventListener("visibilitychange", onHide);
+      flushAll();
+    };
+  }, []);
 
   const fetchData = useCallback(async () => {
     setLoadingReps(true);
@@ -1055,10 +1077,36 @@ const CommissionPage = () => {
                                                     field: "sell_rate" | "cost" | "sub_total" | "commission_rate" | "commission",
                                                     original: number | null,
                                                   ) => (e: FocusEvent<HTMLInputElement>) => {
+                                                    const key = `${d.rep_id}|${inv.invoice_id}|${j}|${field}`;
+                                                    const t = saveTimersRef.current.get(key);
+                                                    if (t) { clearTimeout(t); saveTimersRef.current.delete(key); }
+                                                    pendingSavesRef.current.delete(key);
                                                     const newVal = e.target.value.trim();
                                                     const orig = original == null ? "" : String(original);
                                                     if (newVal === orig) return;
                                                     saveLineOverride(d.rep_id, inv.invoice_id, j, field, newVal);
+                                                  };
+                                                  const handleChange = (
+                                                    field: "sell_rate" | "cost" | "sub_total" | "commission_rate" | "commission",
+                                                    original: number | null,
+                                                  ) => (e: React.ChangeEvent<HTMLInputElement>) => {
+                                                    const key = `${d.rep_id}|${inv.invoice_id}|${j}|${field}`;
+                                                    const newVal = e.target.value.trim();
+                                                    const orig = original == null ? "" : String(original);
+                                                    const existing = saveTimersRef.current.get(key);
+                                                    if (existing) clearTimeout(existing);
+                                                    if (newVal === orig) {
+                                                      saveTimersRef.current.delete(key);
+                                                      pendingSavesRef.current.delete(key);
+                                                      return;
+                                                    }
+                                                    const run = () => {
+                                                      saveTimersRef.current.delete(key);
+                                                      pendingSavesRef.current.delete(key);
+                                                      saveLineOverride(d.rep_id, inv.invoice_id, j, field, newVal);
+                                                    };
+                                                    pendingSavesRef.current.set(key, run);
+                                                    saveTimersRef.current.set(key, setTimeout(run, 700));
                                                   };
                                                   return (
                                                     <tr key={j} className="border-t border-border/40">
@@ -1071,6 +1119,7 @@ const CommissionPage = () => {
                                                         <input
                                                           type="number" step="0.01" disabled={editDisabled}
                                                           defaultValue={li.rate ?? ""}
+                                                          onChange={handleChange("sell_rate", li.rate)}
                                                           onBlur={handleBlur("sell_rate", li.rate)}
                                                           className={cellInputClass}
                                                           title="Sell rate (per unit, excl. VAT)"
@@ -1081,6 +1130,7 @@ const CommissionPage = () => {
                                                           type="number" step="0.01" disabled={editDisabled}
                                                           defaultValue={li.cost ?? ""}
                                                           placeholder="—"
+                                                          onChange={handleChange("cost", li.cost)}
                                                           onBlur={handleBlur("cost", li.cost)}
                                                           className={cellInputClass}
                                                           title="Cost (per unit). Leave blank to clear override."
@@ -1099,6 +1149,7 @@ const CommissionPage = () => {
                                                         <input
                                                           type="number" step="0.01" disabled={editDisabled}
                                                           defaultValue={li.sub_total ?? ""}
+                                                          onChange={handleChange("sub_total", li.sub_total)}
                                                           onBlur={handleBlur("sub_total", li.sub_total)}
                                                           className={cellInputClass}
                                                           title="Line sub-total (excl. VAT). Override only — leave blank to auto-calc from sell × qty."
@@ -1108,6 +1159,7 @@ const CommissionPage = () => {
                                                         <input
                                                           type="number" step="0.01" disabled={editDisabled}
                                                           defaultValue={li.commission_rate ?? ""}
+                                                          onChange={handleChange("commission_rate", li.commission_rate)}
                                                           onBlur={handleBlur("commission_rate", li.commission_rate)}
                                                           className={cellInputClass + " text-foreground"}
                                                           title="Commission % for this line"
@@ -1117,6 +1169,7 @@ const CommissionPage = () => {
                                                         <input
                                                           type="number" step="0.01" disabled={editDisabled}
                                                           defaultValue={li.commission ?? ""}
+                                                          onChange={handleChange("commission", li.commission)}
                                                           onBlur={handleBlur("commission", li.commission)}
                                                           className={cellInputClass + " text-primary font-medium"}
                                                           title="Commission amount. Override only — leave blank to auto-calc."
