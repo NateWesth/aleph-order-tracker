@@ -130,6 +130,28 @@ const CommissionPage = () => {
   const [expandedReps, setExpandedReps] = useState<Set<string>>(new Set());
   const [expandedInvoices, setExpandedInvoices] = useState<Set<string>>(new Set());
   const reportRequestRef = useRef<string | null>(null);
+  const saveTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const pendingSavesRef = useRef<Map<string, () => Promise<void> | void>>(new Map());
+
+  // Flush any pending debounced overrides on unmount / page hide so values
+  // are not lost if the user closes the tab while still focused in a cell.
+  useEffect(() => {
+    const flushAll = () => {
+      saveTimersRef.current.forEach((t) => clearTimeout(t));
+      saveTimersRef.current.clear();
+      const pending = Array.from(pendingSavesRef.current.values());
+      pendingSavesRef.current.clear();
+      pending.forEach((fn) => { try { fn(); } catch {} });
+    };
+    const onHide = () => { if (document.visibilityState === "hidden") flushAll(); };
+    window.addEventListener("pagehide", flushAll);
+    document.addEventListener("visibilitychange", onHide);
+    return () => {
+      window.removeEventListener("pagehide", flushAll);
+      document.removeEventListener("visibilitychange", onHide);
+      flushAll();
+    };
+  }, []);
 
   const fetchData = useCallback(async () => {
     setLoadingReps(true);
