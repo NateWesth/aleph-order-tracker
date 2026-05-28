@@ -1159,6 +1159,7 @@ const CommissionPage = () => {
                                                         <input
                                                           type="number" step="0.01" disabled={editDisabled}
                                                           defaultValue={li.commission_rate ?? ""}
+                                                          onChange={handleChange("commission_rate", li.commission_rate)}
                                                           onBlur={handleBlur("commission_rate", li.commission_rate)}
                                                           className={cellInputClass + " text-foreground"}
                                                           title="Commission % for this line"
