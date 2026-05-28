@@ -1169,6 +1169,7 @@ const CommissionPage = () => {
                                                         <input
                                                           type="number" step="0.01" disabled={editDisabled}
                                                           defaultValue={li.commission ?? ""}
+                                                          onChange={handleChange("commission", li.commission)}
                                                           onBlur={handleBlur("commission", li.commission)}
                                                           className={cellInputClass + " text-primary font-medium"}
                                                           title="Commission amount. Override only — leave blank to auto-calc."
