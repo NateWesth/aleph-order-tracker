@@ -1077,10 +1077,36 @@ const CommissionPage = () => {
                                                     field: "sell_rate" | "cost" | "sub_total" | "commission_rate" | "commission",
                                                     original: number | null,
                                                   ) => (e: FocusEvent<HTMLInputElement>) => {
+                                                    const key = `${d.rep_id}|${inv.invoice_id}|${j}|${field}`;
+                                                    const t = saveTimersRef.current.get(key);
+                                                    if (t) { clearTimeout(t); saveTimersRef.current.delete(key); }
+                                                    pendingSavesRef.current.delete(key);
                                                     const newVal = e.target.value.trim();
                                                     const orig = original == null ? "" : String(original);
                                                     if (newVal === orig) return;
                                                     saveLineOverride(d.rep_id, inv.invoice_id, j, field, newVal);
+                                                  };
+                                                  const handleChange = (
+                                                    field: "sell_rate" | "cost" | "sub_total" | "commission_rate" | "commission",
+                                                    original: number | null,
+                                                  ) => (e: React.ChangeEvent<HTMLInputElement>) => {
+                                                    const key = `${d.rep_id}|${inv.invoice_id}|${j}|${field}`;
+                                                    const newVal = e.target.value.trim();
+                                                    const orig = original == null ? "" : String(original);
+                                                    const existing = saveTimersRef.current.get(key);
+                                                    if (existing) clearTimeout(existing);
+                                                    if (newVal === orig) {
+                                                      saveTimersRef.current.delete(key);
+                                                      pendingSavesRef.current.delete(key);
+                                                      return;
+                                                    }
+                                                    const run = () => {
+                                                      saveTimersRef.current.delete(key);
+                                                      pendingSavesRef.current.delete(key);
+                                                      saveLineOverride(d.rep_id, inv.invoice_id, j, field, newVal);
+                                                    };
+                                                    pendingSavesRef.current.set(key, run);
+                                                    saveTimersRef.current.set(key, setTimeout(run, 700));
                                                   };
                                                   return (
                                                     <tr key={j} className="border-t border-border/40">
