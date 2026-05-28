@@ -1130,6 +1130,7 @@ const CommissionPage = () => {
                                                           type="number" step="0.01" disabled={editDisabled}
                                                           defaultValue={li.cost ?? ""}
                                                           placeholder="—"
+                                                          onChange={handleChange("cost", li.cost)}
                                                           onBlur={handleBlur("cost", li.cost)}
                                                           className={cellInputClass}
                                                           title="Cost (per unit). Leave blank to clear override."
