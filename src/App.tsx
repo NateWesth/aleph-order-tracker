@@ -9,6 +9,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { FloatingUploadButton } from './components/FloatingUploadButton';
 import { PWAInstallPrompt } from './components/PWAInstallPrompt';
 import { PWAUpdatePrompt } from './components/PWAUpdatePrompt';
+import { NetworkStatusIndicator } from './components/ui/NetworkStatusIndicator';
 import AdminDashboard from './pages/AdminDashboard';
 
 // Lazy load heavy components for better Speed Index
@@ -25,6 +26,14 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 5 * 60 * 1000,
+      gcTime: 30 * 60 * 1000,
+      retry: 1,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: true,
+      networkMode: 'offlineFirst',
+    },
+    mutations: {
+      networkMode: 'offlineFirst',
       retry: 1,
     },
   },
@@ -88,6 +97,7 @@ function App() {
               <FloatingUploadButton />
               <PWAInstallPrompt />
               <PWAUpdatePrompt />
+              <NetworkStatusIndicator />
               <Toaster />
             </div>
           </Router>
