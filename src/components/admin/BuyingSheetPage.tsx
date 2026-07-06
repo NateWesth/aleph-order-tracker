@@ -1353,6 +1353,7 @@ export default function BuyingSheetPage() {
                 <Button variant={showSupplierChart ? "default" : "outline"} size="sm" onClick={() => setShowSupplierChart(!showSupplierChart)} className="h-7 text-xs gap-1.5"><PieChart className="h-3 w-3" />Chart</Button>
                 <Button variant="outline" size="sm" onClick={handleCopySupplierEmails} className="h-7 text-xs gap-1.5"><Mail className="h-3 w-3" />Emails</Button>
                 <Button variant="outline" size="sm" onClick={handleBatchEmailAllSuppliers} className="h-7 text-xs gap-1.5"><Send className="h-3 w-3" />All Drafts</Button>
+                <Button variant="outline" size="sm" onClick={selectAllNeedingOrder} className="h-7 text-xs gap-1.5"><CheckSquare className="h-3 w-3" />Select Needing Order</Button>
                 {coverageGaps.length > 0 && (
                   <Tooltip><TooltipTrigger asChild>
                     <Badge variant="destructive" className="text-xs gap-1 cursor-help"><AlertTriangle className="h-3 w-3" />{coverageGaps.length} no supplier</Badge>
