@@ -63,6 +63,9 @@ export default function BuyingSheetPage() {
   const [emailDraftOpen, setEmailDraftOpen] = useState(false);
   const [emailDraftSupplier, setEmailDraftSupplier] = useState<string | null>(null);
   const [emailDraftBody, setEmailDraftBody] = useState("");
+  const [emailDraftSubject, setEmailDraftSubject] = useState("");
+  const [collapsedSuppliers, setCollapsedSuppliers] = useState<Set<string>>(new Set());
+  const lastSelectedSkuRef = useRef<string | null>(null);
   const [snapshotSaved, setSnapshotSaved] = useState(false);
   const [showSnapshot, setShowSnapshot] = useState(false);
   const [snapshotData, setSnapshotData] = useState<{ date: string; rows: { sku: string; toOrder: number }[] } | null>(null);
@@ -633,6 +636,7 @@ export default function BuyingSheetPage() {
     const urgentItems = items.filter(r => r.hasUrgent);
     const urgentNote = urgentItems.length > 0 ? `\n⚠️ URGENT: ${urgentItems.map(r => r.sku).join(", ")} — Please prioritize these items.\n` : "";
     setEmailDraftBody(`Dear ${supplierName},\n\nPlease find below our purchase order requirements:\n${urgentNote}\n${itemLines}\n\nTotal items: ${items.length}\nTotal quantity (incl. safety stock): ${totalQty}\n\nPlease confirm availability and expected delivery date.\n\nKind regards`);
+    setEmailDraftSubject(`Purchase Order — ${supplierName} — ${new Date().toLocaleDateString()} (${items.length} items${urgentItems.length > 0 ? ", URGENT" : ""})`);
     setEmailDraftSupplier(supplierName);
     setEmailDraftOpen(true);
   };
@@ -818,14 +822,60 @@ export default function BuyingSheetPage() {
   const totalSafetyBuffer = useMemo(() => filteredRows.reduce((s, r) => s + r.safetyStock, 0), [filteredRows]);
 
   // ── Inline Helpers ────────────────────────────────────────────────────
-  const toggleSelect = (sku: string) => setSelectedSkus(prev => { const next = new Set(prev); if (next.has(sku)) next.delete(sku); else next.add(sku); return next; });
+  const toggleSelect = (sku: string, shiftKey = false) => setSelectedSkus(prev => {
+    const next = new Set(prev);
+    // Shift-click: select range between last selected and current
+    if (shiftKey && lastSelectedSkuRef.current && lastSelectedSkuRef.current !== sku) {
+      const skus = sortedRows.map(r => r.sku);
+      const a = skus.indexOf(lastSelectedSkuRef.current);
+      const b = skus.indexOf(sku);
+      if (a >= 0 && b >= 0) {
+        const [start, end] = a < b ? [a, b] : [b, a];
+        for (let i = start; i <= end; i++) next.add(skus[i]);
+        lastSelectedSkuRef.current = sku;
+        return next;
+      }
+    }
+    if (next.has(sku)) next.delete(sku); else next.add(sku);
+    lastSelectedSkuRef.current = sku;
+    return next;
+  });
   const toggleSelectAll = () => setSelectedSkus(selectedSkus.size === sortedRows.length ? new Set() : new Set(sortedRows.map(r => r.sku)));
+  const selectAllNeedingOrder = () => setSelectedSkus(new Set(sortedRows.filter(r => r.toOrder > 0).map(r => r.sku)));
+  const fillRecommendedForSelected = () => {
+    const target = sortedRows.filter(r => selectedSkus.has(r.sku));
+    if (target.length === 0) return;
+    setAdjustedQtys(prev => {
+      const next = { ...prev };
+      target.forEach(r => { next[r.sku] = r.recommendedOrderQty; });
+      return next;
+    });
+    toast({ title: "Filled", description: `Recommended qty applied to ${target.length} item${target.length !== 1 ? "s" : ""}` });
+  };
+  const toggleSupplierCollapse = (supplier: string) => setCollapsedSuppliers(prev => {
+    const next = new Set(prev);
+    if (next.has(supplier)) next.delete(supplier); else next.add(supplier);
+    return next;
+  });
   const toggleExpand = (sku: string) => setExpandedSkus(prev => { const next = new Set(prev); if (next.has(sku)) next.delete(sku); else next.add(sku); return next; });
   const togglePin = (sku: string) => {
     const updated = pinnedSkus.includes(sku) ? pinnedSkus.filter(s => s !== sku) : [...pinnedSkus, sku];
     setPinnedSkus(updated); savePinned(updated);
     toast({ title: pinnedSkus.includes(sku) ? "Unpinned" : "Pinned", description: `${sku} ${pinnedSkus.includes(sku) ? "removed from" : "pinned to"} top` });
   };
+
+  // Selection totals (running summary for sticky action bar)
+  const selectionTotals = useMemo(() => {
+    const sel = sortedRows.filter(r => selectedSkus.has(r.sku));
+    const suppliers = new Set(sel.map(r => r.supplierName));
+    return {
+      count: sel.length,
+      qty: sel.reduce((s, r) => s + (adjustedQtys[r.sku] ?? r.recommendedOrderQty), 0),
+      cost: sel.reduce((s, r) => s + (r.estimatedCost || 0), 0),
+      suppliers: suppliers.size,
+      urgent: sel.filter(r => r.hasUrgent).length,
+    };
+  }, [sortedRows, selectedSkus, adjustedQtys]);
 
   const getWaitHeatColor = (days: number) => {
     if (days > 14) return "bg-destructive/10";
@@ -965,7 +1015,7 @@ export default function BuyingSheetPage() {
         <TableRow className={`cursor-pointer transition-colors ${getWaitHeatColor(row.daysWaiting)} ${row.toOrder > 0 ? "" : "opacity-60"} ${selectedSkus.has(row.sku) ? "bg-primary/5" : ""} ${row.hasUrgent ? "border-l-2 border-l-destructive" : ""} ${isExpanded ? "bg-muted/20" : ""} ${isPinned ? "border-l-2 border-l-primary bg-primary/[0.02]" : ""}`}>
           <TableCell className={`w-8 ${densityPy}`} onClick={e => e.stopPropagation()}>
             <div className="flex items-center gap-0.5">
-              <Checkbox checked={selectedSkus.has(row.sku)} onCheckedChange={() => toggleSelect(row.sku)} />
+              <span onClick={(e) => { e.stopPropagation(); toggleSelect(row.sku, e.shiftKey); }} className="inline-flex"><Checkbox checked={selectedSkus.has(row.sku)} /></span>
               <button onClick={() => togglePin(row.sku)} className={`p-0.5 rounded hover:bg-muted transition-colors ${isPinned ? "text-primary" : "text-muted-foreground/20 hover:text-muted-foreground"}`}>
                 {isPinned ? <Pin className="h-3 w-3" /> : <PinOff className="h-3 w-3" />}
               </button>
@@ -1268,8 +1318,17 @@ export default function BuyingSheetPage() {
         {selectedSkus.size > 0 && viewMode === "table" && (
           <div className="sticky bottom-0 z-20 bg-background/95 backdrop-blur-sm border-t border-border -mx-1 px-1 pt-2 pb-1">
             <div className="flex items-center gap-2 p-2.5 rounded-lg bg-primary/10 border border-primary/20 flex-wrap">
-              <span className="text-sm font-medium text-foreground">{selectedSkus.size} selected</span>
+              <div className="flex items-center gap-3 flex-wrap">
+                <span className="text-sm font-semibold text-foreground">{selectionTotals.count} selected</span>
+                <span className="text-xs text-muted-foreground">Qty <strong className="text-foreground">{selectionTotals.qty.toLocaleString()}</strong></span>
+                {selectionTotals.cost > 0 && <span className="text-xs text-muted-foreground">Est. <strong className="text-foreground">R{selectionTotals.cost.toLocaleString()}</strong></span>}
+                <span className="text-xs text-muted-foreground">{selectionTotals.suppliers} supplier{selectionTotals.suppliers !== 1 ? "s" : ""}</span>
+                {selectionTotals.urgent > 0 && <Badge variant="destructive" className="text-[10px] h-4 gap-0.5"><Flame className="h-2.5 w-2.5" />{selectionTotals.urgent} urgent</Badge>}
+              </div>
               <div className="flex items-center gap-1.5 ml-auto flex-wrap">
+                <Tooltip><TooltipTrigger asChild>
+                  <Button variant="outline" size="sm" onClick={fillRecommendedForSelected} className="h-7 text-xs gap-1"><Sparkles className="h-3 w-3" />Fill Recommended</Button>
+                </TooltipTrigger><TooltipContent><p className="text-xs">Set order qty to the recommended value (incl. safety stock) for all selected items</p></TooltipContent></Tooltip>
                 <Button variant="outline" size="sm" onClick={handleExportCSV} className="h-7 text-xs gap-1"><Download className="h-3 w-3" />Export</Button>
                 <Button variant="outline" size="sm" onClick={handleCopySelectedPOLines} className="h-7 text-xs gap-1"><ClipboardCopy className="h-3 w-3" />PO Lines</Button>
                 <Button variant="outline" size="sm" onClick={handleCopySupplierEmails} className="h-7 text-xs gap-1"><Mail className="h-3 w-3" />Emails</Button>
@@ -1283,6 +1342,7 @@ export default function BuyingSheetPage() {
           </div>
         )}
 
+
         {/* View Mode Content */}
         {viewMode === "table" && (
           <>
@@ -1293,6 +1353,7 @@ export default function BuyingSheetPage() {
                 <Button variant={showSupplierChart ? "default" : "outline"} size="sm" onClick={() => setShowSupplierChart(!showSupplierChart)} className="h-7 text-xs gap-1.5"><PieChart className="h-3 w-3" />Chart</Button>
                 <Button variant="outline" size="sm" onClick={handleCopySupplierEmails} className="h-7 text-xs gap-1.5"><Mail className="h-3 w-3" />Emails</Button>
                 <Button variant="outline" size="sm" onClick={handleBatchEmailAllSuppliers} className="h-7 text-xs gap-1.5"><Send className="h-3 w-3" />All Drafts</Button>
+                <Button variant="outline" size="sm" onClick={selectAllNeedingOrder} className="h-7 text-xs gap-1.5"><CheckSquare className="h-3 w-3" />Select Needing Order</Button>
                 {coverageGaps.length > 0 && (
                   <Tooltip><TooltipTrigger asChild>
                     <Badge variant="destructive" className="text-xs gap-1 cursor-help"><AlertTriangle className="h-3 w-3" />{coverageGaps.length} no supplier</Badge>
@@ -1310,6 +1371,7 @@ export default function BuyingSheetPage() {
                 <span><kbd className="px-1 py-0.5 rounded bg-muted text-[10px]">P</kbd> Density</span>
                 {pinnedSkus.length > 0 && <span className="flex items-center gap-0.5"><Pin className="h-2.5 w-2.5" />{pinnedSkus.length} pinned</span>}
                 <span>Click row to expand</span>
+                <span><kbd className="px-1 py-0.5 rounded bg-muted text-[10px]">Shift+Click</kbd> Range select</span>
               </div>
             </div>
 
@@ -1340,28 +1402,47 @@ export default function BuyingSheetPage() {
                       {sortedRows.length === 0 ? (
                         <TableRow><TableCell colSpan={15} className="text-center py-8 text-muted-foreground">{showOnlyNeedOrder ? "All items are covered by stock and POs! 🎉" : "No items found"}</TableCell></TableRow>
                       ) : groupedRows ? (
-                        groupedRows.map(([supplier, items]) => (
-                          <Fragment key={`group-${supplier}`}>
-                            <TableRow className="bg-muted/50 hover:bg-muted/70">
-                              <TableCell colSpan={15}>
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-2">
-                                    <Users className="h-4 w-4 text-primary" />
-                                    <span className="font-semibold text-foreground">{supplier}</span>
-                                    <Badge variant="secondary" className="text-xs">{items.length}</Badge>
-                                    {items[0]?.supplierEmail && <span className="text-xs text-muted-foreground">({items[0].supplierEmail})</span>}
+                        groupedRows.map(([supplier, items]) => {
+                          const isCollapsed = collapsedSuppliers.has(supplier);
+                          const supTotalQty = items.reduce((s, r) => s + r.toOrder, 0);
+                          const supTotalRec = items.reduce((s, r) => s + r.recommendedOrderQty, 0);
+                          const supTotalCost = items.reduce((s, r) => s + (r.estimatedCost || 0), 0);
+                          const supUrgent = items.filter(r => r.hasUrgent).length;
+                          const allSelected = items.every(r => selectedSkus.has(r.sku));
+                          const someSelected = items.some(r => selectedSkus.has(r.sku));
+                          return (
+                            <Fragment key={`group-${supplier}`}>
+                              <TableRow className="bg-muted/50 hover:bg-muted/70 border-t-2 border-border/60">
+                                <TableCell colSpan={15}>
+                                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                                    <div className="flex items-center gap-2">
+                                      <span onClick={(e) => { e.stopPropagation(); setSelectedSkus(prev => { const next = new Set(prev); if (allSelected) items.forEach(r => next.delete(r.sku)); else items.forEach(r => next.add(r.sku)); return next; }); }} className="inline-flex">
+                                        <Checkbox checked={allSelected} data-state={someSelected && !allSelected ? "indeterminate" : allSelected ? "checked" : "unchecked"} />
+                                      </span>
+                                      <button onClick={() => toggleSupplierCollapse(supplier)} className="p-0.5 rounded hover:bg-background/60">
+                                        {isCollapsed ? <ChevronRight className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+                                      </button>
+                                      <Users className="h-4 w-4 text-primary" />
+                                      <span className="font-semibold text-foreground">{supplier}</span>
+                                      <Badge variant="secondary" className="text-xs">{items.length} SKU{items.length !== 1 ? "s" : ""}</Badge>
+                                      {supUrgent > 0 && <Badge variant="destructive" className="text-[10px] h-4 gap-0.5"><Flame className="h-2.5 w-2.5" />{supUrgent}</Badge>}
+                                      {items[0]?.supplierEmail && <span className="text-xs text-muted-foreground hidden md:inline">({items[0].supplierEmail})</span>}
+                                    </div>
+                                    <div className="flex items-center gap-3 text-xs">
+                                      <span className="text-muted-foreground">Order: <strong className="text-primary">{supTotalQty.toLocaleString()}</strong></span>
+                                      {supTotalRec !== supTotalQty && <span className="text-muted-foreground">Rec: <strong className="text-foreground">{supTotalRec.toLocaleString()}</strong></span>}
+                                      {supTotalCost > 0 && <span className="text-muted-foreground">Est: <strong className="text-foreground">R{supTotalCost.toLocaleString()}</strong></span>}
+                                      <Button variant="ghost" size="sm" className="h-6 text-xs gap-1" onClick={() => generateEmailDraft(supplier)}><Send className="h-3 w-3" />Email</Button>
+                                    </div>
                                   </div>
-                                  <div className="flex items-center gap-2 text-sm">
-                                    <Button variant="ghost" size="sm" className="h-6 text-xs gap-1" onClick={() => generateEmailDraft(supplier)}><Send className="h-3 w-3" />Email</Button>
-                                    <span className="text-muted-foreground">To Order: <strong className="text-primary">{items.reduce((s, r) => s + r.toOrder, 0)}</strong></span>
-                                  </div>
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                            {items.map(renderRow)}
-                          </Fragment>
-                        ))
+                                </TableCell>
+                              </TableRow>
+                              {!isCollapsed && items.map(renderRow)}
+                            </Fragment>
+                          );
+                        })
                       ) : sortedRows.map(renderRow)}
+
                       {/* Stats Footer Row */}
                       {sortedRows.length > 0 && (
                         <TableRow className="bg-muted/60 font-semibold border-t-2 border-border">
@@ -1406,16 +1487,32 @@ export default function BuyingSheetPage() {
         <Dialog open={emailDraftOpen} onOpenChange={setEmailDraftOpen}>
           <DialogContent className="max-w-lg">
             <DialogHeader><DialogTitle className="flex items-center gap-2"><Send className="h-4 w-4 text-primary" />Email Draft — {emailDraftSupplier}</DialogTitle></DialogHeader>
-            <Textarea value={emailDraftBody} onChange={e => setEmailDraftBody(e.target.value)} className="min-h-[250px] font-mono text-sm" />
+            <div className="space-y-2">
+              {(() => {
+                const s = sortedRows.find(r => r.supplierName === emailDraftSupplier && r.supplierEmail);
+                return (
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="text-muted-foreground w-14 shrink-0">To:</span>
+                    <Input readOnly value={s?.supplierEmail || "(no email on file)"} className="h-8 text-xs" />
+                  </div>
+                );
+              })()}
+              <div className="flex items-center gap-2 text-xs">
+                <span className="text-muted-foreground w-14 shrink-0">Subject:</span>
+                <Input value={emailDraftSubject} onChange={e => setEmailDraftSubject(e.target.value)} className="h-8 text-xs" />
+              </div>
+              <Textarea value={emailDraftBody} onChange={e => setEmailDraftBody(e.target.value)} className="min-h-[250px] font-mono text-sm" />
+            </div>
             <DialogFooter className="gap-2">
-              <Button variant="outline" onClick={() => { navigator.clipboard.writeText(emailDraftBody); toast({ title: "Copied", description: "Email draft copied" }); }}><Copy className="h-4 w-4 mr-2" />Copy</Button>
+              <Button variant="outline" onClick={() => { navigator.clipboard.writeText(`Subject: ${emailDraftSubject}\n\n${emailDraftBody}`); toast({ title: "Copied", description: "Email draft copied" }); }}><Copy className="h-4 w-4 mr-2" />Copy</Button>
               <Button onClick={() => {
                 const s = sortedRows.find(r => r.supplierName === emailDraftSupplier && r.supplierEmail);
-                window.open(`mailto:${s?.supplierEmail || ""}?subject=${encodeURIComponent(`Purchase Order — ${emailDraftSupplier}`)}&body=${encodeURIComponent(emailDraftBody)}`, "_blank");
+                window.open(`mailto:${s?.supplierEmail || ""}?subject=${encodeURIComponent(emailDraftSubject || `Purchase Order — ${emailDraftSupplier}`)}&body=${encodeURIComponent(emailDraftBody)}`, "_blank");
               }}><Mail className="h-4 w-4 mr-2" />Open in Email</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
       </div>
     </TooltipProvider>
   );
