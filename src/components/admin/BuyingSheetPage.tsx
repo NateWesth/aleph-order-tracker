@@ -1485,16 +1485,32 @@ export default function BuyingSheetPage() {
         <Dialog open={emailDraftOpen} onOpenChange={setEmailDraftOpen}>
           <DialogContent className="max-w-lg">
             <DialogHeader><DialogTitle className="flex items-center gap-2"><Send className="h-4 w-4 text-primary" />Email Draft — {emailDraftSupplier}</DialogTitle></DialogHeader>
-            <Textarea value={emailDraftBody} onChange={e => setEmailDraftBody(e.target.value)} className="min-h-[250px] font-mono text-sm" />
+            <div className="space-y-2">
+              {(() => {
+                const s = sortedRows.find(r => r.supplierName === emailDraftSupplier && r.supplierEmail);
+                return (
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="text-muted-foreground w-14 shrink-0">To:</span>
+                    <Input readOnly value={s?.supplierEmail || "(no email on file)"} className="h-8 text-xs" />
+                  </div>
+                );
+              })()}
+              <div className="flex items-center gap-2 text-xs">
+                <span className="text-muted-foreground w-14 shrink-0">Subject:</span>
+                <Input value={emailDraftSubject} onChange={e => setEmailDraftSubject(e.target.value)} className="h-8 text-xs" />
+              </div>
+              <Textarea value={emailDraftBody} onChange={e => setEmailDraftBody(e.target.value)} className="min-h-[250px] font-mono text-sm" />
+            </div>
             <DialogFooter className="gap-2">
-              <Button variant="outline" onClick={() => { navigator.clipboard.writeText(emailDraftBody); toast({ title: "Copied", description: "Email draft copied" }); }}><Copy className="h-4 w-4 mr-2" />Copy</Button>
+              <Button variant="outline" onClick={() => { navigator.clipboard.writeText(`Subject: ${emailDraftSubject}\n\n${emailDraftBody}`); toast({ title: "Copied", description: "Email draft copied" }); }}><Copy className="h-4 w-4 mr-2" />Copy</Button>
               <Button onClick={() => {
                 const s = sortedRows.find(r => r.supplierName === emailDraftSupplier && r.supplierEmail);
-                window.open(`mailto:${s?.supplierEmail || ""}?subject=${encodeURIComponent(`Purchase Order — ${emailDraftSupplier}`)}&body=${encodeURIComponent(emailDraftBody)}`, "_blank");
+                window.open(`mailto:${s?.supplierEmail || ""}?subject=${encodeURIComponent(emailDraftSubject || `Purchase Order — ${emailDraftSupplier}`)}&body=${encodeURIComponent(emailDraftBody)}`, "_blank");
               }}><Mail className="h-4 w-4 mr-2" />Open in Email</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
       </div>
     </TooltipProvider>
   );
