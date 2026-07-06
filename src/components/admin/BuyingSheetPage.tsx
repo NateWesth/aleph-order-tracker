@@ -1015,7 +1015,7 @@ export default function BuyingSheetPage() {
         <TableRow className={`cursor-pointer transition-colors ${getWaitHeatColor(row.daysWaiting)} ${row.toOrder > 0 ? "" : "opacity-60"} ${selectedSkus.has(row.sku) ? "bg-primary/5" : ""} ${row.hasUrgent ? "border-l-2 border-l-destructive" : ""} ${isExpanded ? "bg-muted/20" : ""} ${isPinned ? "border-l-2 border-l-primary bg-primary/[0.02]" : ""}`}>
           <TableCell className={`w-8 ${densityPy}`} onClick={e => e.stopPropagation()}>
             <div className="flex items-center gap-0.5">
-              <Checkbox checked={selectedSkus.has(row.sku)} onCheckedChange={() => toggleSelect(row.sku)} />
+              <span onClick={(e) => { e.stopPropagation(); toggleSelect(row.sku, e.shiftKey); }} className="inline-flex"><Checkbox checked={selectedSkus.has(row.sku)} /></span>
               <button onClick={() => togglePin(row.sku)} className={`p-0.5 rounded hover:bg-muted transition-colors ${isPinned ? "text-primary" : "text-muted-foreground/20 hover:text-muted-foreground"}`}>
                 {isPinned ? <Pin className="h-3 w-3" /> : <PinOff className="h-3 w-3" />}
               </button>
