@@ -1400,28 +1400,47 @@ export default function BuyingSheetPage() {
                       {sortedRows.length === 0 ? (
                         <TableRow><TableCell colSpan={15} className="text-center py-8 text-muted-foreground">{showOnlyNeedOrder ? "All items are covered by stock and POs! 🎉" : "No items found"}</TableCell></TableRow>
                       ) : groupedRows ? (
-                        groupedRows.map(([supplier, items]) => (
-                          <Fragment key={`group-${supplier}`}>
-                            <TableRow className="bg-muted/50 hover:bg-muted/70">
-                              <TableCell colSpan={15}>
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-2">
-                                    <Users className="h-4 w-4 text-primary" />
-                                    <span className="font-semibold text-foreground">{supplier}</span>
-                                    <Badge variant="secondary" className="text-xs">{items.length}</Badge>
-                                    {items[0]?.supplierEmail && <span className="text-xs text-muted-foreground">({items[0].supplierEmail})</span>}
+                        groupedRows.map(([supplier, items]) => {
+                          const isCollapsed = collapsedSuppliers.has(supplier);
+                          const supTotalQty = items.reduce((s, r) => s + r.toOrder, 0);
+                          const supTotalRec = items.reduce((s, r) => s + r.recommendedOrderQty, 0);
+                          const supTotalCost = items.reduce((s, r) => s + (r.estimatedCost || 0), 0);
+                          const supUrgent = items.filter(r => r.hasUrgent).length;
+                          const allSelected = items.every(r => selectedSkus.has(r.sku));
+                          const someSelected = items.some(r => selectedSkus.has(r.sku));
+                          return (
+                            <Fragment key={`group-${supplier}`}>
+                              <TableRow className="bg-muted/50 hover:bg-muted/70 border-t-2 border-border/60">
+                                <TableCell colSpan={15}>
+                                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                                    <div className="flex items-center gap-2">
+                                      <span onClick={(e) => { e.stopPropagation(); setSelectedSkus(prev => { const next = new Set(prev); if (allSelected) items.forEach(r => next.delete(r.sku)); else items.forEach(r => next.add(r.sku)); return next; }); }} className="inline-flex">
+                                        <Checkbox checked={allSelected} data-state={someSelected && !allSelected ? "indeterminate" : allSelected ? "checked" : "unchecked"} />
+                                      </span>
+                                      <button onClick={() => toggleSupplierCollapse(supplier)} className="p-0.5 rounded hover:bg-background/60">
+                                        {isCollapsed ? <ChevronRight className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+                                      </button>
+                                      <Users className="h-4 w-4 text-primary" />
+                                      <span className="font-semibold text-foreground">{supplier}</span>
+                                      <Badge variant="secondary" className="text-xs">{items.length} SKU{items.length !== 1 ? "s" : ""}</Badge>
+                                      {supUrgent > 0 && <Badge variant="destructive" className="text-[10px] h-4 gap-0.5"><Flame className="h-2.5 w-2.5" />{supUrgent}</Badge>}
+                                      {items[0]?.supplierEmail && <span className="text-xs text-muted-foreground hidden md:inline">({items[0].supplierEmail})</span>}
+                                    </div>
+                                    <div className="flex items-center gap-3 text-xs">
+                                      <span className="text-muted-foreground">Order: <strong className="text-primary">{supTotalQty.toLocaleString()}</strong></span>
+                                      {supTotalRec !== supTotalQty && <span className="text-muted-foreground">Rec: <strong className="text-foreground">{supTotalRec.toLocaleString()}</strong></span>}
+                                      {supTotalCost > 0 && <span className="text-muted-foreground">Est: <strong className="text-foreground">R{supTotalCost.toLocaleString()}</strong></span>}
+                                      <Button variant="ghost" size="sm" className="h-6 text-xs gap-1" onClick={() => generateEmailDraft(supplier)}><Send className="h-3 w-3" />Email</Button>
+                                    </div>
                                   </div>
-                                  <div className="flex items-center gap-2 text-sm">
-                                    <Button variant="ghost" size="sm" className="h-6 text-xs gap-1" onClick={() => generateEmailDraft(supplier)}><Send className="h-3 w-3" />Email</Button>
-                                    <span className="text-muted-foreground">To Order: <strong className="text-primary">{items.reduce((s, r) => s + r.toOrder, 0)}</strong></span>
-                                  </div>
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                            {items.map(renderRow)}
-                          </Fragment>
-                        ))
+                                </TableCell>
+                              </TableRow>
+                              {!isCollapsed && items.map(renderRow)}
+                            </Fragment>
+                          );
+                        })
                       ) : sortedRows.map(renderRow)}
+
                       {/* Stats Footer Row */}
                       {sortedRows.length > 0 && (
                         <TableRow className="bg-muted/60 font-semibold border-t-2 border-border">
