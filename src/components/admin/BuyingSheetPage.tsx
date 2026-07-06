@@ -1371,6 +1371,7 @@ export default function BuyingSheetPage() {
                 <span><kbd className="px-1 py-0.5 rounded bg-muted text-[10px]">P</kbd> Density</span>
                 {pinnedSkus.length > 0 && <span className="flex items-center gap-0.5"><Pin className="h-2.5 w-2.5" />{pinnedSkus.length} pinned</span>}
                 <span>Click row to expand</span>
+                <span><kbd className="px-1 py-0.5 rounded bg-muted text-[10px]">Shift+Click</kbd> Range select</span>
               </div>
             </div>
 
