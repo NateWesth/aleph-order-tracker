@@ -636,6 +636,7 @@ export default function BuyingSheetPage() {
     const urgentItems = items.filter(r => r.hasUrgent);
     const urgentNote = urgentItems.length > 0 ? `\n⚠️ URGENT: ${urgentItems.map(r => r.sku).join(", ")} — Please prioritize these items.\n` : "";
     setEmailDraftBody(`Dear ${supplierName},\n\nPlease find below our purchase order requirements:\n${urgentNote}\n${itemLines}\n\nTotal items: ${items.length}\nTotal quantity (incl. safety stock): ${totalQty}\n\nPlease confirm availability and expected delivery date.\n\nKind regards`);
+    setEmailDraftSubject(`Purchase Order — ${supplierName} — ${new Date().toLocaleDateString()} (${items.length} items${urgentItems.length > 0 ? ", URGENT" : ""})`);
     setEmailDraftSupplier(supplierName);
     setEmailDraftOpen(true);
   };
