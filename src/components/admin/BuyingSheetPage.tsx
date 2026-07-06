@@ -63,6 +63,9 @@ export default function BuyingSheetPage() {
   const [emailDraftOpen, setEmailDraftOpen] = useState(false);
   const [emailDraftSupplier, setEmailDraftSupplier] = useState<string | null>(null);
   const [emailDraftBody, setEmailDraftBody] = useState("");
+  const [emailDraftSubject, setEmailDraftSubject] = useState("");
+  const [collapsedSuppliers, setCollapsedSuppliers] = useState<Set<string>>(new Set());
+  const lastSelectedSkuRef = useRef<string | null>(null);
   const [snapshotSaved, setSnapshotSaved] = useState(false);
   const [showSnapshot, setShowSnapshot] = useState(false);
   const [snapshotData, setSnapshotData] = useState<{ date: string; rows: { sku: string; toOrder: number }[] } | null>(null);
