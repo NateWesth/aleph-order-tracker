@@ -1318,8 +1318,17 @@ export default function BuyingSheetPage() {
         {selectedSkus.size > 0 && viewMode === "table" && (
           <div className="sticky bottom-0 z-20 bg-background/95 backdrop-blur-sm border-t border-border -mx-1 px-1 pt-2 pb-1">
             <div className="flex items-center gap-2 p-2.5 rounded-lg bg-primary/10 border border-primary/20 flex-wrap">
-              <span className="text-sm font-medium text-foreground">{selectedSkus.size} selected</span>
+              <div className="flex items-center gap-3 flex-wrap">
+                <span className="text-sm font-semibold text-foreground">{selectionTotals.count} selected</span>
+                <span className="text-xs text-muted-foreground">Qty <strong className="text-foreground">{selectionTotals.qty.toLocaleString()}</strong></span>
+                {selectionTotals.cost > 0 && <span className="text-xs text-muted-foreground">Est. <strong className="text-foreground">R{selectionTotals.cost.toLocaleString()}</strong></span>}
+                <span className="text-xs text-muted-foreground">{selectionTotals.suppliers} supplier{selectionTotals.suppliers !== 1 ? "s" : ""}</span>
+                {selectionTotals.urgent > 0 && <Badge variant="destructive" className="text-[10px] h-4 gap-0.5"><Flame className="h-2.5 w-2.5" />{selectionTotals.urgent} urgent</Badge>}
+              </div>
               <div className="flex items-center gap-1.5 ml-auto flex-wrap">
+                <Tooltip><TooltipTrigger asChild>
+                  <Button variant="outline" size="sm" onClick={fillRecommendedForSelected} className="h-7 text-xs gap-1"><Sparkles className="h-3 w-3" />Fill Recommended</Button>
+                </TooltipTrigger><TooltipContent><p className="text-xs">Set order qty to the recommended value (incl. safety stock) for all selected items</p></TooltipContent></Tooltip>
                 <Button variant="outline" size="sm" onClick={handleExportCSV} className="h-7 text-xs gap-1"><Download className="h-3 w-3" />Export</Button>
                 <Button variant="outline" size="sm" onClick={handleCopySelectedPOLines} className="h-7 text-xs gap-1"><ClipboardCopy className="h-3 w-3" />PO Lines</Button>
                 <Button variant="outline" size="sm" onClick={handleCopySupplierEmails} className="h-7 text-xs gap-1"><Mail className="h-3 w-3" />Emails</Button>
@@ -1332,6 +1341,7 @@ export default function BuyingSheetPage() {
             </div>
           </div>
         )}
+
 
         {/* View Mode Content */}
         {viewMode === "table" && (
