@@ -822,14 +822,60 @@ export default function BuyingSheetPage() {
   const totalSafetyBuffer = useMemo(() => filteredRows.reduce((s, r) => s + r.safetyStock, 0), [filteredRows]);
 
   // ── Inline Helpers ────────────────────────────────────────────────────
-  const toggleSelect = (sku: string) => setSelectedSkus(prev => { const next = new Set(prev); if (next.has(sku)) next.delete(sku); else next.add(sku); return next; });
+  const toggleSelect = (sku: string, shiftKey = false) => setSelectedSkus(prev => {
+    const next = new Set(prev);
+    // Shift-click: select range between last selected and current
+    if (shiftKey && lastSelectedSkuRef.current && lastSelectedSkuRef.current !== sku) {
+      const skus = sortedRows.map(r => r.sku);
+      const a = skus.indexOf(lastSelectedSkuRef.current);
+      const b = skus.indexOf(sku);
+      if (a >= 0 && b >= 0) {
+        const [start, end] = a < b ? [a, b] : [b, a];
+        for (let i = start; i <= end; i++) next.add(skus[i]);
+        lastSelectedSkuRef.current = sku;
+        return next;
+      }
+    }
+    if (next.has(sku)) next.delete(sku); else next.add(sku);
+    lastSelectedSkuRef.current = sku;
+    return next;
+  });
   const toggleSelectAll = () => setSelectedSkus(selectedSkus.size === sortedRows.length ? new Set() : new Set(sortedRows.map(r => r.sku)));
+  const selectAllNeedingOrder = () => setSelectedSkus(new Set(sortedRows.filter(r => r.toOrder > 0).map(r => r.sku)));
+  const fillRecommendedForSelected = () => {
+    const target = sortedRows.filter(r => selectedSkus.has(r.sku));
+    if (target.length === 0) return;
+    setAdjustedQtys(prev => {
+      const next = { ...prev };
+      target.forEach(r => { next[r.sku] = r.recommendedOrderQty; });
+      return next;
+    });
+    toast({ title: "Filled", description: `Recommended qty applied to ${target.length} item${target.length !== 1 ? "s" : ""}` });
+  };
+  const toggleSupplierCollapse = (supplier: string) => setCollapsedSuppliers(prev => {
+    const next = new Set(prev);
+    if (next.has(supplier)) next.delete(supplier); else next.add(supplier);
+    return next;
+  });
   const toggleExpand = (sku: string) => setExpandedSkus(prev => { const next = new Set(prev); if (next.has(sku)) next.delete(sku); else next.add(sku); return next; });
   const togglePin = (sku: string) => {
     const updated = pinnedSkus.includes(sku) ? pinnedSkus.filter(s => s !== sku) : [...pinnedSkus, sku];
     setPinnedSkus(updated); savePinned(updated);
     toast({ title: pinnedSkus.includes(sku) ? "Unpinned" : "Pinned", description: `${sku} ${pinnedSkus.includes(sku) ? "removed from" : "pinned to"} top` });
   };
+
+  // Selection totals (running summary for sticky action bar)
+  const selectionTotals = useMemo(() => {
+    const sel = sortedRows.filter(r => selectedSkus.has(r.sku));
+    const suppliers = new Set(sel.map(r => r.supplierName));
+    return {
+      count: sel.length,
+      qty: sel.reduce((s, r) => s + (adjustedQtys[r.sku] ?? r.recommendedOrderQty), 0),
+      cost: sel.reduce((s, r) => s + (r.estimatedCost || 0), 0),
+      suppliers: suppliers.size,
+      urgent: sel.filter(r => r.hasUrgent).length,
+    };
+  }, [sortedRows, selectedSkus, adjustedQtys]);
 
   const getWaitHeatColor = (days: number) => {
     if (days > 14) return "bg-destructive/10";
