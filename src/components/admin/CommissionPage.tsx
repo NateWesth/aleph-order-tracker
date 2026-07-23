@@ -797,34 +797,39 @@ const CommissionPage = () => {
             {commissionData && (() => {
               type MissingRow = {
                 rep_name: string; invoice_number: string; customer_name: string;
-                date: string; code: string; name: string; quantity: number; sub_total: number;
+                date: string; code: string; name: string; description: string; quantity: number; sub_total: number;
               };
-              const missing: MissingRow[] = [];
-              for (const rep of commissionData.data) {
-                for (const inv of rep.invoices) {
-                  for (const li of inv.line_items || []) {
-                    if (li.cost == null) {
-                      missing.push({
-                        rep_name: rep.rep_name, invoice_number: inv.invoice_number,
-                        customer_name: inv.customer_name, date: inv.date,
-                        code: li.code || "—", name: li.name || "—",
-                        quantity: li.quantity, sub_total: li.sub_total,
-                      });
-                    }
-                  }
-                }
-              }
-              const bySku = new Map<string, { code: string; name: string; count: number; value: number }>();
+              const unresolved = commissionData.unresolved_cost_items || [];
+              const sigOf = (name: string, desc: string) =>
+                `${(name || "").toLowerCase().trim()}||${(desc || "").toLowerCase().trim()}`;
+              // Build per-line missing list from unresolved_cost_items (has name+description)
+              const missing: MissingRow[] = unresolved.map((u: any) => ({
+                rep_name: "",
+                invoice_number: u.invoice_number || "",
+                customer_name: u.customer_name || "",
+                date: "",
+                code: "",
+                name: u.item_name || "—",
+                description: u.item_description || "",
+                quantity: u.quantity || 0,
+                sub_total: u.sub_total || 0,
+              }));
+              // Group by (name + description) so each unique costable item is one editable row
+              type Group = { name: string; description: string; count: number; value: number; sample: MissingRow };
+              const byKey = new Map<string, Group>();
               for (const m of missing) {
-                const cur = bySku.get(m.code) || { code: m.code, name: m.name, count: 0, value: 0 };
+                const k = sigOf(m.name, m.description);
+                const cur = byKey.get(k) || { name: m.name, description: m.description, count: 0, value: 0, sample: m };
                 cur.count += 1; cur.value += m.sub_total;
-                bySku.set(m.code, cur);
+                byKey.set(k, cur);
               }
-              const skuRows = Array.from(bySku.values()).sort((a, b) => b.value - a.value);
+              const groups = Array.from(byKey.entries())
+                .map(([k, g]) => ({ key: k, ...g }))
+                .sort((a, b) => b.value - a.value);
               const totalValue = missing.reduce((s, m) => s + m.sub_total, 0);
               const downloadMissingCsv = () => {
-                const rows = [["Rep", "Invoice", "Customer", "Date", "SKU", "Item", "Qty", "Sub-total (excl. VAT)"]];
-                for (const m of missing) rows.push([m.rep_name, m.invoice_number, m.customer_name, m.date, m.code, m.name, String(m.quantity), String(m.sub_total)]);
+                const rows = [["Item", "Description", "Occurrences", "Total Value (excl. VAT)"]];
+                for (const g of groups) rows.push([g.name, g.description, String(g.count), String(g.value)]);
                 const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
                 const blob = new Blob([csv], { type: "text/csv" });
                 const url = URL.createObjectURL(blob);
@@ -855,51 +860,21 @@ const CommissionPage = () => {
                     </Button>
                   )}
                   <Dialog open={missingDialogOpen} onOpenChange={setMissingDialogOpen}>
-                    <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+                    <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
                       <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
                           <AlertTriangle className="h-4 w-4 text-amber-500" />
                           Items with Missing Cost
                         </DialogTitle>
                       </DialogHeader>
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between gap-3 flex-wrap">
-                          <Badge variant="outline" className="text-xs">
-                            {missing.length} line{missing.length === 1 ? "" : "s"} · {skuRows.length} unique SKU{skuRows.length === 1 ? "" : "s"} · {formatCurrency(totalValue)}
-                          </Badge>
-                          <Button size="sm" variant="outline" onClick={downloadMissingCsv}>
-                            <Download className="h-4 w-4 mr-1.5" />Export CSV
-                          </Button>
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          These items had no last vendor-bill cost found in Zoho, so commission was set to R 0.00. Add a vendor bill in Zoho with these SKUs to include them.
-                        </p>
-                        <div className="rounded-md border overflow-x-auto">
-                          <table className="w-full text-xs">
-                            <thead className="bg-muted/50">
-                              <tr className="text-left">
-                                <th className="p-2 font-medium">SKU</th>
-                                <th className="p-2 font-medium">Item</th>
-                                <th className="p-2 font-medium text-right">Occurrences</th>
-                                <th className="p-2 font-medium text-right">Total Value (excl. VAT)</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {skuRows.slice(0, 100).map((s) => (
-                                <tr key={s.code} className="border-t">
-                                  <td className="p-2 font-mono">{s.code}</td>
-                                  <td className="p-2">{s.name}</td>
-                                  <td className="p-2 text-right">{s.count}</td>
-                                  <td className="p-2 text-right">{formatCurrency(s.value)}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                        {skuRows.length > 100 && (
-                          <p className="text-xs text-muted-foreground">Showing top 100 SKUs by value. Export CSV for the full list.</p>
-                        )}
-                      </div>
+                      <MissingCostsEditor
+                        groups={groups}
+                        missingCount={missing.length}
+                        totalValue={totalValue}
+                        onExport={downloadMissingCsv}
+                        onSaved={() => fetchCommissionReport(true)}
+                        formatCurrency={formatCurrency}
+                      />
                     </DialogContent>
                   </Dialog>
                 </div>
