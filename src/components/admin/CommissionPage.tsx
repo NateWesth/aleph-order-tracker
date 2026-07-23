@@ -775,6 +775,14 @@ const CommissionPage = () => {
             </div>
           )}
 
+          {commissionData?.unresolved_cost_items && commissionData.unresolved_cost_items.length > 0 && (
+            <UnresolvedCostsPanel
+              items={commissionData.unresolved_cost_items}
+              onSaved={() => fetchCommissionReport(true)}
+            />
+          )}
+
+
           <div className="flex flex-wrap items-center gap-3">
             <Input
               type="month"
