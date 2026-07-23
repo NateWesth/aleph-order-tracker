@@ -318,22 +318,60 @@ Deno.serve(async (req) => {
       relevantInvoices,
     )
 
-    // Build cost map from the LATEST vendor bill line for every available
-    // item identifier on invoice lines. Important: do not keep only item_id —
-    // some Zoho invoice lines and bill lines only line up by SKU/name/code.
-    const skuKeys = new Set<string>()
+    // ---------------------------------------------------------------------
+    // Cost resolution: STRICT name + description match against vendor bills.
+    // The Zoho item list is NOT used — only vendor bill line items count as
+    // authoritative cost, matching exactly on (item name, description).
+    // Admin-entered overrides in commission_item_cost_overrides win over bills
+    // so unresolved items can be fixed manually instead of being silently
+    // skipped.
+    // ---------------------------------------------------------------------
+    const lineCostSignatures = new Set<string>()
+    const signatureSamples = new Map<string, { name: string; description: string; sample_invoice_number?: string; sample_customer?: string }>()
     for (const inv of invoicesWithLines) {
       for (const li of inv.line_items || []) {
-        for (const key of lineItemCostKeys(li)) skuKeys.add(key)
+        const sig = lineCostSignature(li)
+        if (!sig) continue
+        lineCostSignatures.add(sig)
+        if (!signatureSamples.has(sig)) {
+          signatureSamples.set(sig, {
+            name: getLineName(li),
+            description: getLineDescription(li),
+            sample_invoice_number: inv.invoice_number || inv.number || undefined,
+            sample_customer: inv.customer_name || undefined,
+          })
+        }
       }
     }
-    const billCostMap = await fetchCostPricesFromBills(accessToken, orgId, skuKeys, date_end)
-    const itemCostMap = await fetchCostPricesFromItems(accessToken, orgId, skuKeys)
-    const costMap = new Map(billCostMap)
-    for (const [key, value] of itemCostMap) {
-      if (!costMap.has(key)) costMap.set(key, value)
+
+    // 1) Manual admin overrides (highest priority)
+    const { data: costOverrideRows, error: costOverrideError } = await supabase
+      .from('commission_item_cost_overrides')
+      .select('item_name, item_description, cost')
+    if (costOverrideError) {
+      console.warn('Failed to load commission_item_cost_overrides:', costOverrideError.message)
     }
-    console.log(`Resolved Zoho costs for ${costMap.size}/${skuKeys.size} identifiers (${billCostMap.size} from latest bills, ${itemCostMap.size} item fallbacks)`)
+    const overrideCostMap = new Map<string, number>()
+    for (const row of costOverrideRows || []) {
+      const sig = buildCostSignature(row.item_name || '', row.item_description || '')
+      if (!sig) continue
+      const c = Number(row.cost)
+      if (Number.isFinite(c)) overrideCostMap.set(sig, c)
+    }
+
+    // 2) Vendor bill lookup for the remainder
+    const stillNeeded = new Set<string>()
+    for (const sig of lineCostSignatures) {
+      if (!overrideCostMap.has(sig)) stillNeeded.add(sig)
+    }
+    const billCostMap = await fetchCostPricesFromBills(accessToken, orgId, stillNeeded, date_end)
+
+    const costMap = new Map<string, number>()
+    for (const [k, v] of billCostMap) costMap.set(k, v)
+    for (const [k, v] of overrideCostMap) costMap.set(k, v) // overrides win
+
+    console.log(`Resolved ${costMap.size}/${lineCostSignatures.size} item costs (${billCostMap.size} vendor bills, ${overrideCostMap.size} manual overrides)`)
+
 
     // Fetch existing locked payouts for this period so we can flag/skip them.
     // A payout is keyed by (rep_id, invoice_id). Locked invoices are returned
