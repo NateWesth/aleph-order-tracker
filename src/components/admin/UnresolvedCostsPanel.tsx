@@ -24,7 +24,7 @@ interface Props {
 const keyOf = (i: UnresolvedCostItem) =>
   `${i.item_name.toLowerCase().trim()}||${i.item_description.toLowerCase().trim()}`;
 
-const saveCost = async (item: UnresolvedCostItem, cost: number) => {
+export const saveCost = async (item: { item_name: string; item_description: string }, cost: number) => {
   const { error } = await supabase
     .from("commission_item_cost_overrides")
     .upsert(
