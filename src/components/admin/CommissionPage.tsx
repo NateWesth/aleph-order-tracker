@@ -87,6 +87,17 @@ type CommissionRepData = {
   companies: string[];
 };
 
+type UnresolvedCostItem = {
+  item_name: string;
+  item_description: string;
+  invoice_number: string;
+  customer_name: string;
+  quantity: number;
+  sell_rate: number;
+  sub_total: number;
+  occurrences: number;
+};
+
 type CommissionResult = {
   success: boolean;
   data: CommissionRepData[];
@@ -100,7 +111,9 @@ type CommissionResult = {
   refreshed_at?: string;
   stale_due_to_rate_limit?: boolean;
   notice?: string;
+  unresolved_cost_items?: UnresolvedCostItem[];
 };
+
 
 const CommissionPage = () => {
   const { toast } = useToast();
