@@ -81,11 +81,8 @@ const computeLineCommission = (
   cost: number | null,
 ): { commission: number; effectiveRate: number } => {
   let marginPct: number | null = null
-  // Treat costs below R1 as placeholder/missing data (e.g. Zoho R0.01 stubs on
-  // misc items). Without this guard, those lines look like ~1,000,000% margin
-  // and pay the full rate on subtotal, massively inflating the commission.
-  const PLACEHOLDER_COST_THRESHOLD = 1
-  const hasRealCost = cost !== null && cost >= PLACEHOLDER_COST_THRESHOLD
+  // Any positive cost is a real cost — items can legitimately cost less than R1.
+  const hasRealCost = cost !== null && cost > 0
   if (hasRealCost && sellRate > 0) {
     marginPct = ((sellRate - (cost as number)) / (cost as number)) * 100
   }
@@ -113,6 +110,7 @@ const computeLineCommission = (
   const rate = computeEffectiveRate(fullRate, marginPct)
   return { commission: lineSubTotal * (rate / 100), effectiveRate: rate }
 }
+
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {

@@ -58,6 +58,39 @@ export type Database = {
           },
         ]
       }
+      commission_item_cost_overrides: {
+        Row: {
+          cost: number
+          created_at: string
+          created_by: string | null
+          id: string
+          item_description: string
+          item_name: string
+          note: string | null
+          updated_at: string
+        }
+        Insert: {
+          cost: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          item_description?: string
+          item_name: string
+          note?: string | null
+          updated_at?: string
+        }
+        Update: {
+          cost?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          item_description?: string
+          item_name?: string
+          note?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       commission_line_overrides: {
         Row: {
           commission: number | null
