@@ -438,6 +438,16 @@ Deno.serve(async (req) => {
     let duplicatesSkipped = 0
     const unmatchedSamples: string[] = []
     const processedInvoiceIds = new Set<string>()
+    const unresolvedCostItems: Array<{
+      item_name: string
+      item_description: string
+      invoice_number: string
+      customer_name: string
+      quantity: number
+      sell_rate: number
+      sub_total: number
+    }> = []
+
     for (const inv of invoiceList) {
       // Hard dedup: never process the same invoice twice (defense-in-depth
       // beyond the Map-based dedup in fetchZohoInvoices).
