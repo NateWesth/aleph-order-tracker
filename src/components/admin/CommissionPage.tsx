@@ -18,6 +18,8 @@ import { format, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { Printer, AlertTriangle } from "lucide-react";
+import { UnresolvedCostsPanel } from "./UnresolvedCostsPanel";
+
 
 type CommissionMethod = "margin_scaled" | "half_markup_below_25";
 
@@ -87,6 +89,17 @@ type CommissionRepData = {
   companies: string[];
 };
 
+type UnresolvedCostItem = {
+  item_name: string;
+  item_description: string;
+  invoice_number: string;
+  customer_name: string;
+  quantity: number;
+  sell_rate: number;
+  sub_total: number;
+  occurrences: number;
+};
+
 type CommissionResult = {
   success: boolean;
   data: CommissionRepData[];
@@ -100,7 +113,9 @@ type CommissionResult = {
   refreshed_at?: string;
   stale_due_to_rate_limit?: boolean;
   notice?: string;
+  unresolved_cost_items?: UnresolvedCostItem[];
 };
+
 
 const CommissionPage = () => {
   const { toast } = useToast();
@@ -341,10 +356,9 @@ const CommissionPage = () => {
           }
 
           const cost = ov.cost != null ? Number(ov.cost) : li.cost;
-          // Mirror edge-function placeholder guard: costs below R1 are treated as
-          // unknown so we don't pay full commission on R0.01 Zoho stubs.
-          const PLACEHOLDER_COST_THRESHOLD = 1;
-          const effectiveCost = (cost != null && cost >= PLACEHOLDER_COST_THRESHOLD) ? cost : null;
+          // Any positive cost counts — items can legitimately cost less than R1.
+          const effectiveCost = (cost != null && cost > 0) ? cost : null;
+
 
           const isManualCommissionRate = ov.commission_rate != null;
           const commission_rate = isManualCommissionRate
@@ -760,6 +774,14 @@ const CommissionPage = () => {
               <p>{reportNotice}</p>
             </div>
           )}
+
+          {commissionData?.unresolved_cost_items && commissionData.unresolved_cost_items.length > 0 && (
+            <UnresolvedCostsPanel
+              items={commissionData.unresolved_cost_items}
+              onSaved={() => fetchCommissionReport(true)}
+            />
+          )}
+
 
           <div className="flex flex-wrap items-center gap-3">
             <Input

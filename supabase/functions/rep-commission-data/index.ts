@@ -81,11 +81,8 @@ const computeLineCommission = (
   cost: number | null,
 ): { commission: number; effectiveRate: number } => {
   let marginPct: number | null = null
-  // Treat costs below R1 as placeholder/missing data (e.g. Zoho R0.01 stubs on
-  // misc items). Without this guard, those lines look like ~1,000,000% margin
-  // and pay the full rate on subtotal, massively inflating the commission.
-  const PLACEHOLDER_COST_THRESHOLD = 1
-  const hasRealCost = cost !== null && cost >= PLACEHOLDER_COST_THRESHOLD
+  // Any positive cost is a real cost — items can legitimately cost less than R1.
+  const hasRealCost = cost !== null && cost > 0
   if (hasRealCost && sellRate > 0) {
     marginPct = ((sellRate - (cost as number)) / (cost as number)) * 100
   }
@@ -113,6 +110,7 @@ const computeLineCommission = (
   const rate = computeEffectiveRate(fullRate, marginPct)
   return { commission: lineSubTotal * (rate / 100), effectiveRate: rate }
 }
+
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -320,22 +318,60 @@ Deno.serve(async (req) => {
       relevantInvoices,
     )
 
-    // Build cost map from the LATEST vendor bill line for every available
-    // item identifier on invoice lines. Important: do not keep only item_id —
-    // some Zoho invoice lines and bill lines only line up by SKU/name/code.
-    const skuKeys = new Set<string>()
+    // ---------------------------------------------------------------------
+    // Cost resolution: STRICT name + description match against vendor bills.
+    // The Zoho item list is NOT used — only vendor bill line items count as
+    // authoritative cost, matching exactly on (item name, description).
+    // Admin-entered overrides in commission_item_cost_overrides win over bills
+    // so unresolved items can be fixed manually instead of being silently
+    // skipped.
+    // ---------------------------------------------------------------------
+    const lineCostSignatures = new Set<string>()
+    const signatureSamples = new Map<string, { name: string; description: string; sample_invoice_number?: string; sample_customer?: string }>()
     for (const inv of invoicesWithLines) {
       for (const li of inv.line_items || []) {
-        for (const key of lineItemCostKeys(li)) skuKeys.add(key)
+        const sig = lineCostSignature(li)
+        if (!sig) continue
+        lineCostSignatures.add(sig)
+        if (!signatureSamples.has(sig)) {
+          signatureSamples.set(sig, {
+            name: getLineName(li),
+            description: getLineDescription(li),
+            sample_invoice_number: inv.invoice_number || inv.number || undefined,
+            sample_customer: inv.customer_name || undefined,
+          })
+        }
       }
     }
-    const billCostMap = await fetchCostPricesFromBills(accessToken, orgId, skuKeys, date_end)
-    const itemCostMap = await fetchCostPricesFromItems(accessToken, orgId, skuKeys)
-    const costMap = new Map(billCostMap)
-    for (const [key, value] of itemCostMap) {
-      if (!costMap.has(key)) costMap.set(key, value)
+
+    // 1) Manual admin overrides (highest priority)
+    const { data: costOverrideRows, error: costOverrideError } = await supabase
+      .from('commission_item_cost_overrides')
+      .select('item_name, item_description, cost')
+    if (costOverrideError) {
+      console.warn('Failed to load commission_item_cost_overrides:', costOverrideError.message)
     }
-    console.log(`Resolved Zoho costs for ${costMap.size}/${skuKeys.size} identifiers (${billCostMap.size} from latest bills, ${itemCostMap.size} item fallbacks)`)
+    const overrideCostMap = new Map<string, number>()
+    for (const row of costOverrideRows || []) {
+      const sig = buildCostSignature(row.item_name || '', row.item_description || '')
+      if (!sig) continue
+      const c = Number(row.cost)
+      if (Number.isFinite(c)) overrideCostMap.set(sig, c)
+    }
+
+    // 2) Vendor bill lookup for the remainder
+    const stillNeeded = new Set<string>()
+    for (const sig of lineCostSignatures) {
+      if (!overrideCostMap.has(sig)) stillNeeded.add(sig)
+    }
+    const billCostMap = await fetchCostPricesFromBills(accessToken, orgId, stillNeeded, date_end)
+
+    const costMap = new Map<string, number>()
+    for (const [k, v] of billCostMap) costMap.set(k, v)
+    for (const [k, v] of overrideCostMap) costMap.set(k, v) // overrides win
+
+    console.log(`Resolved ${costMap.size}/${lineCostSignatures.size} item costs (${billCostMap.size} vendor bills, ${overrideCostMap.size} manual overrides)`)
+
 
     // Fetch existing locked payouts for this period so we can flag/skip them.
     // A payout is keyed by (rep_id, invoice_id). Locked invoices are returned
@@ -402,6 +438,16 @@ Deno.serve(async (req) => {
     let duplicatesSkipped = 0
     const unmatchedSamples: string[] = []
     const processedInvoiceIds = new Set<string>()
+    const unresolvedCostItems: Array<{
+      item_name: string
+      item_description: string
+      invoice_number: string
+      customer_name: string
+      quantity: number
+      sell_rate: number
+      sub_total: number
+    }> = []
+
     for (const inv of invoiceList) {
       // Hard dedup: never process the same invoice twice (defense-in-depth
       // beyond the Map-based dedup in fetchZohoInvoices).
@@ -466,7 +512,21 @@ Deno.serve(async (req) => {
         if (lineSubTotal <= 0) continue
 
         const sellRate = toNumber(li.rate) ?? (qty > 0 ? lineSubTotal / qty : 0)
-        const cost = getLineItemCost(li, costMap)
+        const sig = lineCostSignature(li)
+        const cost = sig ? (costMap.get(sig) ?? null) : null
+        if (cost === null && lineSubTotal > 0) {
+          const info = sig ? signatureSamples.get(sig) : null
+          unresolvedCostItems.push({
+            item_name: info?.name || getLineName(li),
+            item_description: info?.description || getLineDescription(li),
+            invoice_number: inv.invoice_number || inv.number || '',
+            customer_name: inv.customer_name || '',
+            quantity: qty,
+            sell_rate: toNumber(li.rate) ?? 0,
+            sub_total: lineSubTotal,
+          })
+        }
+
 
         const { commission: lc, effectiveRate } = computeLineCommission(
           method,
@@ -485,7 +545,7 @@ Deno.serve(async (req) => {
           : null
 
         lineDetails.push({
-          name: getLineDisplayName(li),
+          name: getLineName(li),
           code: String(li.sku || li.item_code || '').trim(),
           quantity: qty,
           rate: sellRate,
@@ -566,7 +626,19 @@ Deno.serve(async (req) => {
       totalInvoices: data.reduce((s, d) => s + d.invoice_count, 0),
     }
 
-    const report = { success: true, data, summary }
+    // Deduplicate unresolved items by (name+description) for the UI list.
+    const unresolvedByKey = new Map<string, typeof unresolvedCostItems[number] & { occurrences: number }>()
+    for (const u of unresolvedCostItems) {
+      const k = buildCostSignature(u.item_name, u.item_description)
+      if (!k) continue
+      const existing = unresolvedByKey.get(k)
+      if (existing) existing.occurrences++
+      else unresolvedByKey.set(k, { ...u, occurrences: 1 })
+    }
+    const unresolved = Array.from(unresolvedByKey.values())
+      .sort((a, b) => b.occurrences - a.occurrences)
+
+    const report = { success: true, data, summary, unresolved_cost_items: unresolved }
     await upsertCachedCommissionReport(supabase, {
       periodMonth,
       repId: rep_id ?? null,
@@ -579,6 +651,7 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ ...report, cost_prices: Object.fromEntries(costMap), cached: false, refreshed_at: new Date().toISOString() }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
+
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to calculate commission'
     const isRateLimit = message.toLowerCase().includes('rate limit')
@@ -853,50 +926,38 @@ const getLineDisplayName = (li: Record<string, unknown>): string => {
   return String(name || salesDescription || '').trim()
 }
 
-// Build stable keys for an invoice/bill line item used to look up cost.
-// Keep all possible identifiers because Zoho does not always expose the same
-// fields on invoice lines and vendor bill lines.
-function lineItemCostKeys(li: Record<string, unknown>): string[] {
-  const keys: string[] = []
-  const add = (prefix: string, value: unknown, lower = false) => {
-    const normalized = value == null ? '' : String(value).trim()
-    if (!normalized) return
-    const lowered = normalized.toLowerCase()
-    // Skip truly empty/generic placeholders for non-id keys.
-    if (prefix !== 'id' && isGenericToken(normalized)) return
-    // For sku and name: skip generic shared identifiers like 'M-Miscellaneous'.
-    // These would otherwise return a wrong shared cost from an unrelated line.
-    // The desc: key still applies for exact description matches.
-    if ((prefix === 'sku' || prefix === 'name') && isGenericToken(normalized)) return
-    keys.push(`${prefix}:${lower ? lowered : normalized}`)
-  }
-  const sku = li.sku ?? li.item_code ?? li.code
-  const name = li.name
-  const sharedGenericLine = isSharedGenericIdentifier(sku) || isSharedGenericIdentifier(name)
-  // For shared generic items (M-Miscellaneous, Misc, etc.), even item_id points
-  // to the same reusable Zoho item, so it is unsafe. Match only by exact sales
-  // description against vendor bill line descriptions.
-  if (!sharedGenericLine) {
-    add('id', li.item_id)
-    add('sku', sku, true)
-    add('name', name, true)
-  }
-  // ALSO key by description independently — for generic/Miscellaneous items the
-  // SKU is shared but the description is what uniquely identifies the product.
-  add('desc', li.description, true)
-  add('desc', li.sales_description, true)
-  add('desc', li.item_description, true)
-  add('desc', li.purchase_description, true)
-  return Array.from(new Set(keys))
+// Extract the raw item name from a Zoho invoice/bill line.
+function getLineName(li: Record<string, unknown>): string {
+  const v = (li.name ?? li.item_name ?? '') as unknown
+  return String(v ?? '').trim()
 }
 
-function getLineItemCost(li: Record<string, unknown>, costMap: Map<string, number>): number | null {
-  for (const key of lineItemCostKeys(li)) {
-    const cost = costMap.get(key)
-    if (cost !== undefined) return cost
+// Extract the raw item description from a Zoho invoice/bill line. Falls back
+// across the common description fields Zoho uses.
+function getLineDescription(li: Record<string, unknown>): string {
+  const candidates = [li.description, li.sales_description, li.item_description, li.purchase_description]
+  for (const v of candidates) {
+    const s = String(v ?? '').trim()
+    if (s) return s
   }
-  return null
+  return ''
 }
+
+// Composite signature used to match invoice lines to vendor bill lines and to
+// admin cost overrides. BOTH name and description must match exactly
+// (case-insensitive, whitespace-collapsed).
+function buildCostSignature(name: string, description: string): string {
+  const norm = (s: string) => s.toLowerCase().trim().replace(/\s+/g, ' ')
+  const n = norm(name)
+  const d = norm(description)
+  if (!n && !d) return ''
+  return `${n}||${d}`
+}
+
+function lineCostSignature(li: Record<string, unknown>): string {
+  return buildCostSignature(getLineName(li), getLineDescription(li))
+}
+
 
 // Fetch a single invoice with full line items
 async function fetchInvoiceDetail(accessToken: string, orgId: string, invoiceId: string): Promise<any | null> {
@@ -937,109 +998,20 @@ async function fetchInvoicesWithLineItems(
   return results
 }
 
-// Fetch cost (purchase rate) for given Zoho item_ids using the Items API.
-// Falls back to listing items if needed. Keys used:
-//   id:<item_id>  ->  purchase_rate
-//   sku:<sku>     ->  purchase_rate (resolved via items list)
-async function fetchCostPricesFromItems(
-  accessToken: string,
-  orgId: string,
-  keys: Set<string>,
-): Promise<Map<string, number>> {
-  const costMap = new Map<string, number>()
-  if (keys.size === 0) return costMap
-
-  const itemIds = [...keys].filter(k => k.startsWith('id:')).map(k => k.slice(3))
-  const otherKeys = [...keys].filter(k => !k.startsWith('id:'))
-
-  // 1) Fetch each item by ID in parallel batches
-  const concurrency = 10
-  for (let i = 0; i < itemIds.length; i += concurrency) {
-    const batch = itemIds.slice(i, i + concurrency)
-    await Promise.all(batch.map(async (itemId) => {
-      try {
-        const url = `${ZOHO_API_URL}/books/v3/items/${itemId}?organization_id=${orgId}`
-        const resp = await fetch(url, {
-          headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` },
-        })
-        const data = await resp.json()
-        if (!resp.ok || data.code !== 0) return
-        const item = data.item
-        if (!item) return
-        const cost =
-          toNumber(item.purchase_rate) ??
-          toNumber(item.last_purchase_rate) ??
-          toNumber(item.cost_price) ??
-          0
-        // Ignore placeholder/stub costs (e.g. R0.01 on misc items). Anything
-        // below R1 is treated as missing so the bill-cost lookup can win.
-        if (cost >= 1) {
-          costMap.set(`id:${itemId}`, cost)
-          if (item.sku) costMap.set(`sku:${String(item.sku).toLowerCase()}`, cost)
-          if (item.name) costMap.set(`name:${String(item.name).toLowerCase()}`, cost)
-        }
-      } catch (e) {
-        // ignore per-item errors
-      }
-    }))
-  }
-
-  // 2) For SKU-only / name-only keys we couldn't resolve via item_id, do a best-effort
-  //    items list lookup (limited pages to stay within timeout)
-  const stillMissing = otherKeys.filter(k => !costMap.has(k))
-  if (stillMissing.length > 0) {
-    let page = 1
-    let hasMore = true
-    while (hasMore && page <= 5) {
-      try {
-        const url = `${ZOHO_API_URL}/books/v3/items?organization_id=${orgId}&page=${page}&per_page=200`
-        const resp = await fetch(url, {
-          headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` },
-        })
-        const data = await resp.json()
-        if (!resp.ok || data.code !== 0) break
-        for (const item of data.items || []) {
-          const cost =
-            toNumber(item.purchase_rate) ??
-            toNumber(item.last_purchase_rate) ??
-            toNumber(item.cost_price) ??
-            0
-          if (cost >= 1) {
-            if (item.item_id) costMap.set(`id:${String(item.item_id)}`, cost)
-            if (item.sku) costMap.set(`sku:${String(item.sku).toLowerCase()}`, cost)
-            if (item.name) costMap.set(`name:${String(item.name).toLowerCase()}`, cost)
-          }
-        }
-        hasMore = data.page_context?.has_more_page ?? false
-        page++
-      } catch (e) {
-        break
-      }
-    }
-  }
-
-  return costMap
-}
-
-// Fetch the LATEST vendor bill cost for each item_id / SKU.
-// Walks recent bills (newest first) and records the first (= most recent)
-// rate seen per item_id and per SKU. Stops early once every requested key
-// has been resolved or page cap is reached.
+// Fetch the LATEST vendor bill cost (excluding tax) for each requested
+// (name+description) signature. Walks recent bills newest-first and keeps
+// the first (= most recent) rate seen per signature. Stops early once every
+// requested signature has been resolved or the page cap is reached.
 async function fetchCostPricesFromBills(
   accessToken: string,
   orgId: string,
-  keys: Set<string>,
+  signatures: Set<string>,
   invoiceDateEnd: string,
 ): Promise<Map<string, number>> {
   const costMap = new Map<string, number>()
-  if (keys.size === 0) return costMap
+  if (signatures.size === 0) return costMap
 
-  // Track which keys still need a cost
-  const remaining = new Set(keys)
-
-  // Fetch bills sorted by date desc, paginated. Bills with bill_date up to
-  // the invoice period end are most relevant; we look back further if needed.
-  const concurrency = 1 // bills endpoint sort matters, fetch sequentially
+  const remaining = new Set(signatures)
   let page = 1
   const maxPages = 25 // ~5,000 bills lookback cap
   let hasMore = true
@@ -1071,8 +1043,6 @@ async function fetchCostPricesFromBills(
     const bills = listData.bills || []
     if (!bills.length) break
 
-    // Bills list endpoint does NOT include line_items — fetch detail per bill
-    // (only as many as needed to resolve remaining keys).
     for (let i = 0; i < bills.length && remaining.size > 0; i += 8) {
       const batch = bills.slice(i, i + 8)
       const details = await Promise.all(batch.map(async (b: any) => {
@@ -1092,15 +1062,15 @@ async function fetchCostPricesFromBills(
       for (const bill of details) {
         if (!bill) continue
         for (const li of bill.line_items || []) {
+          // Vendor bill rate is already exclusive of tax in Zoho Books.
           const rate = toNumber(li.rate) ?? toNumber(li.item_rate)
-          // Ignore stub rates (e.g. R0.01) so we don't poison the cost map.
-          if (rate === null || rate < 1) continue
+          if (rate === null || rate <= 0) continue
 
-          for (const k of lineItemCostKeys(li)) {
-            if (k && remaining.has(k) && !costMap.has(k)) {
-              costMap.set(k, rate)
-              remaining.delete(k)
-            }
+          const sig = lineCostSignature(li)
+          if (!sig) continue
+          if (remaining.has(sig) && !costMap.has(sig)) {
+            costMap.set(sig, rate)
+            remaining.delete(sig)
           }
         }
       }
@@ -1112,6 +1082,7 @@ async function fetchCostPricesFromBills(
 
   return costMap
 }
+
 
 async function getOrgId(supabase: any): Promise<string> {
   const { data } = await supabase
