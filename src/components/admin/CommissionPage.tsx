@@ -117,6 +117,164 @@ type CommissionResult = {
 };
 
 
+type MissingGroup = { key: string; name: string; description: string; count: number; value: number };
+
+const MissingCostsEditor = ({
+  groups,
+  missingCount,
+  totalValue,
+  onExport,
+  onSaved,
+  formatCurrency,
+}: {
+  groups: MissingGroup[];
+  missingCount: number;
+  totalValue: number;
+  onExport: () => void;
+  onSaved: () => void;
+  formatCurrency: (n: number) => string;
+}) => {
+  const { toast } = useToast();
+  const [values, setValues] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState<Record<string, boolean>>({});
+  const [savedKeys, setSavedKeys] = useState<Set<string>>(new Set());
+  const [savingAll, setSavingAll] = useState(false);
+
+  const visible = groups.filter((g) => !savedKeys.has(g.key));
+
+  const saveOne = async (g: MissingGroup) => {
+    const raw = values[g.key];
+    const cost = Number(raw);
+    if (!raw || !Number.isFinite(cost) || cost <= 0) {
+      toast({ title: "Enter a valid cost greater than 0", variant: "destructive" });
+      return;
+    }
+    setSaving((s) => ({ ...s, [g.key]: true }));
+    try {
+      await saveOverrideCost({ item_name: g.name, item_description: g.description }, cost);
+      setSavedKeys((s) => { const n = new Set(s); n.add(g.key); return n; });
+      setValues((v) => ({ ...v, [g.key]: "" }));
+      toast({ title: "Cost saved", description: `${g.name} — R${cost.toFixed(2)}` });
+      onSaved();
+    } catch (err: any) {
+      toast({ title: "Failed to save cost", description: err?.message ?? String(err), variant: "destructive" });
+    } finally {
+      setSaving((s) => ({ ...s, [g.key]: false }));
+    }
+  };
+
+  const saveAll = async () => {
+    const pending = visible.filter((g) => {
+      const n = Number(values[g.key]);
+      return values[g.key] && Number.isFinite(n) && n > 0;
+    });
+    if (pending.length === 0) {
+      toast({ title: "No costs entered", description: "Enter a cost for at least one row.", variant: "destructive" });
+      return;
+    }
+    setSavingAll(true);
+    let ok = 0, failed = 0;
+    for (const g of pending) {
+      try {
+        await saveOverrideCost({ item_name: g.name, item_description: g.description }, Number(values[g.key]));
+        ok++;
+        setSavedKeys((s) => { const n = new Set(s); n.add(g.key); return n; });
+        setValues((v) => ({ ...v, [g.key]: "" }));
+      } catch { failed++; }
+    }
+    setSavingAll(false);
+    toast({
+      title: `Saved ${ok} cost${ok === 1 ? "" : "s"}`,
+      description: failed > 0 ? `${failed} failed to save` : "Commission report will refresh",
+      variant: failed > 0 ? "destructive" : "default",
+    });
+    onSaved();
+  };
+
+  const pendingCount = visible.filter((g) => {
+    const n = Number(values[g.key]);
+    return values[g.key] && Number.isFinite(n) && n > 0;
+  }).length;
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <Badge variant="outline" className="text-xs">
+          {missingCount} line{missingCount === 1 ? "" : "s"} · {groups.length} unique item{groups.length === 1 ? "" : "s"} · {formatCurrency(totalValue)}
+        </Badge>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" onClick={onExport}>
+            <Download className="h-4 w-4 mr-1.5" />Export CSV
+          </Button>
+          <Button size="sm" onClick={saveAll} disabled={savingAll || pendingCount === 0}>
+            {savingAll ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : null}
+            Save all{pendingCount > 0 ? ` (${pendingCount})` : ""}
+          </Button>
+        </div>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Enter the cost (ex VAT) for each item and click Save. Saved costs override Zoho and immediately apply to the commission report.
+      </p>
+      {visible.length === 0 ? (
+        <div className="rounded-md border bg-emerald-500/5 border-emerald-500/40 p-4 text-sm text-emerald-700 dark:text-emerald-300">
+          All missing costs have been saved. The report is refreshing…
+        </div>
+      ) : (
+        <div className="rounded-md border overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead className="bg-muted/50">
+              <tr className="text-left">
+                <th className="p-2 font-medium">Item</th>
+                <th className="p-2 font-medium">Description</th>
+                <th className="p-2 font-medium text-right">Occ.</th>
+                <th className="p-2 font-medium text-right">Total Value</th>
+                <th className="p-2 font-medium text-right">Cost (ex VAT)</th>
+                <th className="p-2 font-medium"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {visible.map((g) => {
+                const busy = !!saving[g.key];
+                return (
+                  <tr key={g.key} className="border-t align-top">
+                    <td className="p-2 font-medium">{g.name || "—"}</td>
+                    <td className="p-2 text-muted-foreground">{g.description || "—"}</td>
+                    <td className="p-2 text-right">{g.count}</td>
+                    <td className="p-2 text-right">{formatCurrency(g.value)}</td>
+                    <td className="p-2 text-right">
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="0.00"
+                        value={values[g.key] ?? ""}
+                        onChange={(e) => setValues((v) => ({ ...v, [g.key]: e.target.value }))}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") { e.preventDefault(); saveOne(g); }
+                        }}
+                        className="h-8 w-28 ml-auto"
+                        disabled={busy}
+                      />
+                    </td>
+                    <td className="p-2">
+                      <Button size="sm" onClick={() => saveOne(g)} disabled={busy}>
+                        {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Save"}
+                      </Button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+};
+
+
+
+
 const CommissionPage = () => {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("report");
