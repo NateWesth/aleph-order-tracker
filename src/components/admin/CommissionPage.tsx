@@ -1002,21 +1002,23 @@ const CommissionPage = () => {
                   <Button variant="outline" onClick={printPdfReport}>
                     <Printer className="h-4 w-4 mr-1.5" />Print Full Report
                   </Button>
-                  {missing.length > 0 && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setMissingDialogOpen(true)}
-                      className="gap-1.5 text-amber-600 hover:text-amber-700 hover:bg-amber-500/10 dark:text-amber-400 dark:hover:text-amber-300"
-                    >
+                  <Button
+                    variant="outline"
+                    onClick={() => setMissingDialogOpen(true)}
+                    className={cn(
+                      "gap-1.5",
+                      missing.length > 0 && "border-amber-500/60 text-amber-600 hover:text-amber-700 hover:bg-amber-500/10 dark:text-amber-400 dark:hover:text-amber-300"
+                    )}
+                  >
+                    {missing.length > 0 && (
                       <span className="relative flex h-2 w-2">
                         <span className="absolute inline-flex h-full w-full rounded-full bg-amber-500 opacity-75 animate-ping" />
                         <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
                       </span>
-                      <AlertTriangle className="h-3.5 w-3.5" />
-                      <span className="text-xs font-medium">{missing.length} missing cost{missing.length === 1 ? "" : "s"}</span>
-                    </Button>
-                  )}
+                    )}
+                    <AlertTriangle className="h-4 w-4" />
+                    Missing Costs{missing.length > 0 ? ` (${missing.length})` : ""}
+                  </Button>
                   <Dialog open={missingDialogOpen} onOpenChange={setMissingDialogOpen}>
                     <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
                       <DialogHeader>
