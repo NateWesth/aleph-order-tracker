@@ -341,10 +341,9 @@ const CommissionPage = () => {
           }
 
           const cost = ov.cost != null ? Number(ov.cost) : li.cost;
-          // Mirror edge-function placeholder guard: costs below R1 are treated as
-          // unknown so we don't pay full commission on R0.01 Zoho stubs.
-          const PLACEHOLDER_COST_THRESHOLD = 1;
-          const effectiveCost = (cost != null && cost >= PLACEHOLDER_COST_THRESHOLD) ? cost : null;
+          // Any positive cost counts — items can legitimately cost less than R1.
+          const effectiveCost = (cost != null && cost > 0) ? cost : null;
+
 
           const isManualCommissionRate = ov.commission_rate != null;
           const commission_rate = isManualCommissionRate
