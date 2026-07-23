@@ -926,50 +926,38 @@ const getLineDisplayName = (li: Record<string, unknown>): string => {
   return String(name || salesDescription || '').trim()
 }
 
-// Build stable keys for an invoice/bill line item used to look up cost.
-// Keep all possible identifiers because Zoho does not always expose the same
-// fields on invoice lines and vendor bill lines.
-function lineItemCostKeys(li: Record<string, unknown>): string[] {
-  const keys: string[] = []
-  const add = (prefix: string, value: unknown, lower = false) => {
-    const normalized = value == null ? '' : String(value).trim()
-    if (!normalized) return
-    const lowered = normalized.toLowerCase()
-    // Skip truly empty/generic placeholders for non-id keys.
-    if (prefix !== 'id' && isGenericToken(normalized)) return
-    // For sku and name: skip generic shared identifiers like 'M-Miscellaneous'.
-    // These would otherwise return a wrong shared cost from an unrelated line.
-    // The desc: key still applies for exact description matches.
-    if ((prefix === 'sku' || prefix === 'name') && isGenericToken(normalized)) return
-    keys.push(`${prefix}:${lower ? lowered : normalized}`)
-  }
-  const sku = li.sku ?? li.item_code ?? li.code
-  const name = li.name
-  const sharedGenericLine = isSharedGenericIdentifier(sku) || isSharedGenericIdentifier(name)
-  // For shared generic items (M-Miscellaneous, Misc, etc.), even item_id points
-  // to the same reusable Zoho item, so it is unsafe. Match only by exact sales
-  // description against vendor bill line descriptions.
-  if (!sharedGenericLine) {
-    add('id', li.item_id)
-    add('sku', sku, true)
-    add('name', name, true)
-  }
-  // ALSO key by description independently — for generic/Miscellaneous items the
-  // SKU is shared but the description is what uniquely identifies the product.
-  add('desc', li.description, true)
-  add('desc', li.sales_description, true)
-  add('desc', li.item_description, true)
-  add('desc', li.purchase_description, true)
-  return Array.from(new Set(keys))
+// Extract the raw item name from a Zoho invoice/bill line.
+function getLineName(li: Record<string, unknown>): string {
+  const v = (li.name ?? li.item_name ?? '') as unknown
+  return String(v ?? '').trim()
 }
 
-function getLineItemCost(li: Record<string, unknown>, costMap: Map<string, number>): number | null {
-  for (const key of lineItemCostKeys(li)) {
-    const cost = costMap.get(key)
-    if (cost !== undefined) return cost
+// Extract the raw item description from a Zoho invoice/bill line. Falls back
+// across the common description fields Zoho uses.
+function getLineDescription(li: Record<string, unknown>): string {
+  const candidates = [li.description, li.sales_description, li.item_description, li.purchase_description]
+  for (const v of candidates) {
+    const s = String(v ?? '').trim()
+    if (s) return s
   }
-  return null
+  return ''
 }
+
+// Composite signature used to match invoice lines to vendor bill lines and to
+// admin cost overrides. BOTH name and description must match exactly
+// (case-insensitive, whitespace-collapsed).
+function buildCostSignature(name: string, description: string): string {
+  const norm = (s: string) => s.toLowerCase().trim().replace(/\s+/g, ' ')
+  const n = norm(name)
+  const d = norm(description)
+  if (!n && !d) return ''
+  return `${n}||${d}`
+}
+
+function lineCostSignature(li: Record<string, unknown>): string {
+  return buildCostSignature(getLineName(li), getLineDescription(li))
+}
+
 
 // Fetch a single invoice with full line items
 async function fetchInvoiceDetail(accessToken: string, orgId: string, invoiceId: string): Promise<any | null> {
