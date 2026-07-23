@@ -998,109 +998,20 @@ async function fetchInvoicesWithLineItems(
   return results
 }
 
-// Fetch cost (purchase rate) for given Zoho item_ids using the Items API.
-// Falls back to listing items if needed. Keys used:
-//   id:<item_id>  ->  purchase_rate
-//   sku:<sku>     ->  purchase_rate (resolved via items list)
-async function fetchCostPricesFromItems(
-  accessToken: string,
-  orgId: string,
-  keys: Set<string>,
-): Promise<Map<string, number>> {
-  const costMap = new Map<string, number>()
-  if (keys.size === 0) return costMap
-
-  const itemIds = [...keys].filter(k => k.startsWith('id:')).map(k => k.slice(3))
-  const otherKeys = [...keys].filter(k => !k.startsWith('id:'))
-
-  // 1) Fetch each item by ID in parallel batches
-  const concurrency = 10
-  for (let i = 0; i < itemIds.length; i += concurrency) {
-    const batch = itemIds.slice(i, i + concurrency)
-    await Promise.all(batch.map(async (itemId) => {
-      try {
-        const url = `${ZOHO_API_URL}/books/v3/items/${itemId}?organization_id=${orgId}`
-        const resp = await fetch(url, {
-          headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` },
-        })
-        const data = await resp.json()
-        if (!resp.ok || data.code !== 0) return
-        const item = data.item
-        if (!item) return
-        const cost =
-          toNumber(item.purchase_rate) ??
-          toNumber(item.last_purchase_rate) ??
-          toNumber(item.cost_price) ??
-          0
-        // Ignore placeholder/stub costs (e.g. R0.01 on misc items). Anything
-        // below R1 is treated as missing so the bill-cost lookup can win.
-        if (cost >= 1) {
-          costMap.set(`id:${itemId}`, cost)
-          if (item.sku) costMap.set(`sku:${String(item.sku).toLowerCase()}`, cost)
-          if (item.name) costMap.set(`name:${String(item.name).toLowerCase()}`, cost)
-        }
-      } catch (e) {
-        // ignore per-item errors
-      }
-    }))
-  }
-
-  // 2) For SKU-only / name-only keys we couldn't resolve via item_id, do a best-effort
-  //    items list lookup (limited pages to stay within timeout)
-  const stillMissing = otherKeys.filter(k => !costMap.has(k))
-  if (stillMissing.length > 0) {
-    let page = 1
-    let hasMore = true
-    while (hasMore && page <= 5) {
-      try {
-        const url = `${ZOHO_API_URL}/books/v3/items?organization_id=${orgId}&page=${page}&per_page=200`
-        const resp = await fetch(url, {
-          headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` },
-        })
-        const data = await resp.json()
-        if (!resp.ok || data.code !== 0) break
-        for (const item of data.items || []) {
-          const cost =
-            toNumber(item.purchase_rate) ??
-            toNumber(item.last_purchase_rate) ??
-            toNumber(item.cost_price) ??
-            0
-          if (cost >= 1) {
-            if (item.item_id) costMap.set(`id:${String(item.item_id)}`, cost)
-            if (item.sku) costMap.set(`sku:${String(item.sku).toLowerCase()}`, cost)
-            if (item.name) costMap.set(`name:${String(item.name).toLowerCase()}`, cost)
-          }
-        }
-        hasMore = data.page_context?.has_more_page ?? false
-        page++
-      } catch (e) {
-        break
-      }
-    }
-  }
-
-  return costMap
-}
-
-// Fetch the LATEST vendor bill cost for each item_id / SKU.
-// Walks recent bills (newest first) and records the first (= most recent)
-// rate seen per item_id and per SKU. Stops early once every requested key
-// has been resolved or page cap is reached.
+// Fetch the LATEST vendor bill cost (excluding tax) for each requested
+// (name+description) signature. Walks recent bills newest-first and keeps
+// the first (= most recent) rate seen per signature. Stops early once every
+// requested signature has been resolved or the page cap is reached.
 async function fetchCostPricesFromBills(
   accessToken: string,
   orgId: string,
-  keys: Set<string>,
+  signatures: Set<string>,
   invoiceDateEnd: string,
 ): Promise<Map<string, number>> {
   const costMap = new Map<string, number>()
-  if (keys.size === 0) return costMap
+  if (signatures.size === 0) return costMap
 
-  // Track which keys still need a cost
-  const remaining = new Set(keys)
-
-  // Fetch bills sorted by date desc, paginated. Bills with bill_date up to
-  // the invoice period end are most relevant; we look back further if needed.
-  const concurrency = 1 // bills endpoint sort matters, fetch sequentially
+  const remaining = new Set(signatures)
   let page = 1
   const maxPages = 25 // ~5,000 bills lookback cap
   let hasMore = true
@@ -1132,8 +1043,6 @@ async function fetchCostPricesFromBills(
     const bills = listData.bills || []
     if (!bills.length) break
 
-    // Bills list endpoint does NOT include line_items — fetch detail per bill
-    // (only as many as needed to resolve remaining keys).
     for (let i = 0; i < bills.length && remaining.size > 0; i += 8) {
       const batch = bills.slice(i, i + 8)
       const details = await Promise.all(batch.map(async (b: any) => {
@@ -1153,15 +1062,15 @@ async function fetchCostPricesFromBills(
       for (const bill of details) {
         if (!bill) continue
         for (const li of bill.line_items || []) {
+          // Vendor bill rate is already exclusive of tax in Zoho Books.
           const rate = toNumber(li.rate) ?? toNumber(li.item_rate)
-          // Ignore stub rates (e.g. R0.01) so we don't poison the cost map.
-          if (rate === null || rate < 1) continue
+          if (rate === null || rate <= 0) continue
 
-          for (const k of lineItemCostKeys(li)) {
-            if (k && remaining.has(k) && !costMap.has(k)) {
-              costMap.set(k, rate)
-              remaining.delete(k)
-            }
+          const sig = lineCostSignature(li)
+          if (!sig) continue
+          if (remaining.has(sig) && !costMap.has(sig)) {
+            costMap.set(sig, rate)
+            remaining.delete(sig)
           }
         }
       }
@@ -1173,6 +1082,7 @@ async function fetchCostPricesFromBills(
 
   return costMap
 }
+
 
 async function getOrgId(supabase: any): Promise<string> {
   const { data } = await supabase
