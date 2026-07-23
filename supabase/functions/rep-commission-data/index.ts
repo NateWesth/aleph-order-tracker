@@ -502,7 +502,21 @@ Deno.serve(async (req) => {
         if (lineSubTotal <= 0) continue
 
         const sellRate = toNumber(li.rate) ?? (qty > 0 ? lineSubTotal / qty : 0)
-        const cost = getLineItemCost(li, costMap)
+        const sig = lineCostSignature(li)
+        const cost = sig ? (costMap.get(sig) ?? null) : null
+        if (cost === null && lineSubTotal > 0) {
+          const info = sig ? signatureSamples.get(sig) : null
+          unresolvedCostItems.push({
+            item_name: info?.name || getLineName(li),
+            item_description: info?.description || getLineDescription(li),
+            invoice_number: inv.invoice_number || inv.number || '',
+            customer_name: inv.customer_name || '',
+            quantity: qty,
+            sell_rate: toNumber(li.rate) ?? 0,
+            sub_total: lineSubTotal,
+          })
+        }
+
 
         const { commission: lc, effectiveRate } = computeLineCommission(
           method,
