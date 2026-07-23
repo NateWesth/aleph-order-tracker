@@ -626,7 +626,19 @@ Deno.serve(async (req) => {
       totalInvoices: data.reduce((s, d) => s + d.invoice_count, 0),
     }
 
-    const report = { success: true, data, summary }
+    // Deduplicate unresolved items by (name+description) for the UI list.
+    const unresolvedByKey = new Map<string, typeof unresolvedCostItems[number] & { occurrences: number }>()
+    for (const u of unresolvedCostItems) {
+      const k = buildCostSignature(u.item_name, u.item_description)
+      if (!k) continue
+      const existing = unresolvedByKey.get(k)
+      if (existing) existing.occurrences++
+      else unresolvedByKey.set(k, { ...u, occurrences: 1 })
+    }
+    const unresolved = Array.from(unresolvedByKey.values())
+      .sort((a, b) => b.occurrences - a.occurrences)
+
+    const report = { success: true, data, summary, unresolved_cost_items: unresolved }
     await upsertCachedCommissionReport(supabase, {
       periodMonth,
       repId: rep_id ?? null,
@@ -639,6 +651,7 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ ...report, cost_prices: Object.fromEntries(costMap), cached: false, refreshed_at: new Date().toISOString() }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
+
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to calculate commission'
     const isRateLimit = message.toLowerCase().includes('rate limit')
