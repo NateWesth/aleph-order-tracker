@@ -545,7 +545,7 @@ Deno.serve(async (req) => {
           : null
 
         lineDetails.push({
-          name: getLineDisplayName(li),
+          name: getLineName(li),
           code: String(li.sku || li.item_code || '').trim(),
           quantity: qty,
           rate: sellRate,
