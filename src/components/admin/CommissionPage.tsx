@@ -294,6 +294,27 @@ const CommissionPage = () => {
   const [loadingReps, setLoadingReps] = useState(true);
   const [missingDialogOpen, setMissingDialogOpen] = useState(false);
 
+  // Keyboard shortcut: Shift+M (or Ctrl/Cmd+Shift+M) toggles the Missing Costs dialog
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName;
+      const typing =
+        tag === "INPUT" ||
+        tag === "TEXTAREA" ||
+        tag === "SELECT" ||
+        (target && (target as HTMLElement).isContentEditable);
+      if (typing && !(e.ctrlKey || e.metaKey)) return;
+      if (e.shiftKey && (e.key === "M" || e.key === "m")) {
+        e.preventDefault();
+        setMissingDialogOpen((v) => !v);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+
+
   const [methodFilter, setMethodFilter] = useState<"all" | CommissionMethod>("all");
 
   // Commission report state - default to PREVIOUS month
@@ -1040,7 +1061,10 @@ const CommissionPage = () => {
                             All items have a matched vendor-bill cost. Open to review or manually override any item cost.
                           </p>
                         )}
-                      </TooltipContent>
+                          <p className="mt-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+                            Shortcut: Shift + M
+                          </p>
+                        </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
                   <Dialog open={missingDialogOpen} onOpenChange={setMissingDialogOpen}>
