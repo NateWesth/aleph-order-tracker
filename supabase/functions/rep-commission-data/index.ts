@@ -185,7 +185,11 @@ Deno.serve(async (req) => {
     cacheFallback = { periodMonth, repId: rep_id }
     if (!force_refresh) {
       const cachedReport = await readCachedCommissionReport(supabase, periodMonth, rep_id)
-      if (cachedReport) {
+      // Older cached reports were saved before the unresolved-cost detection
+      // existed. Treat those as stale so we recompute and surface missing costs.
+      const hasUnresolvedField = cachedReport
+        && Object.prototype.hasOwnProperty.call(cachedReport.report as any, 'unresolved_cost_items')
+      if (cachedReport && hasUnresolvedField) {
         const report = await applyLockedPayoutsToReport(supabase, cachedReport.report, periodMonth)
         return new Response(JSON.stringify({
           ...report,
