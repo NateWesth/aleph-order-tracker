@@ -140,22 +140,24 @@ const MissingCostsEditor = ({
   const [saving, setSaving] = useState<Record<string, boolean>>({});
   const [savedKeys, setSavedKeys] = useState<Set<string>>(new Set());
   const [savingAll, setSavingAll] = useState(false);
+  const [filter, setFilter] = useState("");
+  const debounceRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
-  const visible = groups.filter((g) => !savedKeys.has(g.key));
+  const visible = groups
+    .filter((g) => !savedKeys.has(g.key))
+    .filter((g) => {
+      if (!filter.trim()) return true;
+      const q = filter.toLowerCase();
+      return g.name.toLowerCase().includes(q) || g.description.toLowerCase().includes(q);
+    });
 
-  const saveOne = async (g: MissingGroup) => {
-    const raw = values[g.key];
-    const cost = Number(raw);
-    if (!raw || !Number.isFinite(cost) || cost <= 0) {
-      toast({ title: "Enter a valid cost greater than 0", variant: "destructive" });
-      return;
-    }
+  const persist = async (g: MissingGroup, cost: number, opts?: { silent?: boolean }) => {
     setSaving((s) => ({ ...s, [g.key]: true }));
     try {
       await saveOverrideCost({ item_name: g.name, item_description: g.description }, cost);
       setSavedKeys((s) => { const n = new Set(s); n.add(g.key); return n; });
       setValues((v) => ({ ...v, [g.key]: "" }));
-      toast({ title: "Cost saved", description: `${g.name} — R${cost.toFixed(2)}` });
+      if (!opts?.silent) toast({ title: "Cost saved", description: `${g.name} — R${cost.toFixed(2)}` });
       onSaved();
     } catch (err: any) {
       toast({ title: "Failed to save cost", description: err?.message ?? String(err), variant: "destructive" });
@@ -163,6 +165,37 @@ const MissingCostsEditor = ({
       setSaving((s) => ({ ...s, [g.key]: false }));
     }
   };
+
+  const scheduleAutoSave = (g: MissingGroup, raw: string) => {
+    const existing = debounceRef.current.get(g.key);
+    if (existing) clearTimeout(existing);
+    const cost = Number(raw);
+    if (!raw || !Number.isFinite(cost) || cost <= 0) return;
+    const t = setTimeout(() => {
+      debounceRef.current.delete(g.key);
+      persist(g, cost, { silent: true });
+    }, 900);
+    debounceRef.current.set(g.key, t);
+  };
+
+  const saveOne = async (g: MissingGroup) => {
+    const existing = debounceRef.current.get(g.key);
+    if (existing) { clearTimeout(existing); debounceRef.current.delete(g.key); }
+    const raw = values[g.key];
+    const cost = Number(raw);
+    if (!raw || !Number.isFinite(cost) || cost <= 0) {
+      toast({ title: "Enter a valid cost greater than 0", variant: "destructive" });
+      return;
+    }
+    await persist(g, cost);
+  };
+
+  useEffect(() => {
+    return () => {
+      debounceRef.current.forEach((t) => clearTimeout(t));
+      debounceRef.current.clear();
+    };
+  }, []);
 
   const saveAll = async () => {
     const pending = visible.filter((g) => {
@@ -201,9 +234,15 @@ const MissingCostsEditor = ({
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <Badge variant="outline" className="text-xs">
-          {missingCount} line{missingCount === 1 ? "" : "s"} · {groups.length} unique item{groups.length === 1 ? "" : "s"} · {formatCurrency(totalValue)}
+          {visible.length} of {groups.length} unique · {missingCount} line{missingCount === 1 ? "" : "s"} · {formatCurrency(totalValue)}
         </Badge>
         <div className="flex items-center gap-2">
+          <Input
+            placeholder="Filter items..."
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            className="h-8 w-48 text-xs"
+          />
           <Button size="sm" variant="outline" onClick={onExport}>
             <Download className="h-4 w-4 mr-1.5" />Export CSV
           </Button>
@@ -214,16 +253,18 @@ const MissingCostsEditor = ({
         </div>
       </div>
       <p className="text-xs text-muted-foreground">
-        Enter the cost (ex VAT) for each item and click Save. Saved costs override Zoho and immediately apply to the commission report.
+        Enter the cost (ex VAT) for each item — it auto-saves shortly after you stop typing or when you leave the field. Press Enter to save immediately.
       </p>
       {visible.length === 0 ? (
         <div className="rounded-md border bg-emerald-500/5 border-emerald-500/40 p-4 text-sm text-emerald-700 dark:text-emerald-300">
-          All missing costs have been saved. The report is refreshing…
+          {groups.length === 0 || savedKeys.size >= groups.length
+            ? "All missing costs have been saved. The report is refreshing…"
+            : "No items match the current filter."}
         </div>
       ) : (
-        <div className="rounded-md border overflow-x-auto">
+        <div className="rounded-md border overflow-x-auto max-h-[60vh]">
           <table className="w-full text-xs">
-            <thead className="bg-muted/50">
+            <thead className="bg-muted/50 sticky top-0 z-10">
               <tr className="text-left">
                 <th className="p-2 font-medium">Item</th>
                 <th className="p-2 font-medium">Description</th>
@@ -249,7 +290,18 @@ const MissingCostsEditor = ({
                         min="0"
                         placeholder="0.00"
                         value={values[g.key] ?? ""}
-                        onChange={(e) => setValues((v) => ({ ...v, [g.key]: e.target.value }))}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setValues((prev) => ({ ...prev, [g.key]: v }));
+                          scheduleAutoSave(g, v);
+                        }}
+                        onBlur={() => {
+                          const existing = debounceRef.current.get(g.key);
+                          if (existing) { clearTimeout(existing); debounceRef.current.delete(g.key); }
+                          const raw = values[g.key];
+                          const cost = Number(raw);
+                          if (raw && Number.isFinite(cost) && cost > 0) persist(g, cost, { silent: true });
+                        }}
                         onKeyDown={(e) => {
                           if (e.key === "Enter") { e.preventDefault(); saveOne(g); }
                         }}
@@ -258,7 +310,7 @@ const MissingCostsEditor = ({
                       />
                     </td>
                     <td className="p-2">
-                      <Button size="sm" onClick={() => saveOne(g)} disabled={busy}>
+                      <Button size="sm" variant="ghost" onClick={() => saveOne(g)} disabled={busy}>
                         {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Save"}
                       </Button>
                     </td>
@@ -272,6 +324,7 @@ const MissingCostsEditor = ({
     </div>
   );
 };
+
 
 
 
