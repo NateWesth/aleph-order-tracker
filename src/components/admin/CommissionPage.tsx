@@ -19,6 +19,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { Printer, AlertTriangle } from "lucide-react";
 import { UnresolvedCostsPanel, saveCost as saveOverrideCost } from "./UnresolvedCostsPanel";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 
 type CommissionMethod = "margin_scaled" | "half_markup_below_25";
