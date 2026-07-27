@@ -1061,7 +1061,10 @@ const CommissionPage = () => {
                             All items have a matched vendor-bill cost. Open to review or manually override any item cost.
                           </p>
                         )}
-                      </TooltipContent>
+                          <p className="mt-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+                            Shortcut: Shift + M
+                          </p>
+                        </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
                   <Dialog open={missingDialogOpen} onOpenChange={setMissingDialogOpen}>
