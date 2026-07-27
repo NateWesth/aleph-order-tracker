@@ -1003,23 +1003,46 @@ const CommissionPage = () => {
                   <Button variant="outline" onClick={printPdfReport}>
                     <Printer className="h-4 w-4 mr-1.5" />Print Full Report
                   </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => setMissingDialogOpen(true)}
-                    className={cn(
-                      "gap-1.5",
-                      missing.length > 0 && "border-amber-500/60 text-amber-600 hover:text-amber-700 hover:bg-amber-500/10 dark:text-amber-400 dark:hover:text-amber-300"
-                    )}
-                  >
-                    {missing.length > 0 && (
-                      <span className="relative flex h-2 w-2">
-                        <span className="absolute inline-flex h-full w-full rounded-full bg-amber-500 opacity-75 animate-ping" />
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
-                      </span>
-                    )}
-                    <AlertTriangle className="h-4 w-4" />
-                    Missing Costs{missing.length > 0 ? ` (${missing.length})` : ""}
-                  </Button>
+                  <TooltipProvider delayDuration={150}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="outline"
+                          onClick={() => setMissingDialogOpen(true)}
+                          className={cn(
+                            "gap-1.5 relative transition-all",
+                            missing.length > 0 &&
+                              "border-amber-500/70 text-amber-600 hover:text-amber-700 hover:bg-amber-500/10 dark:text-amber-400 dark:hover:text-amber-300 shadow-[0_0_0_3px_rgba(245,158,11,0.15)] ring-1 ring-amber-500/40"
+                          )}
+                        >
+                          {missing.length > 0 && (
+                            <span className="relative flex h-2 w-2">
+                              <span className="absolute inline-flex h-full w-full rounded-full bg-amber-500 opacity-75 animate-ping" />
+                              <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
+                            </span>
+                          )}
+                          <AlertTriangle className="h-4 w-4" />
+                          Missing Costs{missing.length > 0 ? ` (${missing.length})` : ""}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" className="max-w-xs">
+                        {missing.length > 0 ? (
+                          <div className="space-y-1">
+                            <p className="font-semibold text-amber-500">
+                              {missing.length} item{missing.length === 1 ? "" : "s"} need a cost
+                            </p>
+                            <p className="text-xs">
+                              These invoice lines have no matching vendor-bill cost, so their commission can't be calculated. Click to enter the cost (excl. VAT) for each item — the report refreshes automatically once saved.
+                            </p>
+                          </div>
+                        ) : (
+                          <p className="text-xs">
+                            All items have a matched vendor-bill cost. Open to review or manually override any item cost.
+                          </p>
+                        )}
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                   <Dialog open={missingDialogOpen} onOpenChange={setMissingDialogOpen}>
                     <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
                       <DialogHeader>
