@@ -72,6 +72,10 @@ const computeEffectiveRate = (
 }
 
 // Returns commission AMOUNT for a single line, given the chosen method.
+// Zero-cost lines (cost === 0) are treated as "no commissionable margin" and
+// earn nothing — a real vendor cost of 0 usually means the item was mis-billed
+// or given away; paying commission on a "100% margin" from a zero cost would
+// hugely overpay. Negative margins (selling below cost) are floored at 0 too.
 const computeLineCommission = (
   method: CommissionMethod,
   fullRate: number,
@@ -79,26 +83,26 @@ const computeLineCommission = (
   qty: number,
   sellRate: number,
   cost: number | null,
-): { commission: number; effectiveRate: number } => {
+): { commission: number; effectiveRate: number; excluded_reason?: 'zero_cost' | 'negative_margin' | 'unknown_cost' } => {
+  // Explicit zero cost — never earn commission on this line.
+  if (cost !== null && cost <= 0) {
+    return { commission: 0, effectiveRate: 0, excluded_reason: 'zero_cost' }
+  }
+
   let marginPct: number | null = null
-  // Any positive cost is a real cost — items can legitimately cost less than R1.
   const hasRealCost = cost !== null && cost > 0
   if (hasRealCost && sellRate > 0) {
     marginPct = ((sellRate - (cost as number)) / (cost as number)) * 100
   }
 
   if (method === 'half_markup_below_25') {
-    // Unknown cost -> SKIP (no commission) so we never overpay on items
-    // we can't verify a vendor cost for.
     if (marginPct === null) {
-      return { commission: 0, effectiveRate: 0 }
+      return { commission: 0, effectiveRate: 0, excluded_reason: 'unknown_cost' }
     }
-    if (marginPct < 0) return { commission: 0, effectiveRate: 0 }
+    if (marginPct < 0) return { commission: 0, effectiveRate: 0, excluded_reason: 'negative_margin' }
 
     const costBasis = (cost as number) * qty
     const profit = (sellRate - (cost as number)) * qty
-    // >= 25% margin -> rep's full rate applied to cost × qty per line
-    // <  25% margin -> half of the profit (50/50 split)
     const commission = marginPct >= 25
       ? costBasis * (fullRate / 100)
       : Math.max(0, profit * 0.5)
@@ -107,6 +111,9 @@ const computeLineCommission = (
   }
 
   // default: margin_scaled
+  if (marginPct !== null && marginPct < 0) {
+    return { commission: 0, effectiveRate: 0, excluded_reason: 'negative_margin' }
+  }
   const rate = computeEffectiveRate(fullRate, marginPct)
   return { commission: lineSubTotal * (rate / 100), effectiveRate: rate }
 }
@@ -308,6 +315,11 @@ Deno.serve(async (req) => {
 
     const invoiceList = await fetchZohoInvoices(accessToken, orgId, date_start, date_end)
     console.log(`Fetched ${invoiceList.length} invoices`)
+
+    // Fetch credit notes for the same period so we can deduct refunds/returns
+    // from rep commission. Map by referenced invoice_id.
+    const creditByInvoiceId = await fetchCreditNotesByInvoice(accessToken, orgId, date_start, date_end)
+    console.log(`Fetched ${creditByInvoiceId.size} invoices with credit notes`)
 
     // Pre-filter: only fetch line-item details for invoices belonging to assigned reps
     const relevantInvoices = invoiceList.filter(inv =>
@@ -518,6 +530,9 @@ Deno.serve(async (req) => {
         const sellRate = toNumber(li.rate) ?? (qty > 0 ? lineSubTotal / qty : 0)
         const sig = lineCostSignature(li)
         const cost = sig ? (costMap.get(sig) ?? null) : null
+        // Only flag as "unresolved" when we truly have no cost data. A cost
+        // of 0 is a real (though non-commissionable) resolution and should NOT
+        // clutter the missing-costs dialog.
         if (cost === null && lineSubTotal > 0) {
           const info = sig ? signatureSamples.get(sig) : null
           unresolvedCostItems.push({
@@ -578,14 +593,27 @@ Deno.serve(async (req) => {
       }
 
       const invoiceIdStr = String(inv.invoice_id || inv.invoice_number || inv.number || '').trim()
+
+      // Credit-note adjustment: if this invoice has been (partially) credited
+      // during the report period, reduce both the invoiced subtotal and the
+      // commission proportionally. Prevents paying commission on returns.
+      const creditedSubTotal = creditByInvoiceId.get(invoiceIdStr) ?? 0
+      const netSubTotal = Math.max(0, invSubTotal - creditedSubTotal)
+      let creditRatio = 0
+      if (creditedSubTotal > 0 && invSubTotal > 0) {
+        creditRatio = Math.min(1, creditedSubTotal / invSubTotal)
+      }
+      const creditedCommission = commission * creditRatio
+      const netCommission = commission - creditedCommission
+
       const isLocked = lockedSet.has(lockedKey(target.rep_id, invoiceIdStr))
 
       if (isLocked) {
-        result.lockedCommission += commission
+        result.lockedCommission += netCommission
         result.lockedInvoiceCount++
       } else {
-        result.totalInvoiced += invSubTotal
-        result.commissionEarned += commission
+        result.totalInvoiced += netSubTotal
+        result.commissionEarned += netCommission
         result.invoiceCount++
       }
       result.invoices.push({
@@ -593,12 +621,15 @@ Deno.serve(async (req) => {
         invoice_number: inv.invoice_number || inv.number || '',
         customer_name: inv.customer_name || '',
         date: inv.date || inv.invoice_date || '',
-        sub_total: invSubTotal,
+        sub_total: netSubTotal,
         total: invTotal,
-        commission,
+        commission: netCommission,
         commission_rate: Math.round(displayRate * 100) / 100,
         line_items: lineDetails,
         locked: isLocked,
+        gross_sub_total: invSubTotal,
+        credited_sub_total: Math.round(creditedSubTotal * 100) / 100,
+        credited_commission: Math.round(creditedCommission * 100) / 100,
       })
     }
     console.log(`Matched ${matched}/${invoiceList.length} invoices to reps. Skipped ${duplicatesSkipped} duplicates. Unmatched samples:`, unmatchedSamples)
@@ -877,6 +908,99 @@ async function fetchZohoInvoices(accessToken: string, orgId: string, dateStart: 
   }
 
   return Array.from(uniqueInvoices.values())
+}
+
+// Fetch credit notes in the period and aggregate the credited SUBTOTAL
+// (ex-VAT) against each referenced invoice_id. Excludes void/draft.
+async function fetchCreditNotesByInvoice(
+  accessToken: string,
+  orgId: string,
+  dateStart: string,
+  dateEnd: string,
+): Promise<Map<string, number>> {
+  const map = new Map<string, number>()
+  let page = 1
+  let hasMore = true
+
+  while (hasMore && page <= 10) {
+    const params = new URLSearchParams({
+      organization_id: orgId,
+      date_start: dateStart,
+      date_end: dateEnd,
+      page: String(page),
+      per_page: '200',
+    })
+
+    let listData: any
+    try {
+      const resp = await fetch(`${ZOHO_API_URL}/books/v3/creditnotes?${params.toString()}`, {
+        headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` },
+      })
+      listData = await resp.json()
+      if (!resp.ok || listData.code !== 0) {
+        console.warn('Zoho creditnotes list error:', listData?.message)
+        break
+      }
+    } catch (e) {
+      console.warn('Zoho creditnotes fetch error:', e)
+      break
+    }
+
+    const notes = listData.creditnotes || []
+    if (!notes.length) break
+
+    // Fetch detail (line items include invoice_id refs) in parallel batches.
+    for (let i = 0; i < notes.length; i += 8) {
+      const batch = notes.slice(i, i + 8)
+      const details = await Promise.all(batch.map(async (n: any) => {
+        const status = String(n.status || '').toLowerCase()
+        if (status === 'void' || status === 'draft') return null
+        const id = n.creditnote_id
+        if (!id) return null
+        try {
+          const r = await fetch(
+            `${ZOHO_API_URL}/books/v3/creditnotes/${id}?organization_id=${orgId}`,
+            { headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` } },
+          )
+          const d = await r.json()
+          if (!r.ok || d.code !== 0) return null
+          return d.creditnote || null
+        } catch { return null }
+      }))
+
+      for (const cn of details) {
+        if (!cn) continue
+        const subTotal = toNumber(cn.sub_total) ?? toNumber(cn.total_before_tax) ?? 0
+        // invoices_credited: [{ invoice_id, amount_applied }] on newer schemas.
+        const invoicesCredited = Array.isArray(cn.invoices_credited) ? cn.invoices_credited : []
+        if (invoicesCredited.length > 0 && subTotal > 0) {
+          const gross = invoicesCredited.reduce(
+            (s: number, x: any) => s + (toNumber(x.amount_applied) ?? 0),
+            0,
+          )
+          for (const ic of invoicesCredited) {
+            const invId = String(ic.invoice_id || '').trim()
+            if (!invId) continue
+            const applied = toNumber(ic.amount_applied) ?? 0
+            // Pro-rate the ex-VAT subtotal by amount_applied share.
+            const share = gross > 0 ? applied / gross : 1 / invoicesCredited.length
+            map.set(invId, (map.get(invId) ?? 0) + subTotal * share)
+          }
+        } else {
+          // Fallback: some credit notes reference invoice_id directly on the note.
+          const invId = String(cn.invoice_id || '').trim()
+          if (invId && subTotal > 0) {
+            map.set(invId, (map.get(invId) ?? 0) + subTotal)
+          }
+        }
+      }
+    }
+
+    hasMore = listData.page_context?.has_more_page ?? false
+    page++
+  }
+
+  return map
 }
 
 // Identifiers that are shared across many unrelated items (e.g. the generic
