@@ -73,6 +73,9 @@ type CommissionInvoice = {
   commission_rate: number;
   line_items?: CommissionLineItem[];
   locked: boolean;
+  gross_sub_total?: number;
+  credited_sub_total?: number;
+  credited_commission?: number;
 };
 
 type CommissionRepData = {
