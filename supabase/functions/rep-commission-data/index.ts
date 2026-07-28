@@ -530,6 +530,9 @@ Deno.serve(async (req) => {
         const sellRate = toNumber(li.rate) ?? (qty > 0 ? lineSubTotal / qty : 0)
         const sig = lineCostSignature(li)
         const cost = sig ? (costMap.get(sig) ?? null) : null
+        // Only flag as "unresolved" when we truly have no cost data. A cost
+        // of 0 is a real (though non-commissionable) resolution and should NOT
+        // clutter the missing-costs dialog.
         if (cost === null && lineSubTotal > 0) {
           const info = sig ? signatureSamples.get(sig) : null
           unresolvedCostItems.push({
