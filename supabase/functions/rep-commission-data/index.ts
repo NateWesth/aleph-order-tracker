@@ -196,7 +196,11 @@ Deno.serve(async (req) => {
       // existed. Treat those as stale so we recompute and surface missing costs.
       const hasUnresolvedField = cachedReport
         && Object.prototype.hasOwnProperty.call(cachedReport.report as any, 'unresolved_cost_items')
-      if (cachedReport && hasUnresolvedField) {
+      // v2 = cost-as-of-invoice-date resolution. Older caches used latest-only
+      // cost and are treated as stale so we recompute with historical bills.
+      const hasCostAsOfVersion = cachedReport
+        && (cachedReport.report as any)?.report_version >= 2
+      if (cachedReport && hasUnresolvedField && hasCostAsOfVersion) {
         const report = await applyLockedPayoutsToReport(supabase, cachedReport.report, periodMonth)
         return new Response(JSON.stringify({
           ...report,
