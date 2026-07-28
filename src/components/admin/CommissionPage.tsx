@@ -60,6 +60,8 @@ type CommissionLineItem = {
   base_commission_rate?: number;
   commission_rate: number;
   commission: number;
+  excluded_reason?: 'zero_cost' | 'negative_margin' | 'unknown_cost';
+  discount_applied?: number;
 };
 
 type CommissionInvoice = {
@@ -76,6 +78,10 @@ type CommissionInvoice = {
   gross_sub_total?: number;
   credited_sub_total?: number;
   credited_commission?: number;
+  write_off_amount?: number;
+  invoice_discount?: number;
+  excluded_line_count?: number;
+  excluded_sub_total?: number;
 };
 
 type CommissionRepData = {
@@ -89,6 +95,8 @@ type CommissionRepData = {
   locked_commission: number;
   locked_invoice_count: number;
   is_locked: boolean;
+  excluded_line_count?: number;
+  excluded_sub_total?: number;
   invoices: CommissionInvoice[];
   companies: string[];
 };
@@ -1299,6 +1307,21 @@ const CommissionPage = () => {
                                               −{formatCurrency(inv.credited_sub_total || 0)} credited
                                             </Badge>
                                           )}
+                                          {(inv.write_off_amount ?? 0) > 0 && (
+                                            <Badge variant="outline" className="text-[10px] ml-1 border-red-500/60 text-red-700 dark:text-red-300">
+                                              −{formatCurrency(inv.write_off_amount || 0)} written off
+                                            </Badge>
+                                          )}
+                                          {(inv.invoice_discount ?? 0) > 0 && (
+                                            <Badge variant="outline" className="text-[10px] ml-1 border-blue-500/60 text-blue-700 dark:text-blue-300">
+                                              −{formatCurrency(inv.invoice_discount || 0)} discount
+                                            </Badge>
+                                          )}
+                                          {(inv.excluded_line_count ?? 0) > 0 && (
+                                            <Badge variant="outline" className="text-[10px] ml-1 border-muted-foreground/40 text-muted-foreground">
+                                              {inv.excluded_line_count} excluded
+                                            </Badge>
+                                          )}
                                         </span>
                                       </td>
                                       <td className="p-2">{inv.customer_name}</td>
@@ -1382,9 +1405,21 @@ const CommissionPage = () => {
                                                     saveTimersRef.current.set(key, setTimeout(run, 700));
                                                   };
                                                   return (
-                                                    <tr key={j} className="border-t border-border/40">
+                                                    <tr key={j} className={cn("border-t border-border/40", li.excluded_reason && "opacity-60") }>
                                                       <td className="py-1.5 pr-2">
-                                                        <div className="font-medium text-foreground">{li.name || "—"}</div>
+                                                        <div className="font-medium text-foreground flex items-center gap-1.5 flex-wrap">
+                                                          <span>{li.name || "—"}</span>
+                                                          {li.excluded_reason && (
+                                                            <Badge variant="outline" className="text-[9px] px-1 py-0 border-muted-foreground/40 text-muted-foreground uppercase">
+                                                              {li.excluded_reason === 'zero_cost' ? 'Zero cost' : li.excluded_reason === 'negative_margin' ? 'Below cost' : 'No cost'}
+                                                            </Badge>
+                                                          )}
+                                                          {(li.discount_applied ?? 0) > 0 && (
+                                                            <Badge variant="outline" className="text-[9px] px-1 py-0 border-blue-500/50 text-blue-600 dark:text-blue-300">
+                                                              −{formatCurrency(li.discount_applied || 0)} disc
+                                                            </Badge>
+                                                          )}
+                                                        </div>
                                                         {li.code && <div className="text-[10px] text-muted-foreground">{li.code}</div>}
                                                       </td>
                                                       <td className="py-1.5 text-right">{li.quantity}</td>
