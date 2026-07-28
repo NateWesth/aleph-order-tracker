@@ -593,14 +593,27 @@ Deno.serve(async (req) => {
       }
 
       const invoiceIdStr = String(inv.invoice_id || inv.invoice_number || inv.number || '').trim()
+
+      // Credit-note adjustment: if this invoice has been (partially) credited
+      // during the report period, reduce both the invoiced subtotal and the
+      // commission proportionally. Prevents paying commission on returns.
+      const creditedSubTotal = creditByInvoiceId.get(invoiceIdStr) ?? 0
+      const netSubTotal = Math.max(0, invSubTotal - creditedSubTotal)
+      let creditRatio = 0
+      if (creditedSubTotal > 0 && invSubTotal > 0) {
+        creditRatio = Math.min(1, creditedSubTotal / invSubTotal)
+      }
+      const creditedCommission = commission * creditRatio
+      const netCommission = commission - creditedCommission
+
       const isLocked = lockedSet.has(lockedKey(target.rep_id, invoiceIdStr))
 
       if (isLocked) {
-        result.lockedCommission += commission
+        result.lockedCommission += netCommission
         result.lockedInvoiceCount++
       } else {
-        result.totalInvoiced += invSubTotal
-        result.commissionEarned += commission
+        result.totalInvoiced += netSubTotal
+        result.commissionEarned += netCommission
         result.invoiceCount++
       }
       result.invoices.push({
@@ -608,12 +621,15 @@ Deno.serve(async (req) => {
         invoice_number: inv.invoice_number || inv.number || '',
         customer_name: inv.customer_name || '',
         date: inv.date || inv.invoice_date || '',
-        sub_total: invSubTotal,
+        sub_total: netSubTotal,
         total: invTotal,
-        commission,
+        commission: netCommission,
         commission_rate: Math.round(displayRate * 100) / 100,
         line_items: lineDetails,
         locked: isLocked,
+        gross_sub_total: invSubTotal,
+        credited_sub_total: Math.round(creditedSubTotal * 100) / 100,
+        credited_commission: Math.round(creditedCommission * 100) / 100,
       })
     }
     console.log(`Matched ${matched}/${invoiceList.length} invoices to reps. Skipped ${duplicatesSkipped} duplicates. Unmatched samples:`, unmatchedSamples)
