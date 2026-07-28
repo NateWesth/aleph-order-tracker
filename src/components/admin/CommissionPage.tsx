@@ -60,6 +60,8 @@ type CommissionLineItem = {
   base_commission_rate?: number;
   commission_rate: number;
   commission: number;
+  excluded_reason?: 'zero_cost' | 'negative_margin' | 'unknown_cost';
+  discount_applied?: number;
 };
 
 type CommissionInvoice = {
@@ -76,6 +78,10 @@ type CommissionInvoice = {
   gross_sub_total?: number;
   credited_sub_total?: number;
   credited_commission?: number;
+  write_off_amount?: number;
+  invoice_discount?: number;
+  excluded_line_count?: number;
+  excluded_sub_total?: number;
 };
 
 type CommissionRepData = {
@@ -89,6 +95,8 @@ type CommissionRepData = {
   locked_commission: number;
   locked_invoice_count: number;
   is_locked: boolean;
+  excluded_line_count?: number;
+  excluded_sub_total?: number;
   invoices: CommissionInvoice[];
   companies: string[];
 };
