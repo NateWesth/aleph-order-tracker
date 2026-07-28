@@ -502,9 +502,47 @@ Deno.serve(async (req) => {
       const invSubTotal = getInvoiceSubTotal(detailed)
       const invTotal = toNumber(detailed.total) ?? invSubTotal
 
-      let lineCommission = 0
+      // Invoice-level discount (applied at the footer of the invoice, not per
+      // line). Zoho exposes this as discount_total / discount_amount / discount.
+      // We prorate it across lines by their sub_total share so per-line margin
+      // math reflects the actual money received.
+      const invoiceLevelDiscount = Math.max(
+        0,
+        toNumber(detailed.discount_total) ??
+          toNumber(detailed.discount_amount) ??
+          toNumber(detailed.discount) ??
+          0,
+      )
+      // Write-offs — amount the customer will never pay. Treated the same way
+      // as a credit note: reduces both the earned subtotal and commission.
+      const writeOffAmount = Math.max(0, toNumber(detailed.write_off_amount) ?? 0)
+
+      // First pass: collect raw line rows so we can compute the discount share.
+      type RawLine = {
+        li: any
+        qty: number
+        rawSubTotal: number
+        rawSellRate: number
+        sig: string | null
+        cost: number | null
+      }
+      const rawLines: RawLine[] = []
+      let sumRawSubTotals = 0
+      for (const li of lineItems) {
+        const qty = toNumber(li.quantity) ?? 0
+        const rawSubTotal =
+          toNumber(li.item_total) ??
+          toNumber(li.item_sub_total) ??
+          ((toNumber(li.rate) ?? 0) * qty)
+        if (rawSubTotal <= 0) continue
+        const rawSellRate = toNumber(li.rate) ?? (qty > 0 ? rawSubTotal / qty : 0)
+        const sig = lineCostSignature(li)
+        const cost = sig ? (costMap.get(sig) ?? null) : null
+        rawLines.push({ li, qty, rawSubTotal, rawSellRate, sig, cost })
+        sumRawSubTotals += rawSubTotal
+      }
+
       let coveredLineSubTotal = 0
-      let weightedRateNumerator = 0
       const lineDetails: Array<{
         name: string
         code: string
@@ -516,23 +554,20 @@ Deno.serve(async (req) => {
         base_commission_rate: number
         commission_rate: number
         commission: number
+        excluded_reason?: 'zero_cost' | 'negative_margin' | 'unknown_cost'
+        discount_applied?: number
       }> = []
 
-      for (const li of lineItems) {
-        const qty = toNumber(li.quantity) ?? 0
-        const lineSubTotal =
-          toNumber(li.item_total) ??
-          toNumber(li.item_sub_total) ??
-          ((toNumber(li.rate) ?? 0) * qty)
+      for (const row of rawLines) {
+        const { li, qty, rawSubTotal, rawSellRate, sig, cost } = row
 
-        if (lineSubTotal <= 0) continue
+        // Prorate invoice-level discount by sub_total share.
+        const discountShare = sumRawSubTotals > 0 && invoiceLevelDiscount > 0
+          ? (rawSubTotal / sumRawSubTotals) * invoiceLevelDiscount
+          : 0
+        const lineSubTotal = Math.max(0, rawSubTotal - discountShare)
+        const sellRate = qty > 0 ? lineSubTotal / qty : rawSellRate
 
-        const sellRate = toNumber(li.rate) ?? (qty > 0 ? lineSubTotal / qty : 0)
-        const sig = lineCostSignature(li)
-        const cost = sig ? (costMap.get(sig) ?? null) : null
-        // Only flag as "unresolved" when we truly have no cost data. A cost
-        // of 0 is a real (though non-commissionable) resolution and should NOT
-        // clutter the missing-costs dialog.
         if (cost === null && lineSubTotal > 0) {
           const info = sig ? signatureSamples.get(sig) : null
           unresolvedCostItems.push({
@@ -541,13 +576,12 @@ Deno.serve(async (req) => {
             invoice_number: inv.invoice_number || inv.number || '',
             customer_name: inv.customer_name || '',
             quantity: qty,
-            sell_rate: toNumber(li.rate) ?? 0,
+            sell_rate: rawSellRate,
             sub_total: lineSubTotal,
           })
         }
 
-
-        const { commission: lc, effectiveRate } = computeLineCommission(
+        const { commission: lc, effectiveRate, excluded_reason } = computeLineCommission(
           method,
           fullRate,
           lineSubTotal,
@@ -555,9 +589,7 @@ Deno.serve(async (req) => {
           sellRate,
           cost,
         )
-        lineCommission += lc
         coveredLineSubTotal += lineSubTotal
-        weightedRateNumerator += lineSubTotal * effectiveRate
 
         const marginPct = (cost !== null && cost > 0 && sellRate > 0)
           ? ((sellRate - cost) / cost) * 100
@@ -574,6 +606,8 @@ Deno.serve(async (req) => {
           base_commission_rate: fullRate,
           commission_rate: Math.round(effectiveRate * 100) / 100,
           commission: Math.round(lc * 100) / 100,
+          ...(excluded_reason ? { excluded_reason } : {}),
+          ...(discountShare > 0 ? { discount_applied: Math.round(discountShare * 100) / 100 } : {}),
         })
       }
 
@@ -594,17 +628,21 @@ Deno.serve(async (req) => {
 
       const invoiceIdStr = String(inv.invoice_id || inv.invoice_number || inv.number || '').trim()
 
-      // Credit-note adjustment: if this invoice has been (partially) credited
-      // during the report period, reduce both the invoiced subtotal and the
-      // commission proportionally. Prevents paying commission on returns.
+      // Credit-note + write-off adjustment: reduce both the invoiced subtotal
+      // and the commission proportionally so we never pay on returns/uncollected.
       const creditedSubTotal = creditByInvoiceId.get(invoiceIdStr) ?? 0
-      const netSubTotal = Math.max(0, invSubTotal - creditedSubTotal)
-      let creditRatio = 0
-      if (creditedSubTotal > 0 && invSubTotal > 0) {
-        creditRatio = Math.min(1, creditedSubTotal / invSubTotal)
+      const adjustmentTotal = creditedSubTotal + writeOffAmount
+      const netSubTotal = Math.max(0, invSubTotal - adjustmentTotal)
+      let adjustmentRatio = 0
+      if (adjustmentTotal > 0 && invSubTotal > 0) {
+        adjustmentRatio = Math.min(1, adjustmentTotal / invSubTotal)
       }
-      const creditedCommission = commission * creditRatio
+      const creditedCommission = commission * adjustmentRatio
       const netCommission = commission - creditedCommission
+
+      // Excluded-line summary for this invoice.
+      const excludedLines = lineDetails.filter(l => l.excluded_reason)
+      const excludedSubTotal = excludedLines.reduce((s, l) => s + Number(l.sub_total || 0), 0)
 
       const isLocked = lockedSet.has(lockedKey(target.rep_id, invoiceIdStr))
 
@@ -615,6 +653,11 @@ Deno.serve(async (req) => {
         result.totalInvoiced += netSubTotal
         result.commissionEarned += netCommission
         result.invoiceCount++
+      }
+      // Rep-level excluded totals (unlocked only, matches commissionEarned scope).
+      if (!isLocked) {
+        result.excludedLineCount = (result.excludedLineCount || 0) + excludedLines.length
+        result.excludedSubTotal = (result.excludedSubTotal || 0) + excludedSubTotal
       }
       result.invoices.push({
         invoice_id: invoiceIdStr,
@@ -630,6 +673,10 @@ Deno.serve(async (req) => {
         gross_sub_total: invSubTotal,
         credited_sub_total: Math.round(creditedSubTotal * 100) / 100,
         credited_commission: Math.round(creditedCommission * 100) / 100,
+        write_off_amount: Math.round(writeOffAmount * 100) / 100,
+        invoice_discount: Math.round(invoiceLevelDiscount * 100) / 100,
+        excluded_line_count: excludedLines.length,
+        excluded_sub_total: Math.round(excludedSubTotal * 100) / 100,
       })
     }
     console.log(`Matched ${matched}/${invoiceList.length} invoices to reps. Skipped ${duplicatesSkipped} duplicates. Unmatched samples:`, unmatchedSamples)
