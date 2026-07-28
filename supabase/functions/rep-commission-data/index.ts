@@ -375,18 +375,41 @@ Deno.serve(async (req) => {
       if (Number.isFinite(c)) overrideCostMap.set(sig, c)
     }
 
-    // 2) Vendor bill lookup for the remainder
+    // 2) Vendor bill lookup for the remainder — returns a HISTORY per sig so
+    //    we can resolve cost as-of each invoice date (not just the latest).
     const stillNeeded = new Set<string>()
     for (const sig of lineCostSignatures) {
       if (!overrideCostMap.has(sig)) stillNeeded.add(sig)
     }
-    const billCostMap = await fetchCostPricesFromBills(accessToken, orgId, stillNeeded, date_end)
+    const billCostHistory = await fetchBillCostHistory(accessToken, orgId, stillNeeded, date_end)
 
+    // Scalar "latest known" cost map — used only for cache metadata / logging.
     const costMap = new Map<string, number>()
-    for (const [k, v] of billCostMap) costMap.set(k, v)
+    for (const [sig, entries] of billCostHistory) {
+      if (entries.length > 0) costMap.set(sig, entries[0].rate) // entries sorted desc by date
+    }
     for (const [k, v] of overrideCostMap) costMap.set(k, v) // overrides win
 
-    console.log(`Resolved ${costMap.size}/${lineCostSignatures.size} item costs (${billCostMap.size} vendor bills, ${overrideCostMap.size} manual overrides)`)
+    // Resolve the cost for a given signature as of a specific invoice date.
+    // Prefers the latest bill on or before the invoice date; falls back to the
+    // earliest bill we have if none precede the invoice. Admin overrides win.
+    const resolveCostAsOf = (sig: string | null, invoiceDate: string): number | null => {
+      if (!sig) return null
+      const override = overrideCostMap.get(sig)
+      if (override !== undefined) return override
+      const history = billCostHistory.get(sig)
+      if (!history || history.length === 0) return null
+      if (invoiceDate) {
+        for (const entry of history) {
+          if (entry.date && entry.date <= invoiceDate) return entry.rate
+        }
+      }
+      // No bill precedes the invoice — use the earliest available bill
+      // (last element after desc sort) as best-effort baseline.
+      return history[history.length - 1].rate
+    }
+
+    console.log(`Resolved ${costMap.size}/${lineCostSignatures.size} item costs (${billCostHistory.size} vendor bill histories, ${overrideCostMap.size} manual overrides)`)
 
 
     // Fetch existing locked payouts for this period so we can flag/skip them.
