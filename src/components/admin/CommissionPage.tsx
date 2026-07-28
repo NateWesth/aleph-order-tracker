@@ -1294,11 +1294,23 @@ const CommissionPage = () => {
                                             : <ChevronRight className="h-3 w-3 text-muted-foreground" />)}
                                           {inv.invoice_number}
                                           {inv.locked && <Lock className="h-3 w-3 text-muted-foreground ml-1" />}
+                                          {(inv.credited_sub_total ?? 0) > 0 && (
+                                            <Badge variant="outline" className="text-[10px] ml-1 border-amber-500/60 text-amber-700 dark:text-amber-300">
+                                              −{formatCurrency(inv.credited_sub_total || 0)} credited
+                                            </Badge>
+                                          )}
                                         </span>
                                       </td>
                                       <td className="p-2">{inv.customer_name}</td>
                                       <td className="p-2">{inv.date}</td>
-                                      <td className="p-2 text-right">{formatCurrency(inv.sub_total)}</td>
+                                      <td className="p-2 text-right">
+                                        {formatCurrency(inv.sub_total)}
+                                        {(inv.credited_sub_total ?? 0) > 0 && (inv.gross_sub_total ?? 0) > 0 && (
+                                          <div className="text-[10px] text-muted-foreground line-through">
+                                            {formatCurrency(inv.gross_sub_total || 0)}
+                                          </div>
+                                        )}
+                                      </td>
                                       <td className="p-2 text-right">
                                         <Badge variant={inv.commission_rate !== d.commission_rate ? "outline" : "secondary"} className="text-xs">
                                           {inv.commission_rate}%
