@@ -910,6 +910,99 @@ async function fetchZohoInvoices(accessToken: string, orgId: string, dateStart: 
   return Array.from(uniqueInvoices.values())
 }
 
+// Fetch credit notes in the period and aggregate the credited SUBTOTAL
+// (ex-VAT) against each referenced invoice_id. Excludes void/draft.
+async function fetchCreditNotesByInvoice(
+  accessToken: string,
+  orgId: string,
+  dateStart: string,
+  dateEnd: string,
+): Promise<Map<string, number>> {
+  const map = new Map<string, number>()
+  let page = 1
+  let hasMore = true
+
+  while (hasMore && page <= 10) {
+    const params = new URLSearchParams({
+      organization_id: orgId,
+      date_start: dateStart,
+      date_end: dateEnd,
+      page: String(page),
+      per_page: '200',
+    })
+
+    let listData: any
+    try {
+      const resp = await fetch(`${ZOHO_API_URL}/books/v3/creditnotes?${params.toString()}`, {
+        headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` },
+      })
+      listData = await resp.json()
+      if (!resp.ok || listData.code !== 0) {
+        console.warn('Zoho creditnotes list error:', listData?.message)
+        break
+      }
+    } catch (e) {
+      console.warn('Zoho creditnotes fetch error:', e)
+      break
+    }
+
+    const notes = listData.creditnotes || []
+    if (!notes.length) break
+
+    // Fetch detail (line items include invoice_id refs) in parallel batches.
+    for (let i = 0; i < notes.length; i += 8) {
+      const batch = notes.slice(i, i + 8)
+      const details = await Promise.all(batch.map(async (n: any) => {
+        const status = String(n.status || '').toLowerCase()
+        if (status === 'void' || status === 'draft') return null
+        const id = n.creditnote_id
+        if (!id) return null
+        try {
+          const r = await fetch(
+            `${ZOHO_API_URL}/books/v3/creditnotes/${id}?organization_id=${orgId}`,
+            { headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` } },
+          )
+          const d = await r.json()
+          if (!r.ok || d.code !== 0) return null
+          return d.creditnote || null
+        } catch { return null }
+      }))
+
+      for (const cn of details) {
+        if (!cn) continue
+        const subTotal = toNumber(cn.sub_total) ?? toNumber(cn.total_before_tax) ?? 0
+        // invoices_credited: [{ invoice_id, amount_applied }] on newer schemas.
+        const invoicesCredited = Array.isArray(cn.invoices_credited) ? cn.invoices_credited : []
+        if (invoicesCredited.length > 0 && subTotal > 0) {
+          const gross = invoicesCredited.reduce(
+            (s: number, x: any) => s + (toNumber(x.amount_applied) ?? 0),
+            0,
+          )
+          for (const ic of invoicesCredited) {
+            const invId = String(ic.invoice_id || '').trim()
+            if (!invId) continue
+            const applied = toNumber(ic.amount_applied) ?? 0
+            // Pro-rate the ex-VAT subtotal by amount_applied share.
+            const share = gross > 0 ? applied / gross : 1 / invoicesCredited.length
+            map.set(invId, (map.get(invId) ?? 0) + subTotal * share)
+          }
+        } else {
+          // Fallback: some credit notes reference invoice_id directly on the note.
+          const invId = String(cn.invoice_id || '').trim()
+          if (invId && subTotal > 0) {
+            map.set(invId, (map.get(invId) ?? 0) + subTotal)
+          }
+        }
+      }
+    }
+
+    hasMore = listData.page_context?.has_more_page ?? false
+    page++
+  }
+
+  return map
+}
+
 // Identifiers that are shared across many unrelated items (e.g. the generic
 // "M-Miscellaneous" SKU/name is reused on dozens of completely different
 // custom-priced lines). For those, looking up by SKU/name produces a wrong
