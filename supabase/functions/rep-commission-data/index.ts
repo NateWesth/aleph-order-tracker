@@ -72,6 +72,10 @@ const computeEffectiveRate = (
 }
 
 // Returns commission AMOUNT for a single line, given the chosen method.
+// Zero-cost lines (cost === 0) are treated as "no commissionable margin" and
+// earn nothing — a real vendor cost of 0 usually means the item was mis-billed
+// or given away; paying commission on a "100% margin" from a zero cost would
+// hugely overpay. Negative margins (selling below cost) are floored at 0 too.
 const computeLineCommission = (
   method: CommissionMethod,
   fullRate: number,
@@ -79,26 +83,26 @@ const computeLineCommission = (
   qty: number,
   sellRate: number,
   cost: number | null,
-): { commission: number; effectiveRate: number } => {
+): { commission: number; effectiveRate: number; excluded_reason?: 'zero_cost' | 'negative_margin' | 'unknown_cost' } => {
+  // Explicit zero cost — never earn commission on this line.
+  if (cost !== null && cost <= 0) {
+    return { commission: 0, effectiveRate: 0, excluded_reason: 'zero_cost' }
+  }
+
   let marginPct: number | null = null
-  // Any positive cost is a real cost — items can legitimately cost less than R1.
   const hasRealCost = cost !== null && cost > 0
   if (hasRealCost && sellRate > 0) {
     marginPct = ((sellRate - (cost as number)) / (cost as number)) * 100
   }
 
   if (method === 'half_markup_below_25') {
-    // Unknown cost -> SKIP (no commission) so we never overpay on items
-    // we can't verify a vendor cost for.
     if (marginPct === null) {
-      return { commission: 0, effectiveRate: 0 }
+      return { commission: 0, effectiveRate: 0, excluded_reason: 'unknown_cost' }
     }
-    if (marginPct < 0) return { commission: 0, effectiveRate: 0 }
+    if (marginPct < 0) return { commission: 0, effectiveRate: 0, excluded_reason: 'negative_margin' }
 
     const costBasis = (cost as number) * qty
     const profit = (sellRate - (cost as number)) * qty
-    // >= 25% margin -> rep's full rate applied to cost × qty per line
-    // <  25% margin -> half of the profit (50/50 split)
     const commission = marginPct >= 25
       ? costBasis * (fullRate / 100)
       : Math.max(0, profit * 0.5)
@@ -107,6 +111,9 @@ const computeLineCommission = (
   }
 
   // default: margin_scaled
+  if (marginPct !== null && marginPct < 0) {
+    return { commission: 0, effectiveRate: 0, excluded_reason: 'negative_margin' }
+  }
   const rate = computeEffectiveRate(fullRate, marginPct)
   return { commission: lineSubTotal * (rate / 100), effectiveRate: rate }
 }
