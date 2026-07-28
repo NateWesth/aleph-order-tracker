@@ -411,6 +411,8 @@ Deno.serve(async (req) => {
       lockedCommission: number
       lockedInvoiceCount: number
       isLocked: boolean
+      excludedLineCount: number
+      excludedSubTotal: number
       invoices: Array<{
         invoice_id: string
         invoice_number: string
@@ -431,8 +433,17 @@ Deno.serve(async (req) => {
           base_commission_rate: number
           commission_rate: number
           commission: number
+          excluded_reason?: 'zero_cost' | 'negative_margin' | 'unknown_cost'
+          discount_applied?: number
         }>
         locked: boolean
+        gross_sub_total?: number
+        credited_sub_total?: number
+        credited_commission?: number
+        write_off_amount?: number
+        invoice_discount?: number
+        excluded_line_count?: number
+        excluded_sub_total?: number
       }>
     }
 
@@ -446,6 +457,8 @@ Deno.serve(async (req) => {
         lockedCommission: 0,
         lockedInvoiceCount: 0,
         isLocked: false,
+        excludedLineCount: 0,
+        excludedSubTotal: 0,
         invoices: [],
       })
     }
