@@ -899,8 +899,8 @@ const CommissionPage = () => {
       "Effective Rate %", "Commission",
       "Line Item", "SKU", "Qty", "Sell Rate", "Cost", "Margin %", "Line Sub Total", "Line Rate %", "Line Commission", "Excluded Reason",
     ]);
-    for (const inv of [...d.invoices, ...(d.locked_invoices || [])]) {
-      const status = (d.locked_invoices || []).some((li) => li.invoice_id === inv.invoice_id) ? "paid" : "due";
+    for (const inv of d.invoices) {
+      const status = (inv as any).is_locked ? "paid" : "due";
       const lines = inv.line_items || [];
       if (lines.length === 0) {
         rows.push([
