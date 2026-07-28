@@ -564,6 +564,7 @@ Deno.serve(async (req) => {
       }
       const rawLines: RawLine[] = []
       let sumRawSubTotals = 0
+      const invoiceDateForCost: string = String(detailed.date || detailed.invoice_date || inv.date || inv.invoice_date || '')
       for (const li of lineItems) {
         const qty = toNumber(li.quantity) ?? 0
         const rawSubTotal =
@@ -573,7 +574,7 @@ Deno.serve(async (req) => {
         if (rawSubTotal <= 0) continue
         const rawSellRate = toNumber(li.rate) ?? (qty > 0 ? rawSubTotal / qty : 0)
         const sig = lineCostSignature(li)
-        const cost = sig ? (costMap.get(sig) ?? null) : null
+        const cost = resolveCostAsOf(sig, invoiceDateForCost)
         rawLines.push({ li, qty, rawSubTotal, rawSellRate, sig, cost })
         sumRawSubTotals += rawSubTotal
       }
