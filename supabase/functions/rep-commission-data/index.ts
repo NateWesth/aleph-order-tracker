@@ -316,6 +316,11 @@ Deno.serve(async (req) => {
     const invoiceList = await fetchZohoInvoices(accessToken, orgId, date_start, date_end)
     console.log(`Fetched ${invoiceList.length} invoices`)
 
+    // Fetch credit notes for the same period so we can deduct refunds/returns
+    // from rep commission. Map by referenced invoice_id.
+    const creditByInvoiceId = await fetchCreditNotesByInvoice(accessToken, orgId, date_start, date_end)
+    console.log(`Fetched ${creditByInvoiceId.size} invoices with credit notes`)
+
     // Pre-filter: only fetch line-item details for invoices belonging to assigned reps
     const relevantInvoices = invoiceList.filter(inv =>
       matchInvoiceToAssignment(inv.customer_name || '') !== null
