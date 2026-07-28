@@ -879,6 +879,60 @@ const CommissionPage = () => {
     URL.revokeObjectURL(url);
   };
 
+  const exportRepStatement = (d: CommissionRepData) => {
+    const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const monthLabel = format(new Date(selectedMonth + "-01"), "MMMM yyyy");
+    const rows: string[][] = [];
+    rows.push(["Sales Commission Statement"]);
+    rows.push(["Period", monthLabel]);
+    rows.push(["Rep", d.rep_name]);
+    rows.push(["Email", d.rep_email || ""]);
+    rows.push(["Default Rate %", String(d.commission_rate)]);
+    rows.push(["Total Invoiced (excl. VAT)", String(d.total_invoiced)]);
+    rows.push(["Commission Earned", String(d.commission_earned)]);
+    rows.push(["Due Invoice Count", String(d.invoice_count)]);
+    rows.push(["Paid/Locked Commission", String(d.locked_commission)]);
+    rows.push([]);
+    rows.push([
+      "Invoice #", "Customer", "Date", "Status",
+      "Sub Total (excl. VAT)", "Credited", "Write-off", "Discount",
+      "Effective Rate %", "Commission",
+      "Line Item", "SKU", "Qty", "Sell Rate", "Cost", "Margin %", "Line Sub Total", "Line Rate %", "Line Commission", "Excluded Reason",
+    ]);
+    for (const inv of d.invoices) {
+      const status = (inv as any).is_locked ? "paid" : "due";
+      const lines = inv.line_items || [];
+      if (lines.length === 0) {
+        rows.push([
+          inv.invoice_number, inv.customer_name, inv.date, status,
+          String(inv.sub_total), String(inv.credited_sub_total || 0), String(inv.write_off_amount || 0), String(inv.invoice_discount || 0),
+          String(inv.commission_rate), String(inv.commission),
+          "", "", "", "", "", "", "", "", "", "",
+        ]);
+      } else {
+        for (const li of lines) {
+          rows.push([
+            inv.invoice_number, inv.customer_name, inv.date, status,
+            String(inv.sub_total), String(inv.credited_sub_total || 0), String(inv.write_off_amount || 0), String(inv.invoice_discount || 0),
+            String(inv.commission_rate), String(inv.commission),
+            li.name, li.code || "", String(li.quantity), String(li.rate), li.cost === null ? "" : String(li.cost),
+            li.margin_percent === null ? "" : String(li.margin_percent),
+            String(li.sub_total), String(li.commission_rate), String(li.commission), li.excluded_reason || "",
+          ]);
+        }
+      }
+    }
+    const csv = rows.map((r) => r.map(esc).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    const safeName = d.rep_name.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
+    a.download = `statement-${safeName}-${selectedMonth}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const printPdfReport = () => {
     if (!commissionData?.data) return;
     const doc = new jsPDF();
@@ -1227,6 +1281,18 @@ const CommissionPage = () => {
                               Unlock
                             </Button>
                           ) : null}
+                          {(d.invoices.length > 0) && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={(e) => { e.stopPropagation(); exportRepStatement(d); }}
+                              className="gap-1"
+                              title="Download rep statement (CSV)"
+                            >
+                              <Download className="h-3.5 w-3.5" />
+                              Statement
+                            </Button>
+                          )}
                         </div>
                       </div>
                       {d.companies.length > 0 && (

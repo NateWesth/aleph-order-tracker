@@ -196,7 +196,11 @@ Deno.serve(async (req) => {
       // existed. Treat those as stale so we recompute and surface missing costs.
       const hasUnresolvedField = cachedReport
         && Object.prototype.hasOwnProperty.call(cachedReport.report as any, 'unresolved_cost_items')
-      if (cachedReport && hasUnresolvedField) {
+      // v2 = cost-as-of-invoice-date resolution. Older caches used latest-only
+      // cost and are treated as stale so we recompute with historical bills.
+      const hasCostAsOfVersion = cachedReport
+        && (cachedReport.report as any)?.report_version >= 2
+      if (cachedReport && hasUnresolvedField && hasCostAsOfVersion) {
         const report = await applyLockedPayoutsToReport(supabase, cachedReport.report, periodMonth)
         return new Response(JSON.stringify({
           ...report,
@@ -375,18 +379,41 @@ Deno.serve(async (req) => {
       if (Number.isFinite(c)) overrideCostMap.set(sig, c)
     }
 
-    // 2) Vendor bill lookup for the remainder
+    // 2) Vendor bill lookup for the remainder — returns a HISTORY per sig so
+    //    we can resolve cost as-of each invoice date (not just the latest).
     const stillNeeded = new Set<string>()
     for (const sig of lineCostSignatures) {
       if (!overrideCostMap.has(sig)) stillNeeded.add(sig)
     }
-    const billCostMap = await fetchCostPricesFromBills(accessToken, orgId, stillNeeded, date_end)
+    const billCostHistory = await fetchBillCostHistory(accessToken, orgId, stillNeeded, date_end)
 
+    // Scalar "latest known" cost map — used only for cache metadata / logging.
     const costMap = new Map<string, number>()
-    for (const [k, v] of billCostMap) costMap.set(k, v)
+    for (const [sig, entries] of billCostHistory) {
+      if (entries.length > 0) costMap.set(sig, entries[0].rate) // entries sorted desc by date
+    }
     for (const [k, v] of overrideCostMap) costMap.set(k, v) // overrides win
 
-    console.log(`Resolved ${costMap.size}/${lineCostSignatures.size} item costs (${billCostMap.size} vendor bills, ${overrideCostMap.size} manual overrides)`)
+    // Resolve the cost for a given signature as of a specific invoice date.
+    // Prefers the latest bill on or before the invoice date; falls back to the
+    // earliest bill we have if none precede the invoice. Admin overrides win.
+    const resolveCostAsOf = (sig: string | null, invoiceDate: string): number | null => {
+      if (!sig) return null
+      const override = overrideCostMap.get(sig)
+      if (override !== undefined) return override
+      const history = billCostHistory.get(sig)
+      if (!history || history.length === 0) return null
+      if (invoiceDate) {
+        for (const entry of history) {
+          if (entry.date && entry.date <= invoiceDate) return entry.rate
+        }
+      }
+      // No bill precedes the invoice — use the earliest available bill
+      // (last element after desc sort) as best-effort baseline.
+      return history[history.length - 1].rate
+    }
+
+    console.log(`Resolved ${costMap.size}/${lineCostSignatures.size} item costs (${billCostHistory.size} vendor bill histories, ${overrideCostMap.size} manual overrides)`)
 
 
     // Fetch existing locked payouts for this period so we can flag/skip them.
@@ -541,6 +568,7 @@ Deno.serve(async (req) => {
       }
       const rawLines: RawLine[] = []
       let sumRawSubTotals = 0
+      const invoiceDateForCost: string = String(detailed.date || detailed.invoice_date || inv.date || inv.invoice_date || '')
       for (const li of lineItems) {
         const qty = toNumber(li.quantity) ?? 0
         const rawSubTotal =
@@ -550,7 +578,7 @@ Deno.serve(async (req) => {
         if (rawSubTotal <= 0) continue
         const rawSellRate = toNumber(li.rate) ?? (qty > 0 ? rawSubTotal / qty : 0)
         const sig = lineCostSignature(li)
-        const cost = sig ? (costMap.get(sig) ?? null) : null
+        const cost = resolveCostAsOf(sig, invoiceDateForCost)
         rawLines.push({ li, qty, rawSubTotal, rawSellRate, sig, cost })
         sumRawSubTotals += rawSubTotal
       }
@@ -737,7 +765,7 @@ Deno.serve(async (req) => {
     const unresolved = Array.from(unresolvedByKey.values())
       .sort((a, b) => b.occurrences - a.occurrences)
 
-    const report = { success: true, data, summary, unresolved_cost_items: unresolved }
+    const report = { success: true, data, summary, unresolved_cost_items: unresolved, report_version: 2 }
     await upsertCachedCommissionReport(supabase, {
       periodMonth,
       repId: rep_id ?? null,
@@ -1194,21 +1222,20 @@ async function fetchInvoicesWithLineItems(
 // (name+description) signature. Walks recent bills newest-first and keeps
 // the first (= most recent) rate seen per signature. Stops early once every
 // requested signature has been resolved or the page cap is reached.
-async function fetchCostPricesFromBills(
+async function fetchBillCostHistory(
   accessToken: string,
   orgId: string,
   signatures: Set<string>,
   invoiceDateEnd: string,
-): Promise<Map<string, number>> {
-  const costMap = new Map<string, number>()
-  if (signatures.size === 0) return costMap
+): Promise<Map<string, Array<{ date: string; rate: number }>>> {
+  const history = new Map<string, Array<{ date: string; rate: number }>>()
+  if (signatures.size === 0) return history
 
-  const remaining = new Set(signatures)
   let page = 1
   const maxPages = 25 // ~5,000 bills lookback cap
   let hasMore = true
 
-  while (hasMore && page <= maxPages && remaining.size > 0) {
+  while (hasMore && page <= maxPages) {
     const params = new URLSearchParams({
       organization_id: orgId,
       page: String(page),
@@ -1235,7 +1262,7 @@ async function fetchCostPricesFromBills(
     const bills = listData.bills || []
     if (!bills.length) break
 
-    for (let i = 0; i < bills.length && remaining.size > 0; i += 8) {
+    for (let i = 0; i < bills.length; i += 8) {
       const batch = bills.slice(i, i + 8)
       const details = await Promise.all(batch.map(async (b: any) => {
         const id = b.bill_id
@@ -1253,17 +1280,17 @@ async function fetchCostPricesFromBills(
 
       for (const bill of details) {
         if (!bill) continue
+        const billDate: string = String(bill.date || bill.bill_date || '')
         for (const li of bill.line_items || []) {
           // Vendor bill rate is already exclusive of tax in Zoho Books.
           const rate = toNumber(li.rate) ?? toNumber(li.item_rate)
           if (rate === null || rate <= 0) continue
 
           const sig = lineCostSignature(li)
-          if (!sig) continue
-          if (remaining.has(sig) && !costMap.has(sig)) {
-            costMap.set(sig, rate)
-            remaining.delete(sig)
-          }
+          if (!sig || !signatures.has(sig)) continue
+          const arr = history.get(sig) || []
+          arr.push({ date: billDate, rate })
+          history.set(sig, arr)
         }
       }
     }
@@ -1272,7 +1299,13 @@ async function fetchCostPricesFromBills(
     page++
   }
 
-  return costMap
+  // Sort each history desc by date so callers can find "latest on or before X"
+  // with a simple linear scan.
+  for (const arr of history.values()) {
+    arr.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
+  }
+
+  return history
 }
 
 
