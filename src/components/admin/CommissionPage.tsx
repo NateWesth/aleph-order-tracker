@@ -1281,6 +1281,18 @@ const CommissionPage = () => {
                               Unlock
                             </Button>
                           ) : null}
+                          {(d.invoices.length > 0) && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={(e) => { e.stopPropagation(); exportRepStatement(d); }}
+                              className="gap-1"
+                              title="Download rep statement (CSV)"
+                            >
+                              <Download className="h-3.5 w-3.5" />
+                              Statement
+                            </Button>
+                          )}
                         </div>
                       </div>
                       {d.companies.length > 0 && (
