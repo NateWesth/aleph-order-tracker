@@ -1307,6 +1307,21 @@ const CommissionPage = () => {
                                               −{formatCurrency(inv.credited_sub_total || 0)} credited
                                             </Badge>
                                           )}
+                                          {(inv.write_off_amount ?? 0) > 0 && (
+                                            <Badge variant="outline" className="text-[10px] ml-1 border-red-500/60 text-red-700 dark:text-red-300">
+                                              −{formatCurrency(inv.write_off_amount || 0)} written off
+                                            </Badge>
+                                          )}
+                                          {(inv.invoice_discount ?? 0) > 0 && (
+                                            <Badge variant="outline" className="text-[10px] ml-1 border-blue-500/60 text-blue-700 dark:text-blue-300">
+                                              −{formatCurrency(inv.invoice_discount || 0)} discount
+                                            </Badge>
+                                          )}
+                                          {(inv.excluded_line_count ?? 0) > 0 && (
+                                            <Badge variant="outline" className="text-[10px] ml-1 border-muted-foreground/40 text-muted-foreground">
+                                              {inv.excluded_line_count} excluded
+                                            </Badge>
+                                          )}
                                         </span>
                                       </td>
                                       <td className="p-2">{inv.customer_name}</td>
