@@ -1218,21 +1218,20 @@ async function fetchInvoicesWithLineItems(
 // (name+description) signature. Walks recent bills newest-first and keeps
 // the first (= most recent) rate seen per signature. Stops early once every
 // requested signature has been resolved or the page cap is reached.
-async function fetchCostPricesFromBills(
+async function fetchBillCostHistory(
   accessToken: string,
   orgId: string,
   signatures: Set<string>,
   invoiceDateEnd: string,
-): Promise<Map<string, number>> {
-  const costMap = new Map<string, number>()
-  if (signatures.size === 0) return costMap
+): Promise<Map<string, Array<{ date: string; rate: number }>>> {
+  const history = new Map<string, Array<{ date: string; rate: number }>>()
+  if (signatures.size === 0) return history
 
-  const remaining = new Set(signatures)
   let page = 1
   const maxPages = 25 // ~5,000 bills lookback cap
   let hasMore = true
 
-  while (hasMore && page <= maxPages && remaining.size > 0) {
+  while (hasMore && page <= maxPages) {
     const params = new URLSearchParams({
       organization_id: orgId,
       page: String(page),
@@ -1259,7 +1258,7 @@ async function fetchCostPricesFromBills(
     const bills = listData.bills || []
     if (!bills.length) break
 
-    for (let i = 0; i < bills.length && remaining.size > 0; i += 8) {
+    for (let i = 0; i < bills.length; i += 8) {
       const batch = bills.slice(i, i + 8)
       const details = await Promise.all(batch.map(async (b: any) => {
         const id = b.bill_id
@@ -1277,17 +1276,17 @@ async function fetchCostPricesFromBills(
 
       for (const bill of details) {
         if (!bill) continue
+        const billDate: string = String(bill.date || bill.bill_date || '')
         for (const li of bill.line_items || []) {
           // Vendor bill rate is already exclusive of tax in Zoho Books.
           const rate = toNumber(li.rate) ?? toNumber(li.item_rate)
           if (rate === null || rate <= 0) continue
 
           const sig = lineCostSignature(li)
-          if (!sig) continue
-          if (remaining.has(sig) && !costMap.has(sig)) {
-            costMap.set(sig, rate)
-            remaining.delete(sig)
-          }
+          if (!sig || !signatures.has(sig)) continue
+          const arr = history.get(sig) || []
+          arr.push({ date: billDate, rate })
+          history.set(sig, arr)
         }
       }
     }
@@ -1296,7 +1295,13 @@ async function fetchCostPricesFromBills(
     page++
   }
 
-  return costMap
+  // Sort each history desc by date so callers can find "latest on or before X"
+  // with a simple linear scan.
+  for (const arr of history.values()) {
+    arr.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
+  }
+
+  return history
 }
 
 
