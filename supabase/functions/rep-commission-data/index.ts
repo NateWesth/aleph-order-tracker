@@ -711,6 +711,8 @@ Deno.serve(async (req) => {
       locked_commission: Math.round(r.lockedCommission * 100) / 100,
       locked_invoice_count: r.lockedInvoiceCount,
       is_locked: r.isLocked,
+      excluded_line_count: r.excludedLineCount,
+      excluded_sub_total: Math.round(r.excludedSubTotal * 100) / 100,
       invoices: r.invoices,
       companies: Array.from(repCompanies.get(r.rep.id) || []).map(cid => companyIdToName.get(cid) || cid),
     }))
@@ -719,6 +721,8 @@ Deno.serve(async (req) => {
       totalInvoiced: data.reduce((s, d) => s + d.total_invoiced, 0),
       totalCommission: data.reduce((s, d) => s + d.commission_earned, 0),
       totalInvoices: data.reduce((s, d) => s + d.invoice_count, 0),
+      totalExcludedLines: data.reduce((s, d) => s + (d.excluded_line_count || 0), 0),
+      totalExcludedSubTotal: data.reduce((s, d) => s + (d.excluded_sub_total || 0), 0),
     }
 
     // Deduplicate unresolved items by (name+description) for the UI list.
