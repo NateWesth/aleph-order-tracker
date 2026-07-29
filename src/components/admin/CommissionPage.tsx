@@ -1842,6 +1842,20 @@ const CommissionPage = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {manageRep && (
+        <CommissionRepManagementDialog
+          open={!!manageRep}
+          onOpenChange={(v) => { if (!v) setManageRep(null); }}
+          repId={manageRep.rep_id}
+          repName={manageRep.rep_name}
+          periodMonth={selectedMonth}
+          isAdmin={isAdmin}
+          grossCommission={manageRep.commission_earned}
+          invoiceCount={manageRep.invoice_count}
+          onChanged={() => fetchCommissionReport(false)}
+        />
+      )}
     </div>
   );
 };
