@@ -134,8 +134,24 @@ export default function CommissionRepManagementDialog({
   );
   const netPayout = grossCommission + approvedAdjustmentsTotal;
 
+  const notifyRep = async (batchId: string, event: "locked" | "approved" | "paid") => {
+    try {
+      const { data, error } = await supabase.functions.invoke("notify-rep-payout", {
+        body: { batch_id: batchId, event },
+      });
+      if (error) throw error;
+      if (data?.skipped) {
+        toast({ title: "No email on file for rep", description: "Notification not sent." });
+      } else if (data?.ok) {
+        toast({ title: `Rep notified (${event})` });
+      }
+    } catch (e: any) {
+      toast({ title: "Email failed", description: e?.message || "Could not notify rep", variant: "destructive" });
+    }
+  };
+
   const createDraftBatch = async () => {
-    const { error } = await supabase.from("commission_payout_batches").insert({
+    const { data, error } = await supabase.from("commission_payout_batches").insert({
       rep_id: repId,
       period_month: periodDate,
       status: "draft",
@@ -145,10 +161,11 @@ export default function CommissionRepManagementDialog({
       net_payout: netPayout,
       notes: batchNotes || null,
       created_by: user?.id ?? null,
-    });
+    }).select("id").maybeSingle();
     if (error) { toast({ title: "Failed to create batch", description: error.message, variant: "destructive" }); return; }
-    toast({ title: "Draft batch created" });
+    toast({ title: "Draft batch created — period locked" });
     setBatchNotes("");
+    if (data?.id) await notifyRep(data.id, "locked");
     load();
     onChanged();
   };
@@ -163,6 +180,7 @@ export default function CommissionRepManagementDialog({
     }).eq("id", batch.id);
     if (error) { toast({ title: "Approve failed", description: error.message, variant: "destructive" }); return; }
     toast({ title: "Batch approved" });
+    await notifyRep(batch.id, "approved");
     load(); onChanged();
   };
 
@@ -176,6 +194,7 @@ export default function CommissionRepManagementDialog({
     if (error) { toast({ title: "Mark-paid failed", description: error.message, variant: "destructive" }); return; }
     setPaidReference("");
     toast({ title: "Batch marked paid" });
+    await notifyRep(batch.id, "paid");
     load(); onChanged();
   };
 
