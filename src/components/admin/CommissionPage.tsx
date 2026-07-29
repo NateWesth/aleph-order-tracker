@@ -396,6 +396,14 @@ const CommissionPage = () => {
   const reportRequestRef = useRef<string | null>(null);
   const saveTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const pendingSavesRef = useRef<Map<string, () => Promise<void> | void>>(new Map());
+  const [manageRep, setManageRep] = useState<CommissionRepData | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const { user } = useAuth();
+  useEffect(() => {
+    if (!user) return;
+    supabase.from("user_roles").select("role").eq("user_id", user.id).maybeSingle()
+      .then(({ data }) => setIsAdmin(data?.role === "admin"));
+  }, [user]);
 
   // Flush any pending debounced overrides on unmount / page hide so values
   // are not lost if the user closes the tab while still focused in a cell.
