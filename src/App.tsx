@@ -90,6 +90,13 @@ function App() {
                   <Route path="/portal" element={<Portal />} />
                   <Route path="/portal/login" element={<PortalLogin />} />
                   <Route path="/portal/invite" element={<PortalInvite />} />
+
+                  <Route path="/my-commissions" element={
+                    <ProtectedRoute>
+                      <RepStatementsPage />
+                    </ProtectedRoute>
+                  } />
+
                   
                   
                   <Route path="*" element={<NotFound />} />
