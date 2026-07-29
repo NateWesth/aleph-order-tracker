@@ -575,13 +575,28 @@ Deno.serve(async (req) => {
       }
       matched++
 
-      const result = repResults.get(target.rep_id)
+      // Resolve historical rep + rate + method for THIS invoice's date.
+      // Priority: historical per-company assignment override → historical
+      // rep-level rate → current values. Same for method (rep-level only).
+      const invoiceDateForRate: string = String(
+        (invoicesWithLines.find(d => d.invoice_id === inv.invoice_id) || inv).date
+          || (invoicesWithLines.find(d => d.invoice_id === inv.invoice_id) || inv).invoice_date
+          || inv.date || inv.invoice_date || ''
+      ).slice(0, 10)
+
+      const histAssign = resolveAssignmentAsOf(target.company_id, invoiceDateForRate)
+      const effectiveRepId = histAssign?.rep_id || target.rep_id
+      const result = repResults.get(effectiveRepId) || repResults.get(target.rep_id)
       if (!result) continue
 
-      // Use per-company override rate if set, otherwise rep default
-      const fullRate = target.commission_rate ?? result.rep.commission_rate
+      const histRepRate = resolveRepRateMethodAsOf(effectiveRepId, invoiceDateForRate)
+      const fullRate = histAssign?.rate
+        ?? target.commission_rate
+        ?? histRepRate.rate
+        ?? result.rep.commission_rate
       const method: CommissionMethod =
-        (result.rep.commission_method as CommissionMethod) || 'margin_scaled'
+        ((histRepRate.method || result.rep.commission_method) as CommissionMethod) || 'margin_scaled'
+
 
       // Use detailed invoice (with line items) if available, else header-only
       const detailed = invoicesWithLines.find(d => d.invoice_id === inv.invoice_id) || inv
