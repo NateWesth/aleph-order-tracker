@@ -1272,7 +1272,27 @@ const CommissionPage = () => {
                           <div className="text-right">
                             <div className="text-xs text-muted-foreground">{d.invoice_count} due • {formatCurrency(d.total_invoiced)}</div>
                             <div className="font-bold text-primary">{formatCurrency(d.commission_earned)}</div>
+                            {typeof d.adjustments_total === "number" && d.adjustments_total !== 0 && (
+                              <div className="text-[10px] text-muted-foreground">
+                                {d.adjustments_total > 0 ? "+" : ""}{formatCurrency(d.adjustments_total)} adj → net {formatCurrency(d.net_commission ?? d.commission_earned)}
+                              </div>
+                            )}
+                            {(d.open_adjustment_count ?? 0) > 0 && (
+                              <Badge variant="secondary" className="mt-1 text-[10px]">
+                                {d.open_adjustment_count} open dispute{d.open_adjustment_count === 1 ? "" : "s"}
+                              </Badge>
+                            )}
                           </div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={(e) => { e.stopPropagation(); setManageRep(d); }}
+                            className="gap-1"
+                            title="Payout batches & adjustments"
+                          >
+                            <Settings2 className="h-3.5 w-3.5" />
+                            Manage
+                          </Button>
                           {d.invoice_count > 0 ? (
                             <Button
                               size="sm"
