@@ -20,6 +20,7 @@ const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const Portal = lazy(() => import('./pages/Portal'));
 const PortalLogin = lazy(() => import('./pages/PortalLogin'));
 const PortalInvite = lazy(() => import('./pages/PortalInvite'));
+const RepStatementsPage = lazy(() => import('./pages/RepStatementsPage'));
 
 // Create QueryClient outside component to prevent recreation on renders
 const queryClient = new QueryClient({
@@ -89,6 +90,13 @@ function App() {
                   <Route path="/portal" element={<Portal />} />
                   <Route path="/portal/login" element={<PortalLogin />} />
                   <Route path="/portal/invite" element={<PortalInvite />} />
+
+                  <Route path="/my-commissions" element={
+                    <ProtectedRoute>
+                      <RepStatementsPage />
+                    </ProtectedRoute>
+                  } />
+
                   
                   
                   <Route path="*" element={<NotFound />} />
