@@ -101,6 +101,9 @@ type CommissionRepData = {
   excluded_sub_total?: number;
   invoices: CommissionInvoice[];
   companies: string[];
+  adjustments_total?: number;
+  net_commission?: number;
+  open_adjustment_count?: number;
 };
 
 type UnresolvedCostItem = {
