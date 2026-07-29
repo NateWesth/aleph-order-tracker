@@ -229,6 +229,54 @@ Deno.serve(async (req) => {
       .select('rep_id, company_id, commission_rate')
     if (assignError) throw new Error(`Failed to fetch assignments: ${assignError.message}`)
 
+    // Historical rate + assignment tracking. We resolve per-invoice values
+    // using the invoice date, falling back to current values when no history
+    // covers that date. This keeps back-dated rate or assignment edits from
+    // silently rewriting past commissions.
+    const { data: rateHistoryRows } = await supabase
+      .from('rep_rate_history')
+      .select('rep_id, commission_rate, commission_method, effective_from')
+      .order('effective_from', { ascending: false })
+    const { data: assignHistoryRows } = await supabase
+      .from('rep_company_assignment_history')
+      .select('rep_id, company_id, commission_rate, effective_from, effective_to, change_type')
+      .order('effective_from', { ascending: false })
+
+    const rateHistoryByRep = new Map<string, Array<{ rate: number; method: string; from: string }>>()
+    for (const r of rateHistoryRows || []) {
+      if (!rateHistoryByRep.has(r.rep_id)) rateHistoryByRep.set(r.rep_id, [])
+      rateHistoryByRep.get(r.rep_id)!.push({
+        rate: Number(r.commission_rate),
+        method: r.commission_method,
+        from: String(r.effective_from).slice(0, 10),
+      })
+    }
+    const assignHistoryByCompany = new Map<string, Array<{ rep_id: string; rate: number | null; from: string; to: string | null; type: string }>>()
+    for (const r of assignHistoryRows || []) {
+      if (!assignHistoryByCompany.has(r.company_id)) assignHistoryByCompany.set(r.company_id, [])
+      assignHistoryByCompany.get(r.company_id)!.push({
+        rep_id: r.rep_id,
+        rate: r.commission_rate !== null ? Number(r.commission_rate) : null,
+        from: String(r.effective_from).slice(0, 10),
+        to: r.effective_to ? String(r.effective_to).slice(0, 10) : null,
+        type: r.change_type,
+      })
+    }
+
+    const resolveRepRateMethodAsOf = (repId: string, asOf: string): { rate: number | null; method: string | null } => {
+      const list = rateHistoryByRep.get(repId)
+      if (!list || !asOf) return { rate: null, method: null }
+      const hit = list.find(h => h.from <= asOf)
+      return hit ? { rate: hit.rate, method: hit.method } : { rate: null, method: null }
+    }
+    const resolveAssignmentAsOf = (companyId: string, asOf: string): { rep_id: string; rate: number | null } | null => {
+      const list = assignHistoryByCompany.get(companyId)
+      if (!list || !asOf) return null
+      const hit = list.find(h => h.from <= asOf && (!h.to || h.to > asOf) && h.type !== 'unassigned')
+      return hit ? { rep_id: hit.rep_id, rate: hit.rate } : null
+    }
+
+
     // Fetch companies
     const { data: companies, error: compError } = await supabase
       .from('companies')
