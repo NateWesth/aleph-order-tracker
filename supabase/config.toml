@@ -47,3 +47,6 @@ verify_jwt = false
 
 [functions.rep-self-statement]
 verify_jwt = false
+
+[functions.notify-rep-payout]
+verify_jwt = false
