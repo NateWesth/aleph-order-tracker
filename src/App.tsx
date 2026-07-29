@@ -20,6 +20,7 @@ const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const Portal = lazy(() => import('./pages/Portal'));
 const PortalLogin = lazy(() => import('./pages/PortalLogin'));
 const PortalInvite = lazy(() => import('./pages/PortalInvite'));
+const RepStatementsPage = lazy(() => import('./pages/RepStatementsPage'));
 
 // Create QueryClient outside component to prevent recreation on renders
 const queryClient = new QueryClient({
