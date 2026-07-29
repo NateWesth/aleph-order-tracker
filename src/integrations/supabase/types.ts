@@ -58,6 +58,81 @@ export type Database = {
           },
         ]
       }
+      commission_adjustments: {
+        Row: {
+          adjustment_type: string
+          amount: number
+          batch_id: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          invoice_id: string | null
+          invoice_number: string | null
+          line_index: number | null
+          note: string | null
+          period_month: string
+          reason: string
+          rep_id: string
+          resolved_at: string | null
+          resolved_by: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          adjustment_type?: string
+          amount?: number
+          batch_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          invoice_id?: string | null
+          invoice_number?: string | null
+          line_index?: number | null
+          note?: string | null
+          period_month: string
+          reason: string
+          rep_id: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          adjustment_type?: string
+          amount?: number
+          batch_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          invoice_id?: string | null
+          invoice_number?: string | null
+          line_index?: number | null
+          note?: string | null
+          period_month?: string
+          reason?: string
+          rep_id?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commission_adjustments_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "commission_payout_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commission_adjustments_rep_id_fkey"
+            columns: ["rep_id"]
+            isOneToOne: false
+            referencedRelation: "reps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       commission_item_cost_overrides: {
         Row: {
           cost: number
@@ -139,8 +214,86 @@ export type Database = {
         }
         Relationships: []
       }
+      commission_payout_batches: {
+        Row: {
+          adjustments_total: number
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string
+          created_by: string | null
+          gross_commission: number
+          id: string
+          invoice_count: number
+          net_payout: number
+          notes: string | null
+          paid_at: string | null
+          paid_by: string | null
+          paid_reference: string | null
+          period_month: string
+          rep_id: string
+          status: string
+          updated_at: string
+          void_reason: string | null
+          voided_at: string | null
+          voided_by: string | null
+        }
+        Insert: {
+          adjustments_total?: number
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          gross_commission?: number
+          id?: string
+          invoice_count?: number
+          net_payout?: number
+          notes?: string | null
+          paid_at?: string | null
+          paid_by?: string | null
+          paid_reference?: string | null
+          period_month: string
+          rep_id: string
+          status?: string
+          updated_at?: string
+          void_reason?: string | null
+          voided_at?: string | null
+          voided_by?: string | null
+        }
+        Update: {
+          adjustments_total?: number
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          gross_commission?: number
+          id?: string
+          invoice_count?: number
+          net_payout?: number
+          notes?: string | null
+          paid_at?: string | null
+          paid_by?: string | null
+          paid_reference?: string | null
+          period_month?: string
+          rep_id?: string
+          status?: string
+          updated_at?: string
+          void_reason?: string | null
+          voided_at?: string | null
+          voided_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commission_payout_batches_rep_id_fkey"
+            columns: ["rep_id"]
+            isOneToOne: false
+            referencedRelation: "reps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       commission_payouts: {
         Row: {
+          batch_id: string | null
           commission_amount: number
           commission_rate: number
           created_at: string
@@ -157,6 +310,7 @@ export type Database = {
           sub_total: number
         }
         Insert: {
+          batch_id?: string | null
           commission_amount?: number
           commission_rate?: number
           created_at?: string
@@ -173,6 +327,7 @@ export type Database = {
           sub_total?: number
         }
         Update: {
+          batch_id?: string | null
           commission_amount?: number
           commission_rate?: number
           created_at?: string
@@ -189,6 +344,13 @@ export type Database = {
           sub_total?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "commission_payouts_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "commission_payout_batches"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "commission_payouts_rep_id_fkey"
             columns: ["rep_id"]
@@ -870,6 +1032,42 @@ export type Database = {
         }
         Relationships: []
       }
+      rep_company_assignment_history: {
+        Row: {
+          change_type: string
+          commission_rate: number | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          effective_from: string
+          effective_to: string | null
+          id: string
+          rep_id: string
+        }
+        Insert: {
+          change_type?: string
+          commission_rate?: number | null
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          effective_from?: string
+          effective_to?: string | null
+          id?: string
+          rep_id: string
+        }
+        Update: {
+          change_type?: string
+          commission_rate?: number | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          effective_from?: string
+          effective_to?: string | null
+          id?: string
+          rep_id?: string
+        }
+        Relationships: []
+      }
       rep_company_assignments: {
         Row: {
           commission_rate: number | null
@@ -902,6 +1100,44 @@ export type Database = {
           },
           {
             foreignKeyName: "rep_company_assignments_rep_id_fkey"
+            columns: ["rep_id"]
+            isOneToOne: false
+            referencedRelation: "reps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rep_rate_history: {
+        Row: {
+          commission_method: string
+          commission_rate: number
+          created_at: string
+          created_by: string | null
+          effective_from: string
+          id: string
+          rep_id: string
+        }
+        Insert: {
+          commission_method: string
+          commission_rate: number
+          created_at?: string
+          created_by?: string | null
+          effective_from?: string
+          id?: string
+          rep_id: string
+        }
+        Update: {
+          commission_method?: string
+          commission_rate?: number
+          created_at?: string
+          created_by?: string | null
+          effective_from?: string
+          id?: string
+          rep_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rep_rate_history_rep_id_fkey"
             columns: ["rep_id"]
             isOneToOne: false
             referencedRelation: "reps"
@@ -1118,6 +1354,20 @@ export type Database = {
       mark_order_update_as_read: {
         Args: { update_id: string; user_uuid: string }
         Returns: undefined
+      }
+      resolve_rep_for_company_as_of: {
+        Args: { _as_of: string; _company_id: string }
+        Returns: {
+          commission_rate: number
+          rep_id: string
+        }[]
+      }
+      resolve_rep_rate_as_of: {
+        Args: { _as_of: string; _rep_id: string }
+        Returns: {
+          commission_method: string
+          commission_rate: number
+        }[]
       }
       validate_company_code: {
         Args: { company_code: string }

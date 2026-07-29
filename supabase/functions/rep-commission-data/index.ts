@@ -199,7 +199,7 @@ Deno.serve(async (req) => {
       // v2 = cost-as-of-invoice-date resolution. Older caches used latest-only
       // cost and are treated as stale so we recompute with historical bills.
       const hasCostAsOfVersion = cachedReport
-        && (cachedReport.report as any)?.report_version >= 2
+        && (cachedReport.report as any)?.report_version >= 3
       if (cachedReport && hasUnresolvedField && hasCostAsOfVersion) {
         const report = await applyLockedPayoutsToReport(supabase, cachedReport.report, periodMonth)
         return new Response(JSON.stringify({
@@ -228,6 +228,54 @@ Deno.serve(async (req) => {
       .from('rep_company_assignments')
       .select('rep_id, company_id, commission_rate')
     if (assignError) throw new Error(`Failed to fetch assignments: ${assignError.message}`)
+
+    // Historical rate + assignment tracking. We resolve per-invoice values
+    // using the invoice date, falling back to current values when no history
+    // covers that date. This keeps back-dated rate or assignment edits from
+    // silently rewriting past commissions.
+    const { data: rateHistoryRows } = await supabase
+      .from('rep_rate_history')
+      .select('rep_id, commission_rate, commission_method, effective_from')
+      .order('effective_from', { ascending: false })
+    const { data: assignHistoryRows } = await supabase
+      .from('rep_company_assignment_history')
+      .select('rep_id, company_id, commission_rate, effective_from, effective_to, change_type')
+      .order('effective_from', { ascending: false })
+
+    const rateHistoryByRep = new Map<string, Array<{ rate: number; method: string; from: string }>>()
+    for (const r of rateHistoryRows || []) {
+      if (!rateHistoryByRep.has(r.rep_id)) rateHistoryByRep.set(r.rep_id, [])
+      rateHistoryByRep.get(r.rep_id)!.push({
+        rate: Number(r.commission_rate),
+        method: r.commission_method,
+        from: String(r.effective_from).slice(0, 10),
+      })
+    }
+    const assignHistoryByCompany = new Map<string, Array<{ rep_id: string; rate: number | null; from: string; to: string | null; type: string }>>()
+    for (const r of assignHistoryRows || []) {
+      if (!assignHistoryByCompany.has(r.company_id)) assignHistoryByCompany.set(r.company_id, [])
+      assignHistoryByCompany.get(r.company_id)!.push({
+        rep_id: r.rep_id,
+        rate: r.commission_rate !== null ? Number(r.commission_rate) : null,
+        from: String(r.effective_from).slice(0, 10),
+        to: r.effective_to ? String(r.effective_to).slice(0, 10) : null,
+        type: r.change_type,
+      })
+    }
+
+    const resolveRepRateMethodAsOf = (repId: string, asOf: string): { rate: number | null; method: string | null } => {
+      const list = rateHistoryByRep.get(repId)
+      if (!list || !asOf) return { rate: null, method: null }
+      const hit = list.find(h => h.from <= asOf)
+      return hit ? { rate: hit.rate, method: hit.method } : { rate: null, method: null }
+    }
+    const resolveAssignmentAsOf = (companyId: string, asOf: string): { rep_id: string; rate: number | null } | null => {
+      const list = assignHistoryByCompany.get(companyId)
+      if (!list || !asOf) return null
+      const hit = list.find(h => h.from <= asOf && (!h.to || h.to > asOf) && h.type !== 'unassigned')
+      return hit ? { rep_id: hit.rep_id, rate: hit.rate } : null
+    }
+
 
     // Fetch companies
     const { data: companies, error: compError } = await supabase
@@ -527,13 +575,28 @@ Deno.serve(async (req) => {
       }
       matched++
 
-      const result = repResults.get(target.rep_id)
+      // Resolve historical rep + rate + method for THIS invoice's date.
+      // Priority: historical per-company assignment override → historical
+      // rep-level rate → current values. Same for method (rep-level only).
+      const invoiceDateForRate: string = String(
+        (invoicesWithLines.find(d => d.invoice_id === inv.invoice_id) || inv).date
+          || (invoicesWithLines.find(d => d.invoice_id === inv.invoice_id) || inv).invoice_date
+          || inv.date || inv.invoice_date || ''
+      ).slice(0, 10)
+
+      const histAssign = resolveAssignmentAsOf(target.company_id, invoiceDateForRate)
+      const effectiveRepId = histAssign?.rep_id || target.rep_id
+      const result = repResults.get(effectiveRepId) || repResults.get(target.rep_id)
       if (!result) continue
 
-      // Use per-company override rate if set, otherwise rep default
-      const fullRate = target.commission_rate ?? result.rep.commission_rate
+      const histRepRate = resolveRepRateMethodAsOf(effectiveRepId, invoiceDateForRate)
+      const fullRate = histAssign?.rate
+        ?? target.commission_rate
+        ?? histRepRate.rate
+        ?? result.rep.commission_rate
       const method: CommissionMethod =
-        (result.rep.commission_method as CommissionMethod) || 'margin_scaled'
+        ((histRepRate.method || result.rep.commission_method) as CommissionMethod) || 'margin_scaled'
+
 
       // Use detailed invoice (with line items) if available, else header-only
       const detailed = invoicesWithLines.find(d => d.invoice_id === inv.invoice_id) || inv
@@ -728,29 +791,55 @@ Deno.serve(async (req) => {
       r.isLocked = r.lockedInvoiceCount > 0 && r.invoiceCount === 0
     }
 
-    const data = Array.from(repResults.values()).map(r => ({
-      rep_id: r.rep.id,
-      rep_name: r.rep.name,
-      rep_email: r.rep.email,
-      commission_rate: r.rep.commission_rate,
-      total_invoiced: Math.round(r.totalInvoiced * 100) / 100,
-      commission_earned: Math.round(r.commissionEarned * 100) / 100,
-      invoice_count: r.invoiceCount,
-      locked_commission: Math.round(r.lockedCommission * 100) / 100,
-      locked_invoice_count: r.lockedInvoiceCount,
-      is_locked: r.isLocked,
-      excluded_line_count: r.excludedLineCount,
-      excluded_sub_total: Math.round(r.excludedSubTotal * 100) / 100,
-      invoices: r.invoices,
-      companies: Array.from(repCompanies.get(r.rep.id) || []).map(cid => companyIdToName.get(cid) || cid),
-    }))
+    // ---- Adjustments (disputes / bonuses / clawbacks / corrections) -----
+    // Only approved/applied adjustments affect net commission and totals.
+    // Open/rejected are returned for UI transparency but excluded from math.
+    const { data: adjRows } = await supabase
+      .from('commission_adjustments')
+      .select('id, rep_id, invoice_id, invoice_number, line_index, adjustment_type, amount, status, reason, note, created_by, created_at, resolved_at')
+      .eq('period_month', periodMonth)
+    const adjByRep = new Map<string, any[]>()
+    for (const a of adjRows || []) {
+      if (!adjByRep.has(a.rep_id)) adjByRep.set(a.rep_id, [])
+      adjByRep.get(a.rep_id)!.push(a)
+    }
+
+    const data = Array.from(repResults.values()).map(r => {
+      const repAdjustments = adjByRep.get(r.rep.id) || []
+      const applied = repAdjustments.filter(a => a.status === 'approved' || a.status === 'applied')
+      const adjustmentsTotal = applied.reduce((s, a) => s + Number(a.amount || 0), 0)
+      const commissionEarned = Math.round(r.commissionEarned * 100) / 100
+      return {
+        rep_id: r.rep.id,
+        rep_name: r.rep.name,
+        rep_email: r.rep.email,
+        commission_rate: r.rep.commission_rate,
+        total_invoiced: Math.round(r.totalInvoiced * 100) / 100,
+        commission_earned: commissionEarned,
+        adjustments_total: Math.round(adjustmentsTotal * 100) / 100,
+        net_commission: Math.round((commissionEarned + adjustmentsTotal) * 100) / 100,
+        invoice_count: r.invoiceCount,
+        locked_commission: Math.round(r.lockedCommission * 100) / 100,
+        locked_invoice_count: r.lockedInvoiceCount,
+        is_locked: r.isLocked,
+        excluded_line_count: r.excludedLineCount,
+        excluded_sub_total: Math.round(r.excludedSubTotal * 100) / 100,
+        invoices: r.invoices,
+        companies: Array.from(repCompanies.get(r.rep.id) || []).map(cid => companyIdToName.get(cid) || cid),
+        adjustments: repAdjustments,
+        open_adjustment_count: repAdjustments.filter(a => a.status === 'open').length,
+      }
+    })
 
     const summary = {
       totalInvoiced: data.reduce((s, d) => s + d.total_invoiced, 0),
       totalCommission: data.reduce((s, d) => s + d.commission_earned, 0),
+      totalAdjustments: data.reduce((s, d) => s + (d.adjustments_total || 0), 0),
+      totalNet: data.reduce((s, d) => s + (d.net_commission || 0), 0),
       totalInvoices: data.reduce((s, d) => s + d.invoice_count, 0),
       totalExcludedLines: data.reduce((s, d) => s + (d.excluded_line_count || 0), 0),
       totalExcludedSubTotal: data.reduce((s, d) => s + (d.excluded_sub_total || 0), 0),
+      totalOpenAdjustments: data.reduce((s, d) => s + (d.open_adjustment_count || 0), 0),
     }
 
     // Deduplicate unresolved items by (name+description) for the UI list.
@@ -765,7 +854,7 @@ Deno.serve(async (req) => {
     const unresolved = Array.from(unresolvedByKey.values())
       .sort((a, b) => b.occurrences - a.occurrences)
 
-    const report = { success: true, data, summary, unresolved_cost_items: unresolved, report_version: 2 }
+    const report = { success: true, data, summary, unresolved_cost_items: unresolved, report_version: 3 }
     await upsertCachedCommissionReport(supabase, {
       periodMonth,
       repId: rep_id ?? null,
