@@ -44,3 +44,6 @@ verify_jwt = false
 
 [functions.procurement-suggestions]
 verify_jwt = false
+
+[functions.rep-self-statement]
+verify_jwt = false
