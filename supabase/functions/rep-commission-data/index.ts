@@ -791,29 +791,55 @@ Deno.serve(async (req) => {
       r.isLocked = r.lockedInvoiceCount > 0 && r.invoiceCount === 0
     }
 
-    const data = Array.from(repResults.values()).map(r => ({
-      rep_id: r.rep.id,
-      rep_name: r.rep.name,
-      rep_email: r.rep.email,
-      commission_rate: r.rep.commission_rate,
-      total_invoiced: Math.round(r.totalInvoiced * 100) / 100,
-      commission_earned: Math.round(r.commissionEarned * 100) / 100,
-      invoice_count: r.invoiceCount,
-      locked_commission: Math.round(r.lockedCommission * 100) / 100,
-      locked_invoice_count: r.lockedInvoiceCount,
-      is_locked: r.isLocked,
-      excluded_line_count: r.excludedLineCount,
-      excluded_sub_total: Math.round(r.excludedSubTotal * 100) / 100,
-      invoices: r.invoices,
-      companies: Array.from(repCompanies.get(r.rep.id) || []).map(cid => companyIdToName.get(cid) || cid),
-    }))
+    // ---- Adjustments (disputes / bonuses / clawbacks / corrections) -----
+    // Only approved/applied adjustments affect net commission and totals.
+    // Open/rejected are returned for UI transparency but excluded from math.
+    const { data: adjRows } = await supabase
+      .from('commission_adjustments')
+      .select('id, rep_id, invoice_id, invoice_number, line_index, adjustment_type, amount, status, reason, note, created_by, created_at, resolved_at')
+      .eq('period_month', periodMonth)
+    const adjByRep = new Map<string, any[]>()
+    for (const a of adjRows || []) {
+      if (!adjByRep.has(a.rep_id)) adjByRep.set(a.rep_id, [])
+      adjByRep.get(a.rep_id)!.push(a)
+    }
+
+    const data = Array.from(repResults.values()).map(r => {
+      const repAdjustments = adjByRep.get(r.rep.id) || []
+      const applied = repAdjustments.filter(a => a.status === 'approved' || a.status === 'applied')
+      const adjustmentsTotal = applied.reduce((s, a) => s + Number(a.amount || 0), 0)
+      const commissionEarned = Math.round(r.commissionEarned * 100) / 100
+      return {
+        rep_id: r.rep.id,
+        rep_name: r.rep.name,
+        rep_email: r.rep.email,
+        commission_rate: r.rep.commission_rate,
+        total_invoiced: Math.round(r.totalInvoiced * 100) / 100,
+        commission_earned: commissionEarned,
+        adjustments_total: Math.round(adjustmentsTotal * 100) / 100,
+        net_commission: Math.round((commissionEarned + adjustmentsTotal) * 100) / 100,
+        invoice_count: r.invoiceCount,
+        locked_commission: Math.round(r.lockedCommission * 100) / 100,
+        locked_invoice_count: r.lockedInvoiceCount,
+        is_locked: r.isLocked,
+        excluded_line_count: r.excludedLineCount,
+        excluded_sub_total: Math.round(r.excludedSubTotal * 100) / 100,
+        invoices: r.invoices,
+        companies: Array.from(repCompanies.get(r.rep.id) || []).map(cid => companyIdToName.get(cid) || cid),
+        adjustments: repAdjustments,
+        open_adjustment_count: repAdjustments.filter(a => a.status === 'open').length,
+      }
+    })
 
     const summary = {
       totalInvoiced: data.reduce((s, d) => s + d.total_invoiced, 0),
       totalCommission: data.reduce((s, d) => s + d.commission_earned, 0),
+      totalAdjustments: data.reduce((s, d) => s + (d.adjustments_total || 0), 0),
+      totalNet: data.reduce((s, d) => s + (d.net_commission || 0), 0),
       totalInvoices: data.reduce((s, d) => s + d.invoice_count, 0),
       totalExcludedLines: data.reduce((s, d) => s + (d.excluded_line_count || 0), 0),
       totalExcludedSubTotal: data.reduce((s, d) => s + (d.excluded_sub_total || 0), 0),
+      totalOpenAdjustments: data.reduce((s, d) => s + (d.open_adjustment_count || 0), 0),
     }
 
     // Deduplicate unresolved items by (name+description) for the UI list.
@@ -828,7 +854,7 @@ Deno.serve(async (req) => {
     const unresolved = Array.from(unresolvedByKey.values())
       .sort((a, b) => b.occurrences - a.occurrences)
 
-    const report = { success: true, data, summary, unresolved_cost_items: unresolved, report_version: 2 }
+    const report = { success: true, data, summary, unresolved_cost_items: unresolved, report_version: 3 }
     await upsertCachedCommissionReport(supabase, {
       periodMonth,
       repId: rep_id ?? null,
