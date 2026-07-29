@@ -1034,6 +1034,14 @@ const Settings = () => {
                 <CardDescription>
                   Your personal account information
                 </CardDescription>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-2 self-start"
+                  onClick={() => navigate('/my-commissions')}
+                >
+                  View My Commission Statements
+                </Button>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
