@@ -345,6 +345,36 @@ const MissingCostsEditor = ({
 
 
 
+type ExportColumn = { key: string; label: string; group: "invoice" | "line" };
+
+const EXPORT_COLUMNS: ExportColumn[] = [
+  { key: "invoice_number", label: "Invoice #", group: "invoice" },
+  { key: "customer_name", label: "Customer", group: "invoice" },
+  { key: "date", label: "Date", group: "invoice" },
+  { key: "commission", label: "Commission", group: "invoice" },
+  { key: "rep_name", label: "Rep", group: "invoice" },
+  { key: "status", label: "Status (due/paid)", group: "invoice" },
+  { key: "sub_total", label: "Sub-total (excl. VAT)", group: "invoice" },
+  { key: "commission_rate", label: "Effective rate %", group: "invoice" },
+  { key: "credited", label: "Credited", group: "invoice" },
+  { key: "write_off", label: "Write-off", group: "invoice" },
+  { key: "discount", label: "Invoice discount", group: "invoice" },
+  { key: "li_code", label: "SKU", group: "line" },
+  { key: "li_name", label: "Item", group: "line" },
+  { key: "li_quantity", label: "Qty", group: "line" },
+  { key: "li_rate", label: "Sell rate", group: "line" },
+  { key: "li_cost", label: "Cost", group: "line" },
+  { key: "li_sub_total", label: "Line sub-total", group: "line" },
+  { key: "li_margin", label: "Margin %", group: "line" },
+  { key: "li_commission_rate", label: "Line rate %", group: "line" },
+  { key: "li_commission", label: "Line commission", group: "line" },
+  { key: "li_excluded", label: "Excluded reason", group: "line" },
+];
+
+// Always selected by default (and locked on) for every export/print
+const LOCKED_EXPORT_COLUMNS = ["invoice_number", "customer_name", "date", "commission"];
+const DEFAULT_EXPORT_COLUMNS = [...LOCKED_EXPORT_COLUMNS, "rep_name", "sub_total", "commission_rate"];
+
 const CommissionPage = () => {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("report");
