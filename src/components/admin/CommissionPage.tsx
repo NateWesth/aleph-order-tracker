@@ -1223,12 +1223,13 @@ const CommissionPage = () => {
               };
               return (
                 <div className="contents">
-                  <Button variant="outline" onClick={exportCsv}>
+                  <Button variant="outline" onClick={() => setExportTarget("csv")}>
                     <Download className="h-4 w-4 mr-1.5" />Export CSV
                   </Button>
-                  <Button variant="outline" onClick={printPdfReport}>
+                  <Button variant="outline" onClick={() => setExportTarget("pdf")}>
                     <Printer className="h-4 w-4 mr-1.5" />Print Full Report
                   </Button>
+
                   <TooltipProvider delayDuration={150}>
                     <Tooltip>
                       <TooltipTrigger asChild>
