@@ -710,16 +710,17 @@ Deno.serve(async (req) => {
           name: getLineName(li),
           code: String(li.sku || li.item_code || '').trim(),
           quantity: qty,
-          rate: sellRate,
-          cost,
-          sub_total: lineSubTotal,
-          margin_percent: marginPct === null ? null : Math.round(marginPct * 10) / 10,
-          base_commission_rate: fullRate,
-          commission_rate: Math.round(effectiveRate * 100) / 100,
-          commission: Math.round(lc * 100) / 100,
+          rate: r2(sellRate),
+          cost: cost === null ? null : r2(cost),
+          sub_total: r2(lineSubTotal),
+          margin_percent: marginPct === null ? null : r2(marginPct),
+          base_commission_rate: r2(fullRate),
+          commission_rate: r2(effectiveRate),
+          commission: r2(lc),
           ...(excluded_reason ? { excluded_reason } : {}),
-          ...(discountShare > 0 ? { discount_applied: Math.round(discountShare * 100) / 100 } : {}),
+          ...(discountShare > 0 ? { discount_applied: r2(discountShare) } : {}),
         })
+
       }
 
       // Commission is computed strictly per line item (excluding VAT) using
