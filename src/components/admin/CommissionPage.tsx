@@ -1084,7 +1084,7 @@ const CommissionPage = () => {
       doc.setFont("helvetica", "normal");
       doc.setTextColor(80);
       doc.text(
-        `${rep.rep_email || "—"}  |  Rate: ${rep.commission_rate}%  |  Invoices: ${rep.invoice_count}  |  Invoiced: ${formatCurrency(rep.total_invoiced)}  |  Commission: ${formatCurrency(rep.commission_earned)}`,
+        `${rep.rep_email || "—"}  |  Rate: ${Number(rep.commission_rate).toFixed(2)}%  |  Invoices: ${rep.invoice_count}  |  Invoiced: ${formatCurrency(rep.total_invoiced)}  |  Commission: ${formatCurrency(rep.commission_earned)}`,
         14, y,
       );
       y += 5;
@@ -1416,7 +1416,7 @@ const CommissionPage = () => {
                         >
                           {expandedReps.has(d.rep_id) ? <ChevronDown className="h-4 w-4 shrink-0" /> : <ChevronRight className="h-4 w-4 shrink-0" />}
                           <CardTitle className="text-base truncate">{d.rep_name}</CardTitle>
-                          <Badge variant="secondary">{d.commission_rate}% default</Badge>
+                          <Badge variant="secondary">{Number(d.commission_rate).toFixed(2)}% default</Badge>
                           {d.locked_invoice_count > 0 && (
                             <Badge variant="outline" className="gap-1 text-xs">
                               <Lock className="h-3 w-3" />
@@ -1591,7 +1591,7 @@ const CommissionPage = () => {
                                       </td>
                                       <td className="p-2 text-right">
                                         <Badge variant={inv.commission_rate !== d.commission_rate ? "outline" : "secondary"} className="text-xs">
-                                          {inv.commission_rate}%
+                                          {Number(inv.commission_rate).toFixed(2)}%
                                         </Badge>
                                       </td>
                                       <td className="p-2 text-right font-medium text-primary">{formatCurrency(inv.commission)}</td>
@@ -1704,7 +1704,7 @@ const CommissionPage = () => {
                                                           <span className={cn(
                                                             li.margin_percent >= 25 ? "text-primary" : "text-destructive"
                                                           )}>
-                                                            {li.margin_percent}%
+                                                            {Number(li.margin_percent).toFixed(2)}%
                                                           </span>
                                                         ) : <span className="text-muted-foreground">—</span>}
                                                       </td>
@@ -1836,7 +1836,7 @@ const CommissionPage = () => {
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-medium">{rep.name}</span>
-                          <Badge variant="secondary">{rep.commission_rate}% default</Badge>
+                          <Badge variant="secondary">{Number(rep.commission_rate).toFixed(2)}% default</Badge>
                           <Badge variant="outline" className="text-xs">
                             {method === "margin_scaled" ? "Margin-scaled" : "Half-markup <25%"}
                           </Badge>
