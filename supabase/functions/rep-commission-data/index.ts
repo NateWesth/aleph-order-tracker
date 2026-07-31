@@ -11,6 +11,13 @@ const ZOHO_ALLOWED_INVOICE_STATUSES = ['paid', 'sent', 'overdue', 'partially_pai
 
 const normalizeCompanyName = (value: string) => value.toLowerCase().trim().replace(/\s+/g, ' ')
 
+// Every monetary / rate value returned by this function is rounded to 2 decimals.
+const r2 = (value: unknown): number => {
+  const n = Number(value)
+  if (!Number.isFinite(n)) return 0
+  return Math.round((n + Number.EPSILON) * 100) / 100
+}
+
 const toNumber = (value: unknown): number | null => {
   if (typeof value === 'number' && Number.isFinite(value)) return value
   if (typeof value === 'string') {
@@ -199,7 +206,7 @@ Deno.serve(async (req) => {
       // v2 = cost-as-of-invoice-date resolution. Older caches used latest-only
       // cost and are treated as stale so we recompute with historical bills.
       const hasCostAsOfVersion = cachedReport
-        && (cachedReport.report as any)?.report_version >= 3
+        && (cachedReport.report as any)?.report_version >= 4
       if (cachedReport && hasUnresolvedField && hasCostAsOfVersion) {
         const report = await applyLockedPayoutsToReport(supabase, cachedReport.report, periodMonth)
         return new Response(JSON.stringify({
@@ -703,16 +710,17 @@ Deno.serve(async (req) => {
           name: getLineName(li),
           code: String(li.sku || li.item_code || '').trim(),
           quantity: qty,
-          rate: sellRate,
-          cost,
-          sub_total: lineSubTotal,
-          margin_percent: marginPct === null ? null : Math.round(marginPct * 10) / 10,
-          base_commission_rate: fullRate,
-          commission_rate: Math.round(effectiveRate * 100) / 100,
-          commission: Math.round(lc * 100) / 100,
+          rate: r2(sellRate),
+          cost: cost === null ? null : r2(cost),
+          sub_total: r2(lineSubTotal),
+          margin_percent: marginPct === null ? null : r2(marginPct),
+          base_commission_rate: r2(fullRate),
+          commission_rate: r2(effectiveRate),
+          commission: r2(lc),
           ...(excluded_reason ? { excluded_reason } : {}),
-          ...(discountShare > 0 ? { discount_applied: Math.round(discountShare * 100) / 100 } : {}),
+          ...(discountShare > 0 ? { discount_applied: r2(discountShare) } : {}),
         })
+
       }
 
       // Commission is computed strictly per line item (excluding VAT) using
@@ -724,9 +732,9 @@ Deno.serve(async (req) => {
         commission = 0
         displayRate = 0
       } else {
-        commission = lineDetails.reduce((sum, line) => sum + Number(line.commission || 0), 0)
+        commission = r2(lineDetails.reduce((sum, line) => sum + Number(line.commission || 0), 0))
         displayRate = coveredLineSubTotal > 0
-          ? (commission / coveredLineSubTotal) * 100
+          ? r2((commission / coveredLineSubTotal) * 100)
           : 0
       }
 
@@ -734,34 +742,34 @@ Deno.serve(async (req) => {
 
       // Credit-note + write-off adjustment: reduce both the invoiced subtotal
       // and the commission proportionally so we never pay on returns/uncollected.
-      const creditedSubTotal = creditByInvoiceId.get(invoiceIdStr) ?? 0
-      const adjustmentTotal = creditedSubTotal + writeOffAmount
-      const netSubTotal = Math.max(0, invSubTotal - adjustmentTotal)
+      const creditedSubTotal = r2(creditByInvoiceId.get(invoiceIdStr) ?? 0)
+      const adjustmentTotal = r2(creditedSubTotal + writeOffAmount)
+      const netSubTotal = r2(Math.max(0, invSubTotal - adjustmentTotal))
       let adjustmentRatio = 0
       if (adjustmentTotal > 0 && invSubTotal > 0) {
         adjustmentRatio = Math.min(1, adjustmentTotal / invSubTotal)
       }
-      const creditedCommission = commission * adjustmentRatio
-      const netCommission = commission - creditedCommission
+      const creditedCommission = r2(commission * adjustmentRatio)
+      const netCommission = r2(commission - creditedCommission)
 
       // Excluded-line summary for this invoice.
       const excludedLines = lineDetails.filter(l => l.excluded_reason)
-      const excludedSubTotal = excludedLines.reduce((s, l) => s + Number(l.sub_total || 0), 0)
+      const excludedSubTotal = r2(excludedLines.reduce((s, l) => s + Number(l.sub_total || 0), 0))
 
       const isLocked = lockedSet.has(lockedKey(target.rep_id, invoiceIdStr))
 
       if (isLocked) {
-        result.lockedCommission += netCommission
+        result.lockedCommission = r2(result.lockedCommission + netCommission)
         result.lockedInvoiceCount++
       } else {
-        result.totalInvoiced += netSubTotal
-        result.commissionEarned += netCommission
+        result.totalInvoiced = r2(result.totalInvoiced + netSubTotal)
+        result.commissionEarned = r2(result.commissionEarned + netCommission)
         result.invoiceCount++
       }
       // Rep-level excluded totals (unlocked only, matches commissionEarned scope).
       if (!isLocked) {
         result.excludedLineCount = (result.excludedLineCount || 0) + excludedLines.length
-        result.excludedSubTotal = (result.excludedSubTotal || 0) + excludedSubTotal
+        result.excludedSubTotal = r2((result.excludedSubTotal || 0) + excludedSubTotal)
       }
       result.invoices.push({
         invoice_id: invoiceIdStr,
@@ -769,19 +777,20 @@ Deno.serve(async (req) => {
         customer_name: inv.customer_name || '',
         date: inv.date || inv.invoice_date || '',
         sub_total: netSubTotal,
-        total: invTotal,
+        total: r2(invTotal),
         commission: netCommission,
-        commission_rate: Math.round(displayRate * 100) / 100,
+        commission_rate: r2(displayRate),
         line_items: lineDetails,
         locked: isLocked,
-        gross_sub_total: invSubTotal,
-        credited_sub_total: Math.round(creditedSubTotal * 100) / 100,
-        credited_commission: Math.round(creditedCommission * 100) / 100,
-        write_off_amount: Math.round(writeOffAmount * 100) / 100,
-        invoice_discount: Math.round(invoiceLevelDiscount * 100) / 100,
+        gross_sub_total: r2(invSubTotal),
+        credited_sub_total: creditedSubTotal,
+        credited_commission: creditedCommission,
+        write_off_amount: r2(writeOffAmount),
+        invoice_discount: r2(invoiceLevelDiscount),
         excluded_line_count: excludedLines.length,
-        excluded_sub_total: Math.round(excludedSubTotal * 100) / 100,
+        excluded_sub_total: excludedSubTotal,
       })
+
     }
     console.log(`Matched ${matched}/${invoiceList.length} invoices to reps. Skipped ${duplicatesSkipped} duplicates. Unmatched samples:`, unmatchedSamples)
 
@@ -807,23 +816,23 @@ Deno.serve(async (req) => {
     const data = Array.from(repResults.values()).map(r => {
       const repAdjustments = adjByRep.get(r.rep.id) || []
       const applied = repAdjustments.filter(a => a.status === 'approved' || a.status === 'applied')
-      const adjustmentsTotal = applied.reduce((s, a) => s + Number(a.amount || 0), 0)
-      const commissionEarned = Math.round(r.commissionEarned * 100) / 100
+      const adjustmentsTotal = r2(applied.reduce((s, a) => s + Number(a.amount || 0), 0))
+      const commissionEarned = r2(r.commissionEarned)
       return {
         rep_id: r.rep.id,
         rep_name: r.rep.name,
         rep_email: r.rep.email,
-        commission_rate: r.rep.commission_rate,
-        total_invoiced: Math.round(r.totalInvoiced * 100) / 100,
+        commission_rate: r2(r.rep.commission_rate),
+        total_invoiced: r2(r.totalInvoiced),
         commission_earned: commissionEarned,
-        adjustments_total: Math.round(adjustmentsTotal * 100) / 100,
-        net_commission: Math.round((commissionEarned + adjustmentsTotal) * 100) / 100,
+        adjustments_total: adjustmentsTotal,
+        net_commission: r2(commissionEarned + adjustmentsTotal),
         invoice_count: r.invoiceCount,
-        locked_commission: Math.round(r.lockedCommission * 100) / 100,
+        locked_commission: r2(r.lockedCommission),
         locked_invoice_count: r.lockedInvoiceCount,
         is_locked: r.isLocked,
         excluded_line_count: r.excludedLineCount,
-        excluded_sub_total: Math.round(r.excludedSubTotal * 100) / 100,
+        excluded_sub_total: r2(r.excludedSubTotal),
         invoices: r.invoices,
         companies: Array.from(repCompanies.get(r.rep.id) || []).map(cid => companyIdToName.get(cid) || cid),
         adjustments: repAdjustments,
@@ -832,13 +841,14 @@ Deno.serve(async (req) => {
     })
 
     const summary = {
-      totalInvoiced: data.reduce((s, d) => s + d.total_invoiced, 0),
-      totalCommission: data.reduce((s, d) => s + d.commission_earned, 0),
-      totalAdjustments: data.reduce((s, d) => s + (d.adjustments_total || 0), 0),
-      totalNet: data.reduce((s, d) => s + (d.net_commission || 0), 0),
+      totalInvoiced: r2(data.reduce((s, d) => s + d.total_invoiced, 0)),
+      totalCommission: r2(data.reduce((s, d) => s + d.commission_earned, 0)),
+      totalAdjustments: r2(data.reduce((s, d) => s + (d.adjustments_total || 0), 0)),
+      totalNet: r2(data.reduce((s, d) => s + (d.net_commission || 0), 0)),
       totalInvoices: data.reduce((s, d) => s + d.invoice_count, 0),
       totalExcludedLines: data.reduce((s, d) => s + (d.excluded_line_count || 0), 0),
-      totalExcludedSubTotal: data.reduce((s, d) => s + (d.excluded_sub_total || 0), 0),
+      totalExcludedSubTotal: r2(data.reduce((s, d) => s + (d.excluded_sub_total || 0), 0)),
+
       totalOpenAdjustments: data.reduce((s, d) => s + (d.open_adjustment_count || 0), 0),
     }
 
@@ -854,7 +864,7 @@ Deno.serve(async (req) => {
     const unresolved = Array.from(unresolvedByKey.values())
       .sort((a, b) => b.occurrences - a.occurrences)
 
-    const report = { success: true, data, summary, unresolved_cost_items: unresolved, report_version: 3 }
+    const report = { success: true, data, summary, unresolved_cost_items: unresolved, report_version: 4 }
     await upsertCachedCommissionReport(supabase, {
       periodMonth,
       repId: rep_id ?? null,
@@ -966,8 +976,8 @@ function normalizeCommissionReportForCache(report: any) {
     return {
       ...rep,
       invoices,
-      total_invoiced: Math.round(totalInvoiced * 100) / 100,
-      commission_earned: Math.round(commissionEarned * 100) / 100,
+      total_invoiced: r2(totalInvoiced),
+      commission_earned: r2(commissionEarned),
       invoice_count: invoices.length,
       locked_commission: 0,
       locked_invoice_count: 0,
@@ -978,9 +988,10 @@ function normalizeCommissionReportForCache(report: any) {
     ...report,
     data,
     summary: {
-      totalInvoiced: data.reduce((s: number, d: any) => s + Number(d.total_invoiced || 0), 0),
-      totalCommission: data.reduce((s: number, d: any) => s + Number(d.commission_earned || 0), 0),
+      totalInvoiced: r2(data.reduce((s: number, d: any) => s + Number(d.total_invoiced || 0), 0)),
+      totalCommission: r2(data.reduce((s: number, d: any) => s + Number(d.commission_earned || 0), 0)),
       totalInvoices: data.reduce((s: number, d: any) => s + Number(d.invoice_count || 0), 0),
+
     },
   }
 }
@@ -1015,10 +1026,10 @@ async function applyLockedPayoutsToReport(supabase: any, report: any, periodMont
     return {
       ...rep,
       invoices,
-      total_invoiced: Math.round(totalInvoiced * 100) / 100,
-      commission_earned: Math.round(commissionEarned * 100) / 100,
+      total_invoiced: r2(totalInvoiced),
+      commission_earned: r2(commissionEarned),
       invoice_count: invoiceCount,
-      locked_commission: Math.round(lockedCommission * 100) / 100,
+      locked_commission: r2(lockedCommission),
       locked_invoice_count: lockedInvoiceCount,
       is_locked: lockedInvoiceCount > 0 && invoiceCount === 0,
     }
@@ -1028,9 +1039,10 @@ async function applyLockedPayoutsToReport(supabase: any, report: any, periodMont
     ...report,
     data,
     summary: {
-      totalInvoiced: data.reduce((s: number, d: any) => s + Number(d.total_invoiced || 0), 0),
-      totalCommission: data.reduce((s: number, d: any) => s + Number(d.commission_earned || 0), 0),
+      totalInvoiced: r2(data.reduce((s: number, d: any) => s + Number(d.total_invoiced || 0), 0)),
+      totalCommission: r2(data.reduce((s: number, d: any) => s + Number(d.commission_earned || 0), 0)),
       totalInvoices: data.reduce((s: number, d: any) => s + Number(d.invoice_count || 0), 0),
+
     },
   }
 }

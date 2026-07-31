@@ -907,6 +907,13 @@ const CommissionPage = () => {
 
   const selectedExportColumns = () => EXPORT_COLUMNS.filter(c => exportColumns.includes(c.key));
 
+  // Every numeric value in exports/prints is rendered with exactly 2 decimals.
+  const num2 = (v: unknown): string => {
+    if (v === null || v === undefined || v === "") return "";
+    const n = Number(v);
+    return Number.isFinite(n) ? n.toFixed(2) : "";
+  };
+
   const invoiceCellValue = (repName: string, inv: any, key: string): string => {
     switch (key) {
       case "rep_name": return repName;
@@ -914,12 +921,12 @@ const CommissionPage = () => {
       case "customer_name": return inv.customer_name || "";
       case "date": return inv.date || "";
       case "status": return inv.locked || inv.is_locked ? "paid" : "due";
-      case "sub_total": return String(inv.sub_total ?? "");
-      case "commission_rate": return String(inv.commission_rate ?? "");
-      case "credited": return String(inv.credited_sub_total || 0);
-      case "write_off": return String(inv.write_off_amount || 0);
-      case "discount": return String(inv.invoice_discount || 0);
-      case "commission": return String(inv.commission ?? "");
+      case "sub_total": return num2(inv.sub_total);
+      case "commission_rate": return num2(inv.commission_rate);
+      case "credited": return num2(inv.credited_sub_total || 0);
+      case "write_off": return num2(inv.write_off_amount || 0);
+      case "discount": return num2(inv.invoice_discount || 0);
+      case "commission": return num2(inv.commission);
       default: return "";
     }
   };
@@ -928,17 +935,18 @@ const CommissionPage = () => {
     switch (key) {
       case "li_code": return li.code || "";
       case "li_name": return li.name || "";
-      case "li_quantity": return String(li.quantity ?? "");
-      case "li_rate": return String(li.rate ?? "");
-      case "li_cost": return li.cost === null || li.cost === undefined ? "" : String(li.cost);
-      case "li_sub_total": return String(li.sub_total ?? "");
-      case "li_margin": return li.margin_percent === null || li.margin_percent === undefined ? "" : String(li.margin_percent);
-      case "li_commission_rate": return String(li.commission_rate ?? "");
-      case "li_commission": return String(li.commission ?? "");
+      case "li_quantity": return num2(li.quantity);
+      case "li_rate": return num2(li.rate);
+      case "li_cost": return num2(li.cost);
+      case "li_sub_total": return num2(li.sub_total);
+      case "li_margin": return num2(li.margin_percent);
+      case "li_commission_rate": return num2(li.commission_rate);
+      case "li_commission": return num2(li.commission);
       case "li_excluded": return li.excluded_reason || "";
       default: return "";
     }
   };
+
 
   const exportCsv = () => {
     if (!commissionData?.data) return;
@@ -1001,23 +1009,24 @@ const CommissionPage = () => {
       if (lines.length === 0) {
         rows.push([
           inv.invoice_number, inv.customer_name, inv.date, status,
-          String(inv.sub_total), String(inv.credited_sub_total || 0), String(inv.write_off_amount || 0), String(inv.invoice_discount || 0),
-          String(inv.commission_rate), String(inv.commission),
+          num2(inv.sub_total), num2(inv.credited_sub_total || 0), num2(inv.write_off_amount || 0), num2(inv.invoice_discount || 0),
+          num2(inv.commission_rate), num2(inv.commission),
           "", "", "", "", "", "", "", "", "", "",
         ]);
       } else {
         for (const li of lines) {
           rows.push([
             inv.invoice_number, inv.customer_name, inv.date, status,
-            String(inv.sub_total), String(inv.credited_sub_total || 0), String(inv.write_off_amount || 0), String(inv.invoice_discount || 0),
-            String(inv.commission_rate), String(inv.commission),
-            li.name, li.code || "", String(li.quantity), String(li.rate), li.cost === null ? "" : String(li.cost),
-            li.margin_percent === null ? "" : String(li.margin_percent),
-            String(li.sub_total), String(li.commission_rate), String(li.commission), li.excluded_reason || "",
+            num2(inv.sub_total), num2(inv.credited_sub_total || 0), num2(inv.write_off_amount || 0), num2(inv.invoice_discount || 0),
+            num2(inv.commission_rate), num2(inv.commission),
+            li.name, li.code || "", num2(li.quantity), num2(li.rate), num2(li.cost),
+            num2(li.margin_percent),
+            num2(li.sub_total), num2(li.commission_rate), num2(li.commission), li.excluded_reason || "",
           ]);
         }
       }
     }
+
     const csv = rows.map((r) => r.map(esc).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
@@ -1075,7 +1084,7 @@ const CommissionPage = () => {
       doc.setFont("helvetica", "normal");
       doc.setTextColor(80);
       doc.text(
-        `${rep.rep_email || "—"}  |  Rate: ${rep.commission_rate}%  |  Invoices: ${rep.invoice_count}  |  Invoiced: ${formatCurrency(rep.total_invoiced)}  |  Commission: ${formatCurrency(rep.commission_earned)}`,
+        `${rep.rep_email || "—"}  |  Rate: ${Number(rep.commission_rate).toFixed(2)}%  |  Invoices: ${rep.invoice_count}  |  Invoiced: ${formatCurrency(rep.total_invoiced)}  |  Commission: ${formatCurrency(rep.commission_earned)}`,
         14, y,
       );
       y += 5;
@@ -1407,7 +1416,7 @@ const CommissionPage = () => {
                         >
                           {expandedReps.has(d.rep_id) ? <ChevronDown className="h-4 w-4 shrink-0" /> : <ChevronRight className="h-4 w-4 shrink-0" />}
                           <CardTitle className="text-base truncate">{d.rep_name}</CardTitle>
-                          <Badge variant="secondary">{d.commission_rate}% default</Badge>
+                          <Badge variant="secondary">{Number(d.commission_rate).toFixed(2)}% default</Badge>
                           {d.locked_invoice_count > 0 && (
                             <Badge variant="outline" className="gap-1 text-xs">
                               <Lock className="h-3 w-3" />
@@ -1582,7 +1591,7 @@ const CommissionPage = () => {
                                       </td>
                                       <td className="p-2 text-right">
                                         <Badge variant={inv.commission_rate !== d.commission_rate ? "outline" : "secondary"} className="text-xs">
-                                          {inv.commission_rate}%
+                                          {Number(inv.commission_rate).toFixed(2)}%
                                         </Badge>
                                       </td>
                                       <td className="p-2 text-right font-medium text-primary">{formatCurrency(inv.commission)}</td>
@@ -1695,7 +1704,7 @@ const CommissionPage = () => {
                                                           <span className={cn(
                                                             li.margin_percent >= 25 ? "text-primary" : "text-destructive"
                                                           )}>
-                                                            {li.margin_percent}%
+                                                            {Number(li.margin_percent).toFixed(2)}%
                                                           </span>
                                                         ) : <span className="text-muted-foreground">—</span>}
                                                       </td>
@@ -1827,7 +1836,7 @@ const CommissionPage = () => {
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-medium">{rep.name}</span>
-                          <Badge variant="secondary">{rep.commission_rate}% default</Badge>
+                          <Badge variant="secondary">{Number(rep.commission_rate).toFixed(2)}% default</Badge>
                           <Badge variant="outline" className="text-xs">
                             {method === "margin_scaled" ? "Margin-scaled" : "Half-markup <25%"}
                           </Badge>
