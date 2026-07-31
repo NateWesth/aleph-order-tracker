@@ -907,6 +907,13 @@ const CommissionPage = () => {
 
   const selectedExportColumns = () => EXPORT_COLUMNS.filter(c => exportColumns.includes(c.key));
 
+  // Every numeric value in exports/prints is rendered with exactly 2 decimals.
+  const num2 = (v: unknown): string => {
+    if (v === null || v === undefined || v === "") return "";
+    const n = Number(v);
+    return Number.isFinite(n) ? n.toFixed(2) : "";
+  };
+
   const invoiceCellValue = (repName: string, inv: any, key: string): string => {
     switch (key) {
       case "rep_name": return repName;
@@ -914,12 +921,12 @@ const CommissionPage = () => {
       case "customer_name": return inv.customer_name || "";
       case "date": return inv.date || "";
       case "status": return inv.locked || inv.is_locked ? "paid" : "due";
-      case "sub_total": return String(inv.sub_total ?? "");
-      case "commission_rate": return String(inv.commission_rate ?? "");
-      case "credited": return String(inv.credited_sub_total || 0);
-      case "write_off": return String(inv.write_off_amount || 0);
-      case "discount": return String(inv.invoice_discount || 0);
-      case "commission": return String(inv.commission ?? "");
+      case "sub_total": return num2(inv.sub_total);
+      case "commission_rate": return num2(inv.commission_rate);
+      case "credited": return num2(inv.credited_sub_total || 0);
+      case "write_off": return num2(inv.write_off_amount || 0);
+      case "discount": return num2(inv.invoice_discount || 0);
+      case "commission": return num2(inv.commission);
       default: return "";
     }
   };
@@ -928,17 +935,18 @@ const CommissionPage = () => {
     switch (key) {
       case "li_code": return li.code || "";
       case "li_name": return li.name || "";
-      case "li_quantity": return String(li.quantity ?? "");
-      case "li_rate": return String(li.rate ?? "");
-      case "li_cost": return li.cost === null || li.cost === undefined ? "" : String(li.cost);
-      case "li_sub_total": return String(li.sub_total ?? "");
-      case "li_margin": return li.margin_percent === null || li.margin_percent === undefined ? "" : String(li.margin_percent);
-      case "li_commission_rate": return String(li.commission_rate ?? "");
-      case "li_commission": return String(li.commission ?? "");
+      case "li_quantity": return num2(li.quantity);
+      case "li_rate": return num2(li.rate);
+      case "li_cost": return num2(li.cost);
+      case "li_sub_total": return num2(li.sub_total);
+      case "li_margin": return num2(li.margin_percent);
+      case "li_commission_rate": return num2(li.commission_rate);
+      case "li_commission": return num2(li.commission);
       case "li_excluded": return li.excluded_reason || "";
       default: return "";
     }
   };
+
 
   const exportCsv = () => {
     if (!commissionData?.data) return;
