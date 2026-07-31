@@ -1060,6 +1060,10 @@ const CommissionPage = () => {
     doc.text(`Total Commission Due: ${formatCurrency(commissionData.summary.totalCommission)}`, 14, y); y += 5;
     doc.text(`Invoices Matched: ${commissionData.summary.totalInvoices}`, 14, y); y += 8;
 
+    const cols = selectedExportColumns();
+    const invoiceCols = cols.filter(c => c.group === "invoice");
+    const lineCols = cols.filter(c => c.group === "line");
+
     // Per rep
     for (const rep of commissionData.data) {
       if (y > 250) { doc.addPage(); y = 20; }
@@ -1076,53 +1080,39 @@ const CommissionPage = () => {
       );
       y += 5;
 
+      const body: string[][] = [];
       for (const inv of rep.invoices) {
-        if (y > 250) { doc.addPage(); y = 20; }
-        doc.setFontSize(10);
-        doc.setFont("helvetica", "bold");
-        doc.setTextColor(0);
-        doc.text(
-          `Invoice ${inv.invoice_number} — ${inv.customer_name}${inv.locked ? " (LOCKED)" : ""}`,
-          14, y,
-        );
-        y += 4;
-        doc.setFontSize(9);
-        doc.setFont("helvetica", "normal");
-        doc.setTextColor(90);
-        doc.text(
-          `Date: ${inv.date || "—"}  |  Sub-total: ${formatCurrency(inv.sub_total)}  |  Rate: ${inv.commission_rate}%  |  Commission: ${formatCurrency(inv.commission)}`,
-          14, y,
-        );
-        y += 3;
-
-        const items = inv.line_items || [];
-        if (items.length > 0) {
-          autoTable(doc, {
-            startY: y,
-            head: [["SKU", "Item", "Qty", "Rate", "Cost", "Sub-total", "Margin %", "Comm %", "Commission"]],
-            body: items.map(li => [
-              li.code || "—",
-              (li.name || "").slice(0, 40),
-              String(li.quantity ?? ""),
-              li.rate != null ? formatCurrency(Number(li.rate)) : "—",
-              li.cost != null ? formatCurrency(Number(li.cost)) : "—",
-              formatCurrency(Number(li.sub_total || 0)),
-              li.margin_percent != null ? `${Number(li.margin_percent).toFixed(1)}%` : "—",
-              `${li.commission_rate}%`,
-              formatCurrency(Number(li.commission || 0)),
-            ]),
-            styles: { fontSize: 7, cellPadding: 1.5 },
-            headStyles: { fillColor: [16, 185, 129], fontSize: 7 },
-            margin: { left: 14, right: 14 },
-            theme: "striped",
-          });
-          y = (doc as any).lastAutoTable.finalY + 4;
+        const invValues = invoiceCols.map(c => invoiceCellValue(rep.rep_name, inv, c.key));
+        const items = (inv.line_items || []) as any[];
+        if (lineCols.length === 0 || items.length === 0) {
+          body.push(cols.map(c => (c.group === "invoice" ? invValues[invoiceCols.indexOf(c)] : "—")));
         } else {
-          doc.text("(no line items returned)", 14, y + 4);
-          y += 8;
+          for (const li of items) {
+            body.push(cols.map(c =>
+              c.group === "invoice"
+                ? invValues[invoiceCols.indexOf(c)]
+                : (lineCellValue(li, c.key) || "—")
+            ));
+          }
         }
       }
-      y += 4;
+
+      if (body.length > 0 && cols.length > 0) {
+        autoTable(doc, {
+          startY: y,
+          head: [cols.map(c => c.label)],
+          body,
+          styles: { fontSize: 7, cellPadding: 1.5, overflow: "linebreak" },
+          headStyles: { fillColor: [16, 185, 129], fontSize: 7 },
+          margin: { left: 14, right: 14 },
+          theme: "striped",
+        });
+        y = (doc as any).lastAutoTable.finalY + 6;
+      } else {
+        doc.text("(no invoices)", 14, y + 4);
+        y += 10;
+      }
+
       doc.setDrawColor(220);
       doc.line(14, y, pageWidth - 14, y);
       y += 4;
@@ -1130,6 +1120,7 @@ const CommissionPage = () => {
 
     doc.save(`commission-report-${selectedMonth}.pdf`);
   };
+
 
   const formatCurrency = (n: number) => `R ${n.toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
