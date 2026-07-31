@@ -362,6 +362,8 @@ const CommissionPage = () => {
   const [companyRateOverrides, setCompanyRateOverrides] = useState<Map<string, string>>(new Map());
   const [loadingReps, setLoadingReps] = useState(true);
   const [missingDialogOpen, setMissingDialogOpen] = useState(false);
+  const [exportTarget, setExportTarget] = useState<null | "csv" | "pdf">(null);
+  const [exportColumns, setExportColumns] = useState<string[]>(DEFAULT_EXPORT_COLUMNS);
 
   // Keyboard shortcut: Shift+M (or Ctrl/Cmd+Shift+M) toggles the Missing Costs dialog
   useEffect(() => {
