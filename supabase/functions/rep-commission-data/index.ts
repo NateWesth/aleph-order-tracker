@@ -732,9 +732,9 @@ Deno.serve(async (req) => {
         commission = 0
         displayRate = 0
       } else {
-        commission = lineDetails.reduce((sum, line) => sum + Number(line.commission || 0), 0)
+        commission = r2(lineDetails.reduce((sum, line) => sum + Number(line.commission || 0), 0))
         displayRate = coveredLineSubTotal > 0
-          ? (commission / coveredLineSubTotal) * 100
+          ? r2((commission / coveredLineSubTotal) * 100)
           : 0
       }
 
@@ -742,34 +742,34 @@ Deno.serve(async (req) => {
 
       // Credit-note + write-off adjustment: reduce both the invoiced subtotal
       // and the commission proportionally so we never pay on returns/uncollected.
-      const creditedSubTotal = creditByInvoiceId.get(invoiceIdStr) ?? 0
-      const adjustmentTotal = creditedSubTotal + writeOffAmount
-      const netSubTotal = Math.max(0, invSubTotal - adjustmentTotal)
+      const creditedSubTotal = r2(creditByInvoiceId.get(invoiceIdStr) ?? 0)
+      const adjustmentTotal = r2(creditedSubTotal + writeOffAmount)
+      const netSubTotal = r2(Math.max(0, invSubTotal - adjustmentTotal))
       let adjustmentRatio = 0
       if (adjustmentTotal > 0 && invSubTotal > 0) {
         adjustmentRatio = Math.min(1, adjustmentTotal / invSubTotal)
       }
-      const creditedCommission = commission * adjustmentRatio
-      const netCommission = commission - creditedCommission
+      const creditedCommission = r2(commission * adjustmentRatio)
+      const netCommission = r2(commission - creditedCommission)
 
       // Excluded-line summary for this invoice.
       const excludedLines = lineDetails.filter(l => l.excluded_reason)
-      const excludedSubTotal = excludedLines.reduce((s, l) => s + Number(l.sub_total || 0), 0)
+      const excludedSubTotal = r2(excludedLines.reduce((s, l) => s + Number(l.sub_total || 0), 0))
 
       const isLocked = lockedSet.has(lockedKey(target.rep_id, invoiceIdStr))
 
       if (isLocked) {
-        result.lockedCommission += netCommission
+        result.lockedCommission = r2(result.lockedCommission + netCommission)
         result.lockedInvoiceCount++
       } else {
-        result.totalInvoiced += netSubTotal
-        result.commissionEarned += netCommission
+        result.totalInvoiced = r2(result.totalInvoiced + netSubTotal)
+        result.commissionEarned = r2(result.commissionEarned + netCommission)
         result.invoiceCount++
       }
       // Rep-level excluded totals (unlocked only, matches commissionEarned scope).
       if (!isLocked) {
         result.excludedLineCount = (result.excludedLineCount || 0) + excludedLines.length
-        result.excludedSubTotal = (result.excludedSubTotal || 0) + excludedSubTotal
+        result.excludedSubTotal = r2((result.excludedSubTotal || 0) + excludedSubTotal)
       }
       result.invoices.push({
         invoice_id: invoiceIdStr,
@@ -777,19 +777,20 @@ Deno.serve(async (req) => {
         customer_name: inv.customer_name || '',
         date: inv.date || inv.invoice_date || '',
         sub_total: netSubTotal,
-        total: invTotal,
+        total: r2(invTotal),
         commission: netCommission,
-        commission_rate: Math.round(displayRate * 100) / 100,
+        commission_rate: r2(displayRate),
         line_items: lineDetails,
         locked: isLocked,
-        gross_sub_total: invSubTotal,
-        credited_sub_total: Math.round(creditedSubTotal * 100) / 100,
-        credited_commission: Math.round(creditedCommission * 100) / 100,
-        write_off_amount: Math.round(writeOffAmount * 100) / 100,
-        invoice_discount: Math.round(invoiceLevelDiscount * 100) / 100,
+        gross_sub_total: r2(invSubTotal),
+        credited_sub_total: creditedSubTotal,
+        credited_commission: creditedCommission,
+        write_off_amount: r2(writeOffAmount),
+        invoice_discount: r2(invoiceLevelDiscount),
         excluded_line_count: excludedLines.length,
-        excluded_sub_total: Math.round(excludedSubTotal * 100) / 100,
+        excluded_sub_total: excludedSubTotal,
       })
+
     }
     console.log(`Matched ${matched}/${invoiceList.length} invoices to reps. Skipped ${duplicatesSkipped} duplicates. Unmatched samples:`, unmatchedSamples)
 
