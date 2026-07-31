@@ -816,23 +816,23 @@ Deno.serve(async (req) => {
     const data = Array.from(repResults.values()).map(r => {
       const repAdjustments = adjByRep.get(r.rep.id) || []
       const applied = repAdjustments.filter(a => a.status === 'approved' || a.status === 'applied')
-      const adjustmentsTotal = applied.reduce((s, a) => s + Number(a.amount || 0), 0)
-      const commissionEarned = Math.round(r.commissionEarned * 100) / 100
+      const adjustmentsTotal = r2(applied.reduce((s, a) => s + Number(a.amount || 0), 0))
+      const commissionEarned = r2(r.commissionEarned)
       return {
         rep_id: r.rep.id,
         rep_name: r.rep.name,
         rep_email: r.rep.email,
-        commission_rate: r.rep.commission_rate,
-        total_invoiced: Math.round(r.totalInvoiced * 100) / 100,
+        commission_rate: r2(r.rep.commission_rate),
+        total_invoiced: r2(r.totalInvoiced),
         commission_earned: commissionEarned,
-        adjustments_total: Math.round(adjustmentsTotal * 100) / 100,
-        net_commission: Math.round((commissionEarned + adjustmentsTotal) * 100) / 100,
+        adjustments_total: adjustmentsTotal,
+        net_commission: r2(commissionEarned + adjustmentsTotal),
         invoice_count: r.invoiceCount,
-        locked_commission: Math.round(r.lockedCommission * 100) / 100,
+        locked_commission: r2(r.lockedCommission),
         locked_invoice_count: r.lockedInvoiceCount,
         is_locked: r.isLocked,
         excluded_line_count: r.excludedLineCount,
-        excluded_sub_total: Math.round(r.excludedSubTotal * 100) / 100,
+        excluded_sub_total: r2(r.excludedSubTotal),
         invoices: r.invoices,
         companies: Array.from(repCompanies.get(r.rep.id) || []).map(cid => companyIdToName.get(cid) || cid),
         adjustments: repAdjustments,
@@ -841,13 +841,14 @@ Deno.serve(async (req) => {
     })
 
     const summary = {
-      totalInvoiced: data.reduce((s, d) => s + d.total_invoiced, 0),
-      totalCommission: data.reduce((s, d) => s + d.commission_earned, 0),
-      totalAdjustments: data.reduce((s, d) => s + (d.adjustments_total || 0), 0),
-      totalNet: data.reduce((s, d) => s + (d.net_commission || 0), 0),
+      totalInvoiced: r2(data.reduce((s, d) => s + d.total_invoiced, 0)),
+      totalCommission: r2(data.reduce((s, d) => s + d.commission_earned, 0)),
+      totalAdjustments: r2(data.reduce((s, d) => s + (d.adjustments_total || 0), 0)),
+      totalNet: r2(data.reduce((s, d) => s + (d.net_commission || 0), 0)),
       totalInvoices: data.reduce((s, d) => s + d.invoice_count, 0),
       totalExcludedLines: data.reduce((s, d) => s + (d.excluded_line_count || 0), 0),
-      totalExcludedSubTotal: data.reduce((s, d) => s + (d.excluded_sub_total || 0), 0),
+      totalExcludedSubTotal: r2(data.reduce((s, d) => s + (d.excluded_sub_total || 0), 0)),
+
       totalOpenAdjustments: data.reduce((s, d) => s + (d.open_adjustment_count || 0), 0),
     }
 
