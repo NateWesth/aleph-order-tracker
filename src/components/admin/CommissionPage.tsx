@@ -905,16 +905,66 @@ const CommissionPage = () => {
     });
   };
 
+  const selectedExportColumns = () => EXPORT_COLUMNS.filter(c => exportColumns.includes(c.key));
+
+  const invoiceCellValue = (repName: string, inv: any, key: string): string => {
+    switch (key) {
+      case "rep_name": return repName;
+      case "invoice_number": return inv.invoice_number || "";
+      case "customer_name": return inv.customer_name || "";
+      case "date": return inv.date || "";
+      case "status": return inv.locked || inv.is_locked ? "paid" : "due";
+      case "sub_total": return String(inv.sub_total ?? "");
+      case "commission_rate": return String(inv.commission_rate ?? "");
+      case "credited": return String(inv.credited_sub_total || 0);
+      case "write_off": return String(inv.write_off_amount || 0);
+      case "discount": return String(inv.invoice_discount || 0);
+      case "commission": return String(inv.commission ?? "");
+      default: return "";
+    }
+  };
+
+  const lineCellValue = (li: any, key: string): string => {
+    switch (key) {
+      case "li_code": return li.code || "";
+      case "li_name": return li.name || "";
+      case "li_quantity": return String(li.quantity ?? "");
+      case "li_rate": return String(li.rate ?? "");
+      case "li_cost": return li.cost === null || li.cost === undefined ? "" : String(li.cost);
+      case "li_sub_total": return String(li.sub_total ?? "");
+      case "li_margin": return li.margin_percent === null || li.margin_percent === undefined ? "" : String(li.margin_percent);
+      case "li_commission_rate": return String(li.commission_rate ?? "");
+      case "li_commission": return String(li.commission ?? "");
+      case "li_excluded": return li.excluded_reason || "";
+      default: return "";
+    }
+  };
+
   const exportCsv = () => {
     if (!commissionData?.data) return;
-    const rows = [["Rep", "Email", "Rate %", "Total Invoiced (excl. VAT)", "Commission Earned", "Invoice Count"]];
+    const cols = selectedExportColumns();
+    if (cols.length === 0) return;
+    const invoiceCols = cols.filter(c => c.group === "invoice");
+    const lineCols = cols.filter(c => c.group === "line");
+    const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+
+    const rows: string[][] = [cols.map(c => c.label)];
     for (const d of commissionData.data) {
-      rows.push([d.rep_name, d.rep_email || "", String(d.commission_rate), String(d.total_invoiced), String(d.commission_earned), String(d.invoice_count)]);
       for (const inv of d.invoices) {
-        rows.push(["", inv.invoice_number, inv.customer_name, inv.date, String(inv.sub_total), String(inv.commission)]);
+        const invValues = invoiceCols.map(c => invoiceCellValue(d.rep_name, inv, c.key));
+        const lines = (inv.line_items || []) as any[];
+        if (lineCols.length === 0 || lines.length === 0) {
+          rows.push(cols.map(c => (c.group === "invoice" ? invValues[invoiceCols.indexOf(c)] : "")));
+        } else {
+          for (const li of lines) {
+            rows.push(cols.map(c =>
+              c.group === "invoice" ? invValues[invoiceCols.indexOf(c)] : lineCellValue(li, c.key)
+            ));
+          }
+        }
       }
     }
-    const csv = rows.map(r => r.map(c => `"${c}"`).join(",")).join("\n");
+    const csv = rows.map(r => r.map(esc).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -923,6 +973,7 @@ const CommissionPage = () => {
     a.click();
     URL.revokeObjectURL(url);
   };
+
 
   const exportRepStatement = (d: CommissionRepData) => {
     const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
