@@ -11,6 +11,13 @@ const ZOHO_ALLOWED_INVOICE_STATUSES = ['paid', 'sent', 'overdue', 'partially_pai
 
 const normalizeCompanyName = (value: string) => value.toLowerCase().trim().replace(/\s+/g, ' ')
 
+// Every monetary / rate value returned by this function is rounded to 2 decimals.
+const r2 = (value: unknown): number => {
+  const n = Number(value)
+  if (!Number.isFinite(n)) return 0
+  return Math.round((n + Number.EPSILON) * 100) / 100
+}
+
 const toNumber = (value: unknown): number | null => {
   if (typeof value === 'number' && Number.isFinite(value)) return value
   if (typeof value === 'string') {
