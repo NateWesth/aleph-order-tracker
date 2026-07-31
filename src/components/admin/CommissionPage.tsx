@@ -1009,23 +1009,24 @@ const CommissionPage = () => {
       if (lines.length === 0) {
         rows.push([
           inv.invoice_number, inv.customer_name, inv.date, status,
-          String(inv.sub_total), String(inv.credited_sub_total || 0), String(inv.write_off_amount || 0), String(inv.invoice_discount || 0),
-          String(inv.commission_rate), String(inv.commission),
+          num2(inv.sub_total), num2(inv.credited_sub_total || 0), num2(inv.write_off_amount || 0), num2(inv.invoice_discount || 0),
+          num2(inv.commission_rate), num2(inv.commission),
           "", "", "", "", "", "", "", "", "", "",
         ]);
       } else {
         for (const li of lines) {
           rows.push([
             inv.invoice_number, inv.customer_name, inv.date, status,
-            String(inv.sub_total), String(inv.credited_sub_total || 0), String(inv.write_off_amount || 0), String(inv.invoice_discount || 0),
-            String(inv.commission_rate), String(inv.commission),
-            li.name, li.code || "", String(li.quantity), String(li.rate), li.cost === null ? "" : String(li.cost),
-            li.margin_percent === null ? "" : String(li.margin_percent),
-            String(li.sub_total), String(li.commission_rate), String(li.commission), li.excluded_reason || "",
+            num2(inv.sub_total), num2(inv.credited_sub_total || 0), num2(inv.write_off_amount || 0), num2(inv.invoice_discount || 0),
+            num2(inv.commission_rate), num2(inv.commission),
+            li.name, li.code || "", num2(li.quantity), num2(li.rate), num2(li.cost),
+            num2(li.margin_percent),
+            num2(li.sub_total), num2(li.commission_rate), num2(li.commission), li.excluded_reason || "",
           ]);
         }
       }
     }
+
     const csv = rows.map((r) => r.map(esc).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
