@@ -976,8 +976,8 @@ function normalizeCommissionReportForCache(report: any) {
     return {
       ...rep,
       invoices,
-      total_invoiced: Math.round(totalInvoiced * 100) / 100,
-      commission_earned: Math.round(commissionEarned * 100) / 100,
+      total_invoiced: r2(totalInvoiced),
+      commission_earned: r2(commissionEarned),
       invoice_count: invoices.length,
       locked_commission: 0,
       locked_invoice_count: 0,
@@ -988,9 +988,10 @@ function normalizeCommissionReportForCache(report: any) {
     ...report,
     data,
     summary: {
-      totalInvoiced: data.reduce((s: number, d: any) => s + Number(d.total_invoiced || 0), 0),
-      totalCommission: data.reduce((s: number, d: any) => s + Number(d.commission_earned || 0), 0),
+      totalInvoiced: r2(data.reduce((s: number, d: any) => s + Number(d.total_invoiced || 0), 0)),
+      totalCommission: r2(data.reduce((s: number, d: any) => s + Number(d.commission_earned || 0), 0)),
       totalInvoices: data.reduce((s: number, d: any) => s + Number(d.invoice_count || 0), 0),
+
     },
   }
 }
