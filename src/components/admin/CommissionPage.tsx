@@ -345,6 +345,36 @@ const MissingCostsEditor = ({
 
 
 
+type ExportColumn = { key: string; label: string; group: "invoice" | "line" };
+
+const EXPORT_COLUMNS: ExportColumn[] = [
+  { key: "invoice_number", label: "Invoice #", group: "invoice" },
+  { key: "customer_name", label: "Customer", group: "invoice" },
+  { key: "date", label: "Date", group: "invoice" },
+  { key: "commission", label: "Commission", group: "invoice" },
+  { key: "rep_name", label: "Rep", group: "invoice" },
+  { key: "status", label: "Status (due/paid)", group: "invoice" },
+  { key: "sub_total", label: "Sub-total (excl. VAT)", group: "invoice" },
+  { key: "commission_rate", label: "Effective rate %", group: "invoice" },
+  { key: "credited", label: "Credited", group: "invoice" },
+  { key: "write_off", label: "Write-off", group: "invoice" },
+  { key: "discount", label: "Invoice discount", group: "invoice" },
+  { key: "li_code", label: "SKU", group: "line" },
+  { key: "li_name", label: "Item", group: "line" },
+  { key: "li_quantity", label: "Qty", group: "line" },
+  { key: "li_rate", label: "Sell rate", group: "line" },
+  { key: "li_cost", label: "Cost", group: "line" },
+  { key: "li_sub_total", label: "Line sub-total", group: "line" },
+  { key: "li_margin", label: "Margin %", group: "line" },
+  { key: "li_commission_rate", label: "Line rate %", group: "line" },
+  { key: "li_commission", label: "Line commission", group: "line" },
+  { key: "li_excluded", label: "Excluded reason", group: "line" },
+];
+
+// Always selected by default (and locked on) for every export/print
+const LOCKED_EXPORT_COLUMNS = ["invoice_number", "customer_name", "date", "commission"];
+const DEFAULT_EXPORT_COLUMNS = [...LOCKED_EXPORT_COLUMNS, "rep_name", "sub_total", "commission_rate"];
+
 const CommissionPage = () => {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("report");
@@ -362,6 +392,8 @@ const CommissionPage = () => {
   const [companyRateOverrides, setCompanyRateOverrides] = useState<Map<string, string>>(new Map());
   const [loadingReps, setLoadingReps] = useState(true);
   const [missingDialogOpen, setMissingDialogOpen] = useState(false);
+  const [exportTarget, setExportTarget] = useState<null | "csv" | "pdf">(null);
+  const [exportColumns, setExportColumns] = useState<string[]>(DEFAULT_EXPORT_COLUMNS);
 
   // Keyboard shortcut: Shift+M (or Ctrl/Cmd+Shift+M) toggles the Missing Costs dialog
   useEffect(() => {
@@ -873,16 +905,66 @@ const CommissionPage = () => {
     });
   };
 
+  const selectedExportColumns = () => EXPORT_COLUMNS.filter(c => exportColumns.includes(c.key));
+
+  const invoiceCellValue = (repName: string, inv: any, key: string): string => {
+    switch (key) {
+      case "rep_name": return repName;
+      case "invoice_number": return inv.invoice_number || "";
+      case "customer_name": return inv.customer_name || "";
+      case "date": return inv.date || "";
+      case "status": return inv.locked || inv.is_locked ? "paid" : "due";
+      case "sub_total": return String(inv.sub_total ?? "");
+      case "commission_rate": return String(inv.commission_rate ?? "");
+      case "credited": return String(inv.credited_sub_total || 0);
+      case "write_off": return String(inv.write_off_amount || 0);
+      case "discount": return String(inv.invoice_discount || 0);
+      case "commission": return String(inv.commission ?? "");
+      default: return "";
+    }
+  };
+
+  const lineCellValue = (li: any, key: string): string => {
+    switch (key) {
+      case "li_code": return li.code || "";
+      case "li_name": return li.name || "";
+      case "li_quantity": return String(li.quantity ?? "");
+      case "li_rate": return String(li.rate ?? "");
+      case "li_cost": return li.cost === null || li.cost === undefined ? "" : String(li.cost);
+      case "li_sub_total": return String(li.sub_total ?? "");
+      case "li_margin": return li.margin_percent === null || li.margin_percent === undefined ? "" : String(li.margin_percent);
+      case "li_commission_rate": return String(li.commission_rate ?? "");
+      case "li_commission": return String(li.commission ?? "");
+      case "li_excluded": return li.excluded_reason || "";
+      default: return "";
+    }
+  };
+
   const exportCsv = () => {
     if (!commissionData?.data) return;
-    const rows = [["Rep", "Email", "Rate %", "Total Invoiced (excl. VAT)", "Commission Earned", "Invoice Count"]];
+    const cols = selectedExportColumns();
+    if (cols.length === 0) return;
+    const invoiceCols = cols.filter(c => c.group === "invoice");
+    const lineCols = cols.filter(c => c.group === "line");
+    const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+
+    const rows: string[][] = [cols.map(c => c.label)];
     for (const d of commissionData.data) {
-      rows.push([d.rep_name, d.rep_email || "", String(d.commission_rate), String(d.total_invoiced), String(d.commission_earned), String(d.invoice_count)]);
       for (const inv of d.invoices) {
-        rows.push(["", inv.invoice_number, inv.customer_name, inv.date, String(inv.sub_total), String(inv.commission)]);
+        const invValues = invoiceCols.map(c => invoiceCellValue(d.rep_name, inv, c.key));
+        const lines = (inv.line_items || []) as any[];
+        if (lineCols.length === 0 || lines.length === 0) {
+          rows.push(cols.map(c => (c.group === "invoice" ? invValues[invoiceCols.indexOf(c)] : "")));
+        } else {
+          for (const li of lines) {
+            rows.push(cols.map(c =>
+              c.group === "invoice" ? invValues[invoiceCols.indexOf(c)] : lineCellValue(li, c.key)
+            ));
+          }
+        }
       }
     }
-    const csv = rows.map(r => r.map(c => `"${c}"`).join(",")).join("\n");
+    const csv = rows.map(r => r.map(esc).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -891,6 +973,7 @@ const CommissionPage = () => {
     a.click();
     URL.revokeObjectURL(url);
   };
+
 
   const exportRepStatement = (d: CommissionRepData) => {
     const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
@@ -977,6 +1060,10 @@ const CommissionPage = () => {
     doc.text(`Total Commission Due: ${formatCurrency(commissionData.summary.totalCommission)}`, 14, y); y += 5;
     doc.text(`Invoices Matched: ${commissionData.summary.totalInvoices}`, 14, y); y += 8;
 
+    const cols = selectedExportColumns();
+    const invoiceCols = cols.filter(c => c.group === "invoice");
+    const lineCols = cols.filter(c => c.group === "line");
+
     // Per rep
     for (const rep of commissionData.data) {
       if (y > 250) { doc.addPage(); y = 20; }
@@ -993,53 +1080,39 @@ const CommissionPage = () => {
       );
       y += 5;
 
+      const body: string[][] = [];
       for (const inv of rep.invoices) {
-        if (y > 250) { doc.addPage(); y = 20; }
-        doc.setFontSize(10);
-        doc.setFont("helvetica", "bold");
-        doc.setTextColor(0);
-        doc.text(
-          `Invoice ${inv.invoice_number} — ${inv.customer_name}${inv.locked ? " (LOCKED)" : ""}`,
-          14, y,
-        );
-        y += 4;
-        doc.setFontSize(9);
-        doc.setFont("helvetica", "normal");
-        doc.setTextColor(90);
-        doc.text(
-          `Date: ${inv.date || "—"}  |  Sub-total: ${formatCurrency(inv.sub_total)}  |  Rate: ${inv.commission_rate}%  |  Commission: ${formatCurrency(inv.commission)}`,
-          14, y,
-        );
-        y += 3;
-
-        const items = inv.line_items || [];
-        if (items.length > 0) {
-          autoTable(doc, {
-            startY: y,
-            head: [["SKU", "Item", "Qty", "Rate", "Cost", "Sub-total", "Margin %", "Comm %", "Commission"]],
-            body: items.map(li => [
-              li.code || "—",
-              (li.name || "").slice(0, 40),
-              String(li.quantity ?? ""),
-              li.rate != null ? formatCurrency(Number(li.rate)) : "—",
-              li.cost != null ? formatCurrency(Number(li.cost)) : "—",
-              formatCurrency(Number(li.sub_total || 0)),
-              li.margin_percent != null ? `${Number(li.margin_percent).toFixed(1)}%` : "—",
-              `${li.commission_rate}%`,
-              formatCurrency(Number(li.commission || 0)),
-            ]),
-            styles: { fontSize: 7, cellPadding: 1.5 },
-            headStyles: { fillColor: [16, 185, 129], fontSize: 7 },
-            margin: { left: 14, right: 14 },
-            theme: "striped",
-          });
-          y = (doc as any).lastAutoTable.finalY + 4;
+        const invValues = invoiceCols.map(c => invoiceCellValue(rep.rep_name, inv, c.key));
+        const items = (inv.line_items || []) as any[];
+        if (lineCols.length === 0 || items.length === 0) {
+          body.push(cols.map(c => (c.group === "invoice" ? invValues[invoiceCols.indexOf(c)] : "—")));
         } else {
-          doc.text("(no line items returned)", 14, y + 4);
-          y += 8;
+          for (const li of items) {
+            body.push(cols.map(c =>
+              c.group === "invoice"
+                ? invValues[invoiceCols.indexOf(c)]
+                : (lineCellValue(li, c.key) || "—")
+            ));
+          }
         }
       }
-      y += 4;
+
+      if (body.length > 0 && cols.length > 0) {
+        autoTable(doc, {
+          startY: y,
+          head: [cols.map(c => c.label)],
+          body,
+          styles: { fontSize: 7, cellPadding: 1.5, overflow: "linebreak" },
+          headStyles: { fillColor: [16, 185, 129], fontSize: 7 },
+          margin: { left: 14, right: 14 },
+          theme: "striped",
+        });
+        y = (doc as any).lastAutoTable.finalY + 6;
+      } else {
+        doc.text("(no invoices)", 14, y + 4);
+        y += 10;
+      }
+
       doc.setDrawColor(220);
       doc.line(14, y, pageWidth - 14, y);
       y += 4;
@@ -1047,6 +1120,7 @@ const CommissionPage = () => {
 
     doc.save(`commission-report-${selectedMonth}.pdf`);
   };
+
 
   const formatCurrency = (n: number) => `R ${n.toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -1149,12 +1223,85 @@ const CommissionPage = () => {
               };
               return (
                 <div className="contents">
-                  <Button variant="outline" onClick={exportCsv}>
+                  <Button variant="outline" onClick={() => setExportTarget("csv")}>
                     <Download className="h-4 w-4 mr-1.5" />Export CSV
                   </Button>
-                  <Button variant="outline" onClick={printPdfReport}>
+                  <Button variant="outline" onClick={() => setExportTarget("pdf")}>
                     <Printer className="h-4 w-4 mr-1.5" />Print Full Report
                   </Button>
+
+                  <Dialog open={exportTarget !== null} onOpenChange={(o) => !o && setExportTarget(null)}>
+                    <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+                      <DialogHeader>
+                        <DialogTitle>
+                          {exportTarget === "pdf" ? "Print Full Report — choose columns" : "Export CSV — choose columns"}
+                        </DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4 py-1">
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm text-muted-foreground">
+                            Invoice #, Customer, Date and Commission are always included.
+                          </p>
+                          <div className="flex gap-1">
+                            <Button
+                              variant="ghost" size="sm" className="h-7 px-2 text-xs"
+                              onClick={() => setExportColumns(EXPORT_COLUMNS.map(c => c.key))}
+                            >All</Button>
+                            <Button
+                              variant="ghost" size="sm" className="h-7 px-2 text-xs"
+                              onClick={() => setExportColumns([...LOCKED_EXPORT_COLUMNS])}
+                            >Reset</Button>
+                          </div>
+                        </div>
+
+                        {(["invoice", "line"] as const).map(group => (
+                          <div key={group} className="space-y-2">
+                            <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                              {group === "invoice" ? "Invoice columns" : "Line item columns"}
+                            </Label>
+                            <div className="grid grid-cols-2 gap-2 rounded-md border border-border p-3">
+                              {EXPORT_COLUMNS.filter(c => c.group === group).map(col => {
+                                const locked = LOCKED_EXPORT_COLUMNS.includes(col.key);
+                                return (
+                                  <label
+                                    key={col.key}
+                                    className={cn("flex items-center gap-2 text-sm", locked ? "opacity-70" : "cursor-pointer")}
+                                  >
+                                    <Checkbox
+                                      checked={exportColumns.includes(col.key)}
+                                      disabled={locked}
+                                      onCheckedChange={() =>
+                                        setExportColumns(prev =>
+                                          prev.includes(col.key)
+                                            ? prev.filter(k => k !== col.key)
+                                            : [...prev, col.key]
+                                        )
+                                      }
+                                    />
+                                    <span>{col.label}</span>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setExportTarget(null)}>Cancel</Button>
+                        <Button
+                          onClick={() => {
+                            if (exportTarget === "pdf") printPdfReport(); else exportCsv();
+                            setExportTarget(null);
+                          }}
+                        >
+                          {exportTarget === "pdf" ? "Print report" : "Download CSV"}
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+
+
+
                   <TooltipProvider delayDuration={150}>
                     <Tooltip>
                       <TooltipTrigger asChild>
