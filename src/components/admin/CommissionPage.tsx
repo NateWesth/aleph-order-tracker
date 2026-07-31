@@ -1230,6 +1230,78 @@ const CommissionPage = () => {
                     <Printer className="h-4 w-4 mr-1.5" />Print Full Report
                   </Button>
 
+                  <Dialog open={exportTarget !== null} onOpenChange={(o) => !o && setExportTarget(null)}>
+                    <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+                      <DialogHeader>
+                        <DialogTitle>
+                          {exportTarget === "pdf" ? "Print Full Report — choose columns" : "Export CSV — choose columns"}
+                        </DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4 py-1">
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm text-muted-foreground">
+                            Invoice #, Customer, Date and Commission are always included.
+                          </p>
+                          <div className="flex gap-1">
+                            <Button
+                              variant="ghost" size="sm" className="h-7 px-2 text-xs"
+                              onClick={() => setExportColumns(EXPORT_COLUMNS.map(c => c.key))}
+                            >All</Button>
+                            <Button
+                              variant="ghost" size="sm" className="h-7 px-2 text-xs"
+                              onClick={() => setExportColumns([...LOCKED_EXPORT_COLUMNS])}
+                            >Reset</Button>
+                          </div>
+                        </div>
+
+                        {(["invoice", "line"] as const).map(group => (
+                          <div key={group} className="space-y-2">
+                            <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                              {group === "invoice" ? "Invoice columns" : "Line item columns"}
+                            </Label>
+                            <div className="grid grid-cols-2 gap-2 rounded-md border border-border p-3">
+                              {EXPORT_COLUMNS.filter(c => c.group === group).map(col => {
+                                const locked = LOCKED_EXPORT_COLUMNS.includes(col.key);
+                                return (
+                                  <label
+                                    key={col.key}
+                                    className={cn("flex items-center gap-2 text-sm", locked ? "opacity-70" : "cursor-pointer")}
+                                  >
+                                    <Checkbox
+                                      checked={exportColumns.includes(col.key)}
+                                      disabled={locked}
+                                      onCheckedChange={() =>
+                                        setExportColumns(prev =>
+                                          prev.includes(col.key)
+                                            ? prev.filter(k => k !== col.key)
+                                            : [...prev, col.key]
+                                        )
+                                      }
+                                    />
+                                    <span>{col.label}</span>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setExportTarget(null)}>Cancel</Button>
+                        <Button
+                          onClick={() => {
+                            if (exportTarget === "pdf") printPdfReport(); else exportCsv();
+                            setExportTarget(null);
+                          }}
+                        >
+                          {exportTarget === "pdf" ? "Print report" : "Download CSV"}
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+
+
+
                   <TooltipProvider delayDuration={150}>
                     <Tooltip>
                       <TooltipTrigger asChild>
