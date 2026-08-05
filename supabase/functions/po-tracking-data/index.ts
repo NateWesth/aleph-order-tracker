@@ -151,12 +151,12 @@ Deno.serve(async (req) => {
 })
 
 async function fetchOutstandingPurchaseOrders(accessToken: string, orgId: string): Promise<POEntry[]> {
-  const results: POEntry[] = []
+  // 1. Page through the lightweight list endpoint and pre-filter candidates
+  const candidates: any[] = []
   let page = 1
   let hasMore = true
-  let inspected = 0
 
-  while (hasMore && inspected < MAX_PO_DETAILS) {
+  while (hasMore && candidates.length < MAX_PO_DETAILS) {
     const data = await fetchZohoPage(
       accessToken,
       `${ZOHO_API_URL}/books/v3/purchaseorders?organization_id=${orgId}&page=${page}&per_page=200&sort_column=date&sort_order=D`
@@ -166,19 +166,39 @@ async function fetchOutstandingPurchaseOrders(accessToken: string, orgId: string
     if (!summaries.length) break
 
     for (const summary of summaries) {
-      if (inspected >= MAX_PO_DETAILS) break
-
+      if (candidates.length >= MAX_PO_DETAILS) break
       const status = String(summary.status || '').toLowerCase()
       const billedStatus = String(summary.billed_status || '').toLowerCase()
-
-      // Fully billed or cancelled/closed POs drop off the tracking board
       if (EXCLUDED_PO_STATUSES.includes(status)) continue
       if (billedStatus === 'billed') continue
+      candidates.push(summary)
+    }
 
-      const po = await fetchPurchaseOrderDetail(accessToken, orgId, summary.purchaseorder_id)
-      inspected++
+    hasMore = data.page_context?.has_more_page ?? false
+    page++
+  }
 
-      const detailBilled = String(po.billed_status || billedStatus || '').toLowerCase()
+  // 2. Fetch detail records in parallel batches instead of one-by-one
+  const results: POEntry[] = []
+
+  for (let i = 0; i < candidates.length; i += DETAIL_CONCURRENCY) {
+    const batch = candidates.slice(i, i + DETAIL_CONCURRENCY)
+    const details = await Promise.all(
+      batch.map(async (summary) => {
+        try {
+          return { summary, po: await fetchPurchaseOrderDetail(accessToken, orgId, summary.purchaseorder_id) }
+        } catch (e) {
+          console.error(`Failed to fetch PO ${summary.purchaseorder_id}:`, e)
+          return null
+        }
+      })
+    )
+
+    for (const entry of details) {
+      if (!entry) continue
+      const { summary, po } = entry
+      const status = String(summary.status || '').toLowerCase()
+      const detailBilled = String(po.billed_status || summary.billed_status || '').toLowerCase()
       if (detailBilled === 'billed') continue
 
       const rawLines = Array.isArray(po.line_items) ? po.line_items : []
@@ -191,9 +211,7 @@ async function fetchOutstandingPurchaseOrders(accessToken: string, orgId: string
         const quantity = Number(line.quantity || 0)
         const quantityReceived = Number(line.quantity_received ?? 0)
         const quantityBilled = Number(line.quantity_billed ?? 0)
-        // Outstanding = ordered qty not yet billed (a bill is the definitive close-out)
         const outstanding = Math.max(0, quantity - Math.max(quantityBilled, 0))
-
         if (outstanding <= 0) continue
 
         lines.push({
@@ -228,12 +246,9 @@ async function fetchOutstandingPurchaseOrders(accessToken: string, orgId: string
         lines,
       })
     }
-
-    hasMore = data.page_context?.has_more_page ?? false
-    page++
   }
 
-  console.log(`Inspected ${inspected} purchase orders, ${results.length} still outstanding`)
+  console.log(`Inspected ${candidates.length} purchase orders, ${results.length} still outstanding`)
   return results
 }
 
