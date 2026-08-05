@@ -62,7 +62,7 @@ interface ItemProgressBoardProps {
 
 const PROGRESS_STAGES = [
   { id: 'awaiting-stock', label: 'Awaiting Stock', icon: Clock, color: 'bg-amber-500' },
-  { id: 'ordered', label: 'In Progress (on PO)', icon: ShoppingCart, color: 'bg-indigo-500' },
+  { id: 'ordered', label: 'In Progress', icon: ShoppingCart, color: 'bg-indigo-500' },
   { id: 'in-stock', label: 'In Stock', icon: Box, color: 'bg-blue-500' },
   { id: 'ready-for-delivery', label: 'Ready for Delivery', icon: Truck, color: 'bg-orange-500' },
   { id: 'completed', label: 'Completed', icon: CheckCircle, color: 'bg-green-500' },

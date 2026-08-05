@@ -45,6 +45,11 @@ interface OrderItem {
   code: string | null;
   quantity: number;
   stock_status: string;
+  qty_on_po?: number;
+  qty_received?: number;
+  qty_invoiced?: number;
+  qty_completed?: number;
+  totalQuantity?: number;
 }
 
 interface PurchaseOrderInfo {
@@ -67,33 +72,93 @@ interface Order {
   creatorName?: string;
   items?: OrderItem[];
   purchaseOrders?: PurchaseOrderInfo[];
+  /** Which board stage this card represents (an order can appear in several). */
+  boardStage?: ItemStage;
 }
 
-// Default status column configurations
+/** Item-level stages, in flow order. */
+type ItemStage = 'awaiting-stock' | 'ordered' | 'in-stock' | 'ready-for-delivery' | 'completed';
+
+const STAGE_ORDER: ItemStage[] = ['awaiting-stock', 'ordered', 'in-stock', 'ready-for-delivery', 'completed'];
+
+/** Board column key -> item stage. */
+const COLUMN_STAGE: Record<string, ItemStage> = {
+  ordered: 'awaiting-stock',
+  "in-progress": 'ordered',
+  "in-stock": 'in-stock',
+  ready: 'ready-for-delivery',
+  delivered: 'completed',
+};
+
+/** Quantity of an item sitting in each stage. */
+const bucketsFor = (item: OrderItem): Record<ItemStage, number> => {
+  const qty = item.totalQuantity ?? item.quantity ?? 0;
+  const onPo = Math.min(item.qty_on_po ?? 0, qty);
+  const received = Math.min(item.qty_received ?? 0, onPo);
+  const invoiced = Math.min(item.qty_invoiced ?? 0, received);
+  const completed = Math.min(item.qty_completed ?? 0, invoiced);
+  return {
+    'awaiting-stock': Math.max(0, qty - onPo),
+    'ordered': Math.max(0, onPo - received),
+    'in-stock': Math.max(0, received - invoiced),
+    'ready-for-delivery': Math.max(0, invoiced - completed),
+    'completed': completed,
+  };
+};
+
+/** New cumulative counters after moving `qty` units of an item between stages. */
+const countersAfterMove = (item: OrderItem, from: ItemStage, to: ItemStage, qty: number) => {
+  const counters = [item.qty_on_po ?? 0, item.qty_received ?? 0, item.qty_invoiced ?? 0, item.qty_completed ?? 0];
+  const f = STAGE_ORDER.indexOf(from);
+  const t = STAGE_ORDER.indexOf(to);
+  const delta = t > f ? qty : -qty;
+  const lo = Math.min(f, t);
+  const hi = Math.max(f, t);
+  for (let i = lo; i < hi; i++) counters[i] += delta;
+
+  let cap = item.totalQuantity ?? item.quantity ?? 0;
+  for (let i = 0; i < counters.length; i++) {
+    counters[i] = Math.max(0, Math.min(counters[i], cap));
+    cap = counters[i];
+  }
+
+  return {
+    qty_on_po: counters[0],
+    qty_received: counters[1],
+    qty_invoiced: counters[2],
+    qty_completed: counters[3],
+  };
+};
+
+// Default status column configurations (flow: Awaiting Stock -> In Progress -> In Stock -> Ready for Delivery)
 const DEFAULT_STATUS_COLUMNS = [
   {
     key: "ordered",
     label: "Awaiting Stock",
     color: "text-amber-50",
     bgColor: "bg-amber-600",
-    nextStatus: "in-stock",
-    nextLabel: "All In Stock",
-  },
-  {
-    key: "in-stock",
-    label: "In Stock",
-    color: "text-sky-50",
-    bgColor: "bg-sky-600",
     nextStatus: "in-progress",
-    nextLabel: "Start Work",
+    nextLabel: "Move to In Progress",
   },
   {
     key: "in-progress",
     label: "In Progress",
     color: "text-violet-50",
     bgColor: "bg-violet-600",
+    nextStatus: "in-stock",
+    nextLabel: "Mark In Stock",
+    prevStatus: "ordered",
+    prevLabel: "Back to Awaiting",
+  },
+  {
+    key: "in-stock",
+    label: "In Stock",
+    color: "text-sky-50",
+    bgColor: "bg-sky-600",
     nextStatus: "ready",
     nextLabel: "Mark Ready",
+    prevStatus: "in-progress",
+    prevLabel: "Back to In Progress",
   },
   {
     key: "ready",
@@ -101,7 +166,9 @@ const DEFAULT_STATUS_COLUMNS = [
     color: "text-emerald-50",
     bgColor: "bg-emerald-600",
     nextStatus: "delivered",
-    nextLabel: "Complete Order",
+    nextLabel: "Complete Items",
+    prevStatus: "in-stock",
+    prevLabel: "Back to In Stock",
   },
 ];
 
@@ -231,18 +298,23 @@ export default function OrdersPage({
         // Fetch order items
         const { data: itemsData } = await supabase
           .from("order_items")
-          .select("id, order_id, name, code, quantity, stock_status")
+          .select("id, order_id, name, code, quantity, stock_status, qty_on_po, qty_received, qty_invoiced, qty_completed")
           .in("order_id", orderIds);
 
         if (itemsData) {
-          itemsData.forEach((item) => {
+          itemsData.forEach((item: any) => {
             const existing = orderItemsMap.get(item.order_id) || [];
             existing.push({
               id: item.id,
               name: item.name,
               code: item.code,
               quantity: item.quantity,
+              totalQuantity: item.quantity,
               stock_status: item.stock_status,
+              qty_on_po: item.qty_on_po ?? 0,
+              qty_received: item.qty_received ?? 0,
+              qty_invoiced: item.qty_invoiced ?? 0,
+              qty_completed: item.qty_completed ?? 0,
             });
             orderItemsMap.set(item.order_id, existing);
           });
@@ -476,58 +548,66 @@ export default function OrdersPage({
     }
   }, [fetchOrders, toast]);
 
-  const handleMoveOrder = useCallback(async (order: Order, newStatus: string) => {
+  /**
+   * Moves the quantities shown on a board card (an order's items sitting in one
+   * stage) into the target stage. Items move independently of the order, so the
+   * same order can live in several columns at once.
+   */
+  const moveCardItems = useCallback(async (order: Order, fromStage: ItemStage, toStage: ItemStage) => {
+    if (fromStage === toStage) return;
+    const source = orders.find(o => o.id === order.id);
+    const items = (source?.items || []).filter(i => bucketsFor(i)[fromStage] > 0);
+    if (items.length === 0) return;
+
     try {
-      const updateData: any = {
-        status: newStatus,
-        updated_at: new Date().toISOString(),
-      };
+      await Promise.all(items.map(item => {
+        const qty = bucketsFor(item)[fromStage];
+        const next = countersAfterMove(item, fromStage, toStage, qty);
+        return supabase
+          .from("order_items")
+          .update({ ...next, updated_at: new Date().toISOString() })
+          .eq("id", item.id)
+          .throwOnError();
+      }));
 
-      // Set completed_date when marking as delivered
-      if (newStatus === "delivered") {
-        updateData.completed_date = new Date().toISOString();
-        celebrate();
-      }
-
-      const { error } = await supabase
-        .from("orders")
-        .update(updateData)
-        .eq("id", order.id);
-
-      if (error) throw error;
+      if (toStage === 'completed') celebrate();
 
       toast({
-        title: "Updated",
-        description: `Order ${order.order_number} moved to ${newStatus}`,
+        title: "Items moved",
+        description: `${items.length} item${items.length !== 1 ? "s" : ""} on ${order.order_number} moved to ${DEFAULT_STATUS_COLUMNS.find(c => COLUMN_STAGE[c.key] === toStage)?.label || toStage}`,
       });
       fetchOrders();
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to update order",
+        description: "Failed to move items",
         variant: "destructive",
       });
     }
-  }, [fetchOrders, toast, celebrate]);
+  }, [orders, fetchOrders, toast, celebrate]);
+
+  const handleMoveOrder = useCallback((order: Order, newStatus: string) => {
+    const toStage = COLUMN_STAGE[newStatus];
+    const fromStage = order.boardStage;
+    if (!toStage || !fromStage) return;
+    void moveCardItems(order, fromStage, toStage);
+  }, [moveCardItems]);
 
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     setActiveOrderId(null);
     const { active, over } = event;
     if (!over) return;
-    
-    const orderId = active.id as string;
-    const newStatus = over.id as string;
-    
+
+    const [orderId, fromStage] = String(active.id).split("::") as [string, ItemStage];
+    const toStage = COLUMN_STAGE[String(over.id)];
+
     const order = orders.find(o => o.id === orderId);
-    if (!order || order.status === newStatus) return;
-    
-    const validStatuses = ["ordered", "in-stock", "in-progress", "ready", "delivered"];
-    if (!validStatuses.includes(newStatus)) return;
-    
+    if (!order || !toStage || !fromStage || fromStage === toStage) return;
+
     // Play a satisfying drop/success sound
     playSuccess();
-    handleMoveOrder(order, newStatus);
-  }, [orders, handleMoveOrder]);
+    void moveCardItems(order, fromStage, toStage);
+  }, [orders, moveCardItems]);
 
   const handleDeleteOrder = useCallback(async (order: Order) => {
     try {
@@ -589,28 +669,56 @@ export default function OrdersPage({
     low: 4,
   }), []);
 
-  // Memoize orders by status to prevent unnecessary sorting
+  // Item-level board: an order appears in every column where it still has
+  // quantities sitting in that stage, carrying only those items/quantities.
   const ordersByStatus = useMemo(() => {
     const sortOrders = (ordersToSort: Order[]) => {
       return [...ordersToSort].sort((a, b) => {
         const urgencyA = urgencyPriority[a.urgency || "normal"] || 3;
         const urgencyB = urgencyPriority[b.urgency || "normal"] || 3;
-        
+
         if (urgencyA !== urgencyB) {
           return urgencyA - urgencyB;
         }
-        
+
         const dateA = new Date(a.created_at || 0).getTime();
         const dateB = new Date(b.created_at || 0).getTime();
         return dateA - dateB;
       });
     };
 
+    const buckets: Record<string, Order[]> = {
+      ordered: [],
+      "in-progress": [],
+      "in-stock": [],
+      ready: [],
+    };
+
+    filteredOrders.forEach((order) => {
+      const items = order.items || [];
+
+      Object.entries(COLUMN_STAGE).forEach(([columnKey, stage]) => {
+        if (!(columnKey in buckets)) return;
+
+        const stageItems = items
+          .map((item) => ({ item, qty: bucketsFor(item)[stage] }))
+          .filter(({ qty }) => qty > 0)
+          .map(({ item, qty }) => ({ ...item, quantity: qty, totalQuantity: item.totalQuantity ?? item.quantity }));
+
+        // Orders without any item rows still show in their status column
+        const fallback = items.length === 0 && order.status === columnKey;
+
+        if (stageItems.length > 0 || fallback) {
+          buckets[columnKey].push({ ...order, items: stageItems, boardStage: stage });
+        }
+      });
+    });
+
     return {
-      ordered: sortOrders(filteredOrders.filter((o) => o.status === "ordered")),
-      "in-stock": sortOrders(filteredOrders.filter((o) => o.status === "in-stock")),
-      "in-progress": sortOrders(filteredOrders.filter((o) => o.status === "in-progress")),
-      ready: sortOrders(filteredOrders.filter((o) => o.status === "ready")),
+      ordered: sortOrders(buckets.ordered),
+      "in-progress": sortOrders(buckets["in-progress"]),
+      "in-stock": sortOrders(buckets["in-stock"]),
+      ready: sortOrders(buckets.ready),
     };
   }, [filteredOrders, urgencyPriority]);
 
