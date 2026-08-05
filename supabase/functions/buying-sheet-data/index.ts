@@ -432,17 +432,40 @@ function extractPoDate(po: any, poSummary: any): string {
   )
 }
 
-async function fetchZohoPage(accessToken: string, url: string) {
-  const resp = await fetch(url, {
-    headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` },
-  })
 
-  const data = await resp.json()
-  if (!resp.ok || data.code !== 0) {
-    throw new Error(data.message || `Zoho request failed for ${url}`)
+const ZOHO_RETRY_ATTEMPTS = 4
+
+function isZohoThrottle(message: string): boolean {
+  const m = (message || '').toLowerCase()
+  return m.includes('maximum number of in process requests') || m.includes('too many requests') || m.includes('rate limit')
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+async function fetchZohoPage(accessToken: string, url: string) {
+  let lastError: Error | null = null
+
+  for (let attempt = 0; attempt < ZOHO_RETRY_ATTEMPTS; attempt++) {
+    const resp = await fetch(url, {
+      headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` },
+    })
+
+    const data = await resp.json()
+    if (resp.ok && data.code === 0) return data
+
+    const message = data.message || `Zoho request failed for ${url}`
+    lastError = new Error(message)
+
+    // Zoho caps concurrent API requests — back off and retry instead of failing the page
+    if (resp.status === 429 || isZohoThrottle(message)) {
+      await sleep(700 * Math.pow(2, attempt))
+      continue
+    }
+
+    throw lastError
   }
 
-  return data
+  throw lastError ?? new Error(`Zoho request failed for ${url}`)
 }
 
 function normalizeSku(value: unknown): string {
