@@ -14,7 +14,17 @@ type StockEntry = {
   stockOnHand: number
   itemName: string
   vendorName: string
+  purchaseRate: number
 }
+
+type BillEntry = {
+  vendorName: string
+  vendorEmail: string
+  unitCost: number | null
+  quantity: number
+  billDate: string
+}
+
 
 type VendorSummary = {
   vendorName: string
