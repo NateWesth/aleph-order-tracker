@@ -147,6 +147,8 @@ const DEFAULT_STATUS_COLUMNS = [
     bgColor: "bg-violet-600",
     nextStatus: "in-stock",
     nextLabel: "Mark In Stock",
+    prevStatus: "ordered",
+    prevLabel: "Back to Awaiting",
   },
   {
     key: "in-stock",
@@ -155,6 +157,8 @@ const DEFAULT_STATUS_COLUMNS = [
     bgColor: "bg-sky-600",
     nextStatus: "ready",
     nextLabel: "Mark Ready",
+    prevStatus: "in-progress",
+    prevLabel: "Back to In Progress",
   },
   {
     key: "ready",
@@ -163,6 +167,8 @@ const DEFAULT_STATUS_COLUMNS = [
     bgColor: "bg-emerald-600",
     nextStatus: "delivered",
     nextLabel: "Complete Items",
+    prevStatus: "in-stock",
+    prevLabel: "Back to In Stock",
   },
 ];
 
