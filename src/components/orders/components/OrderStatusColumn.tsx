@@ -364,113 +364,32 @@ function OrderStatusColumn({
                       <ChevronDown className={cn("h-3 w-3 sm:h-3.5 sm:w-3.5 transition-transform duration-200", isOrderExpanded ? "rotate-0" : "-rotate-90")} />
                       {order.items?.length} item{order.items?.length !== 1 ? 's' : ''}
                     </span>
-                    {stockSummary && config.key === "ordered" && (
-                      <span className={cn("flex items-center gap-1 font-medium", stockSummary.allInStock ? "text-primary" : "text-amber-600")}>
-                        {stockSummary.allInStock ? <PackageCheck className="h-3 w-3 sm:h-3.5 sm:w-3.5" /> : <PackageX className="h-3 w-3 sm:h-3.5 sm:w-3.5" />}
-                        {stockSummary.inStock}/{stockSummary.total}
+                    {stockSummary && (
+                      <span className="flex items-center gap-1 font-medium text-muted-foreground">
+                        <PackageCheck className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                        {stockSummary.units} unit{stockSummary.units !== 1 ? "s" : ""}
                       </span>
                     )}
                   </button>
                 </CollapsibleTrigger>
                 <CollapsibleContent className="mt-2">
                   <div className="space-y-1.5 bg-muted/30 p-2.5 rounded-lg">
-                    {config.key === "ordered" && order.items && order.items.length > 0 && (
-                      <div className="flex items-center gap-2 text-[10px] font-medium text-muted-foreground pb-1 border-b border-border/50 mb-1">
-                        <div className="flex items-center gap-2 shrink-0">
-                          <span className="w-4 text-center" style={{ color: stockStatusColors.orderedColor }}>O</span>
-                          <span className="w-4 text-center" style={{ color: stockStatusColors.receivedColor }}>R</span>
+                    {order.items?.map(item => {
+                      const total = item.totalQuantity ?? item.quantity;
+                      const isPartial = total > item.quantity;
+                      return (
+                        <div key={item.id} className="flex items-center gap-2 text-xs py-1">
+                          <span className="flex-1 min-w-0 break-words text-foreground">
+                            <span className="font-semibold text-primary">×{item.quantity}</span>
+                            {isPartial && (
+                              <span className="text-[10px] text-muted-foreground ml-1">of {total}</span>
+                            )}
+                            {item.code && <span className="font-mono text-muted-foreground ml-1">[{item.code}]</span>}
+                            <span className="ml-1">{item.name}</span>
+                          </span>
                         </div>
-                        <span className="flex-1">Item</span>
-                      </div>
-                    )}
-                    {order.items?.map(item => (
-                      <div key={item.id} className="flex items-center gap-2 text-xs py-1">
-                        {config.key === "ordered" && (
-                          <div className="flex items-center gap-2 shrink-0">
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <span>
-                                    <Checkbox
-                                      id={`${item.id}-ordered`}
-                                      checked={item.stock_status === "ordered" || item.stock_status === "in-stock"}
-                                      onCheckedChange={checked => {
-                                        if (!canEditItems) return;
-                                        onSetItemStockStatus?.(item.id, checked ? "ordered" : "awaiting");
-                                      }}
-                                      disabled={!canEditItems}
-                                      className="h-4 w-4"
-                                      style={{ '--checkbox-color': stockStatusColors.orderedColor } as React.CSSProperties}
-                                      data-custom-color="true"
-                                    />
-                                  </span>
-                                </TooltipTrigger>
-                                <TooltipContent side="top"><p>Ordered: Item has been ordered from supplier</p></TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <span>
-                                    <Checkbox
-                                      id={`${item.id}-received`}
-                                      checked={item.stock_status === "in-stock"}
-                                      onCheckedChange={checked => {
-                                        if (!canEditItems) return;
-                                        onSetItemStockStatus?.(item.id, checked ? "in-stock" : "ordered");
-                                      }}
-                                      disabled={!canEditItems}
-                                      className="h-4 w-4"
-                                      style={{ '--checkbox-color': stockStatusColors.receivedColor } as React.CSSProperties}
-                                      data-custom-color="true"
-                                    />
-                                  </span>
-                                </TooltipTrigger>
-                                <TooltipContent side="top"><p>Received: Item has arrived and is in stock</p></TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                          </div>
-                        )}
-                        <span className={cn("flex-1 min-w-0 break-words", config.key === "ordered" && item.stock_status === "in-stock" ? "line-through text-muted-foreground" : "text-foreground")}>
-                          <span className="font-semibold text-primary">×{item.quantity}</span>
-                          {item.code && <span className="font-mono text-muted-foreground ml-1">[{item.code}]</span>}
-                          <span className="ml-1">{item.name}</span>
-                        </span>
-                      </div>
-                    ))}
-                    {config.key === "ordered" && order.items && order.items.length > 0 && canEditItems && (
-                      <div className="flex items-center justify-between pt-2 mt-1 border-t border-border/50">
-                        <Button size="sm" variant="outline" className="h-6 text-[10px] px-2" style={{
-                          backgroundColor: `${stockStatusColors.orderedColor}15`,
-                          borderColor: `${stockStatusColors.orderedColor}40`,
-                          color: stockStatusColors.orderedColor,
-                        }} onClick={() => onBulkSetItemsStatus?.(order.items?.map(i => i.id) || [], "ordered")}>
-                          All Ordered
-                        </Button>
-                        <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-                          <div className="flex items-center gap-1">
-                            <div className="w-2 h-2 rounded-sm" style={{ backgroundColor: stockStatusColors.orderedColor }}></div>
-                            <span>O</span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <div className="w-2 h-2 rounded-sm" style={{ backgroundColor: stockStatusColors.receivedColor }}></div>
-                            <span>R</span>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                    {config.key === "ordered" && order.items && order.items.length > 0 && !canEditItems && (
-                      <div className="flex items-center gap-3 pt-2 mt-1 border-t border-border/50 text-[10px] text-muted-foreground">
-                        <div className="flex items-center gap-1">
-                          <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: stockStatusColors.orderedColor }}></div>
-                          <span>Ordered</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: stockStatusColors.receivedColor }}></div>
-                          <span>Received</span>
-                        </div>
-                      </div>
-                    )}
+                      );
+                    })}
                   </div>
                 </CollapsibleContent>
               </Collapsible>
