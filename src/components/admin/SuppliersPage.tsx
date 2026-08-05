@@ -313,7 +313,7 @@ export default function SuppliersPage() {
                       onChange={(e) =>
                         setFormData({ ...formData, code: e.target.value.toUpperCase() })
                       }
-                      placeholder="SUP001"
+                      placeholder="e.g. V-00012"
                       required
                     />
                   </div>
