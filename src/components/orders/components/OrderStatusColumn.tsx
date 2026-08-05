@@ -24,6 +24,7 @@ interface OrderItem {
   code: string | null;
   quantity: number;
   stock_status: string;
+  totalQuantity?: number;
 }
 interface Order {
   id: string;
@@ -38,6 +39,7 @@ interface Order {
   creatorName?: string;
   items?: OrderItem[];
   reference?: string | null;
+  boardStage?: string;
 }
 interface StatusConfig {
   key: string;
