@@ -415,7 +415,7 @@ export default function BuyingSheetPage() {
     // Adjusted qty (user override or recommended)
     const adjustedOrderQty = adjustedQtys[sku] ?? recommendedOrderQty;
 
-    return { ageEscalation, conflictingUrgency, forecastNextMonth, reorderPoint, supplierReliability, velocityScore, weeklyTrend, estimatedCost, unitCost, costSource: billUnitCost !== null ? costSource : (unitCost !== null ? null : null), adjustedOrderQty, abcClass: "C" as "A" | "B" | "C" };
+    return { ageEscalation, conflictingUrgency, forecastNextMonth, reorderPoint, supplierReliability, velocityScore, weeklyTrend, estimatedCost, unitCost, costSource: billUnitCost !== null ? (costSource ?? "bill") : null, adjustedOrderQty, abcClass: "C" as "A" | "B" | "C" };
   };
 
   const fetchLocalData = async () => {
@@ -478,7 +478,7 @@ export default function BuyingSheetPage() {
         const coveragePercent = entry.totalNeeded > 0 ? Math.min(100, Math.round((covered / entry.totalNeeded) * 100)) : 100;
         const { trend, lastMonth, prevMonth } = getDemandTrend(entry.sku);
         const stockoutRiskDays = getStockoutRiskDays(entry.sku, z.stockOnHand, z.onPurchaseOrder);
-        const lastPurchasedDate = lastPurchaseMap.get(entry.sku) || null;
+        const lastPurchasedDate = z.lastPurchasedDate || lastPurchaseMap.get(entry.sku) || null;
         const seasonalPattern = seasonalMap.get(entry.sku) || null;
         const avgLeadTimeDays = leadTimeMap.get(entry.sku) ?? null;
         let priorityScore = 0;
@@ -505,7 +505,7 @@ export default function BuyingSheetPage() {
         const safetyStock = getSafetyStock(entry.sku, avgLeadTimeDays);
         const dailyBurn = getDailyBurnRate(entry.sku);
         const recommendedOrderQty = toOrder > 0 ? toOrder + safetyStock : 0;
-        const analytical = computeAnalyticalFields(entry.sku, toOrder, daysWaiting, avgLeadTimeDays, entry.orders, recommendedOrderQty);
+        const analytical = computeAnalyticalFields(entry.sku, toOrder, daysWaiting, avgLeadTimeDays, entry.orders, recommendedOrderQty, z.unitCost ?? null, z.costSource ?? null);
         return { ...entry, supplierName, supplierEmail, stockOnHand: z.stockOnHand, onPurchaseOrder: z.onPurchaseOrder, toOrder, daysWaiting, priorityScore, coveragePercent, demandTrend: trend, lastMonthQty: lastMonth, prevMonthQty: prevMonth, stockoutRiskDays, lastPurchasedDate, seasonalPattern, avgLeadTimeDays, safetyStock, dailyBurnRate: dailyBurn, demandVariability: demandVar, distinctCustomers, recommendedOrderQty, ...analytical };
       });
       buyingRows.sort((a, b) => b.priorityScore - a.priorityScore);
@@ -545,10 +545,10 @@ export default function BuyingSheetPage() {
           if (row.avgLeadTimeDays !== null && row.daysWaiting > row.avgLeadTimeDays) priorityScore += 10;
           const safetyStock = getSafetyStock(row.sku, row.avgLeadTimeDays);
           const recommendedOrderQty = toOrder > 0 ? toOrder + safetyStock : 0;
-          const analytical = computeAnalyticalFields(row.sku, toOrder, row.daysWaiting, row.avgLeadTimeDays, row.orders, recommendedOrderQty);
-          return { ...row, supplierName, supplierEmail, stockOnHand: z.stockOnHand, onPurchaseOrder: z.onPurchaseOrder, toOrder, coveragePercent, priorityScore, stockoutRiskDays, safetyStock, recommendedOrderQty, ...analytical };
+          const analytical = computeAnalyticalFields(row.sku, toOrder, row.daysWaiting, row.avgLeadTimeDays, row.orders, recommendedOrderQty, z.unitCost ?? null, z.costSource ?? null);
+          return { ...row, supplierName, supplierEmail, stockOnHand: z.stockOnHand, onPurchaseOrder: z.onPurchaseOrder, toOrder, coveragePercent, priorityScore, stockoutRiskDays, safetyStock, recommendedOrderQty, lastPurchasedDate: z.lastPurchasedDate || row.lastPurchasedDate, ...analytical };
         }));
-        toast({ title: "Updated", description: "Zoho stock & PO data loaded" });
+        toast({ title: "Updated", description: "Zoho stock, PO & vendor-bill cost data loaded" });
       }
     });
   };
@@ -573,10 +573,10 @@ export default function BuyingSheetPage() {
         if (row.avgLeadTimeDays !== null && row.daysWaiting > row.avgLeadTimeDays) priorityScore += 10;
         const safetyStock = getSafetyStock(row.sku, row.avgLeadTimeDays);
         const recommendedOrderQty = toOrder > 0 ? toOrder + safetyStock : 0;
-        const analytical = computeAnalyticalFields(row.sku, toOrder, row.daysWaiting, row.avgLeadTimeDays, row.orders, recommendedOrderQty);
-        return { ...row, supplierName, stockOnHand: z.stockOnHand, onPurchaseOrder: z.onPurchaseOrder, toOrder, coveragePercent, priorityScore, stockoutRiskDays, safetyStock, recommendedOrderQty, ...analytical };
+        const analytical = computeAnalyticalFields(row.sku, toOrder, row.daysWaiting, row.avgLeadTimeDays, row.orders, recommendedOrderQty, z.unitCost ?? null, z.costSource ?? null);
+        return { ...row, supplierName, supplierEmail: z.vendorEmail || row.supplierEmail, stockOnHand: z.stockOnHand, onPurchaseOrder: z.onPurchaseOrder, toOrder, coveragePercent, priorityScore, stockoutRiskDays, safetyStock, recommendedOrderQty, lastPurchasedDate: z.lastPurchasedDate || row.lastPurchasedDate, ...analytical };
       }));
-      toast({ title: "Updated", description: "Stock & PO data refreshed from Zoho Books" });
+      toast({ title: "Updated", description: "Stock, POs & vendor-bill costs refreshed from Zoho Books" });
     }
   };
 
