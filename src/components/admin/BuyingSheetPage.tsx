@@ -1127,19 +1127,11 @@ export default function BuyingSheetPage() {
                     {viewDensity === "compact" ? <AlignJustify className="h-3.5 w-3.5" /> : <AlignCenter className="h-3.5 w-3.5" />}
                   </Button>
                 </TooltipTrigger><TooltipContent><p className="text-xs">{viewDensity === "compact" ? "Comfortable" : "Compact"} view</p></TooltipContent></Tooltip>
-                <Select value={String(autoRefreshInterval)} onValueChange={v => setAutoRefreshInterval(Number(v))}>
-                  <SelectTrigger className="w-[90px] h-8 text-xs"><RotateCw className="h-3 w-3 mr-1" /><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="0">Off</SelectItem>
-                    <SelectItem value="5">5 min</SelectItem>
-                    <SelectItem value="10">10 min</SelectItem>
-                    <SelectItem value="15">15 min</SelectItem>
-                    <SelectItem value="30">30 min</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Button variant="outline" size="sm" onClick={handleRefreshZoho} disabled={zohoLoading} className="h-8 gap-1.5">
-                  {zohoLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}Zoho
-                </Button>
+                {zohoLoading && (
+                  <span className="flex items-center gap-1 text-xs text-muted-foreground px-1">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />Syncing Zoho
+                  </span>
+                )}
                 <Button variant="outline" size="sm" onClick={handlePrint} className="h-8"><Printer className="h-3.5 w-3.5" /></Button>
                 <Button variant="outline" size="sm" onClick={handleExportCSV} className="h-8 gap-1.5"><Download className="h-3.5 w-3.5" />{selectedSkus.size > 0 ? `(${selectedSkus.size})` : "CSV"}</Button>
                 <Button variant="outline" size="sm" onClick={handleExportBySupplier} className="h-8"><FileSpreadsheet className="h-3.5 w-3.5" /></Button>
