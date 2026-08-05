@@ -283,6 +283,52 @@ async function fetchPurchaseOrderDetail(accessToken: string, orgId: string, purc
   return data.purchaseorder || {}
 }
 
+function lineKey(sku: unknown, name: unknown, description: unknown): string {
+  const s = String(sku || '').trim().toLowerCase()
+  if (s) return `sku:${s}`
+  return `nm:${String(name || '').trim().toLowerCase()}|${String(description || '').trim().toLowerCase()}`
+}
+
+// Sum quantities already covered by vendor bills linked to this PO
+async function fetchBilledQuantities(
+  accessToken: string,
+  orgId: string,
+  po: any,
+  cache: Map<string, any>
+): Promise<Map<string, number>> {
+  const map = new Map<string, number>()
+  const bills = Array.isArray(po.bills) ? po.bills : []
+  if (!bills.length) return map
+
+  for (const b of bills) {
+    const billId = String(b.bill_id || '')
+    if (!billId) continue
+    try {
+      let bill = cache.get(billId)
+      if (!bill) {
+        const data = await fetchZohoPage(
+          accessToken,
+          `${ZOHO_API_URL}/books/v3/bills/${billId}?organization_id=${orgId}`
+        )
+        bill = data.bill || {}
+        cache.set(billId, bill)
+      }
+      const status = String(bill.status || '').toLowerCase()
+      if (status === 'void' || status === 'cancelled') continue
+      for (const bl of bill.line_items || []) {
+        const key = lineKey(bl.sku, bl.name, bl.description)
+        map.set(key, (map.get(key) ?? 0) + Number(bl.quantity || 0))
+      }
+    } catch (e) {
+      console.error(`Failed to fetch bill ${billId}:`, e)
+    }
+  }
+
+  return map
+}
+
+
+
 
 const ZOHO_RETRY_ATTEMPTS = 4
 
