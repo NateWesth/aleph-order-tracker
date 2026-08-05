@@ -845,6 +845,12 @@ const CommissionPage = () => {
     }
   }, [activeTab, selectedMonth, fetchCommissionReport]);
 
+  // Auto-refresh from Zoho every 30 minutes while the report tab is open
+  useAutoRefresh(() => fetchCommissionReport(true), 30 * 60 * 1000, {
+    enabled: activeTab === "report",
+    focusMinIntervalMs: 15 * 60 * 1000,
+  });
+
   // Lock all currently-unlocked invoices for a single rep into commission_payouts.
   const lockRepPayout = async (rep: CommissionRepData) => {
     const unlocked = rep.invoices.filter(i => !i.locked);
