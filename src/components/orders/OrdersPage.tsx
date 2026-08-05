@@ -292,18 +292,23 @@ export default function OrdersPage({
         // Fetch order items
         const { data: itemsData } = await supabase
           .from("order_items")
-          .select("id, order_id, name, code, quantity, stock_status")
+          .select("id, order_id, name, code, quantity, stock_status, qty_on_po, qty_received, qty_invoiced, qty_completed")
           .in("order_id", orderIds);
 
         if (itemsData) {
-          itemsData.forEach((item) => {
+          itemsData.forEach((item: any) => {
             const existing = orderItemsMap.get(item.order_id) || [];
             existing.push({
               id: item.id,
               name: item.name,
               code: item.code,
               quantity: item.quantity,
+              totalQuantity: item.quantity,
               stock_status: item.stock_status,
+              qty_on_po: item.qty_on_po ?? 0,
+              qty_received: item.qty_received ?? 0,
+              qty_invoiced: item.qty_invoiced ?? 0,
+              qty_completed: item.qty_completed ?? 0,
             });
             orderItemsMap.set(item.order_id, existing);
           });
