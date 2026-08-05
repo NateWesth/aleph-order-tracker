@@ -193,6 +193,7 @@ async function fetchOutstandingPurchaseOrders(accessToken: string, orgId: string
 
   // 2. Fetch detail records in parallel batches instead of one-by-one
   const results: POEntry[] = []
+  const billCache = new Map<string, any>()
 
   for (let i = 0; i < candidates.length; i += DETAIL_CONCURRENCY) {
     const batch = candidates.slice(i, i + DETAIL_CONCURRENCY)
