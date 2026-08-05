@@ -67,7 +67,7 @@ Deno.serve(async (req) => {
       })
     }
 
-    const activeSkus = await getActiveBuyingSheetSkus(supabase)
+    const { skus: activeSkus, nameToSku } = await getActiveBuyingSheetSkus(supabase)
     console.log(`Resolved ${activeSkus.size} active buying sheet SKUs`)
 
     if (activeSkus.size === 0) {
@@ -85,21 +85,47 @@ Deno.serve(async (req) => {
     const { poQtyMap, poVendorMap } = await fetchOpenPurchaseOrderData(accessToken, orgId, activeSkus)
     console.log(`Fetched open PO quantities for ${poQtyMap.size} active SKUs and open PO vendors for ${poVendorMap.size} active SKUs`)
 
-    const latestPurchaseOrderVendors = await fetchLatestPurchaseOrderVendors(accessToken, orgId, activeSkus)
-    console.log(`Resolved latest Zoho PO suppliers for ${latestPurchaseOrderVendors.size} active SKUs`)
+    // Vendor bills are the source of truth for real purchase cost + who we actually bought from
+    const billMap = await fetchVendorBillData(accessToken, orgId, activeSkus, nameToSku)
+    console.log(`Resolved vendor-bill cost/supplier for ${billMap.size} active SKUs`)
 
-    const result: Record<string, { stockOnHand: number; onPurchaseOrder: number; vendorName: string; vendorEmail: string }> = {}
+    const unresolvedAfterBills = new Set(
+      [...activeSkus].filter((sku) => !billMap.get(sku)?.vendorName)
+    )
+    const latestPurchaseOrderVendors = unresolvedAfterBills.size > 0
+      ? await fetchLatestPurchaseOrderVendors(accessToken, orgId, unresolvedAfterBills)
+      : new Map<string, VendorCandidate>()
+    console.log(`Resolved latest Zoho PO suppliers for ${latestPurchaseOrderVendors.size} remaining SKUs`)
+
+    const result: Record<string, {
+      stockOnHand: number
+      onPurchaseOrder: number
+      vendorName: string
+      vendorEmail: string
+      unitCost: number | null
+      lastPurchasedDate: string | null
+      lastPurchasedQty: number | null
+      costSource: 'bill' | 'item' | null
+    }> = {}
 
     for (const sku of activeSkus) {
-      const itemVendor = stockMap.get(sku)?.vendorName ?? ''
+      const item = stockMap.get(sku)
+      const bill = billMap.get(sku)
       const openPoVendor = poVendorMap.get(sku)
       const latestPoVendor = latestPurchaseOrderVendors.get(sku)
 
+      const unitCost = bill?.unitCost ?? (item?.purchaseRate && item.purchaseRate > 0 ? item.purchaseRate : null)
+
       result[sku] = {
-        stockOnHand: stockMap.get(sku)?.stockOnHand ?? 0,
+        stockOnHand: item?.stockOnHand ?? 0,
         onPurchaseOrder: poQtyMap.get(sku) ?? 0,
-        vendorName: latestPoVendor?.vendorName || openPoVendor?.vendorName || itemVendor || '',
-        vendorEmail: latestPoVendor?.vendorEmail || openPoVendor?.vendorEmail || '',
+        // Priority: latest vendor bill > latest PO > open PO > Zoho item vendor
+        vendorName: bill?.vendorName || latestPoVendor?.vendorName || openPoVendor?.vendorName || item?.vendorName || '',
+        vendorEmail: bill?.vendorEmail || latestPoVendor?.vendorEmail || openPoVendor?.vendorEmail || '',
+        unitCost: unitCost !== null ? Math.round(unitCost * 100) / 100 : null,
+        lastPurchasedDate: bill?.billDate || null,
+        lastPurchasedQty: bill?.quantity ?? null,
+        costSource: bill?.unitCost != null ? 'bill' : (unitCost !== null ? 'item' : null),
       }
     }
 
@@ -121,10 +147,10 @@ Deno.serve(async (req) => {
   }
 })
 
-async function getActiveBuyingSheetSkus(supabase: any): Promise<Set<string>> {
+async function getActiveBuyingSheetSkus(supabase: any): Promise<{ skus: Set<string>; nameToSku: Map<string, string> }> {
   const { data, error } = await supabase
     .from('order_items')
-    .select('code')
+    .select('code, name')
     .eq('progress_stage', 'awaiting-stock')
     .not('code', 'is', null)
 
@@ -132,12 +158,20 @@ async function getActiveBuyingSheetSkus(supabase: any): Promise<Set<string>> {
     throw new Error(`Failed to load active buying sheet SKUs: ${error.message}`)
   }
 
-  return new Set(
-    (data || [])
-      .map((row: { code: string | null }) => normalizeSku(row.code))
-      .filter(Boolean)
-  )
+  const skus = new Set<string>()
+  const nameToSku = new Map<string, string>()
+
+  for (const row of (data || []) as { code: string | null; name: string | null }[]) {
+    const sku = normalizeSku(row.code)
+    if (!sku) continue
+    skus.add(sku)
+    const key = normalizeName(row.name)
+    if (key && !nameToSku.has(key)) nameToSku.set(key, sku)
+  }
+
+  return { skus, nameToSku }
 }
+
 
 async function fetchRelevantItemStock(accessToken: string, orgId: string, activeSkus: Set<string>): Promise<Map<string, StockEntry>> {
   const stockMap = new Map<string, StockEntry>()
