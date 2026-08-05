@@ -87,6 +87,7 @@ export default function POTrackingPage() {
   const [selectedOrder, setSelectedOrder] = useState<OrderWithCompany | null>(null);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
   const [fetchedAt, setFetchedAt] = useState<string | null>(null);
+  const [isCached, setIsCached] = useState(false);
   const { toast } = useToast();
   const isMobile = useIsMobile();
 
@@ -143,7 +144,9 @@ export default function POTrackingPage() {
     isRefresh ? setRefreshing(true) : setLoading(true);
     try {
       const [{ data, error }] = await Promise.all([
-        supabase.functions.invoke("po-tracking-data"),
+        supabase.functions.invoke("po-tracking-data", {
+          body: { force: isRefresh },
+        }),
         fetchLinkedOrders(),
       ]);
 
@@ -153,6 +156,7 @@ export default function POTrackingPage() {
       const purchaseOrders: ZohoPO[] = data?.purchaseOrders || [];
       setPos(purchaseOrders);
       setFetchedAt(data?.fetchedAt || null);
+      setIsCached(Boolean(data?.cached));
       setOpenVendors(new Set(purchaseOrders.map((p) => p.vendorName)));
     } catch (error: any) {
       console.error("Error fetching PO tracking data:", error);
@@ -276,7 +280,8 @@ export default function POTrackingPage() {
 
       {fetchedAt && (
         <p className="text-xs text-muted-foreground">
-          Live from Zoho · updated {format(new Date(fetchedAt), "dd MMM yyyy HH:mm")} · POs disappear once a vendor bill is raised
+          {isCached ? "Cached" : "Live from Zoho"} · updated {format(new Date(fetchedAt), "dd MMM yyyy HH:mm")}
+          {isCached ? " · press Refresh to pull the latest from Zoho" : " · POs disappear once a vendor bill is raised"}
         </p>
       )}
 

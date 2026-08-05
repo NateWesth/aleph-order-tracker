@@ -1012,6 +1012,27 @@ export type Database = {
           },
         ]
       }
+      po_tracking_cache: {
+        Row: {
+          created_at: string
+          fetched_at: string
+          id: string
+          payload: Json
+        }
+        Insert: {
+          created_at?: string
+          fetched_at?: string
+          id?: string
+          payload: Json
+        }
+        Update: {
+          created_at?: string
+          fetched_at?: string
+          id?: string
+          payload?: Json
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           approved: boolean | null
