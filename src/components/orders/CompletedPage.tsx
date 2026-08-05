@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { PullToRefresh } from "@/components/ui/PullToRefresh";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -187,6 +188,8 @@ export default function CompletedPage({
     isAdmin,
     pageType: 'completed'
   });
+
+  useAutoRefresh(() => fetchCompletedOrders(), 2 * 60 * 1000);
 
   useEffect(() => {
     if (user?.id) {

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, memo } from "react";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { supabase } from "@/integrations/supabase/client";
 import { PullToRefresh } from "@/components/ui/PullToRefresh";
 import { useOrderCelebration, ConfettiOverlay } from "@/components/ui/OrderCelebration";
@@ -385,6 +386,8 @@ export default function OrdersPage({
       setLoading(false);
     }
   }, [toast]);
+
+  useAutoRefresh(() => fetchOrders(), 2 * 60 * 1000);
 
   useEffect(() => {
     fetchOrders();

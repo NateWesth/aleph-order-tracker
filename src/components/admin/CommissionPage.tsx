@@ -22,6 +22,7 @@ import { UnresolvedCostsPanel, saveCost as saveOverrideCost } from "./Unresolved
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import CommissionRepManagementDialog from "./CommissionRepManagementDialog";
 import { useAuth } from "@/contexts/AuthContext";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 
 
 type CommissionMethod = "margin_scaled" | "half_markup_below_25";
@@ -845,6 +846,12 @@ const CommissionPage = () => {
     }
   }, [activeTab, selectedMonth, fetchCommissionReport]);
 
+  // Auto-refresh from Zoho every 30 minutes while the report tab is open
+  useAutoRefresh(() => fetchCommissionReport(true), 30 * 60 * 1000, {
+    enabled: activeTab === "report",
+    focusMinIntervalMs: 15 * 60 * 1000,
+  });
+
   // Lock all currently-unlocked invoices for a single rep into commission_payouts.
   const lockRepPayout = async (rep: CommissionRepData) => {
     const unlocked = rep.invoices.filter(i => !i.locked);
@@ -1184,10 +1191,11 @@ const CommissionPage = () => {
               onChange={(e) => setSelectedMonth(e.target.value)}
               className="w-48"
             />
-            <Button onClick={() => fetchCommissionReport(true)} disabled={loadingReport} variant="outline">
-              {loadingReport ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <RefreshCw className="h-4 w-4 mr-1.5" />}
-              {loadingReport ? "Calculating..." : "Refresh from Zoho"}
-            </Button>
+            {loadingReport && (
+              <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />Calculating...
+              </span>
+            )}
             {commissionData && (() => {
               type MissingRow = {
                 rep_name: string; invoice_number: string; customer_name: string;
