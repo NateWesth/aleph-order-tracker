@@ -8,8 +8,10 @@ const corsHeaders = {
 const ZOHO_AUTH_URL = 'https://accounts.zoho.com/oauth/v2'
 const ZOHO_API_URL = 'https://www.zohoapis.com'
 
-// Statuses we consider "still outstanding" (fully billed / cancelled / closed drop off)
-const EXCLUDED_PO_STATUSES = ['cancelled', 'closed', 'rejected']
+// Statuses we consider "still outstanding" (fully billed / cancelled / closed / draft drop off)
+const EXCLUDED_PO_STATUSES = ['cancelled', 'closed', 'rejected', 'draft', 'void', 'billed']
+// Ignore anything older than this - stale POs are effectively dead
+const MAX_PO_AGE_DAYS = 180
 const MAX_PO_DETAILS = 250
 const DETAIL_CONCURRENCY = 4
 const CACHE_TTL_MS = 15 * 60 * 1000
