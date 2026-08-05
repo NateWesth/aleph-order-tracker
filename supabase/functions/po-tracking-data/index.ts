@@ -157,8 +157,10 @@ async function fetchOutstandingPurchaseOrders(accessToken: string, orgId: string
   const candidates: any[] = []
   let page = 1
   let hasMore = true
+  let reachedCutoff = false
+  const cutoff = new Date(Date.now() - MAX_PO_AGE_DAYS * 24 * 60 * 60 * 1000)
 
-  while (hasMore && candidates.length < MAX_PO_DETAILS) {
+  while (hasMore && !reachedCutoff && candidates.length < MAX_PO_DETAILS) {
     const data = await fetchZohoPage(
       accessToken,
       `${ZOHO_API_URL}/books/v3/purchaseorders?organization_id=${orgId}&page=${page}&per_page=200&sort_column=date&sort_order=D`
@@ -169,6 +171,14 @@ async function fetchOutstandingPurchaseOrders(accessToken: string, orgId: string
 
     for (const summary of summaries) {
       if (candidates.length >= MAX_PO_DETAILS) break
+
+      // list is sorted newest-first, so once we cross the cutoff we can stop entirely
+      const poDate = summary.date ? new Date(summary.date) : null
+      if (poDate && !isNaN(poDate.getTime()) && poDate < cutoff) {
+        reachedCutoff = true
+        break
+      }
+
       const status = String(summary.status || '').toLowerCase()
       const billedStatus = String(summary.billed_status || '').toLowerCase()
       if (EXCLUDED_PO_STATUSES.includes(status)) continue
@@ -179,6 +189,7 @@ async function fetchOutstandingPurchaseOrders(accessToken: string, orgId: string
     hasMore = data.page_context?.has_more_page ?? false
     page++
   }
+
 
   // 2. Fetch detail records in parallel batches instead of one-by-one
   const results: POEntry[] = []
