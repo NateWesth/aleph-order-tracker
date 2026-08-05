@@ -265,6 +265,14 @@ export default function SuppliersPage() {
               className="pl-9"
             />
           </div>
+          <Button variant="outline" onClick={handleSyncZohoVendors} disabled={syncing}>
+            {syncing ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4 mr-2" />
+            )}
+            Sync Zoho Vendors
+          </Button>
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
               <Button onClick={() => handleOpenDialog()}>
