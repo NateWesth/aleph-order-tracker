@@ -95,6 +95,10 @@ export default function POTrackingPage() {
     fetchData();
   }, []);
 
+  // Auto-refresh from Zoho every 10 minutes and whenever the tab regains focus
+  useAutoRefresh(() => fetchData(true), 10 * 60 * 1000);
+
+
   const fetchLinkedOrders = async () => {
     const { data: links } = await supabase
       .from("order_purchase_orders")
