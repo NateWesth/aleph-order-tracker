@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useAutoRefresh } from "@/hooks/useAutoRefresh";
+import { useLiveData } from "@/hooks/useLiveData";
 import { PullToRefresh } from "@/components/ui/PullToRefresh";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -233,7 +233,7 @@ export default function ProcessingPage({
   });
 
   // Load user info first, then orders
-  useAutoRefresh(() => fetchProcessingOrders(), 2 * 60 * 1000);
+  useLiveData(["orders", "order_items", "order_purchase_orders", "order_files"], () => fetchProcessingOrders());
 
   useEffect(() => {
     if (user?.id) {

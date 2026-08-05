@@ -33,7 +33,7 @@ import { format } from "date-fns";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import { OrderWithCompany } from "@/components/orders/types/orderTypes";
-import { useAutoRefresh } from "@/hooks/useAutoRefresh";
+import { useLiveData } from "@/hooks/useLiveData";
 import OrderDetailsDialog from "@/components/orders/components/OrderDetailsDialog";
 
 interface POLine {
@@ -97,7 +97,10 @@ export default function POTrackingPage() {
   }, []);
 
   // Auto-refresh from Zoho every 10 minutes and whenever the tab regains focus
-  useAutoRefresh(() => fetchData(true), 10 * 60 * 1000);
+  useLiveData(["order_purchase_orders", "order_items"], () => fetchData(true), {
+    fallbackIntervalMs: 5 * 60 * 1000,
+    debounceMs: 1500,
+  });
 
 
   const fetchLinkedOrders = async () => {
@@ -287,7 +290,7 @@ export default function POTrackingPage() {
       {fetchedAt && (
         <p className="text-xs text-muted-foreground">
           {isCached ? "Cached" : "Live from Zoho"} · updated {format(new Date(fetchedAt), "dd MMM yyyy HH:mm")}
-          {" · auto-updates every 10 minutes · POs disappear once a vendor bill is raised"}
+          {" · live · auto-updates every 5 minutes · POs disappear once a vendor bill is raised"}
         </p>
       )}
 

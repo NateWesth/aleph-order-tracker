@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef, Fragment } from "react";
+import { useLiveData } from "@/hooks/useLiveData";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -74,7 +75,7 @@ export default function BuyingSheetPage() {
   const [pinnedSkus, setPinnedSkus] = useState<string[]>(loadPinned);
   const [viewDensity, setViewDensity] = useState<ViewDensity>(loadDensity);
   const [recentlyOrdered, setRecentlyOrdered] = useState<RecentlyOrderedItem[]>(loadRecentlyOrdered);
-  const [autoRefreshInterval, setAutoRefreshInterval] = useState<number>(10);
+  const [autoRefreshInterval, setAutoRefreshInterval] = useState<number>(5);
   const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(null);
   const [autoRefreshCountdown, setAutoRefreshCountdown] = useState(0);
   const [showRecentlyOrdered, setShowRecentlyOrdered] = useState(false);
@@ -95,6 +96,12 @@ export default function BuyingSheetPage() {
     loadSnapshot();
     fetchLocalData();
   }, []);
+
+  // Live feed: re-pull local demand whenever orders / items / POs change
+  useLiveData(["orders", "order_items", "order_purchase_orders"], () => {
+    fetchLocalData();
+    fetchLastPurchaseDates();
+  }, { fallbackIntervalMs: 0, debounceMs: 1500 });
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {

@@ -22,7 +22,7 @@ import { UnresolvedCostsPanel, saveCost as saveOverrideCost } from "./Unresolved
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import CommissionRepManagementDialog from "./CommissionRepManagementDialog";
 import { useAuth } from "@/contexts/AuthContext";
-import { useAutoRefresh } from "@/hooks/useAutoRefresh";
+import { useLiveData } from "@/hooks/useLiveData";
 
 
 type CommissionMethod = "margin_scaled" | "half_markup_below_25";
@@ -847,9 +847,10 @@ const CommissionPage = () => {
   }, [activeTab, selectedMonth, fetchCommissionReport]);
 
   // Auto-refresh from Zoho every 30 minutes while the report tab is open
-  useAutoRefresh(() => fetchCommissionReport(true), 30 * 60 * 1000, {
+  useLiveData(["orders", "order_items"], () => fetchCommissionReport(true), {
     enabled: activeTab === "report",
-    focusMinIntervalMs: 15 * 60 * 1000,
+    fallbackIntervalMs: 15 * 60 * 1000,
+    debounceMs: 3000,
   });
 
   // Lock all currently-unlocked invoices for a single rep into commission_payouts.
