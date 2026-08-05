@@ -399,60 +399,14 @@ async function handleInvoiceWebhook(
     })
   }
 
-  // Only move items whose SKU/code matches an invoice line item
-  let totalItemsUpdated = 0
+  // Move only the invoiced quantities of the invoiced SKUs to ready-for-delivery
+  const { updated: totalItemsUpdated } = await applyInvoiceQuantities(
+    supabase,
+    matchedOrders.map((o: any) => o.id),
+    invoiceLineItems
+  )
+  console.log(`Invoice applied ${totalItemsUpdated} units to ready-for-delivery`)
 
-  for (const order of matchedOrders) {
-    console.log(`Processing order ${order.order_number} (${order.id})`)
-
-    // Get all order items
-    const { data: orderItems, error: itemsErr } = await supabase
-      .from('order_items')
-      .select('id, name, code, quantity, progress_stage, stock_status')
-      .eq('order_id', order.id)
-
-    if (itemsErr || !orderItems) {
-      console.error(`Failed to fetch items for order ${order.id}:`, itemsErr)
-      continue
-    }
-
-    for (const item of orderItems) {
-      // Never touch completed items
-      if (item.progress_stage === 'completed') {
-        console.log(`  Item ${item.code} "${item.name}" already completed - skipping`)
-        continue
-      }
-
-      // Match by SKU/code (case-insensitive)
-      const itemCode = (item.code || '').toLowerCase()
-      if (!itemCode || !invoiceSkus.includes(itemCode)) {
-        console.log(`  Item ${item.code} "${item.name}" not on invoice - skipping`)
-        continue
-      }
-
-      const alreadySynced = item.progress_stage === 'ready-for-delivery' && item.stock_status === 'in-stock'
-      if (alreadySynced) {
-        console.log(`  Item ${item.code} "${item.name}" already synced - skipping`)
-        continue
-      }
-
-      const { error: updateErr } = await supabase
-        .from('order_items')
-        .update({ 
-          progress_stage: 'ready-for-delivery',
-          stock_status: 'in-stock',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', item.id)
-
-      if (updateErr) {
-        console.error(`  Failed to update item ${item.id}:`, updateErr)
-      } else {
-        totalItemsUpdated++
-        console.log(`  ✅ Synced item ${item.code} "${item.name}" to ready-for-delivery + in-stock`)
-      }
-    }
-  }
 
   await supabase.from('zoho_sync_log').insert({
     sync_type: 'invoice_webhook',
