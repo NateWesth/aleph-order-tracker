@@ -11,7 +11,7 @@ const ZOHO_API_URL = 'https://www.zohoapis.com'
 // Statuses we consider "still outstanding" (fully billed / cancelled / closed drop off)
 const EXCLUDED_PO_STATUSES = ['cancelled', 'closed', 'rejected']
 const MAX_PO_DETAILS = 250
-const DETAIL_CONCURRENCY = 12
+const DETAIL_CONCURRENCY = 4
 const CACHE_TTL_MS = 15 * 60 * 1000
 const CACHE_ID = '00000000-0000-0000-0000-000000000001'
 
@@ -260,16 +260,39 @@ async function fetchPurchaseOrderDetail(accessToken: string, orgId: string, purc
   return data.purchaseorder || {}
 }
 
-async function fetchZohoPage(accessToken: string, url: string) {
-  const resp = await fetch(url, {
-    headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` },
-  })
 
-  const data = await resp.json()
-  if (!resp.ok || data.code !== 0) {
-    throw new Error(`Zoho API error (${resp.status}): ${data.message || 'unknown error'}`)
+const ZOHO_RETRY_ATTEMPTS = 4
+
+function isZohoThrottle(message: string): boolean {
+  const m = (message || '').toLowerCase()
+  return m.includes('maximum number of in process requests') || m.includes('too many requests') || m.includes('rate limit')
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+async function fetchZohoPage(accessToken: string, url: string) {
+  let lastError: Error | null = null
+
+  for (let attempt = 0; attempt < ZOHO_RETRY_ATTEMPTS; attempt++) {
+    const resp = await fetch(url, {
+      headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` },
+    })
+
+    const data = await resp.json()
+    if (resp.ok && data.code === 0) return data
+
+    const message = data.message || 'unknown error'
+    lastError = new Error(`Zoho API error (${resp.status}): ${message}`)
+
+    if (resp.status === 429 || isZohoThrottle(message)) {
+      await sleep(700 * Math.pow(2, attempt))
+      continue
+    }
+
+    throw lastError
   }
-  return data
+
+  throw lastError ?? new Error(`Zoho request failed for ${url}`)
 }
 
 async function getOrgId(supabase: any): Promise<string> {
