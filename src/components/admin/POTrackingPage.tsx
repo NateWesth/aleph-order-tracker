@@ -33,6 +33,7 @@ import { format } from "date-fns";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import { OrderWithCompany } from "@/components/orders/types/orderTypes";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import OrderDetailsDialog from "@/components/orders/components/OrderDetailsDialog";
 
 interface POLine {
