@@ -8,12 +8,14 @@ const corsHeaders = {
 const ZOHO_AUTH_URL = 'https://accounts.zoho.com/oauth/v2'
 const ZOHO_API_URL = 'https://www.zohoapis.com'
 
-// Statuses we consider "still outstanding" (fully billed / cancelled / closed drop off)
-const EXCLUDED_PO_STATUSES = ['cancelled', 'closed', 'rejected']
+// Statuses we consider "still outstanding" (fully billed / cancelled / closed / draft drop off)
+const EXCLUDED_PO_STATUSES = ['cancelled', 'closed', 'rejected', 'draft', 'void', 'billed']
+// Ignore anything older than this - stale POs are effectively dead
+const MAX_PO_AGE_DAYS = 180
 const MAX_PO_DETAILS = 250
 const DETAIL_CONCURRENCY = 4
 const CACHE_TTL_MS = 15 * 60 * 1000
-const CACHE_ID = '00000000-0000-0000-0000-000000000001'
+const CACHE_ID = '00000000-0000-0000-0000-000000000002'
 
 type POLine = {
   sku: string
@@ -155,8 +157,10 @@ async function fetchOutstandingPurchaseOrders(accessToken: string, orgId: string
   const candidates: any[] = []
   let page = 1
   let hasMore = true
+  let reachedCutoff = false
+  const cutoff = new Date(Date.now() - MAX_PO_AGE_DAYS * 24 * 60 * 60 * 1000)
 
-  while (hasMore && candidates.length < MAX_PO_DETAILS) {
+  while (hasMore && !reachedCutoff && candidates.length < MAX_PO_DETAILS) {
     const data = await fetchZohoPage(
       accessToken,
       `${ZOHO_API_URL}/books/v3/purchaseorders?organization_id=${orgId}&page=${page}&per_page=200&sort_column=date&sort_order=D`
@@ -167,6 +171,14 @@ async function fetchOutstandingPurchaseOrders(accessToken: string, orgId: string
 
     for (const summary of summaries) {
       if (candidates.length >= MAX_PO_DETAILS) break
+
+      // list is sorted newest-first, so once we cross the cutoff we can stop entirely
+      const poDate = summary.date ? new Date(summary.date) : null
+      if (poDate && !isNaN(poDate.getTime()) && poDate < cutoff) {
+        reachedCutoff = true
+        break
+      }
+
       const status = String(summary.status || '').toLowerCase()
       const billedStatus = String(summary.billed_status || '').toLowerCase()
       if (EXCLUDED_PO_STATUSES.includes(status)) continue
@@ -177,6 +189,7 @@ async function fetchOutstandingPurchaseOrders(accessToken: string, orgId: string
     hasMore = data.page_context?.has_more_page ?? false
     page++
   }
+
 
   // 2. Fetch detail records in parallel batches instead of one-by-one
   const results: POEntry[] = []
@@ -197,8 +210,9 @@ async function fetchOutstandingPurchaseOrders(accessToken: string, orgId: string
     for (const entry of details) {
       if (!entry) continue
       const { summary, po } = entry
-      const status = String(summary.status || '').toLowerCase()
+      const status = String(po.status || summary.status || '').toLowerCase()
       const detailBilled = String(po.billed_status || summary.billed_status || '').toLowerCase()
+      if (EXCLUDED_PO_STATUSES.includes(status)) continue
       if (detailBilled === 'billed') continue
 
       const rawLines = Array.isArray(po.line_items) ? po.line_items : []
