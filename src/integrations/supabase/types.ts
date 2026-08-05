@@ -604,6 +604,63 @@ export type Database = {
         }
         Relationships: []
       }
+      order_item_po_allocations: {
+        Row: {
+          created_at: string
+          id: string
+          order_id: string
+          order_item_id: string
+          purchase_order_number: string | null
+          quantity_ordered: number
+          quantity_received: number
+          sku: string | null
+          updated_at: string
+          vendor_name: string | null
+          zoho_purchaseorder_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          order_id: string
+          order_item_id: string
+          purchase_order_number?: string | null
+          quantity_ordered?: number
+          quantity_received?: number
+          sku?: string | null
+          updated_at?: string
+          vendor_name?: string | null
+          zoho_purchaseorder_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          order_id?: string
+          order_item_id?: string
+          purchase_order_number?: string | null
+          quantity_ordered?: number
+          quantity_received?: number
+          sku?: string | null
+          updated_at?: string
+          vendor_name?: string | null
+          zoho_purchaseorder_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_item_po_allocations_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_item_po_allocations_order_item_id_fkey"
+            columns: ["order_item_id"]
+            isOneToOne: false
+            referencedRelation: "order_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_items: {
         Row: {
           code: string | null
@@ -615,6 +672,10 @@ export type Database = {
           notes: string | null
           order_id: string
           progress_stage: string
+          qty_completed: number
+          qty_invoiced: number
+          qty_on_po: number
+          qty_received: number
           quantity: number
           stock_status: string
           updated_at: string
@@ -629,6 +690,10 @@ export type Database = {
           notes?: string | null
           order_id: string
           progress_stage?: string
+          qty_completed?: number
+          qty_invoiced?: number
+          qty_on_po?: number
+          qty_received?: number
           quantity?: number
           stock_status?: string
           updated_at?: string
@@ -643,6 +708,10 @@ export type Database = {
           notes?: string | null
           order_id?: string
           progress_stage?: string
+          qty_completed?: number
+          qty_invoiced?: number
+          qty_on_po?: number
+          qty_received?: number
           quantity?: number
           stock_status?: string
           updated_at?: string

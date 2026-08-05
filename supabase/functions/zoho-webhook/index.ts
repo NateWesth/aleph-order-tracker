@@ -1,4 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { allocatePurchaseOrder, applyBillReceipt, applyInvoiceQuantities } from './quantity-flow.ts'
+
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -75,14 +77,26 @@ Deno.serve(async (req) => {
       return await handleScanAllInvoices(supabase, clientId, clientSecret)
     }
 
-    // Detect event type - invoice or sales order
+    // Detect event type - invoice, purchase order, vendor bill or sales order
     const invoiceId = payload.invoice_id || payload.data?.invoice_id || payload.invoice?.invoice_id
+    const purchaseOrderId = payload.purchaseorder_id || payload.purchaseorder?.purchaseorder_id ||
+      payload.data?.purchaseorder?.purchaseorder_id || payload.data?.purchaseorder_id
+    const billId = payload.bill_id || payload.bill?.bill_id || payload.data?.bill?.bill_id || payload.data?.bill_id
     const salesOrderId = payload.salesorder_id || payload.resource_id || payload.id || 
       payload.salesorder?.salesorder_id || payload.data?.salesorder_id
 
     if (invoiceId) {
       return await handleInvoiceWebhook(supabase, payload, invoiceId, clientId, clientSecret)
     }
+
+    if (purchaseOrderId) {
+      return await handlePurchaseOrderWebhook(supabase, purchaseOrderId, clientId, clientSecret)
+    }
+
+    if (billId) {
+      return await handleBillWebhook(supabase, billId, clientId, clientSecret)
+    }
+
 
     if (salesOrderId) {
       return await handleSalesOrderWebhook(supabase, payload, salesOrderId, clientId, clientSecret)
@@ -385,60 +399,14 @@ async function handleInvoiceWebhook(
     })
   }
 
-  // Only move items whose SKU/code matches an invoice line item
-  let totalItemsUpdated = 0
+  // Move only the invoiced quantities of the invoiced SKUs to ready-for-delivery
+  const { updated: totalItemsUpdated } = await applyInvoiceQuantities(
+    supabase,
+    matchedOrders.map((o: any) => o.id),
+    invoiceLineItems
+  )
+  console.log(`Invoice applied ${totalItemsUpdated} units to ready-for-delivery`)
 
-  for (const order of matchedOrders) {
-    console.log(`Processing order ${order.order_number} (${order.id})`)
-
-    // Get all order items
-    const { data: orderItems, error: itemsErr } = await supabase
-      .from('order_items')
-      .select('id, name, code, quantity, progress_stage, stock_status')
-      .eq('order_id', order.id)
-
-    if (itemsErr || !orderItems) {
-      console.error(`Failed to fetch items for order ${order.id}:`, itemsErr)
-      continue
-    }
-
-    for (const item of orderItems) {
-      // Never touch completed items
-      if (item.progress_stage === 'completed') {
-        console.log(`  Item ${item.code} "${item.name}" already completed - skipping`)
-        continue
-      }
-
-      // Match by SKU/code (case-insensitive)
-      const itemCode = (item.code || '').toLowerCase()
-      if (!itemCode || !invoiceSkus.includes(itemCode)) {
-        console.log(`  Item ${item.code} "${item.name}" not on invoice - skipping`)
-        continue
-      }
-
-      const alreadySynced = item.progress_stage === 'ready-for-delivery' && item.stock_status === 'in-stock'
-      if (alreadySynced) {
-        console.log(`  Item ${item.code} "${item.name}" already synced - skipping`)
-        continue
-      }
-
-      const { error: updateErr } = await supabase
-        .from('order_items')
-        .update({ 
-          progress_stage: 'ready-for-delivery',
-          stock_status: 'in-stock',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', item.id)
-
-      if (updateErr) {
-        console.error(`  Failed to update item ${item.id}:`, updateErr)
-      } else {
-        totalItemsUpdated++
-        console.log(`  ✅ Synced item ${item.code} "${item.name}" to ready-for-delivery + in-stock`)
-      }
-    }
-  }
 
   await supabase.from('zoho_sync_log').insert({
     sync_type: 'invoice_webhook',
@@ -607,43 +575,14 @@ async function handleScanAllInvoices(
 
     if (invoiceSkus.length === 0) continue
 
-    for (const order of orders) {
-      // Get order items and match by SKU
-      const { data: orderItems } = await supabase
-        .from('order_items')
-        .select('id, code, name, progress_stage, stock_status')
-        .eq('order_id', order.id)
+    const { updated } = await applyInvoiceQuantities(supabase, orders.map((o: any) => o.id), invoiceLineItems)
+    totalItemsUpdated += updated
 
-      if (!orderItems) continue
-
-      for (const item of orderItems) {
-        if (item.progress_stage === 'completed') continue
-        const itemCode = (item.code || '').toLowerCase()
-        if (!itemCode || !invoiceSkus.includes(itemCode)) continue
-
-        const alreadySynced = item.progress_stage === 'ready-for-delivery' && item.stock_status === 'in-stock'
-        if (alreadySynced) continue
-
-        const { error } = await supabase
-          .from('order_items')
-          .update({
-            progress_stage: 'ready-for-delivery',
-            stock_status: 'in-stock',
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', item.id)
-
-        if (!error) {
-          totalItemsUpdated++
-          console.log(`  ✅ ${order.order_number}: synced ${item.code} "${item.name}" to ready-for-delivery + in-stock`)
-        }
-      }
-
-      if (totalItemsUpdated > 0) {
-        totalMatched++
-        matchedOrders.push(order.order_number)
-      }
+    if (updated > 0) {
+      totalMatched++
+      matchedOrders.push(...orders.map((o: any) => o.order_number))
     }
+
   }
 
   await supabase.from('zoho_sync_log').insert({
@@ -1042,4 +981,73 @@ async function getValidAccessToken(supabase: any, clientId: string, clientSecret
     .eq('id', '00000000-0000-0000-0000-000000000001')
 
   return tokenData.access_token
+}
+// ─── PURCHASE ORDER WEBHOOK (allocates ordered quantities) ─────────────────────
+
+async function handlePurchaseOrderWebhook(
+  supabase: any, purchaseOrderId: string,
+  clientId: string, clientSecret: string
+) {
+  console.log('Processing purchase order:', purchaseOrderId)
+  const accessToken = await getValidAccessToken(supabase, clientId, clientSecret)
+  const orgId = await getOrgId(supabase)
+
+  const resp = await fetch(
+    `${ZOHO_API_URL}/books/v3/purchaseorders/${purchaseOrderId}?organization_id=${orgId}`,
+    { headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` } }
+  )
+  const data = await resp.json()
+  if (data.code !== 0 || !data.purchaseorder) {
+    throw new Error(`Failed to fetch purchase order: ${data.message || 'Unknown error'}`)
+  }
+
+  const result = await allocatePurchaseOrder(supabase, data.purchaseorder)
+
+  await supabase.from('zoho_sync_log').insert({
+    sync_type: 'purchase_order_webhook',
+    status: 'completed',
+    items_synced: result.allocated,
+    completed_at: new Date().toISOString(),
+  })
+
+  console.log(`=== PO WEBHOOK COMPLETE: ${result.allocated} units allocated ===`)
+
+  return new Response(JSON.stringify({ success: true, ...result }), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+  })
+}
+
+// ─── VENDOR BILL WEBHOOK (marks quantities received) ───────────────────────────
+
+async function handleBillWebhook(
+  supabase: any, billId: string,
+  clientId: string, clientSecret: string
+) {
+  console.log('Processing vendor bill:', billId)
+  const accessToken = await getValidAccessToken(supabase, clientId, clientSecret)
+  const orgId = await getOrgId(supabase)
+
+  const resp = await fetch(
+    `${ZOHO_API_URL}/books/v3/bills/${billId}?organization_id=${orgId}`,
+    { headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` } }
+  )
+  const data = await resp.json()
+  if (data.code !== 0 || !data.bill) {
+    throw new Error(`Failed to fetch bill: ${data.message || 'Unknown error'}`)
+  }
+
+  const result = await applyBillReceipt(supabase, data.bill)
+
+  await supabase.from('zoho_sync_log').insert({
+    sync_type: 'bill_webhook',
+    status: 'completed',
+    items_synced: result.received,
+    completed_at: new Date().toISOString(),
+  })
+
+  console.log(`=== BILL WEBHOOK COMPLETE: ${result.received} units received ===`)
+
+  return new Response(JSON.stringify({ success: true, ...result }), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+  })
 }

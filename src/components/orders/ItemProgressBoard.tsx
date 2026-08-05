@@ -3,10 +3,11 @@ import { playClick, playSuccess } from "@/utils/ambientSounds";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ChevronDown, ChevronRight, Package, Clock, Truck, CheckCircle, Box, Loader2, GripVertical } from "lucide-react";
+import { ChevronDown, ChevronRight, Package, Clock, Truck, CheckCircle, Box, Loader2, GripVertical, ShoppingCart } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserData } from "@/hooks/useUserData";
@@ -34,8 +35,10 @@ interface OrderItem {
   quantity: number;
   code: string | null;
   notes: string | null;
-  stock_status: 'awaiting' | 'ordered' | 'in-stock';
-  progress_stage: 'awaiting-stock' | 'in-stock' | 'packing' | 'delivery' | 'completed';
+  qty_on_po: number;
+  qty_received: number;
+  qty_invoiced: number;
+  qty_completed: number;
 }
 
 interface Order {
@@ -59,29 +62,89 @@ interface ItemProgressBoardProps {
 
 const PROGRESS_STAGES = [
   { id: 'awaiting-stock', label: 'Awaiting Stock', icon: Clock, color: 'bg-amber-500' },
+  { id: 'ordered', label: 'In Progress (on PO)', icon: ShoppingCart, color: 'bg-indigo-500' },
   { id: 'in-stock', label: 'In Stock', icon: Box, color: 'bg-blue-500' },
-  { id: 'packing', label: 'Packing', icon: Package, color: 'bg-purple-500' },
-  { id: 'delivery', label: 'Delivery', icon: Truck, color: 'bg-orange-500' },
+  { id: 'ready-for-delivery', label: 'Ready for Delivery', icon: Truck, color: 'bg-orange-500' },
   { id: 'completed', label: 'Completed', icon: CheckCircle, color: 'bg-green-500' },
 ] as const;
 
 type ProgressStageId = typeof PROGRESS_STAGES[number]['id'];
 
+const STAGE_INDEX: Record<ProgressStageId, number> = {
+  'awaiting-stock': 0,
+  'ordered': 1,
+  'in-stock': 2,
+  'ready-for-delivery': 3,
+  'completed': 4,
+};
+
+/** Quantity sitting in each stage for a given item. */
+function bucketsFor(item: OrderItem): Record<ProgressStageId, number> {
+  const qty = item.quantity || 0;
+  const onPo = Math.min(item.qty_on_po || 0, qty);
+  const received = Math.min(item.qty_received || 0, onPo);
+  const invoiced = Math.min(item.qty_invoiced || 0, received);
+  const completed = Math.min(item.qty_completed || 0, invoiced);
+  return {
+    'awaiting-stock': Math.max(0, qty - onPo),
+    'ordered': Math.max(0, onPo - received),
+    'in-stock': Math.max(0, received - invoiced),
+    'ready-for-delivery': Math.max(0, invoiced - completed),
+    'completed': completed,
+  };
+}
+
+/** New cumulative counters after moving `qty` units from one stage to another. */
+function countersAfterMove(item: OrderItem, from: ProgressStageId, to: ProgressStageId, qty: number) {
+  const counters = [item.qty_on_po || 0, item.qty_received || 0, item.qty_invoiced || 0, item.qty_completed || 0];
+  const f = STAGE_INDEX[from];
+  const t = STAGE_INDEX[to];
+  const delta = t > f ? qty : -qty;
+  const lo = Math.min(f, t);
+  const hi = Math.max(f, t);
+  for (let i = lo; i < hi; i++) counters[i] += delta;
+
+  // Keep the counters monotonically decreasing and inside [0, quantity]
+  let cap = item.quantity || 0;
+  for (let i = 0; i < counters.length; i++) {
+    counters[i] = Math.max(0, Math.min(counters[i], cap));
+    cap = counters[i];
+  }
+
+  return {
+    qty_on_po: counters[0],
+    qty_received: counters[1],
+    qty_invoiced: counters[2],
+    qty_completed: counters[3],
+  };
+}
+
+interface BoardCard {
+  item: OrderItem;
+  stage: ProgressStageId;
+  qty: number;
+}
+
 // Draggable Item Component
-function DraggableItem({ 
-  item, 
-  order, 
+function DraggableItem({
+  card,
+  order,
   isUpdating,
-  isDragging = false 
-}: { 
-  item: OrderItem; 
+  isDragging = false,
+  moveQty,
+  onMoveQtyChange,
+}: {
+  card: BoardCard;
   order: Order;
   isUpdating: boolean;
   isDragging?: boolean;
+  moveQty: number;
+  onMoveQtyChange: (qty: number) => void;
 }) {
+  const { item, stage, qty } = card;
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
-    id: item.id,
-    data: { item, order },
+    id: `${item.id}:${stage}`,
+    data: { card, order },
   });
 
   const style = transform ? {
@@ -93,42 +156,55 @@ function DraggableItem({
     <div
       ref={setNodeRef}
       style={style}
-      {...attributes}
-      {...listeners}
-      className={`p-2 bg-muted/50 rounded text-xs space-y-1 cursor-grab active:cursor-grabbing hover:bg-muted hover:ring-2 hover:ring-primary/30 transition-all touch-none ${
+      className={`p-2 bg-muted/50 rounded text-xs space-y-1 hover:bg-muted hover:ring-2 hover:ring-primary/30 transition-all touch-none ${
         isDragging ? 'opacity-50 ring-2 ring-primary' : ''
       } ${isUpdating ? 'opacity-50 pointer-events-none' : ''}`}
     >
       <div className="flex items-start justify-between gap-2">
-        <div className="flex items-center gap-1.5 min-w-0">
+        <div
+          className="flex items-center gap-1.5 min-w-0 cursor-grab active:cursor-grabbing"
+          {...attributes}
+          {...listeners}
+        >
           <GripVertical className="h-4 w-4 text-muted-foreground shrink-0" />
           <span className="font-medium truncate">{item.name}</span>
         </div>
         <Badge variant="secondary" className="text-[10px] shrink-0">
-          x{item.quantity}
+          {qty} of {item.quantity}
         </Badge>
       </div>
-      {item.notes && (
-        <p className="text-muted-foreground text-[10px] pl-5">{item.notes}</p>
-      )}
       {item.code && (
         <p className="text-muted-foreground text-[10px] pl-5 font-mono">{item.code}</p>
+      )}
+      {qty > 1 && (
+        <div className="flex items-center gap-1.5 pl-5">
+          <span className="text-[10px] text-muted-foreground">Move qty</span>
+          <Input
+            type="number"
+            min={1}
+            max={qty}
+            value={moveQty}
+            onChange={(e) => onMoveQtyChange(Math.max(1, Math.min(qty, Number(e.target.value) || 1)))}
+            onClick={(e) => e.stopPropagation()}
+            className="h-6 w-16 text-[11px] px-1.5"
+          />
+        </div>
       )}
     </div>
   );
 }
 
 // Drag Overlay Item (shown while dragging)
-function DragOverlayItem({ item, order }: { item: OrderItem; order: Order }) {
+function DragOverlayItem({ card, order, qty }: { card: BoardCard; order: Order; qty: number }) {
   return (
     <div className="p-2 bg-card border border-primary rounded text-xs space-y-1 shadow-lg">
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-1.5 min-w-0">
           <GripVertical className="h-3.5 w-3.5 text-primary shrink-0" />
-          <span className="font-medium truncate">{item.name}</span>
+          <span className="font-medium truncate">{card.item.name}</span>
         </div>
         <Badge variant="secondary" className="text-[10px] shrink-0">
-          x{item.quantity}
+          x{qty}
         </Badge>
       </div>
       <p className="text-muted-foreground text-[10px] pl-5">
@@ -173,7 +249,12 @@ export default function ItemProgressBoard({ isAdmin }: ItemProgressBoardProps) {
   const [loading, setLoading] = useState(true);
   const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
   const [updatingItems, setUpdatingItems] = useState<Set<string>>(new Set());
-  const [activeItem, setActiveItem] = useState<{ item: OrderItem; order: Order } | null>(null);
+  const [activeCard, setActiveCard] = useState<{ card: BoardCard; order: Order } | null>(null);
+  const [moveQtys, setMoveQtys] = useState<Record<string, number>>({});
+
+  const cardKey = (itemId: string, stage: ProgressStageId) => `${itemId}:${stage}`;
+  const getMoveQty = (itemId: string, stage: ProgressStageId, max: number) =>
+    Math.max(1, Math.min(max, moveQtys[cardKey(itemId, stage)] ?? max));
 
   // Configure sensors for drag and drop
   const sensors = useSensors(
@@ -197,7 +278,6 @@ export default function ItemProgressBoard({ isAdmin }: ItemProgressBoardProps) {
     
     setLoading(true);
     try {
-      // First fetch orders that are in progress (not pending, not completed)
       let ordersQuery = supabase
         .from('orders')
         .select(`
@@ -207,7 +287,6 @@ export default function ItemProgressBoard({ isAdmin }: ItemProgressBoardProps) {
         .in('status', ['received', 'in-progress', 'processing'])
         .order('created_at', { ascending: true });
 
-      // Apply user filtering if not admin
       if (userRole === 'user' && userCompanyId) {
         ordersQuery = ordersQuery.eq('company_id', userCompanyId);
       } else if (userRole === 'user' && !userCompanyId) {
@@ -223,7 +302,6 @@ export default function ItemProgressBoard({ isAdmin }: ItemProgressBoardProps) {
         return;
       }
 
-      // Then fetch items for all orders
       const orderIds = ordersData.map(o => o.id);
       const { data: itemsData, error: itemsError } = await supabase
         .from('order_items')
@@ -232,7 +310,6 @@ export default function ItemProgressBoard({ isAdmin }: ItemProgressBoardProps) {
 
       if (itemsError) throw itemsError;
 
-      // Fetch creator profile names
       const userIds = [...new Set(ordersData.map(o => (o as any).user_id).filter(Boolean))] as string[];
       let userMap = new Map<string, string>();
       if (userIds.length > 0) {
@@ -243,7 +320,6 @@ export default function ItemProgressBoard({ isAdmin }: ItemProgressBoardProps) {
         userMap = new Map(profilesData?.map(p => [p.id, p.full_name || 'Unknown']) || []);
       }
 
-      // Combine orders with their items
       const ordersWithItems: OrderWithItems[] = ordersData.map(order => ({
         id: order.id,
         order_number: order.order_number,
@@ -255,24 +331,30 @@ export default function ItemProgressBoard({ isAdmin }: ItemProgressBoardProps) {
         urgency: order.urgency,
         items: (itemsData || [])
           .filter(item => item.order_id === order.id)
-          .map(item => ({
+          .map((item: any) => ({
             id: item.id,
             order_id: item.order_id,
             name: item.name,
             quantity: item.quantity,
             code: item.code,
             notes: item.notes,
-            stock_status: item.stock_status as 'awaiting' | 'ordered' | 'in-stock',
-            progress_stage: (item.progress_stage || 'awaiting-stock') as ProgressStageId,
+            qty_on_po: item.qty_on_po ?? 0,
+            qty_received: item.qty_received ?? 0,
+            qty_invoiced: item.qty_invoiced ?? 0,
+            qty_completed: item.qty_completed ?? 0,
           }))
       }));
 
       setOrders(ordersWithItems);
-      
-      // Auto-expand orders that have items in multiple stages
+
+      // Auto-expand orders that have quantities spread over multiple stages
       const ordersToExpand = ordersWithItems
         .filter(order => {
-          const stages = new Set(order.items.map(i => i.progress_stage));
+          const stages = new Set<string>();
+          order.items.forEach(i => {
+            const b = bucketsFor(i);
+            PROGRESS_STAGES.forEach(s => { if (b[s.id] > 0) stages.add(s.id); });
+          });
           return stages.size > 1;
         })
         .map(o => o.id);
@@ -303,32 +385,35 @@ export default function ItemProgressBoard({ isAdmin }: ItemProgressBoardProps) {
     onUpdate: fetchOrdersWithItems,
   });
 
-  // Move an item to a different progress stage
-  const moveItemToStage = async (itemId: string, newStage: ProgressStageId) => {
-    setUpdatingItems(prev => new Set(prev).add(itemId));
-    
+  // Move a quantity of an item between stages
+  const moveQuantity = async (item: OrderItem, from: ProgressStageId, to: ProgressStageId, qty: number) => {
+    if (from === to || qty <= 0) return;
+
+    setUpdatingItems(prev => new Set(prev).add(item.id));
+
+    const next = countersAfterMove(item, from, to, qty);
+
     try {
       const { error } = await supabase
         .from('order_items')
-        .update({ 
-          progress_stage: newStage,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', itemId);
+        .update({ ...next, updated_at: new Date().toISOString() })
+        .eq('id', item.id);
 
       if (error) throw error;
 
-      // Update local state
       setOrders(prev => prev.map(order => ({
         ...order,
-        items: order.items.map(item => 
-          item.id === itemId ? { ...item, progress_stage: newStage } : item
-        )
+        items: order.items.map(i => (i.id === item.id ? { ...i, ...next } : i))
       })));
+      setMoveQtys(prev => {
+        const copy = { ...prev };
+        delete copy[cardKey(item.id, from)];
+        return copy;
+      });
 
       toast({
-        title: "Item Moved",
-        description: `Item moved to ${PROGRESS_STAGES.find(s => s.id === newStage)?.label}`,
+        title: "Items Moved",
+        description: `${qty} × ${item.name} moved to ${PROGRESS_STAGES.find(s => s.id === to)?.label}`,
       });
     } catch (error) {
       console.error('Error updating item:', error);
@@ -339,40 +424,35 @@ export default function ItemProgressBoard({ isAdmin }: ItemProgressBoardProps) {
       });
     } finally {
       setUpdatingItems(prev => {
-        const next = new Set(prev);
-        next.delete(itemId);
-        return next;
+        const nextSet = new Set(prev);
+        nextSet.delete(item.id);
+        return nextSet;
       });
     }
   };
 
-  // Handle drag start
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
-    const data = active.data.current as { item: OrderItem; order: Order } | undefined;
+    const data = active.data.current as { card: BoardCard; order: Order } | undefined;
     if (data) {
       playClick();
-      setActiveItem(data);
+      setActiveCard(data);
     }
   };
 
-  // Handle drag end
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
-    setActiveItem(null);
+    const data = active.data.current as { card: BoardCard; order: Order } | undefined;
+    setActiveCard(null);
 
-    if (!over) return;
+    if (!over || !data) return;
 
-    const itemId = active.id as string;
     const newStage = over.id as ProgressStageId;
+    const { item, stage, qty } = data.card;
+    if (stage === newStage) return;
 
-    // Find current item stage
-    const currentItem = orders.flatMap(o => o.items).find(i => i.id === itemId);
-    if (!currentItem || currentItem.progress_stage === newStage) return;
-
-    // Move the item
     playSuccess();
-    moveItemToStage(itemId, newStage);
+    moveQuantity(item, stage, newStage, getMoveQty(item.id, stage, qty));
   };
 
   const toggleOrderExpansion = (orderId: string) => {
@@ -387,26 +467,23 @@ export default function ItemProgressBoard({ isAdmin }: ItemProgressBoardProps) {
     });
   };
 
-  // Group items by stage within each order, and group orders by stage
+  // Group cards (item + quantity) by stage, within each order
   const ordersByStage = useMemo(() => {
-    const result: Record<ProgressStageId, OrderWithItems[]> = {
+    const result: Record<ProgressStageId, { order: Order; cards: BoardCard[] }[]> = {
       'awaiting-stock': [],
+      'ordered': [],
       'in-stock': [],
-      'packing': [],
-      'delivery': [],
+      'ready-for-delivery': [],
       'completed': [],
     };
 
     orders.forEach(order => {
-      // For each stage, check if the order has items in that stage
       PROGRESS_STAGES.forEach(stage => {
-        const itemsInStage = order.items.filter(item => item.progress_stage === stage.id);
-        if (itemsInStage.length > 0) {
-          // Create a copy of the order with only the items in this stage
-          result[stage.id].push({
-            ...order,
-            items: itemsInStage
-          });
+        const cards: BoardCard[] = order.items
+          .map(item => ({ item, stage: stage.id as ProgressStageId, qty: bucketsFor(item)[stage.id] }))
+          .filter(c => c.qty > 0);
+        if (cards.length > 0) {
+          result[stage.id].push({ order, cards });
         }
       });
     });
@@ -434,6 +511,36 @@ export default function ItemProgressBoard({ isAdmin }: ItemProgressBoardProps) {
     );
   }
 
+  const renderOrderHeader = (order: Order, unitCount: number, padding: string) => (
+    <CollapsibleTrigger className={`w-full ${padding} flex items-center justify-between hover:bg-muted/50 rounded-t-lg`}>
+      <div className="text-left min-w-0">
+        <div className="flex items-center gap-1">
+          <p className="text-sm font-medium truncate">#{order.order_number}</p>
+          {order.reference && (
+            <span className="inline-flex items-center rounded bg-muted px-1 py-0.5 text-[9px] font-medium text-muted-foreground whitespace-nowrap">
+              SO: {order.reference}
+            </span>
+          )}
+        </div>
+        <p className="text-xs text-muted-foreground truncate">{order.companyName}</p>
+        <p className="text-[10px] text-muted-foreground/60 font-light">
+          {new Date(order.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} · {new Date(order.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+          {order.creatorName && <> · {order.creatorName}</>}
+        </p>
+      </div>
+      <div className="flex items-center gap-1 shrink-0">
+        <Badge variant="outline" className="text-xs">
+          {unitCount} units
+        </Badge>
+        {expandedOrders.has(order.id) ? (
+          <ChevronDown className="h-4 w-4" />
+        ) : (
+          <ChevronRight className="h-4 w-4" />
+        )}
+      </div>
+    </CollapsibleTrigger>
+  );
+
   return (
     <DndContext
       sensors={sensors}
@@ -445,7 +552,7 @@ export default function ItemProgressBoard({ isAdmin }: ItemProgressBoardProps) {
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold">Item Progress Board</h2>
           <p className="text-sm text-muted-foreground">
-            Drag items between columns to update progress
+            Quantities move independently — one order can appear in several columns
           </p>
         </div>
 
@@ -454,8 +561,8 @@ export default function ItemProgressBoard({ isAdmin }: ItemProgressBoardProps) {
           <div className="grid grid-cols-5 gap-4 h-[calc(100vh-220px)] min-h-[400px]">
             {PROGRESS_STAGES.map(stage => {
               const StageIcon = stage.icon;
-              const ordersInStage = ordersByStage[stage.id];
-              const totalItems = ordersInStage.reduce((acc, o) => acc + o.items.length, 0);
+              const groups = ordersByStage[stage.id];
+              const totalUnits = groups.reduce((acc, g) => acc + g.cards.reduce((s, c) => s + c.qty, 0), 0);
               
               return (
                 <DroppableColumn key={stage.id} stageId={stage.id}>
@@ -467,60 +574,36 @@ export default function ItemProgressBoard({ isAdmin }: ItemProgressBoardProps) {
                         </div>
                         <CardTitle className="text-sm font-medium">{stage.label}</CardTitle>
                         <Badge variant="secondary" className="ml-auto text-xs">
-                          {totalItems}
+                          {totalUnits}
                         </Badge>
                       </div>
                     </CardHeader>
                     <ScrollArea className="flex-1 min-h-0">
                       <CardContent className="p-2 space-y-2">
-                        {ordersInStage.length === 0 ? (
+                        {groups.length === 0 ? (
                           <p className="text-xs text-muted-foreground text-center py-8">
                             Drop items here
                           </p>
                         ) : (
-                          ordersInStage.map(order => (
+                          groups.map(({ order, cards }) => (
                             <Collapsible
                               key={`${stage.id}-${order.id}`}
                               open={expandedOrders.has(order.id)}
                               onOpenChange={() => toggleOrderExpansion(order.id)}
                             >
                               <div className={`border rounded-lg bg-card border-l-4 ${getUrgencyColor(order.urgency)}`}>
-                                <CollapsibleTrigger className="w-full p-2 flex items-center justify-between hover:bg-muted/50 rounded-t-lg">
-                                  <div className="text-left min-w-0">
-                                    <div className="flex items-center gap-1">
-                                      <p className="text-sm font-medium truncate">#{order.order_number}</p>
-                                      {order.reference && (
-                                        <span className="inline-flex items-center rounded bg-muted px-1 py-0.5 text-[9px] font-medium text-muted-foreground whitespace-nowrap">
-                                          SO: {order.reference}
-                                        </span>
-                                      )}
-                                    </div>
-                                    <p className="text-xs text-muted-foreground truncate">{order.companyName}</p>
-                                    <p className="text-[10px] text-muted-foreground/60 font-light">
-                                      {new Date(order.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} · {new Date(order.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
-                                      {order.creatorName && <> · {order.creatorName}</>}
-                                    </p>
-                                  </div>
-                                  <div className="flex items-center gap-1 shrink-0">
-                                    <Badge variant="outline" className="text-xs">
-                                      {order.items.length}
-                                    </Badge>
-                                    {expandedOrders.has(order.id) ? (
-                                      <ChevronDown className="h-4 w-4" />
-                                    ) : (
-                                      <ChevronRight className="h-4 w-4" />
-                                    )}
-                                  </div>
-                                </CollapsibleTrigger>
+                                {renderOrderHeader(order, cards.reduce((s, c) => s + c.qty, 0), 'p-2')}
                                 <CollapsibleContent>
                                   <div className="px-2 pb-2 space-y-1.5">
-                                    {order.items.map(item => (
+                                    {cards.map(card => (
                                       <DraggableItem
-                                        key={item.id}
-                                        item={item}
+                                        key={`${card.item.id}-${stage.id}`}
+                                        card={card}
                                         order={order}
-                                        isUpdating={updatingItems.has(item.id)}
-                                        isDragging={activeItem?.item.id === item.id}
+                                        isUpdating={updatingItems.has(card.item.id)}
+                                        isDragging={activeCard?.card.item.id === card.item.id && activeCard?.card.stage === stage.id}
+                                        moveQty={getMoveQty(card.item.id, stage.id, card.qty)}
+                                        onMoveQtyChange={(q) => setMoveQtys(prev => ({ ...prev, [cardKey(card.item.id, stage.id)]: q }))}
                                       />
                                     ))}
                                   </div>
@@ -537,14 +620,14 @@ export default function ItemProgressBoard({ isAdmin }: ItemProgressBoardProps) {
             })}
           </div>
         ) : (
-          /* Mobile: Stacked cards with buttons (drag not optimal on mobile) */
+          /* Mobile: Stacked cards with buttons */
           <div className="space-y-4">
             {PROGRESS_STAGES.map(stage => {
               const StageIcon = stage.icon;
-              const ordersInStage = ordersByStage[stage.id];
-              const totalItems = ordersInStage.reduce((acc, o) => acc + o.items.length, 0);
+              const groups = ordersByStage[stage.id];
+              const totalUnits = groups.reduce((acc, g) => acc + g.cards.reduce((s, c) => s + c.qty, 0), 0);
               
-              if (totalItems === 0) return null;
+              if (totalUnits === 0) return null;
               
               return (
                 <Card key={stage.id}>
@@ -555,83 +638,72 @@ export default function ItemProgressBoard({ isAdmin }: ItemProgressBoardProps) {
                       </div>
                       <CardTitle className="text-sm font-medium">{stage.label}</CardTitle>
                       <Badge variant="secondary" className="ml-auto text-xs">
-                        {totalItems} items
+                        {totalUnits} units
                       </Badge>
                     </div>
                   </CardHeader>
                   <CardContent className="p-2 space-y-2">
-                    {ordersInStage.map(order => (
+                    {groups.map(({ order, cards }) => (
                       <Collapsible
                         key={`${stage.id}-${order.id}`}
                         open={expandedOrders.has(order.id)}
                         onOpenChange={() => toggleOrderExpansion(order.id)}
                       >
                         <div className={`border rounded-lg bg-card border-l-4 ${getUrgencyColor(order.urgency)}`}>
-                          <CollapsibleTrigger className="w-full p-3 flex items-center justify-between">
-                            <div className="text-left min-w-0">
-                              <div className="flex items-center gap-1">
-                                <p className="text-sm font-medium">#{order.order_number}</p>
-                                {order.reference && (
-                                  <span className="inline-flex items-center rounded bg-muted px-1 py-0.5 text-[9px] font-medium text-muted-foreground whitespace-nowrap">
-                                    SO: {order.reference}
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-xs text-muted-foreground">{order.companyName}</p>
-                              <p className="text-[10px] text-muted-foreground/60 font-light">
-                                {new Date(order.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} · {new Date(order.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
-                                {order.creatorName && <> · {order.creatorName}</>}
-                              </p>
-                            </div>
-                            <div className="flex items-center gap-2 shrink-0">
-                              <Badge variant="outline" className="text-xs">
-                                {order.items.length} items
-                              </Badge>
-                              {expandedOrders.has(order.id) ? (
-                                <ChevronDown className="h-4 w-4" />
-                              ) : (
-                                <ChevronRight className="h-4 w-4" />
-                              )}
-                            </div>
-                          </CollapsibleTrigger>
+                          {renderOrderHeader(order, cards.reduce((s, c) => s + c.qty, 0), 'p-3')}
                           <CollapsibleContent>
                             <div className="px-3 pb-3 space-y-2">
-                              {order.items.map(item => (
-                                <div
-                                  key={item.id}
-                                  className="p-3 bg-muted/50 rounded space-y-2"
-                                >
-                                  <div className="flex items-start justify-between gap-2">
-                                    <span className="font-medium text-sm">{item.name}</span>
-                                    <Badge variant="secondary" className="text-xs shrink-0">
-                                      x{item.quantity}
-                                    </Badge>
+                              {cards.map(card => {
+                                const moveQty = getMoveQty(card.item.id, stage.id, card.qty);
+                                return (
+                                  <div key={card.item.id} className="p-3 bg-muted/50 rounded space-y-2">
+                                    <div className="flex items-start justify-between gap-2">
+                                      <span className="font-medium text-sm">{card.item.name}</span>
+                                      <Badge variant="secondary" className="text-xs shrink-0">
+                                        {card.qty} of {card.item.quantity}
+                                      </Badge>
+                                    </div>
+                                    {card.qty > 1 && (
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-[11px] text-muted-foreground">Move qty</span>
+                                        <Input
+                                          type="number"
+                                          min={1}
+                                          max={card.qty}
+                                          value={moveQty}
+                                          onChange={(e) => setMoveQtys(prev => ({
+                                            ...prev,
+                                            [cardKey(card.item.id, stage.id)]: Math.max(1, Math.min(card.qty, Number(e.target.value) || 1)),
+                                          }))}
+                                          className="h-7 w-20 text-xs"
+                                        />
+                                      </div>
+                                    )}
+                                    <div className="flex flex-wrap gap-1.5">
+                                      {PROGRESS_STAGES.filter(s => s.id !== stage.id).map(nextStage => {
+                                        const NextIcon = nextStage.icon;
+                                        return (
+                                          <Button
+                                            key={nextStage.id}
+                                            variant="outline"
+                                            size="sm"
+                                            className="h-7 text-xs"
+                                            onClick={() => moveQuantity(card.item, stage.id, nextStage.id, moveQty)}
+                                            disabled={updatingItems.has(card.item.id)}
+                                          >
+                                            {updatingItems.has(card.item.id) ? (
+                                              <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                                            ) : (
+                                              <NextIcon className="h-3 w-3 mr-1" />
+                                            )}
+                                            {nextStage.label}
+                                          </Button>
+                                        );
+                                      })}
+                                    </div>
                                   </div>
-                                  {/* Stage movement buttons for mobile */}
-                                  <div className="flex flex-wrap gap-1.5">
-                                    {PROGRESS_STAGES.filter(s => s.id !== stage.id).map(nextStage => {
-                                      const NextIcon = nextStage.icon;
-                                      return (
-                                        <Button
-                                          key={nextStage.id}
-                                          variant="outline"
-                                          size="sm"
-                                          className="h-7 text-xs"
-                                          onClick={() => moveItemToStage(item.id, nextStage.id)}
-                                          disabled={updatingItems.has(item.id)}
-                                        >
-                                          {updatingItems.has(item.id) ? (
-                                            <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                                          ) : (
-                                            <NextIcon className="h-3 w-3 mr-1" />
-                                          )}
-                                          {nextStage.label}
-                                        </Button>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-                              ))}
+                                );
+                              })}
                             </div>
                           </CollapsibleContent>
                         </div>
@@ -656,8 +728,12 @@ export default function ItemProgressBoard({ isAdmin }: ItemProgressBoardProps) {
 
       {/* Drag overlay - shows the item being dragged */}
       <DragOverlay>
-        {activeItem ? (
-          <DragOverlayItem item={activeItem.item} order={activeItem.order} />
+        {activeCard ? (
+          <DragOverlayItem
+            card={activeCard.card}
+            order={activeCard.order}
+            qty={getMoveQty(activeCard.card.item.id, activeCard.card.stage, activeCard.card.qty)}
+          />
         ) : null}
       </DragOverlay>
     </DndContext>
