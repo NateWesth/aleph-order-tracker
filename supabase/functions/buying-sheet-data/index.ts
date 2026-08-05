@@ -9,6 +9,7 @@ const ZOHO_AUTH_URL = 'https://accounts.zoho.com/oauth/v2'
 const ZOHO_API_URL = 'https://www.zohoapis.com'
 const OPEN_PO_STATUSES = ['open', 'draft']
 const MAX_RECENT_PO_DETAILS = 100
+const MAX_RECENT_BILL_DETAILS = 150
 
 type StockEntry = {
   stockOnHand: number
@@ -444,6 +445,10 @@ async function fetchZohoPage(accessToken: string, url: string) {
 
 function normalizeSku(value: unknown): string {
   return String(value || '').trim().toUpperCase()
+}
+
+function normalizeName(value: unknown): string {
+  return String(value || '').trim().toLowerCase().replace(/\s+/g, ' ')
 }
 
 async function getOrgId(supabase: any): Promise<string> {
