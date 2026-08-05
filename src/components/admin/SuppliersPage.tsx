@@ -306,7 +306,7 @@ export default function SuppliersPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="code">Code *</Label>
+                    <Label htmlFor="code">Vendor No. *</Label>
                     <Input
                       id="code"
                       value={formData.code}
