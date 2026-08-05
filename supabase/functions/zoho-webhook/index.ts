@@ -575,43 +575,14 @@ async function handleScanAllInvoices(
 
     if (invoiceSkus.length === 0) continue
 
-    for (const order of orders) {
-      // Get order items and match by SKU
-      const { data: orderItems } = await supabase
-        .from('order_items')
-        .select('id, code, name, progress_stage, stock_status')
-        .eq('order_id', order.id)
+    const { updated } = await applyInvoiceQuantities(supabase, orders.map((o: any) => o.id), invoiceLineItems)
+    totalItemsUpdated += updated
 
-      if (!orderItems) continue
-
-      for (const item of orderItems) {
-        if (item.progress_stage === 'completed') continue
-        const itemCode = (item.code || '').toLowerCase()
-        if (!itemCode || !invoiceSkus.includes(itemCode)) continue
-
-        const alreadySynced = item.progress_stage === 'ready-for-delivery' && item.stock_status === 'in-stock'
-        if (alreadySynced) continue
-
-        const { error } = await supabase
-          .from('order_items')
-          .update({
-            progress_stage: 'ready-for-delivery',
-            stock_status: 'in-stock',
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', item.id)
-
-        if (!error) {
-          totalItemsUpdated++
-          console.log(`  ✅ ${order.order_number}: synced ${item.code} "${item.name}" to ready-for-delivery + in-stock`)
-        }
-      }
-
-      if (totalItemsUpdated > 0) {
-        totalMatched++
-        matchedOrders.push(order.order_number)
-      }
+    if (updated > 0) {
+      totalMatched++
+      matchedOrders.push(...orders.map((o: any) => o.order_number))
     }
+
   }
 
   await supabase.from('zoho_sync_log').insert({
