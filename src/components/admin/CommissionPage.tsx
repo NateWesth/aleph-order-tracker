@@ -1184,10 +1184,11 @@ const CommissionPage = () => {
               onChange={(e) => setSelectedMonth(e.target.value)}
               className="w-48"
             />
-            <Button onClick={() => fetchCommissionReport(true)} disabled={loadingReport} variant="outline">
-              {loadingReport ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <RefreshCw className="h-4 w-4 mr-1.5" />}
-              {loadingReport ? "Calculating..." : "Refresh from Zoho"}
-            </Button>
+            {loadingReport && (
+              <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />Calculating...
+              </span>
+            )}
             {commissionData && (() => {
               type MissingRow = {
                 rep_name: string; invoice_number: string; customer_name: string;
