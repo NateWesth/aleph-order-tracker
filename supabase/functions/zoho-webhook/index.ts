@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { allocatePurchaseOrder, applyBillReceipt, applyInvoiceQuantities } from './quantity-flow.ts'
+import { allocatePurchaseOrder, applyBillReceipt, applyInvoiceQuantities, isExcludedSku } from './quantity-flow.ts'
 
 
 const corsHeaders = {
@@ -773,6 +773,12 @@ async function syncOrderItems(supabase: any, orderId: string, lineItems: any[]):
 
   for (const lineItem of lineItems) {
     const itemCode = lineItem.sku || lineItem.item_code || null
+
+    // Shipping / handling style SKUs never belong on the order board
+    if (isExcludedSku(itemCode)) {
+      console.log(`Excluded SKU skipped: ${itemCode}`)
+      continue
+    }
     // Always prefer Zoho line item description over catalog item name
     const itemName = lineItem.description || lineItem.name || lineItem.item_name || 'Unknown Item'
     const qty = lineItem.quantity || 1
