@@ -663,28 +663,56 @@ export default function OrdersPage({
     low: 4,
   }), []);
 
-  // Memoize orders by status to prevent unnecessary sorting
+  // Item-level board: an order appears in every column where it still has
+  // quantities sitting in that stage, carrying only those items/quantities.
   const ordersByStatus = useMemo(() => {
     const sortOrders = (ordersToSort: Order[]) => {
       return [...ordersToSort].sort((a, b) => {
         const urgencyA = urgencyPriority[a.urgency || "normal"] || 3;
         const urgencyB = urgencyPriority[b.urgency || "normal"] || 3;
-        
+
         if (urgencyA !== urgencyB) {
           return urgencyA - urgencyB;
         }
-        
+
         const dateA = new Date(a.created_at || 0).getTime();
         const dateB = new Date(b.created_at || 0).getTime();
         return dateA - dateB;
       });
     };
 
+    const buckets: Record<string, Order[]> = {
+      ordered: [],
+      "in-progress": [],
+      "in-stock": [],
+      ready: [],
+    };
+
+    filteredOrders.forEach((order) => {
+      const items = order.items || [];
+
+      Object.entries(COLUMN_STAGE).forEach(([columnKey, stage]) => {
+        if (!(columnKey in buckets)) return;
+
+        const stageItems = items
+          .map((item) => ({ item, qty: bucketsFor(item)[stage] }))
+          .filter(({ qty }) => qty > 0)
+          .map(({ item, qty }) => ({ ...item, quantity: qty, totalQuantity: item.totalQuantity ?? item.quantity }));
+
+        // Orders without any item rows still show in their status column
+        const fallback = items.length === 0 && order.status === columnKey;
+
+        if (stageItems.length > 0 || fallback) {
+          buckets[columnKey].push({ ...order, items: stageItems, boardStage: stage });
+        }
+      });
+    });
+
     return {
-      ordered: sortOrders(filteredOrders.filter((o) => o.status === "ordered")),
-      "in-stock": sortOrders(filteredOrders.filter((o) => o.status === "in-stock")),
-      "in-progress": sortOrders(filteredOrders.filter((o) => o.status === "in-progress")),
-      ready: sortOrders(filteredOrders.filter((o) => o.status === "ready")),
+      ordered: sortOrders(buckets.ordered),
+      "in-progress": sortOrders(buckets["in-progress"]),
+      "in-stock": sortOrders(buckets["in-stock"]),
+      ready: sortOrders(buckets.ready),
     };
   }, [filteredOrders, urgencyPriority]);
 
