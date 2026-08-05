@@ -542,58 +542,66 @@ export default function OrdersPage({
     }
   }, [fetchOrders, toast]);
 
-  const handleMoveOrder = useCallback(async (order: Order, newStatus: string) => {
+  /**
+   * Moves the quantities shown on a board card (an order's items sitting in one
+   * stage) into the target stage. Items move independently of the order, so the
+   * same order can live in several columns at once.
+   */
+  const moveCardItems = useCallback(async (order: Order, fromStage: ItemStage, toStage: ItemStage) => {
+    if (fromStage === toStage) return;
+    const source = orders.find(o => o.id === order.id);
+    const items = (source?.items || []).filter(i => bucketsFor(i)[fromStage] > 0);
+    if (items.length === 0) return;
+
     try {
-      const updateData: any = {
-        status: newStatus,
-        updated_at: new Date().toISOString(),
-      };
+      await Promise.all(items.map(item => {
+        const qty = bucketsFor(item)[fromStage];
+        const next = countersAfterMove(item, fromStage, toStage, qty);
+        return supabase
+          .from("order_items")
+          .update({ ...next, updated_at: new Date().toISOString() })
+          .eq("id", item.id)
+          .throwOnError();
+      }));
 
-      // Set completed_date when marking as delivered
-      if (newStatus === "delivered") {
-        updateData.completed_date = new Date().toISOString();
-        celebrate();
-      }
-
-      const { error } = await supabase
-        .from("orders")
-        .update(updateData)
-        .eq("id", order.id);
-
-      if (error) throw error;
+      if (toStage === 'completed') celebrate();
 
       toast({
-        title: "Updated",
-        description: `Order ${order.order_number} moved to ${newStatus}`,
+        title: "Items moved",
+        description: `${items.length} item${items.length !== 1 ? "s" : ""} on ${order.order_number} moved to ${DEFAULT_STATUS_COLUMNS.find(c => COLUMN_STAGE[c.key] === toStage)?.label || toStage}`,
       });
       fetchOrders();
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to update order",
+        description: "Failed to move items",
         variant: "destructive",
       });
     }
-  }, [fetchOrders, toast, celebrate]);
+  }, [orders, fetchOrders, toast, celebrate]);
+
+  const handleMoveOrder = useCallback((order: Order, newStatus: string) => {
+    const toStage = COLUMN_STAGE[newStatus];
+    const fromStage = order.boardStage;
+    if (!toStage || !fromStage) return;
+    void moveCardItems(order, fromStage, toStage);
+  }, [moveCardItems]);
 
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     setActiveOrderId(null);
     const { active, over } = event;
     if (!over) return;
-    
-    const orderId = active.id as string;
-    const newStatus = over.id as string;
-    
+
+    const [orderId, fromStage] = String(active.id).split("::") as [string, ItemStage];
+    const toStage = COLUMN_STAGE[String(over.id)];
+
     const order = orders.find(o => o.id === orderId);
-    if (!order || order.status === newStatus) return;
-    
-    const validStatuses = ["ordered", "in-stock", "in-progress", "ready", "delivered"];
-    if (!validStatuses.includes(newStatus)) return;
-    
+    if (!order || !toStage || !fromStage || fromStage === toStage) return;
+
     // Play a satisfying drop/success sound
     playSuccess();
-    handleMoveOrder(order, newStatus);
-  }, [orders, handleMoveOrder]);
+    void moveCardItems(order, fromStage, toStage);
+  }, [orders, moveCardItems]);
 
   const handleDeleteOrder = useCallback(async (order: Order) => {
     try {
