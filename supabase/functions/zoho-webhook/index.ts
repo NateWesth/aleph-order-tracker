@@ -982,3 +982,72 @@ async function getValidAccessToken(supabase: any, clientId: string, clientSecret
 
   return tokenData.access_token
 }
+// ─── PURCHASE ORDER WEBHOOK (allocates ordered quantities) ─────────────────────
+
+async function handlePurchaseOrderWebhook(
+  supabase: any, purchaseOrderId: string,
+  clientId: string, clientSecret: string
+) {
+  console.log('Processing purchase order:', purchaseOrderId)
+  const accessToken = await getValidAccessToken(supabase, clientId, clientSecret)
+  const orgId = await getOrgId(supabase)
+
+  const resp = await fetch(
+    `${ZOHO_API_URL}/books/v3/purchaseorders/${purchaseOrderId}?organization_id=${orgId}`,
+    { headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` } }
+  )
+  const data = await resp.json()
+  if (data.code !== 0 || !data.purchaseorder) {
+    throw new Error(`Failed to fetch purchase order: ${data.message || 'Unknown error'}`)
+  }
+
+  const result = await allocatePurchaseOrder(supabase, data.purchaseorder)
+
+  await supabase.from('zoho_sync_log').insert({
+    sync_type: 'purchase_order_webhook',
+    status: 'completed',
+    items_synced: result.allocated,
+    completed_at: new Date().toISOString(),
+  })
+
+  console.log(`=== PO WEBHOOK COMPLETE: ${result.allocated} units allocated ===`)
+
+  return new Response(JSON.stringify({ success: true, ...result }), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+  })
+}
+
+// ─── VENDOR BILL WEBHOOK (marks quantities received) ───────────────────────────
+
+async function handleBillWebhook(
+  supabase: any, billId: string,
+  clientId: string, clientSecret: string
+) {
+  console.log('Processing vendor bill:', billId)
+  const accessToken = await getValidAccessToken(supabase, clientId, clientSecret)
+  const orgId = await getOrgId(supabase)
+
+  const resp = await fetch(
+    `${ZOHO_API_URL}/books/v3/bills/${billId}?organization_id=${orgId}`,
+    { headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` } }
+  )
+  const data = await resp.json()
+  if (data.code !== 0 || !data.bill) {
+    throw new Error(`Failed to fetch bill: ${data.message || 'Unknown error'}`)
+  }
+
+  const result = await applyBillReceipt(supabase, data.bill)
+
+  await supabase.from('zoho_sync_log').insert({
+    sync_type: 'bill_webhook',
+    status: 'completed',
+    items_synced: result.received,
+    completed_at: new Date().toISOString(),
+  })
+
+  console.log(`=== BILL WEBHOOK COMPLETE: ${result.received} units received ===`)
+
+  return new Response(JSON.stringify({ success: true, ...result }), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+  })
+}
