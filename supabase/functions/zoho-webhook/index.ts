@@ -77,6 +77,11 @@ Deno.serve(async (req) => {
       return await handleScanAllInvoices(supabase, clientId, clientSecret)
     }
 
+    // Full rebuild of item quantities from Zoho POs, bills and invoices
+    if (payload.action === 'reconcile_quantities') {
+      return await handleReconcileQuantities(supabase, clientId, clientSecret, Number(payload.since_days) || 90)
+    }
+
     // Detect event type - invoice, purchase order, vendor bill or sales order
     const invoiceId = payload.invoice_id || payload.data?.invoice_id || payload.invoice?.invoice_id
     const purchaseOrderId = payload.purchaseorder_id || payload.purchaseorder?.purchaseorder_id ||
