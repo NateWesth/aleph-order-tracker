@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { allocatePurchaseOrder, applyBillReceipt, applyInvoiceQuantities } from './quantity-flow.ts'
+import { allocatePurchaseOrder, applyBillReceipt, applyInvoiceQuantities, findOrderIdsForReferences } from './quantity-flow.ts'
 
 
 const corsHeaders = {
@@ -75,6 +75,11 @@ Deno.serve(async (req) => {
     // Support scanning ALL recent invoices to match orders
     if (payload.action === 'scan_all_invoices') {
       return await handleScanAllInvoices(supabase, clientId, clientSecret)
+    }
+
+    // Full rebuild of item quantities from Zoho POs, bills and invoices
+    if (payload.action === 'reconcile_quantities') {
+      return await handleReconcileQuantities(supabase, clientId, clientSecret, Number(payload.since_days) || 90)
     }
 
     // Detect event type - invoice, purchase order, vendor bill or sales order
@@ -1048,6 +1053,113 @@ async function handleBillWebhook(
   console.log(`=== BILL WEBHOOK COMPLETE: ${result.received} units received ===`)
 
   return new Response(JSON.stringify({ success: true, ...result }), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+  })
+}
+
+// ─── FULL QUANTITY RECONCILIATION (POs -> bills -> invoices) ───────────────────
+
+async function handleReconcileQuantities(
+  supabase: any, clientId: string, clientSecret: string, sinceDays = 90
+) {
+  console.log('=== RECONCILING ITEM QUANTITIES FROM ZOHO ===')
+
+  const accessToken = await getValidAccessToken(supabase, clientId, clientSecret)
+  const orgId = await getOrgId(supabase)
+  const since = new Date(Date.now() - sinceDays * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+
+  const authHeaders = { 'Authorization': `Zoho-oauthtoken ${accessToken}` }
+  const zohoGet = async (path: string) => {
+    const resp = await fetch(`${ZOHO_API_URL}/books/v3/${path}`, { headers: authHeaders })
+    const data = await resp.json()
+    if (data.code !== 0) throw new Error(data.message || `Zoho request failed: ${path}`)
+    return data
+  }
+
+  // 1. Reset counters for every active order so we recompute from scratch
+  const { data: activeOrders } = await supabase
+    .from('orders')
+    .select('id, order_number, reference')
+    .neq('status', 'completed')
+
+  const orderIds = (activeOrders || []).map((o: any) => o.id)
+  if (!orderIds.length) {
+    return new Response(JSON.stringify({ success: true, message: 'No active orders to reconcile' }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
+  }
+
+  await supabase.from('order_item_po_allocations').delete().in('order_id', orderIds)
+  await supabase
+    .from('order_items')
+    .update({ qty_on_po: 0, qty_received: 0, qty_invoiced: 0, qty_completed: 0, updated_at: new Date().toISOString() })
+    .in('order_id', orderIds)
+
+  // 2. Replay purchase orders (sets "In Progress")
+  let poAllocated = 0
+  let poCount = 0
+  const poIndex = new Map<string, string>() // purchaseorder_number -> id
+  const poList = await zohoGet(`purchaseorders?organization_id=${orgId}&date_after=${since}&per_page=200`)
+  for (const summary of poList.purchaseorders || []) {
+    if (String(summary.status || '').toLowerCase() === 'cancelled') continue
+    poIndex.set(String(summary.purchaseorder_number || ''), summary.purchaseorder_id)
+    const detail = await zohoGet(`purchaseorders/${summary.purchaseorder_id}?organization_id=${orgId}`)
+    if (!detail.purchaseorder) continue
+    const result = await allocatePurchaseOrder(supabase, detail.purchaseorder)
+    poAllocated += result.allocated || 0
+    poCount++
+  }
+
+  // 3. Replay vendor bills (moves "In Progress" -> "In Stock")
+  let billReceived = 0
+  let billCount = 0
+  const billList = await zohoGet(`bills?organization_id=${orgId}&date_after=${since}&per_page=200`)
+  for (const summary of billList.bills || []) {
+    if (String(summary.status || '').toLowerCase() === 'void') continue
+    const detail = await zohoGet(`bills/${summary.bill_id}?organization_id=${orgId}`)
+    if (!detail.bill) continue
+    await applyBillReceipt(supabase, detail.bill)
+    billCount++
+  }
+
+  // 4. Replay customer invoices (moves quantities -> "Ready for Delivery")
+  let invoiceUpdated = 0
+  let invoiceCount = 0
+  const invList = await zohoGet(`invoices?organization_id=${orgId}&date_after=${since}&per_page=200`)
+  for (const inv of invList.invoices || []) {
+    if (String(inv.status || '').toLowerCase() === 'void') continue
+    const refs = [inv.reference_number, inv.purchase_order, (inv as any).purchaseorder_number].filter(Boolean)
+    if (!refs.length) continue
+
+    const matchedIds = (await findOrderIdsForReferences(supabase, refs)).filter((id: string) => orderIds.includes(id))
+    if (!matchedIds.length) continue
+
+    const detail = await zohoGet(`invoices/${inv.invoice_id}?organization_id=${orgId}`)
+    const lineItems = detail.invoice?.line_items || []
+    const result = await applyInvoiceQuantities(supabase, matchedIds, lineItems)
+    invoiceUpdated += result.updated || 0
+    invoiceCount++
+  }
+
+  await supabase.from('zoho_sync_log').insert({
+    sync_type: 'reconcile_quantities',
+    status: 'completed',
+    items_synced: poAllocated + invoiceUpdated,
+    completed_at: new Date().toISOString(),
+  })
+
+  const summary = {
+    success: true,
+    orders_reset: orderIds.length,
+    purchase_orders_scanned: poCount,
+    units_on_po: poAllocated,
+    bills_scanned: billCount,
+    invoices_matched: invoiceCount,
+    units_invoiced: invoiceUpdated,
+  }
+  console.log('=== RECONCILE COMPLETE ===', JSON.stringify(summary))
+
+  return new Response(JSON.stringify(summary), {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' }
   })
 }
