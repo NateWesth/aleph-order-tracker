@@ -973,7 +973,9 @@ export default function BuyingSheetPage() {
               <div className="flex justify-between"><span className="text-muted-foreground">Reorder Point:</span><span className="font-medium">{row.reorderPoint}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Safety Stock:</span><span className="font-medium">{row.safetyStock > 0 ? `+${row.safetyStock} buffer` : "—"}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Recommended Qty:</span><span className="font-bold text-primary">{row.recommendedOrderQty}</span></div>
+              {row.unitCost !== null && <div className="flex justify-between"><span className="text-muted-foreground">Unit Cost:</span><span className="font-medium">R{row.unitCost.toFixed(2)} <span className="text-[10px] text-muted-foreground">({row.costSource === "bill" ? "vendor bill" : "estimated"})</span></span></div>}
               {row.estimatedCost !== null && <div className="flex justify-between"><span className="text-muted-foreground">Est. Cost:</span><span className="font-bold">R{row.estimatedCost.toLocaleString()}</span></div>}
+
               <div className="flex justify-between"><span className="text-muted-foreground">Coverage:</span><CoverageBar percent={row.coveragePercent} /></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Stockout Risk:</span><StockoutRiskBadge days={row.stockoutRiskDays} /></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Customers Affected:</span><span className="font-medium">{row.distinctCustomers}</span></div>
