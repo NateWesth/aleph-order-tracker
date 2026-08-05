@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { PullToRefresh } from "@/components/ui/PullToRefresh";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -145,6 +146,8 @@ export default function ProgressPage({
   };
 
   // Load orders when user data is available
+  useAutoRefresh(() => fetchProgressOrders(), 2 * 60 * 1000);
+
   useEffect(() => {
     if (user?.id && userRole && (userRole === 'admin' || userCompanyId !== null)) {
       console.log('Loading progress orders...');
