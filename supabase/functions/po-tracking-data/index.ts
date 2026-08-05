@@ -11,6 +11,9 @@ const ZOHO_API_URL = 'https://www.zohoapis.com'
 // Statuses we consider "still outstanding" (fully billed / cancelled / closed drop off)
 const EXCLUDED_PO_STATUSES = ['cancelled', 'closed', 'rejected']
 const MAX_PO_DETAILS = 250
+const DETAIL_CONCURRENCY = 12
+const CACHE_TTL_MS = 15 * 60 * 1000
+const CACHE_ID = '00000000-0000-0000-0000-000000000001'
 
 type POLine = {
   sku: string
@@ -82,16 +85,57 @@ Deno.serve(async (req) => {
       })
     }
 
-    const accessToken = await getValidAccessToken(supabase, clientId, clientSecret)
-    const orgId = await getOrgId(supabase)
+    let force = false
+    if (req.method === 'POST') {
+      try {
+        const body = await req.json()
+        force = body?.force === true
+      } catch (_e) { /* no body */ }
+    }
+
+    // Serve from cache when fresh — Zoho round trips are the slow part
+    if (!force) {
+      const { data: cached } = await supabase
+        .from('po_tracking_cache')
+        .select('payload, fetched_at')
+        .eq('id', CACHE_ID)
+        .maybeSingle()
+
+      if (cached?.payload && cached.fetched_at) {
+        const age = Date.now() - new Date(cached.fetched_at).getTime()
+        if (age < CACHE_TTL_MS) {
+          const purchaseOrders = cached.payload as POEntry[]
+          return new Response(JSON.stringify({
+            success: true,
+            purchaseOrders,
+            count: purchaseOrders.length,
+            fetchedAt: cached.fetched_at,
+            cached: true,
+          }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+        }
+      }
+    }
+
+    const [accessToken, orgId] = await Promise.all([
+      getValidAccessToken(supabase, clientId, clientSecret),
+      getOrgId(supabase),
+    ])
 
     const purchaseOrders = await fetchOutstandingPurchaseOrders(accessToken, orgId)
+    const fetchedAt = new Date().toISOString()
+
+    await supabase.from('po_tracking_cache').upsert({
+      id: CACHE_ID,
+      payload: purchaseOrders,
+      fetched_at: fetchedAt,
+    })
 
     return new Response(JSON.stringify({
       success: true,
       purchaseOrders,
       count: purchaseOrders.length,
-      fetchedAt: new Date().toISOString(),
+      fetchedAt,
+      cached: false,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
