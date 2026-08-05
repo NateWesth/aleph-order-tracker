@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { allocatePurchaseOrder, applyBillReceipt, applyInvoiceQuantities, findOrderIdsForReferences } from './quantity-flow.ts'
+import { allocatePurchaseOrder, applyBillReceipt, applyInvoiceQuantities } from './quantity-flow.ts'
 
 
 const corsHeaders = {
@@ -1057,26 +1057,27 @@ async function handleBillWebhook(
   })
 }
 
-// ─── FULL QUANTITY RECONCILIATION (POs -> bills -> invoices) ───────────────────
+// ─── FULL QUANTITY RECONCILIATION (POs -> receipts -> invoices) ────────────────
 
 async function handleReconcileQuantities(
-  supabase: any, clientId: string, clientSecret: string, sinceDays = 90
+  supabase: any, clientId: string, clientSecret: string, sinceDays = 120
 ) {
   console.log('=== RECONCILING ITEM QUANTITIES FROM ZOHO ===')
 
   const accessToken = await getValidAccessToken(supabase, clientId, clientSecret)
   const orgId = await getOrgId(supabase)
   const since = new Date(Date.now() - sinceDays * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-
   const authHeaders = { 'Authorization': `Zoho-oauthtoken ${accessToken}` }
+
   const zohoGet = async (path: string) => {
     const resp = await fetch(`${ZOHO_API_URL}/books/v3/${path}`, { headers: authHeaders })
     const data = await resp.json()
     if (data.code !== 0) throw new Error(data.message || `Zoho request failed: ${path}`)
     return data
   }
+  const key = (v: unknown) => String(v ?? '').trim().toLowerCase()
 
-  // 1. Reset counters for every active order so we recompute from scratch
+  // 1. Active orders + every reference that can point at them
   const { data: activeOrders } = await supabase
     .from('orders')
     .select('id, order_number, reference')
@@ -1089,49 +1090,78 @@ async function handleReconcileQuantities(
     })
   }
 
+  const refToOrders = new Map<string, string[]>()
+  const addRef = (ref: unknown, id: string) => {
+    const k = key(ref)
+    if (!k) return
+    refToOrders.set(k, [...new Set([...(refToOrders.get(k) || []), id])])
+  }
+  for (const o of activeOrders || []) {
+    addRef(o.order_number, o.id)
+    addRef(o.reference, o.id)
+  }
+
+  // App-linked supplier PO numbers also point at an order
+  const { data: linkedPos } = await supabase
+    .from('order_purchase_orders')
+    .select('order_id, purchase_order_number')
+    .in('order_id', orderIds)
+  for (const l of linkedPos || []) addRef(l.purchase_order_number, l.order_id)
+
+  const matchRefs = (refs: unknown[]) => {
+    const ids = new Set<string>()
+    for (const r of refs) (refToOrders.get(key(r)) || []).forEach(id => ids.add(id))
+    return [...ids]
+  }
+
+  // 2. Reset counters so everything is rebuilt from Zoho
   await supabase.from('order_item_po_allocations').delete().in('order_id', orderIds)
   await supabase
     .from('order_items')
     .update({ qty_on_po: 0, qty_received: 0, qty_invoiced: 0, qty_completed: 0, updated_at: new Date().toISOString() })
     .in('order_id', orderIds)
 
-  // 2. Replay purchase orders (sets "In Progress")
+  // 3. Purchase orders -> "In Progress", plus billed/received qty -> "In Stock"
   let poAllocated = 0
   let poCount = 0
-  const poIndex = new Map<string, string>() // purchaseorder_number -> id
+  let receivedUnits = 0
   const poList = await zohoGet(`purchaseorders?organization_id=${orgId}&date_after=${since}&per_page=200`)
   for (const summary of poList.purchaseorders || []) {
     if (String(summary.status || '').toLowerCase() === 'cancelled') continue
-    poIndex.set(String(summary.purchaseorder_number || ''), summary.purchaseorder_id)
+    if (!matchRefs([summary.reference_number, summary.purchaseorder_number]).length) continue
+
     const detail = await zohoGet(`purchaseorders/${summary.purchaseorder_id}?organization_id=${orgId}`)
-    if (!detail.purchaseorder) continue
-    const result = await allocatePurchaseOrder(supabase, detail.purchaseorder)
+    const po = detail.purchaseorder
+    if (!po) continue
+
+    const result = await allocatePurchaseOrder(supabase, po)
     poAllocated += result.allocated || 0
     poCount++
+
+    // Anything already billed/received on the PO means the stock landed
+    const receivedLines = (po.line_items || [])
+      .map((l: any) => ({
+        sku: l.sku || l.item_code,
+        quantity: Math.max(Number(l.quantity_received || 0), Number(l.quantity_billed || 0)),
+      }))
+      .filter((l: any) => l.quantity > 0)
+
+    if (receivedLines.length) {
+      const r = await applyBillReceipt(supabase, {
+        purchaseorder_id: String(po.purchaseorder_id),
+        line_items: receivedLines,
+      })
+      receivedUnits += r.received || 0
+    }
   }
 
-  // 3. Replay vendor bills (moves "In Progress" -> "In Stock")
-  let billReceived = 0
-  let billCount = 0
-  const billList = await zohoGet(`bills?organization_id=${orgId}&date_after=${since}&per_page=200`)
-  for (const summary of billList.bills || []) {
-    if (String(summary.status || '').toLowerCase() === 'void') continue
-    const detail = await zohoGet(`bills/${summary.bill_id}?organization_id=${orgId}`)
-    if (!detail.bill) continue
-    await applyBillReceipt(supabase, detail.bill)
-    billCount++
-  }
-
-  // 4. Replay customer invoices (moves quantities -> "Ready for Delivery")
+  // 4. Customer invoices -> "Ready for Delivery"
   let invoiceUpdated = 0
   let invoiceCount = 0
   const invList = await zohoGet(`invoices?organization_id=${orgId}&date_after=${since}&per_page=200`)
   for (const inv of invList.invoices || []) {
     if (String(inv.status || '').toLowerCase() === 'void') continue
-    const refs = [inv.reference_number, inv.purchase_order, (inv as any).purchaseorder_number].filter(Boolean)
-    if (!refs.length) continue
-
-    const matchedIds = (await findOrderIdsForReferences(supabase, refs)).filter((id: string) => orderIds.includes(id))
+    const matchedIds = matchRefs([inv.reference_number, inv.purchase_order, (inv as any).purchaseorder_number])
     if (!matchedIds.length) continue
 
     const detail = await zohoGet(`invoices/${inv.invoice_id}?organization_id=${orgId}`)
@@ -1151,9 +1181,9 @@ async function handleReconcileQuantities(
   const summary = {
     success: true,
     orders_reset: orderIds.length,
-    purchase_orders_scanned: poCount,
+    purchase_orders_matched: poCount,
     units_on_po: poAllocated,
-    bills_scanned: billCount,
+    units_received: receivedUnits,
     invoices_matched: invoiceCount,
     units_invoiced: invoiceUpdated,
   }
