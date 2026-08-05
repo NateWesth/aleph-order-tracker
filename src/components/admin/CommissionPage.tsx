@@ -22,6 +22,7 @@ import { UnresolvedCostsPanel, saveCost as saveOverrideCost } from "./Unresolved
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import CommissionRepManagementDialog from "./CommissionRepManagementDialog";
 import { useAuth } from "@/contexts/AuthContext";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 
 
 type CommissionMethod = "margin_scaled" | "half_markup_below_25";
