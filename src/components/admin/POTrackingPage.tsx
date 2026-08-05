@@ -143,7 +143,9 @@ export default function POTrackingPage() {
     isRefresh ? setRefreshing(true) : setLoading(true);
     try {
       const [{ data, error }] = await Promise.all([
-        supabase.functions.invoke("po-tracking-data"),
+        supabase.functions.invoke("po-tracking-data", {
+          body: { force: isRefresh },
+        }),
         fetchLinkedOrders(),
       ]);
 
