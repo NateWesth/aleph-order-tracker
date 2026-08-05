@@ -74,7 +74,7 @@ export default function BuyingSheetPage() {
   const [pinnedSkus, setPinnedSkus] = useState<string[]>(loadPinned);
   const [viewDensity, setViewDensity] = useState<ViewDensity>(loadDensity);
   const [recentlyOrdered, setRecentlyOrdered] = useState<RecentlyOrderedItem[]>(loadRecentlyOrdered);
-  const [autoRefreshInterval, setAutoRefreshInterval] = useState<number>(10);
+  const [autoRefreshInterval, setAutoRefreshInterval] = useState<number>(5);
   const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(null);
   const [autoRefreshCountdown, setAutoRefreshCountdown] = useState(0);
   const [showRecentlyOrdered, setShowRecentlyOrdered] = useState(false);
