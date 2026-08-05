@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import sidebarBg from "@/assets/sidebar-bg.jpg";
+
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
@@ -46,7 +46,7 @@ const DEFAULT_CONFIG = { icon: Activity, color: "text-muted-foreground", bg: "bg
 export default function ActivityFeedSidebar() {
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
   const [newCount, setNewCount] = useState(0);
   const lastFetchRef = useRef<string | null>(null);
 
@@ -160,12 +160,8 @@ export default function ActivityFeedSidebar() {
         collapsed ? "w-12" : "w-72 xl:w-80"
       )}
     >
-      {/* Background image + frosted overlay */}
-      <div className="absolute inset-0 pointer-events-none">
-        <img src={sidebarBg} alt="" className="absolute inset-0 w-full h-full object-cover opacity-20 dark:opacity-15" />
-        <div className="absolute inset-0 bg-card/60 dark:bg-card/70 backdrop-blur-xl" />
-        <div className="absolute inset-0 bg-gradient-to-b from-primary/[0.03] via-transparent to-primary/[0.02]" />
-      </div>
+      {/* Background matches app background in every theme */}
+      <div className="absolute inset-0 pointer-events-none bg-background" />
 
       {/* Glow border accent (dark mode) */}
       <div className="absolute top-0 left-0 bottom-0 w-px pointer-events-none bg-gradient-to-b from-primary/30 via-primary/10 to-transparent dark:from-primary/40 dark:via-primary/15 dark:to-transparent" />
