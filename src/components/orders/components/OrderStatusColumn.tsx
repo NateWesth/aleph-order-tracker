@@ -385,8 +385,8 @@ function OrderStatusColumn({
 
             {/* Actions */}
             <div className="flex items-center gap-1.5 sm:gap-2 pt-1">
-              {config.key === "in-stock" && (
-                <Button size="sm" variant="outline" className="h-7 sm:h-8 text-[10px] sm:text-xs font-medium rounded-lg px-2 sm:px-3" onClick={() => onMoveOrder(order, "ordered")}>
+              {config.prevStatus && (
+                <Button size="sm" variant="outline" className="h-7 sm:h-8 text-[10px] sm:text-xs font-medium rounded-lg px-2 sm:px-3" onClick={() => onMoveOrder(order, config.prevStatus!)}>
                   <Undo2 className="h-3 w-3 sm:h-3.5 sm:w-3.5 mr-1" />
                   Back
                 </Button>
