@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { allocatePurchaseOrder, applyBillReceipt, applyInvoiceQuantities } from './quantity-flow.ts'
+import { allocatePurchaseOrder, applyBillReceipt, applyInvoiceQuantities, findOrderIdsForReferences } from './quantity-flow.ts'
 
 
 const corsHeaders = {
