@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import sidebarBg from "@/assets/sidebar-bg.jpg";
+
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
