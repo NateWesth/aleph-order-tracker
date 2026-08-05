@@ -393,11 +393,15 @@ async function handleInvoiceWebhook(
     qty: li.quantity
   })))
 
-  if (invoiceSkus.length === 0) {
-    console.log('No SKUs found on invoice line items - cannot match items')
+  const matchableInvoiceLines = invoiceLineItems.filter((li: any) =>
+    String(li.sku || li.item_code || li.name || li.item_name || li.description || '').trim()
+  )
+
+  if (matchableInvoiceLines.length === 0) {
+    console.log('No matchable SKU or name found on invoice line items')
     return new Response(JSON.stringify({ 
       received: true, 
-      warning: 'Invoice has no line items with SKUs',
+      warning: 'Invoice has no line items with a SKU or item name',
       orders_matched: matchedOrders.map((o: any) => o.order_number),
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -574,11 +578,10 @@ async function handleScanAllInvoices(
     )
     const invDetailData = await invDetailResp.json()
     const invoiceLineItems = invDetailData?.invoice?.line_items || []
-    const invoiceSkus = invoiceLineItems
-      .map((li: any) => (li.sku || li.item_code || '').toLowerCase())
-      .filter(Boolean)
-
-    if (invoiceSkus.length === 0) continue
+    const hasMatchableLine = invoiceLineItems.some((li: any) =>
+      String(li.sku || li.item_code || li.name || li.item_name || li.description || '').trim()
+    )
+    if (!hasMatchableLine) continue
 
     const { updated } = await applyInvoiceQuantities(supabase, orders.map((o: any) => o.id), invoiceLineItems)
     totalItemsUpdated += updated

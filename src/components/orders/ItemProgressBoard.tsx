@@ -378,6 +378,26 @@ export default function ItemProgressBoard({ isAdmin }: ItemProgressBoardProps) {
     }
   }, [user?.id, userRole, userCompanyId]);
 
+  // Reconciliation can update many rows before a realtime channel reconnects.
+  // Refresh on focus/visibility and periodically so the board never keeps stale
+  // stage quantities after a Zoho sync has completed.
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') void fetchOrdersWithItems();
+    };
+    const interval = window.setInterval(refreshWhenVisible, 60_000);
+
+    window.addEventListener('focus', refreshWhenVisible);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('focus', refreshWhenVisible);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+    };
+  }, [user?.id, userRole, userCompanyId]);
+
   // Set up realtime subscription
   useOptimizedRealtime({
     table: 'order_items',
