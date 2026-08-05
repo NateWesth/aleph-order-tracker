@@ -426,7 +426,7 @@ function OrderStatusColumn({
 
     return isMobile ? (
       <SwipeableCard
-        key={order.id}
+        key={`${order.id}-${config.key}`}
         onSwipeLeft={() => onDeleteOrder(order)}
         onSwipeRight={config.nextStatus ? () => onMoveOrder(order, config.nextStatus!) : undefined}
         leftLabel="Delete"
@@ -436,7 +436,7 @@ function OrderStatusColumn({
         {cardContent}
       </SwipeableCard>
     ) : (
-      <DraggableCard key={order.id} id={order.id}>
+      <DraggableCard key={`${order.id}-${config.key}`} id={`${order.id}::${order.boardStage || config.key}`}>
         {cardContent}
       </DraggableCard>
     );
