@@ -209,7 +209,9 @@ async function fetchRelevantItemStock(accessToken: string, orgId: string, active
         stockOnHand: item.stock_on_hand ?? item.available_stock ?? 0,
         itemName: item.name || item.description || '',
         vendorName: item.vendor_name || item.manufacturer || '',
+        purchaseRate: Number(item.purchase_rate ?? 0) || 0,
       })
+
 
       remainingSkus.delete(sku)
     }
