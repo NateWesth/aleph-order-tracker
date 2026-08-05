@@ -276,17 +276,18 @@ export default function POTrackingPage() {
             <Package className="h-4 w-4" />
             {totalOutstandingUnits} units · {money(totalOutstandingValue)}
           </span>
-          <Button size="sm" variant="outline" onClick={() => fetchData(true)} disabled={refreshing}>
-            {refreshing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-            <span className="ml-2 hidden sm:inline">Refresh</span>
-          </Button>
+          {refreshing && (
+            <span className="flex items-center gap-1">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Updating
+            </span>
+          )}
         </div>
       </div>
 
       {fetchedAt && (
         <p className="text-xs text-muted-foreground">
           {isCached ? "Cached" : "Live from Zoho"} · updated {format(new Date(fetchedAt), "dd MMM yyyy HH:mm")}
-          {isCached ? " · press Refresh to pull the latest from Zoho" : " · POs disappear once a vendor bill is raised"}
+          {" · auto-updates every 10 minutes · POs disappear once a vendor bill is raised"}
         </p>
       )}
 
