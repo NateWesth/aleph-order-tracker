@@ -4,7 +4,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
   Collapsible,
   CollapsibleContent,
@@ -18,15 +18,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { 
-  ChevronDown, 
-  ChevronRight, 
-  Search, 
-  Truck, 
+import {
+  ChevronDown,
+  ChevronRight,
+  Search,
+  Truck,
   Package,
   FileText,
-  Building2,
-  Loader2
+  Loader2,
+  RefreshCw,
+  Mail,
 } from "lucide-react";
 import { format } from "date-fns";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -34,51 +35,58 @@ import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import { OrderWithCompany } from "@/components/orders/types/orderTypes";
 import OrderDetailsDialog from "@/components/orders/components/OrderDetailsDialog";
 
-interface Supplier {
-  id: string;
+interface POLine {
+  sku: string;
   name: string;
-  code: string;
-  contact_person: string | null;
-  phone: string | null;
-  email: string | null;
+  description: string;
+  quantity: number;
+  quantityReceived: number;
+  quantityBilled: number;
+  outstanding: number;
+  rate: number;
 }
 
-interface OrderPurchaseOrder {
-  id: string;
-  order_id: string;
-  supplier_id: string;
-  purchase_order_number: string;
-  notes: string | null;
+interface ZohoPO {
+  purchaseOrderId: string;
+  purchaseOrderNumber: string;
+  vendorId: string;
+  vendorName: string;
+  vendorEmail: string;
+  date: string;
+  expectedDeliveryDate: string | null;
+  status: string;
+  receivedStatus: string;
+  billedStatus: string;
+  total: number;
+  outstandingValue: number;
+  lines: POLine[];
 }
 
-interface OrderWithPO {
-  id: string;
-  order_number: string;
-  purchase_order_numbers: string[];
+interface LinkedOrderRef {
+  orderId: string;
+  orderNumber: string;
+  companyName: string;
   status: string | null;
   urgency: string | null;
-  created_at: string;
-  company_id: string | null;
-  supplier_id: string | null;
-  companyName: string;
-  supplierName?: string | null;
+  createdAt: string;
   description: string | null;
+  companyId: string | null;
 }
 
-interface SupplierGroup {
-  supplier: Supplier;
-  orders: OrderWithPO[];
-  isOpen: boolean;
-}
+const money = (n: number) =>
+  `R${n.toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export default function POTrackingPage() {
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [orders, setOrders] = useState<OrderWithPO[]>([]);
+  const [pos, setPos] = useState<ZohoPO[]>([]);
+  const [linkedOrders, setLinkedOrders] = useState<Record<string, LinkedOrderRef[]>>({});
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [openSuppliers, setOpenSuppliers] = useState<Set<string>>(new Set());
+  const [openVendors, setOpenVendors] = useState<Set<string>>(new Set());
+  const [openPOs, setOpenPOs] = useState<Set<string>>(new Set());
   const [selectedOrder, setSelectedOrder] = useState<OrderWithCompany | null>(null);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
+  const [fetchedAt, setFetchedAt] = useState<string | null>(null);
   const { toast } = useToast();
   const isMobile = useIsMobile();
 
@@ -86,213 +94,157 @@ export default function POTrackingPage() {
     fetchData();
   }, []);
 
-  const fetchData = async () => {
-    setLoading(true);
+  const fetchLinkedOrders = async () => {
+    const { data: links } = await supabase
+      .from("order_purchase_orders")
+      .select("order_id, purchase_order_number");
+
+    if (!links?.length) {
+      setLinkedOrders({});
+      return;
+    }
+
+    const orderIds = [...new Set(links.map((l) => l.order_id))];
+    const { data: ordersData } = await supabase
+      .from("orders")
+      .select("id, order_number, status, urgency, created_at, company_id, description")
+      .in("id", orderIds);
+
+    const companyIds = [...new Set((ordersData || []).map((o) => o.company_id).filter(Boolean))] as string[];
+    let companyMap = new Map<string, string>();
+    if (companyIds.length) {
+      const { data: companies } = await supabase.from("companies").select("id, name").in("id", companyIds);
+      companyMap = new Map((companies || []).map((c) => [c.id, c.name]));
+    }
+
+    const map: Record<string, LinkedOrderRef[]> = {};
+    links.forEach((link) => {
+      const order = ordersData?.find((o) => o.id === link.order_id);
+      if (!order) return;
+      const key = (link.purchase_order_number || "").trim().toUpperCase();
+      if (!key) return;
+      if (!map[key]) map[key] = [];
+      if (map[key].some((o) => o.orderId === order.id)) return;
+      map[key].push({
+        orderId: order.id,
+        orderNumber: order.order_number,
+        companyName: order.company_id ? companyMap.get(order.company_id) || "Unknown" : "No Client",
+        status: order.status,
+        urgency: order.urgency,
+        createdAt: order.created_at,
+        description: order.description,
+        companyId: order.company_id,
+      });
+    });
+    setLinkedOrders(map);
+  };
+
+  const fetchData = async (isRefresh = false) => {
+    isRefresh ? setRefreshing(true) : setLoading(true);
     try {
-      // Fetch all suppliers
-      const { data: suppliersData, error: suppliersError } = await supabase
-        .from("suppliers")
-        .select("*")
-        .order("name");
+      const [{ data, error }] = await Promise.all([
+        supabase.functions.invoke("po-tracking-data"),
+        fetchLinkedOrders(),
+      ]);
 
-      if (suppliersError) throw suppliersError;
-      setSuppliers(suppliersData || []);
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
 
-      // Fetch all order-PO relationships from the junction table
-      const { data: orderPOsData, error: orderPOsError } = await supabase
-        .from("order_purchase_orders")
-        .select("id, order_id, supplier_id, purchase_order_number, notes");
-
-      if (orderPOsError) throw orderPOsError;
-
-      // Get unique order IDs that have PO relationships
-      const orderIds = [...new Set(orderPOsData?.map(po => po.order_id) || [])];
-
-      if (orderIds.length === 0) {
-        setOrders([]);
-        setLoading(false);
-        return;
-      }
-
-      // Fetch orders that have PO relationships
-      const { data: ordersData, error: ordersError } = await supabase
-        .from("orders")
-        .select("id, order_number, status, urgency, created_at, company_id, description")
-        .in("id", orderIds)
-        .order("created_at", { ascending: false });
-
-      if (ordersError) throw ordersError;
-
-      // Fetch company names for all orders
-      const companyIds = [...new Set(ordersData?.map(o => o.company_id).filter(Boolean))];
-      let companyMap = new Map<string, string>();
-
-      if (companyIds.length > 0) {
-        const { data: companiesData } = await supabase
-          .from("companies")
-          .select("id, name")
-          .in("id", companyIds);
-        companyMap = new Map(companiesData?.map(c => [c.id, c.name]) || []);
-      }
-
-      // Group POs by supplier and order
-      const posBySupplierAndOrder = new Map<string, Map<string, OrderPurchaseOrder[]>>();
-      orderPOsData?.forEach(po => {
-        if (!posBySupplierAndOrder.has(po.supplier_id)) {
-          posBySupplierAndOrder.set(po.supplier_id, new Map());
-        }
-        const supplierPOs = posBySupplierAndOrder.get(po.supplier_id)!;
-        if (!supplierPOs.has(po.order_id)) {
-          supplierPOs.set(po.order_id, []);
-        }
-        supplierPOs.get(po.order_id)!.push(po);
-      });
-
-      // Build orders grouped by supplier
-      const ordersWithPOs: OrderWithPO[] = [];
-      
-      posBySupplierAndOrder.forEach((orderMap, supplierId) => {
-        orderMap.forEach((pos, orderId) => {
-          const order = ordersData?.find(o => o.id === orderId);
-          if (order) {
-            ordersWithPOs.push({
-              ...order,
-              supplier_id: supplierId,
-              purchase_order_numbers: pos.map(p => p.purchase_order_number),
-              companyName: order.company_id ? companyMap.get(order.company_id) || "Unknown" : "No Client"
-            });
-          }
-        });
-      });
-
-      setOrders(ordersWithPOs);
-
-      // Auto-open suppliers that have orders
-      const suppliersWithOrders = new Set(ordersWithPOs.map(o => o.supplier_id).filter(Boolean));
-      setOpenSuppliers(suppliersWithOrders as Set<string>);
-
+      const purchaseOrders: ZohoPO[] = data?.purchaseOrders || [];
+      setPos(purchaseOrders);
+      setFetchedAt(data?.fetchedAt || null);
+      setOpenVendors(new Set(purchaseOrders.map((p) => p.vendorName)));
     } catch (error: any) {
       console.error("Error fetching PO tracking data:", error);
       toast({
         title: "Error",
-        description: "Failed to load PO tracking data",
+        description: error?.message || "Failed to load purchase orders from Zoho",
         variant: "destructive",
       });
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
-  const getStatusColor = (status: string | null) => {
-    switch (status?.toLowerCase()) {
-      case "delivered":
-      case "completed":
-        return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300";
-      case "in-progress":
-        return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300";
-      case "ready":
-        return "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300";
-      case "in-stock":
-        return "bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-300";
-      case "ordered":
-        return "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-300";
-      default:
-        return "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300";
-    }
-  };
+  const vendorGroups = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
 
-  const getUrgencyColor = (urgency: string | null) => {
-    switch (urgency?.toLowerCase()) {
-      case "urgent":
-        return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300";
-      case "high":
-        return "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300";
-      case "low":
-        return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300";
-      default:
-        return "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300";
-    }
-  };
-
-  // Filter and group orders by supplier
-  const supplierGroups = useMemo(() => {
-    // Filter orders based on search term
-    const filteredOrders = orders.filter(order => {
-      const searchLower = searchTerm.toLowerCase();
+    const matches = (po: ZohoPO) => {
+      if (!term) return true;
       return (
-        order.order_number.toLowerCase().includes(searchLower) ||
-        order.purchase_order_numbers?.some(po => po.toLowerCase().includes(searchLower)) ||
-        order.companyName.toLowerCase().includes(searchLower)
+        po.purchaseOrderNumber.toLowerCase().includes(term) ||
+        po.vendorName.toLowerCase().includes(term) ||
+        po.lines.some(
+          (l) =>
+            l.sku.toLowerCase().includes(term) ||
+            l.name.toLowerCase().includes(term) ||
+            l.description.toLowerCase().includes(term)
+        ) ||
+        (linkedOrders[po.purchaseOrderNumber.trim().toUpperCase()] || []).some((o) =>
+          o.orderNumber.toLowerCase().includes(term) || o.companyName.toLowerCase().includes(term)
+        )
       );
+    };
+
+    const grouped = new Map<string, ZohoPO[]>();
+    pos.filter(matches).forEach((po) => {
+      const key = po.vendorName || "Unknown supplier";
+      grouped.set(key, [...(grouped.get(key) || []), po]);
     });
 
-    // Group orders by supplier
-    const ordersBySupplier = new Map<string, OrderWithPO[]>();
-    filteredOrders.forEach(order => {
-      const supplierId = (order as any).supplier_id;
-      if (supplierId) {
-        const existing = ordersBySupplier.get(supplierId) || [];
-        existing.push(order);
-        ordersBySupplier.set(supplierId, existing);
-      }
-    });
+    return [...grouped.entries()]
+      .map(([vendorName, vendorPOs]) => ({
+        vendorName,
+        vendorEmail: vendorPOs.find((p) => p.vendorEmail)?.vendorEmail || "",
+        pos: vendorPOs.sort((a, b) => (b.date || "").localeCompare(a.date || "")),
+        outstandingUnits: vendorPOs.reduce(
+          (sum, p) => sum + p.lines.reduce((s, l) => s + l.outstanding, 0),
+          0
+        ),
+        outstandingValue: vendorPOs.reduce((sum, p) => sum + p.outstandingValue, 0),
+      }))
+      .sort((a, b) => b.outstandingValue - a.outstandingValue);
+  }, [pos, searchTerm, linkedOrders]);
 
-    // Filter suppliers that match search or have matching orders
-    const filteredSuppliers = suppliers.filter(supplier => {
-      const searchLower = searchTerm.toLowerCase();
-      const hasMatchingOrders = ordersBySupplier.has(supplier.id);
-      const supplierMatches = 
-        supplier.name.toLowerCase().includes(searchLower) ||
-        supplier.code.toLowerCase().includes(searchLower);
-      
-      return hasMatchingOrders || (searchTerm === "" || supplierMatches);
-    });
-
-    return filteredSuppliers.map(supplier => ({
-      supplier,
-      orders: ordersBySupplier.get(supplier.id) || [],
-      isOpen: openSuppliers.has(supplier.id)
-    }));
-  }, [suppliers, orders, searchTerm, openSuppliers]);
-
-  const toggleSupplier = (supplierId: string) => {
-    setOpenSuppliers(prev => {
-      const next = new Set(prev);
-      if (next.has(supplierId)) {
-        next.delete(supplierId);
-      } else {
-        next.add(supplierId);
-      }
-      return next;
-    });
+  const toggle = (set: Set<string>, key: string, setter: (s: Set<string>) => void) => {
+    const next = new Set(set);
+    next.has(key) ? next.delete(key) : next.add(key);
+    setter(next);
   };
 
-  const handleOrderClick = (order: OrderWithPO, supplierName: string) => {
-    // Convert OrderWithPO to OrderWithCompany for the dialog
-    const orderForDialog: OrderWithCompany = {
-      id: order.id,
-      order_number: order.order_number,
-      description: order.description,
-      status: order.status,
-      urgency: order.urgency,
-      company_id: order.company_id,
-      created_at: order.created_at,
-      companyName: order.companyName,
-      supplier_id: order.supplier_id,
-      purchase_order_number: order.purchase_order_numbers?.[0] || null,
-      supplierName: supplierName
-    };
-    setSelectedOrder(orderForDialog);
+  const openOrder = (ref: LinkedOrderRef) => {
+    setSelectedOrder({
+      id: ref.orderId,
+      order_number: ref.orderNumber,
+      description: ref.description,
+      status: ref.status,
+      urgency: ref.urgency,
+      company_id: ref.companyId,
+      created_at: ref.createdAt,
+      companyName: ref.companyName,
+      supplier_id: null,
+      purchase_order_number: null,
+      supplierName: null,
+    } as OrderWithCompany);
     setDetailsDialogOpen(true);
   };
 
-  // Calculate totals
-  const totalLinkedOrders = orders.length;
-  const suppliersWithOrders = new Set(orders.map(o => (o as any).supplier_id)).size;
+  const receiveBadge = (po: ZohoPO) => {
+    const received = po.lines.reduce((s, l) => s + l.quantityReceived, 0);
+    const ordered = po.lines.reduce((s, l) => s + l.quantity, 0);
+    if (received <= 0) return <Badge variant="outline">Awaiting stock</Badge>;
+    if (received < ordered) return <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-300">Partially received</Badge>;
+    return <Badge className="bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-300">Received, unbilled</Badge>;
+  };
 
-  if (loading) {
-    return <PageSkeleton variant="table" />;
-  }
+  const totalOutstandingUnits = pos.reduce(
+    (sum, p) => sum + p.lines.reduce((s, l) => s + l.outstanding, 0),
+    0
+  );
+  const totalOutstandingValue = pos.reduce((sum, p) => sum + p.outstandingValue, 0);
+
+  if (loading) return <PageSkeleton variant="table" />;
 
   return (
     <div className="space-y-4">
@@ -300,183 +252,189 @@ export default function POTrackingPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <FileText className="h-5 w-5 text-primary" />
-          <h2 className="text-lg font-semibold">PO Tracking</h2>
+          <h2 className="text-lg font-semibold">Outstanding Purchase Orders</h2>
         </div>
         <div className="flex items-center gap-3 text-sm text-muted-foreground">
           <span className="flex items-center gap-1">
             <Truck className="h-4 w-4" />
-            {suppliersWithOrders} suppliers
+            {vendorGroups.length} suppliers
+          </span>
+          <span className="flex items-center gap-1">
+            <FileText className="h-4 w-4" />
+            {pos.length} POs
           </span>
           <span className="flex items-center gap-1">
             <Package className="h-4 w-4" />
-            {totalLinkedOrders} linked orders
+            {totalOutstandingUnits} units · {money(totalOutstandingValue)}
           </span>
+          <Button size="sm" variant="outline" onClick={() => fetchData(true)} disabled={refreshing}>
+            {refreshing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+            <span className="ml-2 hidden sm:inline">Refresh</span>
+          </Button>
         </div>
       </div>
+
+      {fetchedAt && (
+        <p className="text-xs text-muted-foreground">
+          Live from Zoho · updated {format(new Date(fetchedAt), "dd MMM yyyy HH:mm")} · POs disappear once a vendor bill is raised
+        </p>
+      )}
 
       {/* Search */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Search by supplier, order number, PO number, or client..."
+          placeholder="Search by supplier, PO number, SKU, item, or linked order..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="pl-9"
         />
       </div>
 
-      {/* Supplier Groups */}
-      {supplierGroups.length === 0 ? (
+      {vendorGroups.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center">
             <Truck className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
-            <p className="text-lg font-medium text-muted-foreground">No purchase orders found</p>
+            <p className="text-lg font-medium text-muted-foreground">No outstanding purchase orders</p>
             <p className="text-sm text-muted-foreground mt-1">
-              Link orders to suppliers when creating or editing orders
+              Every Zoho purchase order has been fully billed
             </p>
           </CardContent>
         </Card>
       ) : (
         <div className="space-y-3">
-          {supplierGroups.map(group => (
-            <Card key={group.supplier.id} className="overflow-hidden">
+          {vendorGroups.map((group) => (
+            <Card key={group.vendorName} className="overflow-hidden">
               <Collapsible
-                open={group.isOpen}
-                onOpenChange={() => toggleSupplier(group.supplier.id)}
+                open={openVendors.has(group.vendorName)}
+                onOpenChange={() => toggle(openVendors, group.vendorName, setOpenVendors)}
               >
                 <CollapsibleTrigger className="w-full">
                   <CardHeader className="py-3 px-4 hover:bg-muted/50 transition-colors cursor-pointer">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        {group.isOpen ? (
-                          <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        {openVendors.has(group.vendorName) ? (
+                          <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
                         ) : (
-                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                          <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
                         )}
-                        <div className="flex items-center gap-2">
-                          <Truck className="h-4 w-4 text-primary" />
-                          <span className="font-semibold">{group.supplier.name}</span>
-                          <Badge variant="outline" className="font-mono text-xs">
-                            {group.supplier.code}
-                          </Badge>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        {group.supplier.contact_person && (
-                          <span className="text-sm text-muted-foreground hidden sm:block">
-                            {group.supplier.contact_person}
+                        <Truck className="h-4 w-4 text-primary shrink-0" />
+                        <span className="font-semibold truncate">{group.vendorName}</span>
+                        {group.vendorEmail && !isMobile && (
+                          <span className="text-xs text-muted-foreground flex items-center gap-1 truncate">
+                            <Mail className="h-3 w-3" />
+                            {group.vendorEmail}
                           </span>
                         )}
-                        <Badge variant="secondary">
-                          {group.orders.length} order{group.orders.length !== 1 ? 's' : ''}
-                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Badge variant="secondary">{group.pos.length} PO{group.pos.length !== 1 ? "s" : ""}</Badge>
+                        <Badge variant="outline">{group.outstandingUnits} units</Badge>
+                        {!isMobile && <Badge variant="outline">{money(group.outstandingValue)}</Badge>}
                       </div>
                     </div>
                   </CardHeader>
                 </CollapsibleTrigger>
-                
+
                 <CollapsibleContent>
-                  <CardContent className="pt-0 pb-3 px-4">
-                    {group.orders.length === 0 ? (
-                      <div className="text-center py-6 text-muted-foreground text-sm">
-                        No orders linked to this supplier
-                      </div>
-                    ) : isMobile ? (
-                      <div className="space-y-2">
-                        {group.orders.map(order => (
-                          <div 
-                            key={order.id} 
-                            className="p-3 bg-muted/30 rounded-lg space-y-2 cursor-pointer hover:bg-muted/50 transition-colors"
-                            onClick={() => handleOrderClick(order, group.supplier.name)}
+                  <CardContent className="pt-0 pb-3 px-4 space-y-2">
+                    {group.pos.map((po) => {
+                      const links = linkedOrders[po.purchaseOrderNumber.trim().toUpperCase()] || [];
+                      const isOpen = openPOs.has(po.purchaseOrderId);
+                      return (
+                        <div key={po.purchaseOrderId} className="rounded-lg border bg-muted/20">
+                          <button
+                            className="w-full text-left p-3 flex flex-wrap items-center justify-between gap-2 hover:bg-muted/40 rounded-lg transition-colors"
+                            onClick={() => toggle(openPOs, po.purchaseOrderId, setOpenPOs)}
                           >
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <Package className="h-4 w-4 text-muted-foreground" />
-                                <span className="font-medium">{order.order_number}</span>
-                              </div>
-                              <Badge className={getStatusColor(order.status)}>
-                                {order.status || 'pending'}
-                              </Badge>
-                            </div>
-                            <div className="grid grid-cols-2 gap-2 text-sm">
-                              <div>
-                                <p className="text-xs text-muted-foreground">Client</p>
-                                <p className="flex items-center gap-1">
-                                  <Building2 className="h-3 w-3" />
-                                  {order.companyName}
-                                </p>
-                              </div>
-                              <div>
-                                <p className="text-xs text-muted-foreground">PO Number(s)</p>
-                                <p className="font-mono text-xs">
-                                  {order.purchase_order_numbers?.join(', ') || '-'}
-                                </p>
-                              </div>
-                            </div>
-                            <div className="flex items-center justify-between text-xs text-muted-foreground">
-                              <span>{format(new Date(order.created_at), 'dd MMM yyyy')}</span>
-                              {order.urgency && order.urgency !== 'normal' && (
-                                <Badge className={getUrgencyColor(order.urgency)} variant="outline">
-                                  {order.urgency}
-                                </Badge>
+                            <div className="flex items-center gap-2 min-w-0">
+                              {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                              <span className="font-mono font-medium">{po.purchaseOrderNumber}</span>
+                              {po.date && (
+                                <span className="text-xs text-muted-foreground">
+                                  {format(new Date(po.date), "dd MMM yyyy")}
+                                </span>
                               )}
                             </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Order #</TableHead>
-                            <TableHead>PO Number(s)</TableHead>
-                            <TableHead>Client</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead>Urgency</TableHead>
-                            <TableHead>Date</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {group.orders.map(order => (
-                            <TableRow 
-                              key={order.id} 
-                              className="cursor-pointer hover:bg-muted/50"
-                              onClick={() => handleOrderClick(order, group.supplier.name)}
-                            >
-                              <TableCell className="font-medium">
-                                {order.order_number}
-                              </TableCell>
-                              <TableCell className="font-mono text-sm">
-                                {order.purchase_order_numbers?.join(', ') || '-'}
-                              </TableCell>
-                              <TableCell>
-                                <div className="flex items-center gap-1.5">
-                                  <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
-                                  {order.companyName}
+                            <div className="flex items-center gap-2 flex-wrap">
+                              {receiveBadge(po)}
+                              <Badge variant="outline">
+                                {po.lines.reduce((s, l) => s + l.outstanding, 0)} pending
+                              </Badge>
+                              <span className="text-sm text-muted-foreground">{money(po.outstandingValue)}</span>
+                            </div>
+                          </button>
+
+                          {isOpen && (
+                            <div className="px-3 pb-3 space-y-3">
+                              {links.length > 0 && (
+                                <div className="flex flex-wrap items-center gap-2 text-xs">
+                                  <span className="text-muted-foreground">Linked orders:</span>
+                                  {links.map((l) => (
+                                    <Badge
+                                      key={l.orderId}
+                                      variant="secondary"
+                                      className="cursor-pointer hover:bg-primary/20"
+                                      onClick={() => openOrder(l)}
+                                    >
+                                      {l.orderNumber} · {l.companyName}
+                                    </Badge>
+                                  ))}
                                 </div>
-                              </TableCell>
-                              <TableCell>
-                                <Badge className={getStatusColor(order.status)}>
-                                  {order.status || 'pending'}
-                                </Badge>
-                              </TableCell>
-                              <TableCell>
-                                {order.urgency && order.urgency !== 'normal' ? (
-                                  <Badge className={getUrgencyColor(order.urgency)} variant="outline">
-                                    {order.urgency}
-                                  </Badge>
-                                ) : (
-                                  <span className="text-muted-foreground">-</span>
-                                )}
-                              </TableCell>
-                              <TableCell className="text-muted-foreground">
-                                {format(new Date(order.created_at), 'dd MMM yyyy')}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    )}
+                              )}
+
+                              {isMobile ? (
+                                <div className="space-y-2">
+                                  {po.lines.map((line, idx) => (
+                                    <div key={`${po.purchaseOrderId}-${idx}`} className="p-2 rounded-md bg-background border space-y-1">
+                                      <p className="text-sm font-medium">{line.name || line.description}</p>
+                                      <p className="text-xs font-mono text-muted-foreground">{line.sku || "-"}</p>
+                                      <div className="grid grid-cols-4 gap-1 text-xs">
+                                        <div><span className="text-muted-foreground block">Ord</span>{line.quantity}</div>
+                                        <div><span className="text-muted-foreground block">Rec</span>{line.quantityReceived}</div>
+                                        <div><span className="text-muted-foreground block">Billed</span>{line.quantityBilled}</div>
+                                        <div className="font-semibold"><span className="text-muted-foreground block font-normal">Pending</span>{line.outstanding}</div>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead>SKU</TableHead>
+                                      <TableHead>Item</TableHead>
+                                      <TableHead className="text-right">Ordered</TableHead>
+                                      <TableHead className="text-right">Received</TableHead>
+                                      <TableHead className="text-right">Billed</TableHead>
+                                      <TableHead className="text-right">Pending</TableHead>
+                                      <TableHead className="text-right">Value</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {po.lines.map((line, idx) => (
+                                      <TableRow key={`${po.purchaseOrderId}-${idx}`}>
+                                        <TableCell className="font-mono text-xs">{line.sku || "-"}</TableCell>
+                                        <TableCell className="max-w-[320px] truncate">
+                                          {line.name || line.description}
+                                        </TableCell>
+                                        <TableCell className="text-right">{line.quantity}</TableCell>
+                                        <TableCell className="text-right">{line.quantityReceived}</TableCell>
+                                        <TableCell className="text-right">{line.quantityBilled}</TableCell>
+                                        <TableCell className="text-right font-semibold">{line.outstanding}</TableCell>
+                                        <TableCell className="text-right text-muted-foreground">
+                                          {money(line.outstanding * line.rate)}
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                  </TableBody>
+                                </Table>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </CardContent>
                 </CollapsibleContent>
               </Collapsible>
@@ -485,14 +443,13 @@ export default function POTrackingPage() {
         </div>
       )}
 
-      {/* Order Details Dialog */}
       {selectedOrder && (
         <OrderDetailsDialog
           open={detailsDialogOpen}
           onOpenChange={setDetailsDialogOpen}
           order={selectedOrder}
           isAdmin={true}
-          onSave={fetchData}
+          onSave={() => fetchData(true)}
         />
       )}
     </div>

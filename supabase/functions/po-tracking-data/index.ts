@@ -1,0 +1,263 @@
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
+
+const ZOHO_AUTH_URL = 'https://accounts.zoho.com/oauth/v2'
+const ZOHO_API_URL = 'https://www.zohoapis.com'
+
+// Statuses we consider "still outstanding" (fully billed / cancelled / closed drop off)
+const EXCLUDED_PO_STATUSES = ['cancelled', 'closed', 'rejected']
+const MAX_PO_DETAILS = 250
+
+type POLine = {
+  sku: string
+  name: string
+  description: string
+  quantity: number
+  quantityReceived: number
+  quantityBilled: number
+  outstanding: number
+  rate: number
+}
+
+type POEntry = {
+  purchaseOrderId: string
+  purchaseOrderNumber: string
+  vendorId: string
+  vendorName: string
+  vendorEmail: string
+  date: string
+  expectedDeliveryDate: string | null
+  status: string
+  receivedStatus: string
+  billedStatus: string
+  total: number
+  outstandingValue: number
+  lines: POLine[]
+}
+
+function isExcludedSku(sku: string): boolean {
+  const s = (sku || '').trim().toUpperCase()
+  return s.startsWith('SH-') || s.startsWith('ZSH')
+}
+
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders })
+  }
+
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  )
+
+  const clientId = Deno.env.get('ZOHO_CLIENT_ID')
+  const clientSecret = Deno.env.get('ZOHO_CLIENT_SECRET')
+
+  if (!clientId || !clientSecret) {
+    return new Response(JSON.stringify({ error: 'Zoho credentials not configured' }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  }
+
+  try {
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    const token = authHeader.replace('Bearer ', '')
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    const accessToken = await getValidAccessToken(supabase, clientId, clientSecret)
+    const orgId = await getOrgId(supabase)
+
+    const purchaseOrders = await fetchOutstandingPurchaseOrders(accessToken, orgId)
+
+    return new Response(JSON.stringify({
+      success: true,
+      purchaseOrders,
+      count: purchaseOrders.length,
+      fetchedAt: new Date().toISOString(),
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  } catch (error) {
+    console.error('PO tracking data error:', error)
+    return new Response(JSON.stringify({
+      error: error instanceof Error ? error.message : 'Failed to fetch Zoho purchase orders',
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  }
+})
+
+async function fetchOutstandingPurchaseOrders(accessToken: string, orgId: string): Promise<POEntry[]> {
+  const results: POEntry[] = []
+  let page = 1
+  let hasMore = true
+  let inspected = 0
+
+  while (hasMore && inspected < MAX_PO_DETAILS) {
+    const data = await fetchZohoPage(
+      accessToken,
+      `${ZOHO_API_URL}/books/v3/purchaseorders?organization_id=${orgId}&page=${page}&per_page=200&sort_column=date&sort_order=D`
+    )
+
+    const summaries = data.purchaseorders || []
+    if (!summaries.length) break
+
+    for (const summary of summaries) {
+      if (inspected >= MAX_PO_DETAILS) break
+
+      const status = String(summary.status || '').toLowerCase()
+      const billedStatus = String(summary.billed_status || '').toLowerCase()
+
+      // Fully billed or cancelled/closed POs drop off the tracking board
+      if (EXCLUDED_PO_STATUSES.includes(status)) continue
+      if (billedStatus === 'billed') continue
+
+      const po = await fetchPurchaseOrderDetail(accessToken, orgId, summary.purchaseorder_id)
+      inspected++
+
+      const detailBilled = String(po.billed_status || billedStatus || '').toLowerCase()
+      if (detailBilled === 'billed') continue
+
+      const rawLines = Array.isArray(po.line_items) ? po.line_items : []
+      const lines: POLine[] = []
+
+      for (const line of rawLines) {
+        const sku = String(line.sku || '').trim()
+        if (isExcludedSku(sku)) continue
+
+        const quantity = Number(line.quantity || 0)
+        const quantityReceived = Number(line.quantity_received ?? 0)
+        const quantityBilled = Number(line.quantity_billed ?? 0)
+        // Outstanding = ordered qty not yet billed (a bill is the definitive close-out)
+        const outstanding = Math.max(0, quantity - Math.max(quantityBilled, 0))
+
+        if (outstanding <= 0) continue
+
+        lines.push({
+          sku,
+          name: String(line.name || ''),
+          description: String(line.description || ''),
+          quantity,
+          quantityReceived,
+          quantityBilled,
+          outstanding,
+          rate: Number(line.rate ?? 0),
+        })
+      }
+
+      if (lines.length === 0) continue
+
+      const outstandingValue = lines.reduce((sum, l) => sum + l.outstanding * l.rate, 0)
+
+      results.push({
+        purchaseOrderId: String(po.purchaseorder_id || summary.purchaseorder_id),
+        purchaseOrderNumber: String(po.purchaseorder_number || summary.purchaseorder_number || ''),
+        vendorId: String(po.vendor_id || summary.vendor_id || ''),
+        vendorName: String(po.vendor_name || summary.vendor_name || 'Unknown supplier'),
+        vendorEmail: String(po.vendor_email || summary.vendor_email || ''),
+        date: String(po.date || summary.date || ''),
+        expectedDeliveryDate: po.delivery_date || summary.delivery_date || null,
+        status,
+        receivedStatus: String(po.received_status || summary.received_status || ''),
+        billedStatus: detailBilled,
+        total: Number(po.total ?? summary.total ?? 0),
+        outstandingValue: Math.round(outstandingValue * 100) / 100,
+        lines,
+      })
+    }
+
+    hasMore = data.page_context?.has_more_page ?? false
+    page++
+  }
+
+  console.log(`Inspected ${inspected} purchase orders, ${results.length} still outstanding`)
+  return results
+}
+
+async function fetchPurchaseOrderDetail(accessToken: string, orgId: string, purchaseOrderId: string) {
+  const data = await fetchZohoPage(
+    accessToken,
+    `${ZOHO_API_URL}/books/v3/purchaseorders/${purchaseOrderId}?organization_id=${orgId}`
+  )
+  return data.purchaseorder || {}
+}
+
+async function fetchZohoPage(accessToken: string, url: string) {
+  const resp = await fetch(url, {
+    headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` },
+  })
+
+  const data = await resp.json()
+  if (!resp.ok || data.code !== 0) {
+    throw new Error(`Zoho API error (${resp.status}): ${data.message || 'unknown error'}`)
+  }
+  return data
+}
+
+async function getOrgId(supabase: any): Promise<string> {
+  const { data } = await supabase
+    .from('zoho_tokens')
+    .select('organization_id')
+    .eq('id', '00000000-0000-0000-0000-000000000001')
+    .single()
+  if (!data?.organization_id) throw new Error('Zoho organization ID not found')
+  return data.organization_id
+}
+
+async function getValidAccessToken(supabase: any, clientId: string, clientSecret: string): Promise<string> {
+  const { data: tokenRow } = await supabase
+    .from('zoho_tokens')
+    .select('*')
+    .eq('id', '00000000-0000-0000-0000-000000000001')
+    .single()
+
+  if (!tokenRow) throw new Error('No Zoho tokens found. Please connect Zoho Books first.')
+
+  const expiresAt = new Date(tokenRow.expires_at)
+  if (expiresAt.getTime() - Date.now() > 5 * 60 * 1000) {
+    return tokenRow.access_token
+  }
+
+  const tokenResponse = await fetch(`${ZOHO_AUTH_URL}/token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      refresh_token: tokenRow.refresh_token,
+      client_id: clientId,
+      client_secret: clientSecret,
+      grant_type: 'refresh_token',
+    }),
+  })
+
+  const tokenData = await tokenResponse.json()
+  if (tokenData.error) throw new Error(`Token refresh failed: ${tokenData.error}`)
+
+  await supabase
+    .from('zoho_tokens')
+    .update({
+      access_token: tokenData.access_token,
+      expires_at: new Date(Date.now() + (tokenData.expires_in || 3600) * 1000).toISOString(),
+    })
+    .eq('id', '00000000-0000-0000-0000-000000000001')
+
+  return tokenData.access_token
+}
