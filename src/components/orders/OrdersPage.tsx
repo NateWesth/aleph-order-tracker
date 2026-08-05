@@ -45,6 +45,11 @@ interface OrderItem {
   code: string | null;
   quantity: number;
   stock_status: string;
+  qty_on_po?: number;
+  qty_received?: number;
+  qty_invoiced?: number;
+  qty_completed?: number;
+  totalQuantity?: number;
 }
 
 interface PurchaseOrderInfo {
