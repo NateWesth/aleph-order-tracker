@@ -9,12 +9,23 @@ const ZOHO_AUTH_URL = 'https://accounts.zoho.com/oauth/v2'
 const ZOHO_API_URL = 'https://www.zohoapis.com'
 const OPEN_PO_STATUSES = ['open', 'draft']
 const MAX_RECENT_PO_DETAILS = 100
+const MAX_RECENT_BILL_DETAILS = 150
 
 type StockEntry = {
   stockOnHand: number
   itemName: string
   vendorName: string
+  purchaseRate: number
 }
+
+type BillEntry = {
+  vendorName: string
+  vendorEmail: string
+  unitCost: number | null
+  quantity: number
+  billDate: string
+}
+
 
 type VendorSummary = {
   vendorName: string
@@ -67,7 +78,7 @@ Deno.serve(async (req) => {
       })
     }
 
-    const activeSkus = await getActiveBuyingSheetSkus(supabase)
+    const { skus: activeSkus, nameToSku } = await getActiveBuyingSheetSkus(supabase)
     console.log(`Resolved ${activeSkus.size} active buying sheet SKUs`)
 
     if (activeSkus.size === 0) {
@@ -85,21 +96,47 @@ Deno.serve(async (req) => {
     const { poQtyMap, poVendorMap } = await fetchOpenPurchaseOrderData(accessToken, orgId, activeSkus)
     console.log(`Fetched open PO quantities for ${poQtyMap.size} active SKUs and open PO vendors for ${poVendorMap.size} active SKUs`)
 
-    const latestPurchaseOrderVendors = await fetchLatestPurchaseOrderVendors(accessToken, orgId, activeSkus)
-    console.log(`Resolved latest Zoho PO suppliers for ${latestPurchaseOrderVendors.size} active SKUs`)
+    // Vendor bills are the source of truth for real purchase cost + who we actually bought from
+    const billMap = await fetchVendorBillData(accessToken, orgId, activeSkus, nameToSku)
+    console.log(`Resolved vendor-bill cost/supplier for ${billMap.size} active SKUs`)
 
-    const result: Record<string, { stockOnHand: number; onPurchaseOrder: number; vendorName: string; vendorEmail: string }> = {}
+    const unresolvedAfterBills = new Set(
+      [...activeSkus].filter((sku) => !billMap.get(sku)?.vendorName)
+    )
+    const latestPurchaseOrderVendors = unresolvedAfterBills.size > 0
+      ? await fetchLatestPurchaseOrderVendors(accessToken, orgId, unresolvedAfterBills)
+      : new Map<string, VendorCandidate>()
+    console.log(`Resolved latest Zoho PO suppliers for ${latestPurchaseOrderVendors.size} remaining SKUs`)
+
+    const result: Record<string, {
+      stockOnHand: number
+      onPurchaseOrder: number
+      vendorName: string
+      vendorEmail: string
+      unitCost: number | null
+      lastPurchasedDate: string | null
+      lastPurchasedQty: number | null
+      costSource: 'bill' | 'item' | null
+    }> = {}
 
     for (const sku of activeSkus) {
-      const itemVendor = stockMap.get(sku)?.vendorName ?? ''
+      const item = stockMap.get(sku)
+      const bill = billMap.get(sku)
       const openPoVendor = poVendorMap.get(sku)
       const latestPoVendor = latestPurchaseOrderVendors.get(sku)
 
+      const unitCost = bill?.unitCost ?? (item?.purchaseRate && item.purchaseRate > 0 ? item.purchaseRate : null)
+
       result[sku] = {
-        stockOnHand: stockMap.get(sku)?.stockOnHand ?? 0,
+        stockOnHand: item?.stockOnHand ?? 0,
         onPurchaseOrder: poQtyMap.get(sku) ?? 0,
-        vendorName: latestPoVendor?.vendorName || openPoVendor?.vendorName || itemVendor || '',
-        vendorEmail: latestPoVendor?.vendorEmail || openPoVendor?.vendorEmail || '',
+        // Priority: latest vendor bill > latest PO > open PO > Zoho item vendor
+        vendorName: bill?.vendorName || latestPoVendor?.vendorName || openPoVendor?.vendorName || item?.vendorName || '',
+        vendorEmail: bill?.vendorEmail || latestPoVendor?.vendorEmail || openPoVendor?.vendorEmail || '',
+        unitCost: unitCost !== null ? Math.round(unitCost * 100) / 100 : null,
+        lastPurchasedDate: bill?.billDate || null,
+        lastPurchasedQty: bill?.quantity ?? null,
+        costSource: bill?.unitCost != null ? 'bill' : (unitCost !== null ? 'item' : null),
       }
     }
 
@@ -121,10 +158,10 @@ Deno.serve(async (req) => {
   }
 })
 
-async function getActiveBuyingSheetSkus(supabase: any): Promise<Set<string>> {
+async function getActiveBuyingSheetSkus(supabase: any): Promise<{ skus: Set<string>; nameToSku: Map<string, string> }> {
   const { data, error } = await supabase
     .from('order_items')
-    .select('code')
+    .select('code, name')
     .eq('progress_stage', 'awaiting-stock')
     .not('code', 'is', null)
 
@@ -132,12 +169,20 @@ async function getActiveBuyingSheetSkus(supabase: any): Promise<Set<string>> {
     throw new Error(`Failed to load active buying sheet SKUs: ${error.message}`)
   }
 
-  return new Set(
-    (data || [])
-      .map((row: { code: string | null }) => normalizeSku(row.code))
-      .filter(Boolean)
-  )
+  const skus = new Set<string>()
+  const nameToSku = new Map<string, string>()
+
+  for (const row of (data || []) as { code: string | null; name: string | null }[]) {
+    const sku = normalizeSku(row.code)
+    if (!sku) continue
+    skus.add(sku)
+    const key = normalizeName(row.name)
+    if (key && !nameToSku.has(key)) nameToSku.set(key, sku)
+  }
+
+  return { skus, nameToSku }
 }
+
 
 async function fetchRelevantItemStock(accessToken: string, orgId: string, activeSkus: Set<string>): Promise<Map<string, StockEntry>> {
   const stockMap = new Map<string, StockEntry>()
@@ -165,7 +210,9 @@ async function fetchRelevantItemStock(accessToken: string, orgId: string, active
         stockOnHand: item.stock_on_hand ?? item.available_stock ?? 0,
         itemName: item.name || item.description || '',
         vendorName: item.vendor_name || item.manufacturer || '',
+        purchaseRate: Number(item.purchase_rate ?? 0) || 0,
       })
+
 
       remainingSkus.delete(sku)
     }
@@ -224,7 +271,80 @@ async function fetchOpenPurchaseOrderData(accessToken: string, orgId: string, ac
   return { poQtyMap, poVendorMap }
 }
 
+/**
+ * Scan recent vendor bills (newest first) to find, per active SKU, the real
+ * purchase cost and the vendor we actually bought from. Bill lines without a
+ * SKU are matched by item name/description against the awaiting-stock items.
+ */
+async function fetchVendorBillData(
+  accessToken: string,
+  orgId: string,
+  activeSkus: Set<string>,
+  nameToSku: Map<string, string>,
+): Promise<Map<string, BillEntry>> {
+  const billMap = new Map<string, BillEntry>()
+  const unresolved = new Set(activeSkus)
+  let page = 1
+  let hasMore = true
+  let inspected = 0
+
+  while (hasMore && unresolved.size > 0 && inspected < MAX_RECENT_BILL_DETAILS) {
+    const data = await fetchZohoPage(
+      accessToken,
+      `${ZOHO_API_URL}/books/v3/bills?organization_id=${orgId}&page=${page}&per_page=200&sort_column=date&sort_order=D`
+    )
+
+    const bills = data.bills || []
+    if (!bills.length) break
+
+    for (const summary of bills) {
+      if (inspected >= MAX_RECENT_BILL_DETAILS || unresolved.size === 0) break
+      if (String(summary.status || '').toLowerCase() === 'void') continue
+
+      const detail = await fetchBillDetail(accessToken, orgId, summary.bill_id)
+      inspected++
+
+      const vendorName = detail.vendor_name || summary.vendor_name || ''
+      const vendorEmail = detail.vendor_email || summary.vendor_email || ''
+      const billDate = String(detail.date || summary.date || detail.last_modified_time || '')
+      const lineItems = Array.isArray(detail.line_items) ? detail.line_items : []
+
+      for (const line of lineItems) {
+        let sku = normalizeSku(line.sku)
+        if (!sku || !unresolved.has(sku)) {
+          const byName = nameToSku.get(normalizeName(line.name)) || nameToSku.get(normalizeName(line.description))
+          if (byName && unresolved.has(byName)) sku = byName
+          else continue
+        }
+
+        const qty = Number(line.quantity || 0)
+        const rate = Number(line.rate ?? 0)
+        const total = Number(line.item_total ?? 0)
+        const unitCost = rate > 0 ? rate : (qty > 0 && total > 0 ? total / qty : null)
+
+        billMap.set(sku, { vendorName, vendorEmail, unitCost, quantity: qty, billDate })
+        unresolved.delete(sku)
+      }
+    }
+
+    hasMore = data.page_context?.has_more_page ?? false
+    page++
+  }
+
+  console.log(`Inspected ${inspected} vendor bills; ${unresolved.size} active SKUs have no bill history`)
+  return billMap
+}
+
+async function fetchBillDetail(accessToken: string, orgId: string, billId: string) {
+  const data = await fetchZohoPage(
+    accessToken,
+    `${ZOHO_API_URL}/books/v3/bills/${billId}?organization_id=${orgId}`
+  )
+  return data.bill || {}
+}
+
 async function fetchLatestPurchaseOrderVendors(accessToken: string, orgId: string, activeSkus: Set<string>) {
+
   const latestVendorMap = new Map<string, VendorCandidate>()
   const unresolvedSkus = new Set(activeSkus)
   let page = 1
@@ -325,6 +445,10 @@ async function fetchZohoPage(accessToken: string, url: string) {
 
 function normalizeSku(value: unknown): string {
   return String(value || '').trim().toUpperCase()
+}
+
+function normalizeName(value: unknown): string {
+  return String(value || '').trim().toLowerCase().replace(/\s+/g, ' ')
 }
 
 async function getOrgId(supabase: any): Promise<string> {

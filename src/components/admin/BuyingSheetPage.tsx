@@ -378,7 +378,7 @@ export default function BuyingSheetPage() {
   };
 
   // Helper: compute new analytical fields for a row
-  const computeAnalyticalFields = (sku: string, toOrder: number, daysWaiting: number, avgLeadTimeDays: number | null, orders: { urgency?: string }[], recommendedOrderQty: number) => {
+  const computeAnalyticalFields = (sku: string, toOrder: number, daysWaiting: number, avgLeadTimeDays: number | null, orders: { urgency?: string }[], recommendedOrderQty: number, billUnitCost: number | null = null, costSource: "bill" | "item" | null = null) => {
     // Age escalation
     const leadRef = avgLeadTimeDays || 14;
     const ageRatio = daysWaiting / leadRef;
@@ -407,14 +407,15 @@ export default function BuyingSheetPage() {
     // Weekly trend %
     const weeklyTrend = wh && wh.lastWeek > 0 ? Math.round(((wh.thisWeek - wh.lastWeek) / wh.lastWeek) * 100) : 0;
 
-    // Cost estimation
-    const unitCost = costHistory.get(sku) ?? null;
-    const estimatedCost = unitCost !== null ? Math.round(unitCost * toOrder * 100) / 100 : null;
+    // Cost: real vendor-bill cost first, local history only as a last resort
+    const unitCost = billUnitCost ?? costHistory.get(sku) ?? null;
+    const qtyForCost = toOrder > 0 ? toOrder : recommendedOrderQty;
+    const estimatedCost = unitCost !== null ? Math.round(unitCost * qtyForCost * 100) / 100 : null;
 
     // Adjusted qty (user override or recommended)
     const adjustedOrderQty = adjustedQtys[sku] ?? recommendedOrderQty;
 
-    return { ageEscalation, conflictingUrgency, forecastNextMonth, reorderPoint, supplierReliability, velocityScore, weeklyTrend, estimatedCost, adjustedOrderQty, abcClass: "C" as "A" | "B" | "C" };
+    return { ageEscalation, conflictingUrgency, forecastNextMonth, reorderPoint, supplierReliability, velocityScore, weeklyTrend, estimatedCost, unitCost, costSource: billUnitCost !== null ? (costSource ?? "bill") : null, adjustedOrderQty, abcClass: "C" as "A" | "B" | "C" };
   };
 
   const fetchLocalData = async () => {
@@ -477,7 +478,7 @@ export default function BuyingSheetPage() {
         const coveragePercent = entry.totalNeeded > 0 ? Math.min(100, Math.round((covered / entry.totalNeeded) * 100)) : 100;
         const { trend, lastMonth, prevMonth } = getDemandTrend(entry.sku);
         const stockoutRiskDays = getStockoutRiskDays(entry.sku, z.stockOnHand, z.onPurchaseOrder);
-        const lastPurchasedDate = lastPurchaseMap.get(entry.sku) || null;
+        const lastPurchasedDate = z.lastPurchasedDate || lastPurchaseMap.get(entry.sku) || null;
         const seasonalPattern = seasonalMap.get(entry.sku) || null;
         const avgLeadTimeDays = leadTimeMap.get(entry.sku) ?? null;
         let priorityScore = 0;
@@ -504,7 +505,7 @@ export default function BuyingSheetPage() {
         const safetyStock = getSafetyStock(entry.sku, avgLeadTimeDays);
         const dailyBurn = getDailyBurnRate(entry.sku);
         const recommendedOrderQty = toOrder > 0 ? toOrder + safetyStock : 0;
-        const analytical = computeAnalyticalFields(entry.sku, toOrder, daysWaiting, avgLeadTimeDays, entry.orders, recommendedOrderQty);
+        const analytical = computeAnalyticalFields(entry.sku, toOrder, daysWaiting, avgLeadTimeDays, entry.orders, recommendedOrderQty, z.unitCost ?? null, z.costSource ?? null);
         return { ...entry, supplierName, supplierEmail, stockOnHand: z.stockOnHand, onPurchaseOrder: z.onPurchaseOrder, toOrder, daysWaiting, priorityScore, coveragePercent, demandTrend: trend, lastMonthQty: lastMonth, prevMonthQty: prevMonth, stockoutRiskDays, lastPurchasedDate, seasonalPattern, avgLeadTimeDays, safetyStock, dailyBurnRate: dailyBurn, demandVariability: demandVar, distinctCustomers, recommendedOrderQty, ...analytical };
       });
       buyingRows.sort((a, b) => b.priorityScore - a.priorityScore);
@@ -544,10 +545,10 @@ export default function BuyingSheetPage() {
           if (row.avgLeadTimeDays !== null && row.daysWaiting > row.avgLeadTimeDays) priorityScore += 10;
           const safetyStock = getSafetyStock(row.sku, row.avgLeadTimeDays);
           const recommendedOrderQty = toOrder > 0 ? toOrder + safetyStock : 0;
-          const analytical = computeAnalyticalFields(row.sku, toOrder, row.daysWaiting, row.avgLeadTimeDays, row.orders, recommendedOrderQty);
-          return { ...row, supplierName, supplierEmail, stockOnHand: z.stockOnHand, onPurchaseOrder: z.onPurchaseOrder, toOrder, coveragePercent, priorityScore, stockoutRiskDays, safetyStock, recommendedOrderQty, ...analytical };
+          const analytical = computeAnalyticalFields(row.sku, toOrder, row.daysWaiting, row.avgLeadTimeDays, row.orders, recommendedOrderQty, z.unitCost ?? null, z.costSource ?? null);
+          return { ...row, supplierName, supplierEmail, stockOnHand: z.stockOnHand, onPurchaseOrder: z.onPurchaseOrder, toOrder, coveragePercent, priorityScore, stockoutRiskDays, safetyStock, recommendedOrderQty, lastPurchasedDate: z.lastPurchasedDate || row.lastPurchasedDate, ...analytical };
         }));
-        toast({ title: "Updated", description: "Zoho stock & PO data loaded" });
+        toast({ title: "Updated", description: "Zoho stock, PO & vendor-bill cost data loaded" });
       }
     });
   };
@@ -572,10 +573,10 @@ export default function BuyingSheetPage() {
         if (row.avgLeadTimeDays !== null && row.daysWaiting > row.avgLeadTimeDays) priorityScore += 10;
         const safetyStock = getSafetyStock(row.sku, row.avgLeadTimeDays);
         const recommendedOrderQty = toOrder > 0 ? toOrder + safetyStock : 0;
-        const analytical = computeAnalyticalFields(row.sku, toOrder, row.daysWaiting, row.avgLeadTimeDays, row.orders, recommendedOrderQty);
-        return { ...row, supplierName, stockOnHand: z.stockOnHand, onPurchaseOrder: z.onPurchaseOrder, toOrder, coveragePercent, priorityScore, stockoutRiskDays, safetyStock, recommendedOrderQty, ...analytical };
+        const analytical = computeAnalyticalFields(row.sku, toOrder, row.daysWaiting, row.avgLeadTimeDays, row.orders, recommendedOrderQty, z.unitCost ?? null, z.costSource ?? null);
+        return { ...row, supplierName, supplierEmail: z.vendorEmail || row.supplierEmail, stockOnHand: z.stockOnHand, onPurchaseOrder: z.onPurchaseOrder, toOrder, coveragePercent, priorityScore, stockoutRiskDays, safetyStock, recommendedOrderQty, lastPurchasedDate: z.lastPurchasedDate || row.lastPurchasedDate, ...analytical };
       }));
-      toast({ title: "Updated", description: "Stock & PO data refreshed from Zoho Books" });
+      toast({ title: "Updated", description: "Stock, POs & vendor-bill costs refreshed from Zoho Books" });
     }
   };
 
@@ -972,7 +973,9 @@ export default function BuyingSheetPage() {
               <div className="flex justify-between"><span className="text-muted-foreground">Reorder Point:</span><span className="font-medium">{row.reorderPoint}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Safety Stock:</span><span className="font-medium">{row.safetyStock > 0 ? `+${row.safetyStock} buffer` : "—"}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Recommended Qty:</span><span className="font-bold text-primary">{row.recommendedOrderQty}</span></div>
+              {row.unitCost !== null && <div className="flex justify-between"><span className="text-muted-foreground">Unit Cost:</span><span className="font-medium">R{row.unitCost.toFixed(2)} <span className="text-[10px] text-muted-foreground">({row.costSource === "bill" ? "vendor bill" : "estimated"})</span></span></div>}
               {row.estimatedCost !== null && <div className="flex justify-between"><span className="text-muted-foreground">Est. Cost:</span><span className="font-bold">R{row.estimatedCost.toLocaleString()}</span></div>}
+
               <div className="flex justify-between"><span className="text-muted-foreground">Coverage:</span><CoverageBar percent={row.coveragePercent} /></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Stockout Risk:</span><StockoutRiskBadge days={row.stockoutRiskDays} /></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Customers Affected:</span><span className="font-medium">{row.distinctCustomers}</span></div>
