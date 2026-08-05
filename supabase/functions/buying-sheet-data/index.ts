@@ -161,7 +161,7 @@ Deno.serve(async (req) => {
 async function getActiveBuyingSheetSkus(supabase: any): Promise<{ skus: Set<string>; nameToSku: Map<string, string> }> {
   const { data, error } = await supabase
     .from('order_items')
-    .select('code, name')
+    .select('code, name, quantity, qty_on_po')
     .eq('progress_stage', 'awaiting-stock')
     .not('code', 'is', null)
 
@@ -172,7 +172,9 @@ async function getActiveBuyingSheetSkus(supabase: any): Promise<{ skus: Set<stri
   const skus = new Set<string>()
   const nameToSku = new Map<string, string>()
 
-  for (const row of (data || []) as { code: string | null; name: string | null }[]) {
+  for (const row of (data || []) as { code: string | null; name: string | null; quantity: number | null; qty_on_po: number | null }[]) {
+    // Skip lines whose full quantity is already covered by a purchase order
+    if (Math.max(0, (row.quantity || 0) - (row.qty_on_po || 0)) <= 0) continue
     const sku = normalizeSku(row.code)
     if (!sku) continue
     skus.add(sku)

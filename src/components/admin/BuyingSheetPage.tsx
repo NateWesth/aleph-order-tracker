@@ -421,7 +421,7 @@ export default function BuyingSheetPage() {
   const fetchLocalData = async () => {
     setLoading(true);
     try {
-      const { data: orderItems, error: itemsError } = await supabase.from("order_items").select("id, name, code, quantity, progress_stage, order_id, created_at").in("progress_stage", ["awaiting-stock"]).order("created_at", { ascending: false });
+      const { data: orderItems, error: itemsError } = await supabase.from("order_items").select("id, name, code, quantity, qty_on_po, progress_stage, order_id, created_at").in("progress_stage", ["awaiting-stock"]).order("created_at", { ascending: false });
       if (itemsError) throw itemsError;
       const activeSkus = new Set<string>();
       if (!orderItems?.length) { setRows([]); setLoading(false); fetchSuggestedRestock(activeSkus); return; }
@@ -447,6 +447,9 @@ export default function BuyingSheetPage() {
 
       const skuMap = new Map<string, { sku: string; itemName: string; totalNeeded: number; orders: { orderNumber: string; customerName: string; quantity: number; urgency?: string }[]; supplierName: string; supplierId: string | null; supplierEmail?: string; oldestCreatedAt: string; hasUrgent: boolean }>();
       for (const item of orderItems) {
+        // Only the quantity that is NOT already on a purchase order still needs buying
+        const outstanding = Math.max(0, (item.quantity || 0) - (item.qty_on_po || 0));
+        if (outstanding <= 0) continue;
         const sku = (item.code || "NO-SKU").toUpperCase(); activeSkus.add(sku);
         const order = ordersMap.get(item.order_id);
         const customerName = order?.company_id ? companiesMap.get(order.company_id) || "Unknown" : "Unknown";
@@ -457,11 +460,11 @@ export default function BuyingSheetPage() {
         else if (order?.supplier_id) { const s = suppliersMap.get(order.supplier_id); supplierName = s?.name || "Unknown"; supplierId = order.supplier_id; supplierEmail = s?.email || undefined; }
         const existing = skuMap.get(sku);
         if (existing) {
-          existing.totalNeeded += item.quantity; existing.orders.push({ orderNumber: order?.order_number || "—", customerName, quantity: item.quantity, urgency });
+          existing.totalNeeded += outstanding; existing.orders.push({ orderNumber: order?.order_number || "—", customerName, quantity: outstanding, urgency });
           if (item.created_at < existing.oldestCreatedAt) existing.oldestCreatedAt = item.created_at;
           if (urgency === "urgent" || urgency === "critical") existing.hasUrgent = true;
         } else {
-          skuMap.set(sku, { sku, itemName: item.name, totalNeeded: item.quantity, orders: [{ orderNumber: order?.order_number || "—", customerName, quantity: item.quantity, urgency }], supplierName, supplierId, supplierEmail, oldestCreatedAt: item.created_at, hasUrgent: urgency === "urgent" || urgency === "critical" });
+          skuMap.set(sku, { sku, itemName: item.name, totalNeeded: outstanding, orders: [{ orderNumber: order?.order_number || "—", customerName, quantity: outstanding, urgency }], supplierName, supplierId, supplierEmail, oldestCreatedAt: item.created_at, hasUrgent: urgency === "urgent" || urgency === "critical" });
         }
       }
 
