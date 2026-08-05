@@ -1,0 +1,2 @@
+ALTER TABLE public.suppliers ADD COLUMN IF NOT EXISTS zoho_contact_id text;
+CREATE UNIQUE INDEX IF NOT EXISTS suppliers_zoho_contact_id_key ON public.suppliers (zoho_contact_id) WHERE zoho_contact_id IS NOT NULL;
