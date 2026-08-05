@@ -50,12 +50,32 @@ async function loadItems(supabase: Supa, orderIds: string[]) {
   return data || []
 }
 
-const matchesSku = (item: any, sku: string, name: string) => {
-  const code = norm(item.code)
-  if (sku && code && code === sku) return true
-  if (!code && name && norm(item.name) === name) return true
-  return false
+export const isExcludedSku = (sku: unknown) => {
+  const s = norm(sku)
+  return s.startsWith('sh-') || s.startsWith('zsh')
 }
+
+/**
+ * Match score for a line against an order item.
+ *   2 = exact SKU match, 1 = exact name match, 0 = no match.
+ * Name matching is always allowed as a fallback, because Zoho invoices often
+ * carry a different SKU (or none) to the one stored on the order line.
+ */
+const matchScore = (item: any, sku: string, name: string) => {
+  const code = norm(item.code)
+  if (sku && code && code === sku) return 2
+  const itemName = norm(item.name)
+  if (name && itemName && (itemName === name || itemName.startsWith(name) || name.startsWith(itemName))) return 1
+  return 0
+}
+
+/** Items that can take this line, best match first. */
+const candidates = (items: any[], sku: string, name: string) =>
+  items
+    .map((item, idx) => ({ item, score: matchScore(item, sku, name), idx }))
+    .filter(c => c.score > 0)
+    .sort((a, b) => b.score - a.score || a.idx - b.idx)
+    .map(c => c.item)
 
 /**
  * Spreads purchase-order line quantities across the matching customer order
@@ -94,9 +114,8 @@ export async function allocatePurchaseOrder(supabase: Supa, po: any) {
     remaining -= alreadyAllocated
     if (remaining <= 0) continue
 
-    for (const item of items) {
+    for (const item of candidates(items, sku, name)) {
       if (remaining <= 0) break
-      if (!matchesSku(item, sku, name)) continue
 
       const awaiting = Math.max(0, (item.quantity || 0) - (item.qty_on_po || 0))
       if (awaiting <= 0) continue
@@ -202,9 +221,8 @@ export async function applyInvoiceQuantities(supabase: Supa, orderIds: string[],
     let remaining = Math.round(Number(line.quantity || 0))
     if (remaining <= 0) continue
 
-    for (const item of items) {
+    for (const item of candidates(items, sku, name)) {
       if (remaining <= 0) break
-      if (!matchesSku(item, sku, name)) continue
 
       const invoiceable = Math.max(0, (item.quantity || 0) - (item.qty_invoiced || 0))
       if (invoiceable <= 0) continue
