@@ -152,31 +152,19 @@ function OrderStatusColumn({
     }
   };
 
-  const getOrderProgress = (order: Order) => {
-    const statusProgress: Record<string, number> = {
-      ordered: 25,
-      "in-stock": 50,
-      "in-progress": 75,
-      ready: 100,
-    };
-    const baseProgress = statusProgress[order.status || "ordered"] || 25;
-    // For "ordered" column, factor in item stock completion
-    if (config.key === "ordered" && order.items && order.items.length > 0) {
-      const inStock = order.items.filter(i => i.stock_status === "in-stock").length;
-      const itemProgress = (inStock / order.items.length) * 25; // 0-25% based on items
-      return Math.round(itemProgress);
-    }
-    return baseProgress;
+  const STAGE_PROGRESS: Record<string, number> = {
+    "awaiting-stock": 15,
+    ordered: 40,
+    "in-stock": 65,
+    "ready-for-delivery": 90,
+    completed: 100,
   };
+  const getOrderProgress = (order: Order) =>
+    STAGE_PROGRESS[order.boardStage || ""] ?? 15;
+
   const getItemStockSummary = (items: OrderItem[] | undefined) => {
     if (!items || items.length === 0) return null;
-    const inStock = items.filter(i => i.stock_status === "in-stock").length;
-    const total = items.length;
-    return {
-      inStock,
-      total,
-      allInStock: inStock === total
-    };
+    return { units: items.reduce((sum, i) => sum + (i.quantity || 0), 0) };
   };
   return <>
     <div ref={setNodeRef} className={cn("flex flex-col w-full min-w-0", isOver && "ring-2 ring-primary/50 rounded-xl transition-all")}>
