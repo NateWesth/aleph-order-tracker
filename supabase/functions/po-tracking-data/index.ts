@@ -210,8 +210,9 @@ async function fetchOutstandingPurchaseOrders(accessToken: string, orgId: string
     for (const entry of details) {
       if (!entry) continue
       const { summary, po } = entry
-      const status = String(summary.status || '').toLowerCase()
+      const status = String(po.status || summary.status || '').toLowerCase()
       const detailBilled = String(po.billed_status || summary.billed_status || '').toLowerCase()
+      if (EXCLUDED_PO_STATUSES.includes(status)) continue
       if (detailBilled === 'billed') continue
 
       const rawLines = Array.isArray(po.line_items) ? po.line_items : []
