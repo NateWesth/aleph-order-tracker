@@ -35,7 +35,9 @@ export interface BuyingSheetRow {
   ageEscalation: "green" | "yellow" | "orange" | "red";
   conflictingUrgency: boolean; // same SKU has both normal & urgent orders
   adjustedOrderQty: number; // user-adjustable qty (defaults to recommendedOrderQty)
-  estimatedCost: number | null; // estimated cost from historical data
+  estimatedCost: number | null; // toOrder x unit cost
+  unitCost: number | null; // last vendor-bill unit cost
+  costSource: "bill" | "item" | null;
   weeklyTrend: number; // % change week over week
 }
 
@@ -49,7 +51,18 @@ export interface SuggestedRestockRow {
 }
 
 export interface ZohoStockData {
-  [sku: string]: { stockOnHand: number; onPurchaseOrder: number; vendorName?: string; vendorEmail?: string };
+  [sku: string]: {
+    stockOnHand: number;
+    onPurchaseOrder: number;
+    vendorName?: string;
+    vendorEmail?: string;
+    /** Real unit purchase cost from the latest Zoho vendor bill (fallback: item purchase rate) */
+    unitCost?: number | null;
+    /** Date of the latest vendor bill containing this SKU */
+    lastPurchasedDate?: string | null;
+    lastPurchasedQty?: number | null;
+    costSource?: "bill" | "item" | null;
+  };
 }
 
 export type SortField = "sku" | "itemName" | "totalNeeded" | "stockOnHand" | "onPurchaseOrder" | "toOrder" | "supplierName" | "daysWaiting" | "priorityScore" | "stockoutRiskDays";

@@ -378,7 +378,7 @@ export default function BuyingSheetPage() {
   };
 
   // Helper: compute new analytical fields for a row
-  const computeAnalyticalFields = (sku: string, toOrder: number, daysWaiting: number, avgLeadTimeDays: number | null, orders: { urgency?: string }[], recommendedOrderQty: number) => {
+  const computeAnalyticalFields = (sku: string, toOrder: number, daysWaiting: number, avgLeadTimeDays: number | null, orders: { urgency?: string }[], recommendedOrderQty: number, billUnitCost: number | null = null, costSource: "bill" | "item" | null = null) => {
     // Age escalation
     const leadRef = avgLeadTimeDays || 14;
     const ageRatio = daysWaiting / leadRef;
@@ -407,14 +407,15 @@ export default function BuyingSheetPage() {
     // Weekly trend %
     const weeklyTrend = wh && wh.lastWeek > 0 ? Math.round(((wh.thisWeek - wh.lastWeek) / wh.lastWeek) * 100) : 0;
 
-    // Cost estimation
-    const unitCost = costHistory.get(sku) ?? null;
-    const estimatedCost = unitCost !== null ? Math.round(unitCost * toOrder * 100) / 100 : null;
+    // Cost: real vendor-bill cost first, local history only as a last resort
+    const unitCost = billUnitCost ?? costHistory.get(sku) ?? null;
+    const qtyForCost = toOrder > 0 ? toOrder : recommendedOrderQty;
+    const estimatedCost = unitCost !== null ? Math.round(unitCost * qtyForCost * 100) / 100 : null;
 
     // Adjusted qty (user override or recommended)
     const adjustedOrderQty = adjustedQtys[sku] ?? recommendedOrderQty;
 
-    return { ageEscalation, conflictingUrgency, forecastNextMonth, reorderPoint, supplierReliability, velocityScore, weeklyTrend, estimatedCost, adjustedOrderQty, abcClass: "C" as "A" | "B" | "C" };
+    return { ageEscalation, conflictingUrgency, forecastNextMonth, reorderPoint, supplierReliability, velocityScore, weeklyTrend, estimatedCost, unitCost, costSource: billUnitCost !== null ? costSource : (unitCost !== null ? null : null), adjustedOrderQty, abcClass: "C" as "A" | "B" | "C" };
   };
 
   const fetchLocalData = async () => {
