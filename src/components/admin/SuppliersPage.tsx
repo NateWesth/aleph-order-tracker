@@ -79,8 +79,32 @@ export default function SuppliersPage() {
   const [supplierToDelete, setSupplierToDelete] = useState<Supplier | null>(null);
   const [formData, setFormData] = useState<SupplierFormData>(emptyFormData);
   const [saving, setSaving] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const { toast } = useToast();
   const isMobile = useIsMobile();
+
+  const handleSyncZohoVendors = async () => {
+    setSyncing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("zoho-sync-vendors");
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      toast({
+        title: "Vendors synced",
+        description: `${(data as any)?.total_vendors ?? 0} Zoho vendors processed — ${(data as any)?.created ?? 0} added, ${(data as any)?.updated ?? 0} updated.`,
+      });
+      fetchSuppliers();
+    } catch (error: any) {
+      console.error("Vendor sync failed:", error);
+      toast({
+        title: "Sync failed",
+        description: error.message || "Could not sync vendors from Zoho",
+        variant: "destructive",
+      });
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   useEffect(() => {
     fetchSuppliers();
