@@ -77,14 +77,26 @@ Deno.serve(async (req) => {
       return await handleScanAllInvoices(supabase, clientId, clientSecret)
     }
 
-    // Detect event type - invoice or sales order
+    // Detect event type - invoice, purchase order, vendor bill or sales order
     const invoiceId = payload.invoice_id || payload.data?.invoice_id || payload.invoice?.invoice_id
+    const purchaseOrderId = payload.purchaseorder_id || payload.purchaseorder?.purchaseorder_id ||
+      payload.data?.purchaseorder?.purchaseorder_id || payload.data?.purchaseorder_id
+    const billId = payload.bill_id || payload.bill?.bill_id || payload.data?.bill?.bill_id || payload.data?.bill_id
     const salesOrderId = payload.salesorder_id || payload.resource_id || payload.id || 
       payload.salesorder?.salesorder_id || payload.data?.salesorder_id
 
     if (invoiceId) {
       return await handleInvoiceWebhook(supabase, payload, invoiceId, clientId, clientSecret)
     }
+
+    if (purchaseOrderId) {
+      return await handlePurchaseOrderWebhook(supabase, purchaseOrderId, clientId, clientSecret)
+    }
+
+    if (billId) {
+      return await handleBillWebhook(supabase, billId, clientId, clientSecret)
+    }
+
 
     if (salesOrderId) {
       return await handleSalesOrderWebhook(supabase, payload, salesOrderId, clientId, clientSecret)
