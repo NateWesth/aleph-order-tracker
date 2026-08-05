@@ -72,31 +72,87 @@ interface Order {
   creatorName?: string;
   items?: OrderItem[];
   purchaseOrders?: PurchaseOrderInfo[];
+  /** Which board stage this card represents (an order can appear in several). */
+  boardStage?: ItemStage;
 }
 
-// Default status column configurations
+/** Item-level stages, in flow order. */
+type ItemStage = 'awaiting-stock' | 'ordered' | 'in-stock' | 'ready-for-delivery' | 'completed';
+
+const STAGE_ORDER: ItemStage[] = ['awaiting-stock', 'ordered', 'in-stock', 'ready-for-delivery', 'completed'];
+
+/** Board column key -> item stage. */
+const COLUMN_STAGE: Record<string, ItemStage> = {
+  ordered: 'awaiting-stock',
+  "in-progress": 'ordered',
+  "in-stock": 'in-stock',
+  ready: 'ready-for-delivery',
+  delivered: 'completed',
+};
+
+/** Quantity of an item sitting in each stage. */
+const bucketsFor = (item: OrderItem): Record<ItemStage, number> => {
+  const qty = item.totalQuantity ?? item.quantity ?? 0;
+  const onPo = Math.min(item.qty_on_po ?? 0, qty);
+  const received = Math.min(item.qty_received ?? 0, onPo);
+  const invoiced = Math.min(item.qty_invoiced ?? 0, received);
+  const completed = Math.min(item.qty_completed ?? 0, invoiced);
+  return {
+    'awaiting-stock': Math.max(0, qty - onPo),
+    'ordered': Math.max(0, onPo - received),
+    'in-stock': Math.max(0, received - invoiced),
+    'ready-for-delivery': Math.max(0, invoiced - completed),
+    'completed': completed,
+  };
+};
+
+/** New cumulative counters after moving `qty` units of an item between stages. */
+const countersAfterMove = (item: OrderItem, from: ItemStage, to: ItemStage, qty: number) => {
+  const counters = [item.qty_on_po ?? 0, item.qty_received ?? 0, item.qty_invoiced ?? 0, item.qty_completed ?? 0];
+  const f = STAGE_ORDER.indexOf(from);
+  const t = STAGE_ORDER.indexOf(to);
+  const delta = t > f ? qty : -qty;
+  const lo = Math.min(f, t);
+  const hi = Math.max(f, t);
+  for (let i = lo; i < hi; i++) counters[i] += delta;
+
+  let cap = item.totalQuantity ?? item.quantity ?? 0;
+  for (let i = 0; i < counters.length; i++) {
+    counters[i] = Math.max(0, Math.min(counters[i], cap));
+    cap = counters[i];
+  }
+
+  return {
+    qty_on_po: counters[0],
+    qty_received: counters[1],
+    qty_invoiced: counters[2],
+    qty_completed: counters[3],
+  };
+};
+
+// Default status column configurations (flow: Awaiting Stock -> In Progress -> In Stock -> Ready for Delivery)
 const DEFAULT_STATUS_COLUMNS = [
   {
     key: "ordered",
     label: "Awaiting Stock",
     color: "text-amber-50",
     bgColor: "bg-amber-600",
-    nextStatus: "in-stock",
-    nextLabel: "All In Stock",
-  },
-  {
-    key: "in-stock",
-    label: "In Stock",
-    color: "text-sky-50",
-    bgColor: "bg-sky-600",
     nextStatus: "in-progress",
-    nextLabel: "Start Work",
+    nextLabel: "Move to In Progress",
   },
   {
     key: "in-progress",
     label: "In Progress",
     color: "text-violet-50",
     bgColor: "bg-violet-600",
+    nextStatus: "in-stock",
+    nextLabel: "Mark In Stock",
+  },
+  {
+    key: "in-stock",
+    label: "In Stock",
+    color: "text-sky-50",
+    bgColor: "bg-sky-600",
     nextStatus: "ready",
     nextLabel: "Mark Ready",
   },
@@ -106,7 +162,7 @@ const DEFAULT_STATUS_COLUMNS = [
     color: "text-emerald-50",
     bgColor: "bg-emerald-600",
     nextStatus: "delivered",
-    nextLabel: "Complete Order",
+    nextLabel: "Complete Items",
   },
 ];
 
