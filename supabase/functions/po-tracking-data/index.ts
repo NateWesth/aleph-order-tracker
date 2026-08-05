@@ -15,7 +15,7 @@ const MAX_PO_AGE_DAYS = 180
 const MAX_PO_DETAILS = 250
 const DETAIL_CONCURRENCY = 4
 const CACHE_TTL_MS = 15 * 60 * 1000
-const CACHE_ID = '00000000-0000-0000-0000-000000000002'
+const CACHE_ID = '00000000-0000-0000-0000-000000000003'
 
 type POLine = {
   sku: string
@@ -193,6 +193,7 @@ async function fetchOutstandingPurchaseOrders(accessToken: string, orgId: string
 
   // 2. Fetch detail records in parallel batches instead of one-by-one
   const results: POEntry[] = []
+  const billCache = new Map<string, any>()
 
   for (let i = 0; i < candidates.length; i += DETAIL_CONCURRENCY) {
     const batch = candidates.slice(i, i + DETAIL_CONCURRENCY)
@@ -218,14 +219,21 @@ async function fetchOutstandingPurchaseOrders(accessToken: string, orgId: string
       const rawLines = Array.isArray(po.line_items) ? po.line_items : []
       const lines: POLine[] = []
 
+      // Zoho doesn't always populate quantity_billed on PO lines, so reconcile
+      // against the actual vendor bills linked to this PO.
+      const billedMap = await fetchBilledQuantities(accessToken, orgId, po, billCache)
+
       for (const line of rawLines) {
         const sku = String(line.sku || '').trim()
         if (isExcludedSku(sku)) continue
 
         const quantity = Number(line.quantity || 0)
         const quantityReceived = Number(line.quantity_received ?? 0)
-        const quantityBilled = Number(line.quantity_billed ?? 0)
+        const zohoBilled = Number(line.quantity_billed ?? 0)
+        const billBilled = billedMap.get(lineKey(sku, line.name, line.description)) ?? 0
+        const quantityBilled = Math.max(zohoBilled, billBilled)
         const outstanding = Math.max(0, quantity - Math.max(quantityBilled, 0))
+        // Item already has a vendor bill covering it -> not outstanding
         if (outstanding <= 0) continue
 
         lines.push({
@@ -239,6 +247,7 @@ async function fetchOutstandingPurchaseOrders(accessToken: string, orgId: string
           rate: Number(line.rate ?? 0),
         })
       }
+
 
       if (lines.length === 0) continue
 
@@ -273,6 +282,52 @@ async function fetchPurchaseOrderDetail(accessToken: string, orgId: string, purc
   )
   return data.purchaseorder || {}
 }
+
+function lineKey(sku: unknown, name: unknown, description: unknown): string {
+  const s = String(sku || '').trim().toLowerCase()
+  if (s) return `sku:${s}`
+  return `nm:${String(name || '').trim().toLowerCase()}|${String(description || '').trim().toLowerCase()}`
+}
+
+// Sum quantities already covered by vendor bills linked to this PO
+async function fetchBilledQuantities(
+  accessToken: string,
+  orgId: string,
+  po: any,
+  cache: Map<string, any>
+): Promise<Map<string, number>> {
+  const map = new Map<string, number>()
+  const bills = Array.isArray(po.bills) ? po.bills : []
+  if (!bills.length) return map
+
+  for (const b of bills) {
+    const billId = String(b.bill_id || '')
+    if (!billId) continue
+    try {
+      let bill = cache.get(billId)
+      if (!bill) {
+        const data = await fetchZohoPage(
+          accessToken,
+          `${ZOHO_API_URL}/books/v3/bills/${billId}?organization_id=${orgId}`
+        )
+        bill = data.bill || {}
+        cache.set(billId, bill)
+      }
+      const status = String(bill.status || '').toLowerCase()
+      if (status === 'void' || status === 'cancelled') continue
+      for (const bl of bill.line_items || []) {
+        const key = lineKey(bl.sku, bl.name, bl.description)
+        map.set(key, (map.get(key) ?? 0) + Number(bl.quantity || 0))
+      }
+    } catch (e) {
+      console.error(`Failed to fetch bill ${billId}:`, e)
+    }
+  }
+
+  return map
+}
+
+
 
 
 const ZOHO_RETRY_ATTEMPTS = 4
