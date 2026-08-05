@@ -218,14 +218,21 @@ async function fetchOutstandingPurchaseOrders(accessToken: string, orgId: string
       const rawLines = Array.isArray(po.line_items) ? po.line_items : []
       const lines: POLine[] = []
 
+      // Zoho doesn't always populate quantity_billed on PO lines, so reconcile
+      // against the actual vendor bills linked to this PO.
+      const billedMap = await fetchBilledQuantities(accessToken, orgId, po, billCache)
+
       for (const line of rawLines) {
         const sku = String(line.sku || '').trim()
         if (isExcludedSku(sku)) continue
 
         const quantity = Number(line.quantity || 0)
         const quantityReceived = Number(line.quantity_received ?? 0)
-        const quantityBilled = Number(line.quantity_billed ?? 0)
+        const zohoBilled = Number(line.quantity_billed ?? 0)
+        const billBilled = billedMap.get(lineKey(sku, line.name, line.description)) ?? 0
+        const quantityBilled = Math.max(zohoBilled, billBilled)
         const outstanding = Math.max(0, quantity - Math.max(quantityBilled, 0))
+        // Item already has a vendor bill covering it -> not outstanding
         if (outstanding <= 0) continue
 
         lines.push({
@@ -239,6 +246,7 @@ async function fetchOutstandingPurchaseOrders(accessToken: string, orgId: string
           rate: Number(line.rate ?? 0),
         })
       }
+
 
       if (lines.length === 0) continue
 
