@@ -96,6 +96,12 @@ export default function BuyingSheetPage() {
     fetchLocalData();
   }, []);
 
+  // Live feed: re-pull local demand whenever orders / items / POs change
+  useLiveData(["orders", "order_items", "order_purchase_orders"], () => {
+    fetchLocalData();
+    fetchLastPurchaseDates();
+  }, { fallbackIntervalMs: 0, debounceMs: 1500 });
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
