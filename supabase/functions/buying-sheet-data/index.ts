@@ -270,7 +270,80 @@ async function fetchOpenPurchaseOrderData(accessToken: string, orgId: string, ac
   return { poQtyMap, poVendorMap }
 }
 
+/**
+ * Scan recent vendor bills (newest first) to find, per active SKU, the real
+ * purchase cost and the vendor we actually bought from. Bill lines without a
+ * SKU are matched by item name/description against the awaiting-stock items.
+ */
+async function fetchVendorBillData(
+  accessToken: string,
+  orgId: string,
+  activeSkus: Set<string>,
+  nameToSku: Map<string, string>,
+): Promise<Map<string, BillEntry>> {
+  const billMap = new Map<string, BillEntry>()
+  const unresolved = new Set(activeSkus)
+  let page = 1
+  let hasMore = true
+  let inspected = 0
+
+  while (hasMore && unresolved.size > 0 && inspected < MAX_RECENT_BILL_DETAILS) {
+    const data = await fetchZohoPage(
+      accessToken,
+      `${ZOHO_API_URL}/books/v3/bills?organization_id=${orgId}&page=${page}&per_page=200&sort_column=date&sort_order=D`
+    )
+
+    const bills = data.bills || []
+    if (!bills.length) break
+
+    for (const summary of bills) {
+      if (inspected >= MAX_RECENT_BILL_DETAILS || unresolved.size === 0) break
+      if (String(summary.status || '').toLowerCase() === 'void') continue
+
+      const detail = await fetchBillDetail(accessToken, orgId, summary.bill_id)
+      inspected++
+
+      const vendorName = detail.vendor_name || summary.vendor_name || ''
+      const vendorEmail = detail.vendor_email || summary.vendor_email || ''
+      const billDate = String(detail.date || summary.date || detail.last_modified_time || '')
+      const lineItems = Array.isArray(detail.line_items) ? detail.line_items : []
+
+      for (const line of lineItems) {
+        let sku = normalizeSku(line.sku)
+        if (!sku || !unresolved.has(sku)) {
+          const byName = nameToSku.get(normalizeName(line.name)) || nameToSku.get(normalizeName(line.description))
+          if (byName && unresolved.has(byName)) sku = byName
+          else continue
+        }
+
+        const qty = Number(line.quantity || 0)
+        const rate = Number(line.rate ?? 0)
+        const total = Number(line.item_total ?? 0)
+        const unitCost = rate > 0 ? rate : (qty > 0 && total > 0 ? total / qty : null)
+
+        billMap.set(sku, { vendorName, vendorEmail, unitCost, quantity: qty, billDate })
+        unresolved.delete(sku)
+      }
+    }
+
+    hasMore = data.page_context?.has_more_page ?? false
+    page++
+  }
+
+  console.log(`Inspected ${inspected} vendor bills; ${unresolved.size} active SKUs have no bill history`)
+  return billMap
+}
+
+async function fetchBillDetail(accessToken: string, orgId: string, billId: string) {
+  const data = await fetchZohoPage(
+    accessToken,
+    `${ZOHO_API_URL}/books/v3/bills/${billId}?organization_id=${orgId}`
+  )
+  return data.bill || {}
+}
+
 async function fetchLatestPurchaseOrderVendors(accessToken: string, orgId: string, activeSkus: Set<string>) {
+
   const latestVendorMap = new Map<string, VendorCandidate>()
   const unresolvedSkus = new Set(activeSkus)
   let page = 1
