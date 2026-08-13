@@ -88,14 +88,6 @@ interface OrderStatusColumnProps {
   onCloseItemsBubble?: () => void;
 }
 
-  // Animated order-items bubble
-  itemsBubble?: {
-    orderId: string;
-    columnKey: string;
-  } | null;
-  onOpenItemsBubble?: (orderId: string) => void;
-  onCloseItemsBubble?: () => void;
-}
 // Draggable wrapper for order cards (desktop only)
 function DraggableCard({ id, children, disabled }: { id: string; children: React.ReactNode; disabled?: boolean }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id, disabled });
@@ -113,7 +105,7 @@ function DraggableCard({ id, children, disabled }: { id: string; children: React
   );
 }
 
-ffunction OrderStatusColumn({
+function OrderStatusColumn({
   config,
   orders,
   onMoveOrder,
@@ -442,40 +434,37 @@ ffunction OrderStatusColumn({
             {hasItems && (
               <Collapsible open={isOrderExpanded} onOpenChange={() => toggleExpanded(order.id)}>
                 <CollapsibleTrigger asChild>
-                  function OrderStatusColumn({
- <button
-  className={cn(
-    "flex items-center justify-between w-full text-[10px] sm:text-xs bg-muted/50 hover:bg-muted px-2 sm:px-2.5 py-1.5 sm:py-2 rounded-lg transition-all duration-200",
-    itemsBubble?.orderId === order.id &&
-      "ring-2 ring-primary/40 bg-primary/10"
-  )}
-  onClick={(e) => {
-    e.stopPropagation();
+                  <button
+                    className={cn(
+                      "flex items-center justify-between w-full text-[10px] sm:text-xs bg-muted/50 hover:bg-muted px-2 sm:px-2.5 py-1.5 sm:py-2 rounded-lg transition-all duration-200",
+                      itemsBubble?.orderId === order.id && "ring-2 ring-primary/40 bg-primary/10",
+                    )}
+                    onClick={(e) => {
+                      e.stopPropagation();
 
-    if (itemsBubble?.orderId === order.id) {
-      onCloseItemsBubble?.();
-    } else {
-      onOpenItemsBubble?.(order.id);
-    }
-  }}
->
-  <span className="flex items-center gap-1 sm:gap-1.5 text-muted-foreground font-medium">
-    <ChevronDown
-      className={cn(
-        "h-3 w-3 sm:h-3.5 sm:w-3.5 transition-transform duration-200",
-        isOrderExpanded ? "rotate-0" : "-rotate-90"
-      )}
-    />
-    {order.items?.length} item{order.items?.length !== 1 ? "s" : ""}
-  </span>
+                      if (itemsBubble?.orderId === order.id) {
+                        onCloseItemsBubble?.();
+                      } else {
+                        onOpenItemsBubble?.(order.id);
+                      }
+                    }}
+                  >
+                    <span className="flex items-center gap-1 sm:gap-1.5 text-muted-foreground font-medium">
+                      <ChevronDown
+                        className={cn(
+                          "h-3 w-3 sm:h-3.5 sm:w-3.5 transition-transform duration-200",
+                          isOrderExpanded ? "rotate-0" : "-rotate-90",
+                        )}
+                      />
+                      {order.items?.length} item{order.items?.length !== 1 ? "s" : ""}
+                    </span>
 
-  {stockSummary && (
-    <span className="flex items-center gap-1 font-medium text-muted-foreground">
-      <PackageCheck className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
-      {stockSummary.units} unit{stockSummary.units !== 1 ? "s" : ""}
-    </span>
-  )}
-</button>
+                    {stockSummary && (
+                      <span className="flex items-center gap-1 font-medium text-muted-foreground">
+                        <PackageCheck className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                        {stockSummary.units} unit{stockSummary.units !== 1 ? "s" : ""}
+                      </span>
+                    )}
                   </button>
                 </CollapsibleTrigger>
                 <CollapsibleContent className="mt-2">
