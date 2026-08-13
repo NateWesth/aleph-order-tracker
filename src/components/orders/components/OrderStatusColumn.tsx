@@ -233,75 +233,135 @@ function OrderStatusColumn({
     <>
       <style>{`
         /*
-         * STEP 3
-         * The bubble now visually grows OUT OF the order card.
+         * STEPS 4–7
          *
-         * The card itself slightly expands/pulls toward the bubble while
-         * the bubble starts compressed against the card and grows outward.
+         * Step 4:
+         * Subtle elastic overshoot / bounce.
+         *
+         * Step 5:
+         * Shadow + glow trail follows the expansion point.
+         *
+         * Step 6:
+         * Main animation is kept inside the 500–650ms range so it
+         * feels responsive enough for a real business application.
+         *
+         * Step 7:
+         * All existing drag/drop, scrolling and mobile behavior remains
+         * untouched. These animations only affect the visual bubble/card
+         * connection when the bubble is opened.
          */
 
-        @keyframes order-card-bubble-grow {
+        @keyframes order-card-bubble-elastic {
           0% {
             transform: translateX(0) scale(1);
+            filter: drop-shadow(0 0 0 transparent);
           }
 
-          28% {
-            transform: translateX(3px) scale(1.018);
+          20% {
+            transform: translateX(3px) scale(1.012);
           }
 
-          55% {
-            transform: translateX(5px) scale(1.008);
+          43% {
+            transform: translateX(7px) scale(1.022);
+            filter: drop-shadow(
+              8px 0 10px hsl(var(--primary) / 0.10)
+            );
           }
 
-          78% {
-            transform: translateX(3px) scale(1.003);
+          61% {
+            transform: translateX(4px) scale(1.008);
+            filter: drop-shadow(
+              5px 0 8px hsl(var(--primary) / 0.08)
+            );
+          }
+
+          77% {
+            transform: translateX(1.5px) scale(1.002);
+            filter: drop-shadow(
+              2px 0 5px hsl(var(--primary) / 0.04)
+            );
+          }
+
+          89% {
+            transform: translateX(-0.5px) scale(1.001);
           }
 
           100% {
             transform: translateX(0) scale(1);
+            filter: drop-shadow(0 0 0 transparent);
           }
         }
 
-        @keyframes order-bubble-grow-from-card {
+        @keyframes order-bubble-elastic-grow {
           0% {
             opacity: 0;
             transform-origin: left center;
             transform:
               translateX(-12px)
-              scaleX(0.12)
-              scaleY(0.82);
+              scaleX(0.10)
+              scaleY(0.78);
             border-radius: 1rem;
+            box-shadow:
+              0 0 0 0 hsl(var(--primary) / 0),
+              0 0 0 0 hsl(var(--primary) / 0);
           }
 
-          18% {
-            opacity: 0.35;
+          13% {
+            opacity: 0.22;
             transform:
-              translateX(-6px)
-              scaleX(0.38)
-              scaleY(0.9);
+              translateX(-8px)
+              scaleX(0.28)
+              scaleY(0.84);
+            box-shadow:
+              -6px 0 12px 2px hsl(var(--primary) / 0.10);
           }
 
-          42% {
-            opacity: 0.8;
+          31% {
+            opacity: 0.65;
             transform:
-              translateX(-1px)
-              scaleX(0.76)
-              scaleY(0.97);
+              translateX(-3px)
+              scaleX(0.62)
+              scaleY(0.93);
+            box-shadow:
+              -8px 0 18px 3px hsl(var(--primary) / 0.14);
           }
 
-          68% {
+          52% {
             opacity: 1;
             transform:
               translateX(1px)
-              scaleX(1.035)
-              scaleY(1.015);
+              scaleX(1.045)
+              scaleY(1.018);
+            box-shadow:
+              -10px 0 24px 4px hsl(var(--primary) / 0.16),
+              0 8px 28px -8px hsl(var(--primary) / 0.14);
           }
 
-          84% {
+          68% {
             transform:
               translateX(0)
-              scaleX(0.992)
-              scaleY(0.997);
+              scaleX(0.985)
+              scaleY(0.993);
+            box-shadow:
+              -7px 0 18px 3px hsl(var(--primary) / 0.10),
+              0 6px 24px -10px hsl(var(--primary) / 0.10);
+          }
+
+          82% {
+            transform:
+              translateX(0)
+              scaleX(1.012)
+              scaleY(1.006);
+            box-shadow:
+              -4px 0 12px 2px hsl(var(--primary) / 0.06),
+              0 5px 20px -12px hsl(var(--primary) / 0.08);
+          }
+
+          92% {
+            transform:
+              translateX(0)
+              scaleX(0.997)
+              scaleY(0.998);
           }
 
           100% {
@@ -311,35 +371,116 @@ function OrderStatusColumn({
               scaleX(1)
               scaleY(1);
             border-radius: 1rem;
+            box-shadow:
+              0 25px 50px -20px hsl(var(--foreground) / 0.20);
           }
         }
 
-        @keyframes order-bubble-connector-grow {
+        /*
+         * The connector has its own small elastic motion so the visual
+         * connection between the card and bubble feels continuous.
+         */
+        @keyframes order-bubble-connector-elastic {
           0% {
             opacity: 0;
-            transform: translateX(-8px) rotate(45deg) scale(0.25);
+            transform:
+              translateX(-9px)
+              rotate(45deg)
+              scale(0.2);
           }
 
-          45% {
-            opacity: 0.7;
-            transform: translateX(-2px) rotate(45deg) scale(0.8);
+          35% {
+            opacity: 0.65;
+            transform:
+              translateX(-3px)
+              rotate(45deg)
+              scale(0.78);
+          }
+
+          58% {
+            opacity: 1;
+            transform:
+              translateX(1px)
+              rotate(45deg)
+              scale(1.08);
+          }
+
+          76% {
+            transform:
+              translateX(-0.5px)
+              rotate(45deg)
+              scale(0.96);
           }
 
           100% {
             opacity: 1;
-            transform: translateX(0) rotate(45deg) scale(1);
+            transform:
+              translateX(0)
+              rotate(45deg)
+              scale(1);
+          }
+        }
+
+        /*
+         * Short glow pulse at the point where the bubble leaves the card.
+         * This creates the subtle "energy trail" without being distracting.
+         */
+        @keyframes order-bubble-glow-trail {
+          0% {
+            opacity: 0;
+            transform:
+              translateX(-10px)
+              scaleX(0.35)
+              scaleY(0.75);
+          }
+
+          20% {
+            opacity: 0.75;
+            transform:
+              translateX(-3px)
+              scaleX(0.75)
+              scaleY(0.92);
+          }
+
+          45% {
+            opacity: 0.5;
+            transform:
+              translateX(4px)
+              scaleX(1.15)
+              scaleY(1);
+          }
+
+          70% {
+            opacity: 0.22;
+            transform:
+              translateX(9px)
+              scaleX(1.4)
+              scaleY(1.02);
+          }
+
+          100% {
+            opacity: 0;
+            transform:
+              translateX(16px)
+              scaleX(1.65)
+              scaleY(1.05);
           }
         }
 
         @keyframes order-bubble-content-rise {
           0% {
             opacity: 0;
-            transform: translateY(8px);
+            transform: translateY(7px);
           }
 
-          55% {
+          45% {
             opacity: 0;
-            transform: translateY(5px);
+            transform: translateY(4px);
+          }
+
+          72% {
+            opacity: 0.75;
+            transform: translateY(1px);
           }
 
           100% {
@@ -351,7 +492,12 @@ function OrderStatusColumn({
         @keyframes order-item-pop {
           0% {
             opacity: 0;
-            transform: translateX(-8px) scale(0.96);
+            transform: translateX(-7px) scale(0.97);
+          }
+
+          65% {
+            opacity: 1;
+            transform: translateX(1px) scale(1.005);
           }
 
           100% {
@@ -360,43 +506,61 @@ function OrderStatusColumn({
           }
         }
 
+        /*
+         * 600ms = fast enough for frequent business interactions while
+         * still allowing the elastic motion to be perceived.
+         */
         .animate-order-card-bubble-grow {
           animation:
-            order-card-bubble-grow
-            650ms
+            order-card-bubble-elastic
+            600ms
             cubic-bezier(0.22, 1, 0.36, 1)
             both;
+          will-change: transform, filter;
         }
 
         .animate-order-bubble-grow {
           animation:
-            order-bubble-grow-from-card
-            720ms
+            order-bubble-elastic-grow
+            620ms
             cubic-bezier(0.22, 1, 0.36, 1)
             both;
+          will-change: transform, opacity, box-shadow;
         }
 
         .animate-order-bubble-connector {
           animation:
-            order-bubble-connector-grow
-            500ms
-            180ms
+            order-bubble-connector-elastic
+            520ms
+            80ms
             cubic-bezier(0.22, 1, 0.36, 1)
             both;
+          will-change: transform, opacity;
+        }
+
+        .animate-order-bubble-glow-trail {
+          animation:
+            order-bubble-glow-trail
+            560ms
+            cubic-bezier(0.22, 1, 0.36, 1)
+            both;
+          will-change: transform, opacity;
         }
 
         .animate-order-bubble-content {
           animation:
             order-bubble-content-rise
-            720ms
+            560ms
+            70ms
             cubic-bezier(0.22, 1, 0.36, 1)
             both;
+          will-change: transform, opacity;
         }
 
         .animate-item-pop {
           animation:
             order-item-pop
-            360ms
+            300ms
             cubic-bezier(0.22, 1, 0.36, 1)
             both;
         }
@@ -405,6 +569,7 @@ function OrderStatusColumn({
           .animate-order-card-bubble-grow,
           .animate-order-bubble-grow,
           .animate-order-bubble-connector,
+          .animate-order-bubble-glow-trail,
           .animate-order-bubble-content,
           .animate-item-pop {
             animation: none !important;
@@ -746,6 +911,7 @@ function OrderStatusColumn({
                   onClick={() => onMoveOrder(order, config.nextStatus!)}
                 >
                   <span className="truncate">{config.nextLabel}</span>
+
                   <ArrowRight className="h-3 w-3 sm:h-3.5 sm:w-3.5 ml-1 shrink-0" />
                 </Button>
               )}
@@ -789,25 +955,59 @@ function OrderStatusColumn({
     );
 
     /*
-     * STEP 3 BUBBLE
+     * STEPS 4–7
      *
-     * Important change:
-     * The bubble is rendered immediately beside the card inside the same
-     * visual "connection" container.
+     * The bubble remains in the same connection container as the card.
+     * The animation is therefore visual only and does not alter:
      *
-     * This makes the animation feel like the bubble is expanding FROM
-     * the card instead of simply appearing beside it.
+     * - drag/drop
+     * - DnD identifiers
+     * - scrolling
+     * - mobile swipe behavior
+     * - order actions
+     * - order data
      */
+
     const orderItemsBubble = isBubbleOpen ? (
       <div
         className={cn(
           "relative overflow-visible rounded-2xl",
-          "border border-primary/20 bg-background/95 shadow-2xl",
+          "border border-primary/20 bg-background/95",
           "backdrop-blur-xl",
           "origin-left",
           "animate-order-bubble-grow",
+          "shadow-2xl",
         )}
       >
+        {/* Moving glow / shadow trail */}
+        <div
+          className={cn(
+            "absolute -left-4 top-5 bottom-5 w-10",
+            "rounded-full",
+            "bg-primary/20",
+            "blur-xl",
+            "pointer-events-none",
+            "z-0",
+            "animate-order-bubble-glow-trail",
+          )}
+        />
+
+        {/* Secondary subtle trail */}
+        <div
+          className={cn(
+            "absolute -left-2 top-8 bottom-8 w-5",
+            "rounded-full",
+            "bg-primary/15",
+            "blur-md",
+            "pointer-events-none",
+            "z-0",
+            "animate-order-bubble-glow-trail",
+          )}
+          style={{
+            animationDelay: "45ms",
+          }}
+        />
+
         {/* Visual connector from card into bubble */}
         <div
           className={cn(
@@ -819,12 +1019,10 @@ function OrderStatusColumn({
           )}
         />
 
-        {/* Soft glow at the point where bubble grows from card */}
-        <div className="absolute -left-3 top-4 bottom-4 w-8 rounded-full bg-primary/15 blur-xl pointer-events-none" />
-
+        {/* Soft ambient top glow */}
         <div className="absolute inset-x-0 top-0 h-16 bg-primary/10 blur-2xl pointer-events-none rounded-t-2xl" />
 
-        <div className="relative p-4 sm:p-5 animate-order-bubble-content">
+        <div className="relative z-10 p-4 sm:p-5 animate-order-bubble-content">
           {/* Header */}
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
@@ -874,7 +1072,7 @@ function OrderStatusColumn({
                   key={item.id}
                   className="flex items-center gap-3 rounded-xl bg-muted/40 px-3 py-2.5 text-xs animate-item-pop"
                   style={{
-                    animationDelay: `${itemIndex * 60 + 420}ms`,
+                    animationDelay: `${Math.min(itemIndex * 45 + 300, 500)}ms`,
                   }}
                 >
                   <div className="flex h-7 min-w-7 items-center justify-center rounded-lg bg-primary/10 px-1.5 font-bold text-primary">
