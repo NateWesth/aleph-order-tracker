@@ -298,7 +298,7 @@ const AdminDashboard = () => {
         <main className="flex-1 overflow-x-hidden overflow-y-auto w-full pb-16 sm:pb-0">
           <div
             className={cn(
-              "w-full px-1.5 sm:px-3 py-2 sm:py-3",
+              "w-full px-3 sm:px-5 lg:px-6 py-4 sm:py-6",
               activeView === "orders" || activeView === "history" ? "max-w-none" : "max-w-7xl mx-auto"
             )}
           >
