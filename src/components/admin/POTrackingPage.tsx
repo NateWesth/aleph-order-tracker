@@ -35,6 +35,7 @@ import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import { OrderWithCompany } from "@/components/orders/types/orderTypes";
 import { useLiveData } from "@/hooks/useLiveData";
 import OrderDetailsDialog from "@/components/orders/components/OrderDetailsDialog";
+import PageHeader from "@/components/ui/PageHeader";
 
 interface POLine {
   sku: string;
