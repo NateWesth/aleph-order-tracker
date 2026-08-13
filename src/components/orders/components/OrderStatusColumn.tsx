@@ -560,6 +560,8 @@ function OrderStatusColumn({
         {/* Bubble connector */}
         <div className="absolute -top-2 left-8 h-4 w-4 rotate-45 border-l border-t border-primary/20 bg-background/95" />
 
+        <div className="absolute inset-x-0 top-0 h-16 bg-primary/10 blur-2xl pointer-events-none" />
+
         <div className="relative p-4 sm:p-5">
           {/* Header */}
           <div className="flex items-start justify-between gap-3">
@@ -608,7 +610,7 @@ function OrderStatusColumn({
               return (
                 <div
                   key={item.id}
-                  className="flex items-center gap-3 rounded-xl bg-muted/40 px-3 py-2.5 text-xs animate-in fade-in slide-in-from-left-2 duration-300"
+                  className="flex items-center gap-3 rounded-xl bg-muted/40 px-3 py-2.5 text-xs animate-item-pop"
                   style={{ animationDelay: `${itemIndex * 60}ms` }}
                 >
                   <div className="flex h-7 min-w-7 items-center justify-center rounded-lg bg-primary/10 px-1.5 font-bold text-primary">
@@ -648,25 +650,44 @@ function OrderStatusColumn({
     ) : null;
 
     return (
-      <div className="space-y-2">
+      <div
+        className={cn(
+          "space-y-2 transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]",
+          isBubbleOpen && !isMobile && "relative z-30 lg:space-y-3",
+        )}
+      >
         {isMobile ? (
-          <SwipeableCard
-            key={`${order.id}-${config.key}`}
-            onSwipeLeft={() => onDeleteOrder(order)}
-            onSwipeRight={config.nextStatus ? () => onMoveOrder(order, config.nextStatus!) : undefined}
-            leftLabel="Delete"
-            rightLabel={config.nextLabel || "Next"}
-            rightIcon={<ArrowRight className="h-4 w-4" />}
-          >
-            {cardContent}
-          </SwipeableCard>
+          <div className="space-y-2">
+            <SwipeableCard
+              key={`${order.id}-${config.key}`}
+              onSwipeLeft={() => onDeleteOrder(order)}
+              onSwipeRight={config.nextStatus ? () => onMoveOrder(order, config.nextStatus!) : undefined}
+              leftLabel="Delete"
+              rightLabel={config.nextLabel || "Next"}
+              rightIcon={<ArrowRight className="h-4 w-4" />}
+            >
+              {cardContent}
+            </SwipeableCard>
+
+            {orderItemsBubble}
+          </div>
+        ) : isBubbleOpen ? (
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(360px,0.85fr)] gap-3 lg:gap-4 items-start">
+            <div className="min-w-0 animate-in fade-in zoom-in-95 duration-300">
+              <DraggableCard key={`${order.id}-${config.key}`} id={`${order.id}::${order.boardStage || config.key}`}>
+                {cardContent}
+              </DraggableCard>
+            </div>
+
+            <div className="min-w-0 lg:sticky lg:top-3" style={{ animationDelay: "80ms" }}>
+              {orderItemsBubble}
+            </div>
+          </div>
         ) : (
           <DraggableCard key={`${order.id}-${config.key}`} id={`${order.id}::${order.boardStage || config.key}`}>
             {cardContent}
           </DraggableCard>
         )}
-
-        {orderItemsBubble}
       </div>
     );
   }
