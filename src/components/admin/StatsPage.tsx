@@ -14,6 +14,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
+import PageHeader from "@/components/ui/PageHeader";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 
@@ -249,18 +250,13 @@ export default function StatsPage() {
 
   return (
     <div className="space-y-6 pb-8">
-      {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Analytics</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            {format(dateRange.from, "MMM d, yyyy")} — {format(dateRange.to, "MMM d, yyyy")}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <ReportGenerator />
-        </div>
-      </div>
+      <PageHeader
+        title="Analytics"
+        icon={BarChart3}
+        description={`${format(dateRange.from, "MMM d, yyyy")} — ${format(dateRange.to, "MMM d, yyyy")}`}
+        actions={<ReportGenerator />}
+      />
+
 
       {/* Date Range Selector */}
       <div className="flex items-center gap-2 flex-wrap">

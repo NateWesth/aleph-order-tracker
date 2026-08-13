@@ -10,7 +10,8 @@ import {
 } from "@/components/ui/dialog";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { Plus, Search, Users } from "lucide-react";
+import { Plus, Search, Users, Building2 } from "lucide-react";
+import PageHeader from "@/components/ui/PageHeader";
 import { Input } from "@/components/ui/input";
 
 import CompanyForm, { companySchema, type CompanyFormValues } from "./components/CompanyForm";
@@ -185,28 +186,36 @@ export default function ClientCompaniesPage() {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between gap-4">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search clients..."
-            className="pl-9 h-9"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-        <div className="flex items-center gap-2">
-          <Button size="sm" variant="outline" onClick={() => setInviteDialogOpen(true)}>
-            <Users className="h-4 w-4 mr-1" />
-            Invite Client
-          </Button>
-          <Button size="sm" onClick={() => setIsNewCompanyDialogOpen(true)}>
-            <Plus className="h-4 w-4 mr-1" />
-            Add Client
-          </Button>
-        </div>
-      </div>
+    <div className="space-y-5">
+      <PageHeader
+        title="Clients"
+        icon={Building2}
+        description="Companies you supply, their codes and portal invites."
+        stats={[{ label: "clients", value: filteredCompanies.length, icon: Building2 }]}
+        actions={
+          <>
+            <Button variant="outline" onClick={() => setInviteDialogOpen(true)}>
+              <Users className="h-4 w-4 mr-2" />
+              Invite Client
+            </Button>
+            <Button onClick={() => setIsNewCompanyDialogOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Client
+            </Button>
+          </>
+        }
+        toolbar={
+          <div className="relative w-full sm:max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search clients..."
+              className="pl-9"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+        }
+      />
 
       <CompanyTable 
         companies={filteredCompanies.map(company => ({
@@ -221,7 +230,7 @@ export default function ClientCompaniesPage() {
         }}
       />
 
-      <p className="text-xs text-muted-foreground">{filteredCompanies.length} clients</p>
+      
 
       {/* New Company Dialog */}
       <Dialog open={isNewCompanyDialogOpen} onOpenChange={handleDialogClose}>

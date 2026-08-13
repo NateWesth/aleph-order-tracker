@@ -909,3 +909,91 @@ img {
     scroll-behavior: auto !important;
   }
 }
+
+/* ============================================================
+   Layout rhythm & visual refinement
+   ============================================================ */
+
+/* Consistent breathing room between stacked page sections */
+main .page-section + .page-section {
+  margin-top: 1.25rem;
+}
+
+/* Cards: quieter borders, gentle lift on hover */
+main [class*="rounded-"][class*="bg-card"] {
+  border-color: hsl(var(--border) / 0.7);
+}
+
+main a[class*="bg-card"]:hover,
+main button[class*="bg-card"]:hover,
+main [role="button"][class*="bg-card"]:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 24px -12px hsl(var(--foreground) / 0.18);
+  border-color: hsl(var(--primary) / 0.35);
+}
+
+/* Tables read cleaner: lighter dividers, calm zebra, tighter headers */
+main table thead th {
+  font-size: 0.75rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: hsl(var(--muted-foreground));
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+main table tbody tr {
+  border-color: hsl(var(--border) / 0.5);
+}
+
+main table tbody tr:hover {
+  background-color: hsl(var(--muted) / 0.45);
+}
+
+/* Numeric columns line up */
+main table td .tabular,
+main .tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Slimmer, themed scrollbars so dense pages feel less noisy */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: hsl(var(--muted-foreground) / 0.25);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: hsl(var(--muted-foreground) / 0.45);
+}
+
+/* Sticky table headers on long lists */
+main .sticky-head thead th {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background-color: hsl(var(--card));
+  backdrop-filter: blur(8px);
+}
+
+/* Empty states get a touch of air */
+main .empty-state {
+  padding: 3rem 1.5rem;
+  text-align: center;
+  color: hsl(var(--muted-foreground));
+}
