@@ -1,17 +1,16 @@
-import { useState, useEffect, useCallback, useMemo, memo } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useLiveData } from "@/hooks/useLiveData";
 import { supabase } from "@/integrations/supabase/client";
 import { PullToRefresh } from "@/components/ui/PullToRefresh";
 import { useOrderCelebration, ConfettiOverlay } from "@/components/ui/OrderCelebration";
 import { playClick, playSuccess } from "@/utils/ambientSounds";
 import { Button } from "@/components/ui/button";
-import { Plus, Filter, ChevronDown, ChevronUp, Users } from "lucide-react";
+import { Plus, Filter, Users } from "lucide-react";
 import OrderTemplatesDialog from "./components/OrderTemplatesDialog";
 import OverdueAlerts from "./components/OverdueAlerts";
 import SavedFiltersBar, { type OrderFilter } from "./components/SavedFiltersBar";
 import {
   DndContext,
-  DragOverlay,
   closestCenter,
   PointerSensor,
   useSensor,
@@ -77,16 +76,13 @@ interface Order {
   creatorName?: string;
   items?: OrderItem[];
   purchaseOrders?: PurchaseOrderInfo[];
-  /** Which board stage this card represents (an order can appear in several). */
   boardStage?: ItemStage;
 }
 
-/** Item-level stages, in flow order. */
 type ItemStage = "awaiting-stock" | "ordered" | "in-stock" | "ready-for-delivery" | "completed";
 
 const STAGE_ORDER: ItemStage[] = ["awaiting-stock", "ordered", "in-stock", "ready-for-delivery", "completed"];
 
-/** Board column key -> item stage. */
 const COLUMN_STAGE: Record<string, ItemStage> = {
   ordered: "awaiting-stock",
   "in-progress": "ordered",
@@ -95,33 +91,38 @@ const COLUMN_STAGE: Record<string, ItemStage> = {
   delivered: "completed",
 };
 
-/** Quantity of an item sitting in each stage. */
 const bucketsFor = (item: OrderItem): Record<ItemStage, number> => {
   const qty = item.totalQuantity ?? item.quantity ?? 0;
   const onPo = Math.min(item.qty_on_po ?? 0, qty);
   const received = Math.min(item.qty_received ?? 0, onPo);
   const invoiced = Math.min(item.qty_invoiced ?? 0, received);
   const completed = Math.min(item.qty_completed ?? 0, invoiced);
+
   return {
     "awaiting-stock": Math.max(0, qty - onPo),
     ordered: Math.max(0, onPo - received),
     "in-stock": Math.max(0, received - invoiced),
     "ready-for-delivery": Math.max(0, invoiced - completed),
-    completed: completed,
+    completed,
   };
 };
 
-/** New cumulative counters after moving `qty` units of an item between stages. */
 const countersAfterMove = (item: OrderItem, from: ItemStage, to: ItemStage, qty: number) => {
   const counters = [item.qty_on_po ?? 0, item.qty_received ?? 0, item.qty_invoiced ?? 0, item.qty_completed ?? 0];
+
   const f = STAGE_ORDER.indexOf(from);
   const t = STAGE_ORDER.indexOf(to);
   const delta = t > f ? qty : -qty;
+
   const lo = Math.min(f, t);
   const hi = Math.max(f, t);
-  for (let i = lo; i < hi; i++) counters[i] += delta;
+
+  for (let i = lo; i < hi; i++) {
+    counters[i] += delta;
+  }
 
   let cap = item.totalQuantity ?? item.quantity ?? 0;
+
   for (let i = 0; i < counters.length; i++) {
     counters[i] = Math.max(0, Math.min(counters[i], cap));
     cap = counters[i];
@@ -135,7 +136,6 @@ const countersAfterMove = (item: OrderItem, from: ItemStage, to: ItemStage, qty:
   };
 };
 
-// Default status column configurations (flow: Awaiting Stock -> In Progress -> In Stock -> Ready for Delivery)
 const DEFAULT_STATUS_COLUMNS = [
   {
     key: "ordered",
@@ -177,7 +177,6 @@ const DEFAULT_STATUS_COLUMNS = [
   },
 ];
 
-// Helper to get status columns based on theme settings
 const getStatusColumns = (
   boardColorMode: string,
   boardSingleColor: string,
@@ -186,6 +185,7 @@ const getStatusColumns = (
 ) => {
   if (boardColorMode === "colorful") {
     const preset = colorfulPresets[colorfulPreset as keyof typeof colorfulPresets] || colorfulPresets.default;
+
     return DEFAULT_STATUS_COLUMNS.map((col, index) => ({
       ...col,
       bgColor: preset.colors[index],
@@ -204,6 +204,7 @@ const getStatusColumns = (
 
   const colorConfig =
     boardSingleColors[boardSingleColor as keyof typeof boardSingleColors] || boardSingleColors.primary;
+
   return DEFAULT_STATUS_COLUMNS.map((col) => ({
     ...col,
     color: colorConfig.textClass,
@@ -221,34 +222,44 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
   const [activeFilter, setActiveFilter] = useState<OrderFilter | null>(null);
   const [activeOrderId, setActiveOrderId] = useState<string | null>(null);
 
-  // Order items bubble currently being displayed.
-  // This is deliberately separate from the existing inline item expansion.
+  /*
+   * Items bubble state.
+   *
+   * The selected order remains owned by OrderStatusColumn. This state only
+   * controls which column currently has its expanded item bubble open.
+   */
   const [itemsBubble, setItemsBubble] = useState<{
     orderId: string;
     columnKey: string;
   } | null>(null);
 
-  // On desktop/tablet, all columns are always expanded (not collapsible)
-  // On mobile, columns are collapsible and start collapsed
   const [expandedColumns, setExpandedColumns] = useState<Set<string>>(new Set());
+
   const { toast } = useToast();
   const { user } = useAuth();
   const { companies } = useCompanyData();
   const { boardColorMode, boardSingleColor, colorfulPreset, customBoardColor } = useTheme();
+
   const [groupByClient, setGroupByClient] = useState(false);
+
   const { showConfetti, streak, celebrate } = useOrderCelebration();
+
   const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
+
   const [allTags, setAllTags] = useState<{ id: string; name: string; color: string }[]>([]);
+
   const [tagAssignments, setTagAssignments] = useState<Map<string, string[]>>(new Map());
 
   const toggleOrderSelection = useCallback((orderId: string) => {
     setSelectedOrderIds((prev) => {
       const next = new Set(prev);
+
       if (next.has(orderId)) {
         next.delete(orderId);
       } else {
         next.add(orderId);
       }
+
       return next;
     });
   }, []);
@@ -276,16 +287,21 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
     [boardColorMode, boardSingleColor, colorfulPreset, customBoardColor],
   );
 
-  // Drag-and-drop sensors (require 8px movement to start dragging)
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+  );
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
     playClick();
-    setActiveOrderId(event.active.id as string);
+    setActiveOrderId(String(event.active.id));
   }, []);
+
   const fetchOrders = useCallback(async () => {
     try {
-      // Fetch all orders except delivered (those go to history)
       const { data, error } = await supabase
         .from("orders")
         .select(
@@ -296,22 +312,22 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
 
       if (error) throw error;
 
-      // Fetch company names
       const companyIds = [...new Set(data?.map((o) => o.company_id).filter(Boolean))];
+
       let companyMap = new Map<string, string>();
 
       if (companyIds.length > 0) {
         const { data: companiesData } = await supabase.from("companies").select("id, name").in("id", companyIds);
+
         companyMap = new Map(companiesData?.map((c) => [c.id, c.name]) || []);
       }
 
-      // Fetch order items for all orders
       const orderIds = data?.map((o) => o.id) || [];
-      let orderItemsMap = new Map<string, OrderItem[]>();
-      let orderPOsMap = new Map<string, PurchaseOrderInfo[]>();
+
+      const orderItemsMap = new Map<string, OrderItem[]>();
+      const orderPOsMap = new Map<string, PurchaseOrderInfo[]>();
 
       if (orderIds.length > 0) {
-        // Fetch order items
         const { data: itemsData } = await supabase
           .from("order_items")
           .select(
@@ -322,6 +338,7 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
         if (itemsData) {
           itemsData.forEach((item: any) => {
             const existing = orderItemsMap.get(item.order_id) || [];
+
             existing.push({
               id: item.id,
               name: item.name,
@@ -334,44 +351,49 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
               qty_invoiced: item.qty_invoiced ?? 0,
               qty_completed: item.qty_completed ?? 0,
             });
+
             orderItemsMap.set(item.order_id, existing);
           });
         }
 
-        // Fetch purchase orders from junction table
         const { data: posData } = await supabase
           .from("order_purchase_orders")
           .select("id, order_id, supplier_id, purchase_order_number")
           .in("order_id", orderIds);
 
         if (posData && posData.length > 0) {
-          // Get unique supplier IDs from POs
           const poSupplierIds = [...new Set(posData.map((po) => po.supplier_id))];
+
           let supplierMap = new Map<string, string>();
 
           if (poSupplierIds.length > 0) {
             const { data: suppliersData } = await supabase.from("suppliers").select("id, name").in("id", poSupplierIds);
+
             supplierMap = new Map(suppliersData?.map((s) => [s.id, s.name]) || []);
           }
 
           posData.forEach((po) => {
             const existing = orderPOsMap.get(po.order_id) || [];
+
             existing.push({
               id: po.id,
               supplier_id: po.supplier_id,
               purchase_order_number: po.purchase_order_number,
               supplierName: supplierMap.get(po.supplier_id) || "Unknown",
             });
+
             orderPOsMap.set(po.order_id, existing);
           });
         }
       }
 
-      // Fetch creator profile names
       const userIds = [...new Set(data?.map((o) => o.user_id).filter(Boolean))] as string[];
+
       let userMap = new Map<string, string>();
+
       if (userIds.length > 0) {
         const { data: profilesData } = await supabase.from("profiles").select("id, full_name").in("id", userIds);
+
         userMap = new Map(profilesData?.map((p) => [p.id, p.full_name || "Unknown"]) || []);
       }
 
@@ -384,8 +406,21 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
       }));
 
       setOrders(ordersWithData);
+
+      /*
+       * If the currently opened bubble belongs to an order that no longer
+       * exists, close it cleanly rather than leaving a stale bubble state.
+       */
+      if (itemsBubble) {
+        const stillExists = ordersWithData.some((order) => order.id === itemsBubble.orderId);
+
+        if (!stillExists) {
+          setItemsBubble(null);
+        }
+      }
     } catch (error) {
       console.error("Error fetching orders:", error);
+
       toast({
         title: "Error",
         description: "Failed to load orders",
@@ -394,7 +429,7 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, [toast, itemsBubble]);
 
   useLiveData(["orders", "order_items", "order_purchase_orders", "order_files"], () => fetchOrders());
 
@@ -409,14 +444,20 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
         supabase.from("order_tags").select("id, name, color").order("name"),
         supabase.from("order_tag_assignments").select("order_id, tag_id"),
       ]);
-      if (tagsRes.data) setAllTags(tagsRes.data);
+
+      if (tagsRes.data) {
+        setAllTags(tagsRes.data);
+      }
+
       if (assignmentsRes.data) {
         const map = new Map<string, string[]>();
+
         assignmentsRes.data.forEach((a: any) => {
           const existing = map.get(a.order_id) || [];
           existing.push(a.tag_id);
           map.set(a.order_id, existing);
         });
+
         setTagAssignments(map);
       }
     } catch (error) {
@@ -445,17 +486,18 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
         description: "Please log in to create orders",
         variant: "destructive",
       });
+
       return;
     }
 
     setSubmitting(true);
+
     try {
       const itemsDescription = orderData.items
         .filter((item) => item.name && item.quantity > 0)
         .map((item) => `${item.name} (Qty: ${item.quantity})${item.notes ? ` - ${item.notes}` : ""}`)
         .join("\n");
 
-      // Create the order
       const { data: newOrder, error } = await supabase
         .from("orders")
         .insert({
@@ -466,7 +508,7 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
           company_id: orderData.companyId,
           total_amount: orderData.totalAmount || 0,
           user_id: user.id,
-          status: "ordered", // Always start in "ordered" (Awaiting Stock)
+          status: "ordered",
           urgency: orderData.urgency,
         })
         .select("id")
@@ -474,8 +516,8 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
 
       if (error) throw error;
 
-      // Insert order items
       const validItems = orderData.items.filter((item) => item.name && item.quantity > 0);
+
       if (validItems.length > 0 && newOrder) {
         const orderItemsToInsert = validItems.map((item) => ({
           order_id: newOrder.id,
@@ -496,6 +538,7 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
         title: "Order Created",
         description: `Order ${orderData.orderNumber} has been created.`,
       });
+
       setCreateDialogOpen(false);
       fetchOrders();
     } catch (error: any) {
@@ -512,8 +555,10 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
   const handleSetItemStockStatus = useCallback(
     async (itemId: string, newStatus: string) => {
       try {
-        // When marking as received (in-stock), also advance progress_stage
-        const updateData: Record<string, string> = { stock_status: newStatus };
+        const updateData: Record<string, string> = {
+          stock_status: newStatus,
+        };
+
         if (newStatus === "in-stock") {
           updateData.progress_stage = "in-stock";
         }
@@ -546,7 +591,6 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
           description: `All items marked as ${newStatus === "in-stock" ? "received" : "ordered"}`,
         });
 
-        // Refresh orders (the database trigger will auto-move the order if all items are in stock)
         fetchOrders();
       } catch (error) {
         toast({
@@ -559,28 +603,33 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
     [fetchOrders, toast],
   );
 
-  /**
-   * Moves the quantities shown on a board card (an order's items sitting in one
-   * stage) into the target stage. Items move independently of the order, so the
-   * same order can live in several columns at once.
-   */
   const moveCardItems = useCallback(
     async (order: Order, fromStage: ItemStage, toStage: ItemStage) => {
       if (fromStage === toStage) return;
+
       const source = orders.find((o) => o.id === order.id);
+
       const items = (source?.items || []).filter((i) => bucketsFor(i)[fromStage] > 0);
+
       if (items.length === 0) return;
 
       try {
         const movedCounters = new Map<string, ReturnType<typeof countersAfterMove>>();
+
         await Promise.all(
           items.map((item) => {
             const qty = bucketsFor(item)[fromStage];
+
             const next = countersAfterMove(item, fromStage, toStage, qty);
+
             movedCounters.set(item.id, next);
+
             return supabase
               .from("order_items")
-              .update({ ...next, updated_at: new Date().toISOString() })
+              .update({
+                ...next,
+                updated_at: new Date().toISOString(),
+              })
               .eq("id", item.id)
               .throwOnError();
           }),
@@ -589,29 +638,42 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
         if (toStage === "completed") {
           celebrate();
 
-          // If every item on the order is now fully completed, the order itself is
-          // delivered — send it to Completed Orders so it leaves the board for good.
           const allItems = source?.items || [];
+
           const fullyDone =
             allItems.length > 0 &&
             allItems.every((item) => {
               const counters = movedCounters.get(item.id);
+
               const completed = counters ? counters.qty_completed : (item.qty_completed ?? 0);
+
               return completed >= (item.totalQuantity ?? item.quantity ?? 0);
             });
 
           if (fullyDone) {
             await supabase
               .from("orders")
-              .update({ status: "delivered", completed_date: new Date().toISOString() })
+              .update({
+                status: "delivered",
+                completed_date: new Date().toISOString(),
+              })
               .eq("id", order.id);
+
+            /*
+             * The completed order is no longer on the active board,
+             * therefore its bubble must also disappear.
+             */
+            setItemsBubble((current) => (current?.orderId === order.id ? null : current));
           }
         }
 
         toast({
           title: "Items moved",
-          description: `${items.length} item${items.length !== 1 ? "s" : ""} on ${order.order_number} moved to ${DEFAULT_STATUS_COLUMNS.find((c) => COLUMN_STAGE[c.key] === toStage)?.label || toStage}`,
+          description: `${items.length} item${items.length !== 1 ? "s" : ""} on ${order.order_number} moved to ${
+            DEFAULT_STATUS_COLUMNS.find((c) => COLUMN_STAGE[c.key] === toStage)?.label || toStage
+          }`,
         });
+
         fetchOrders();
       } catch (error) {
         toast({
@@ -628,7 +690,9 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
     (order: Order, newStatus: string) => {
       const toStage = COLUMN_STAGE[newStatus];
       const fromStage = order.boardStage;
+
       if (!toStage || !fromStage) return;
+
       void moveCardItems(order, fromStage, toStage);
     },
     [moveCardItems],
@@ -637,17 +701,23 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
       setActiveOrderId(null);
+
       const { active, over } = event;
+
       if (!over) return;
 
       const [orderId, fromStage] = String(active.id).split("::") as [string, ItemStage];
+
       const toStage = COLUMN_STAGE[String(over.id)];
 
       const order = orders.find((o) => o.id === orderId);
-      if (!order || !toStage || !fromStage || fromStage === toStage) return;
 
-      // Play a satisfying drop/success sound
+      if (!order || !toStage || !fromStage || fromStage === toStage) {
+        return;
+      }
+
       playSuccess();
+
       void moveCardItems(order, fromStage, toStage);
     },
     [orders, moveCardItems],
@@ -657,12 +727,19 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
     async (order: Order) => {
       try {
         const { error } = await supabase.from("orders").delete().eq("id", order.id);
+
         if (error) throw error;
+
+        /*
+         * Remove an open bubble immediately when its order is deleted.
+         */
+        setItemsBubble((current) => (current?.orderId === order.id ? null : current));
 
         toast({
           title: "Deleted",
           description: `Order ${order.order_number} has been deleted`,
         });
+
         fetchOrders();
       } catch (error) {
         toast({
@@ -675,29 +752,33 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
     [fetchOrders, toast],
   );
 
-  // Memoize filtered orders to prevent unnecessary recalculations
   const filteredOrders = useMemo(() => {
     const searchLower = searchTerm.toLowerCase();
+
     return orders.filter((order) => {
       const effectiveCompanyId = activeFilter?.companyId || selectedCompanyId;
+
       const matchesCompany = effectiveCompanyId === "all" || order.company_id === effectiveCompanyId;
+
       const matchesSearch =
         order.order_number.toLowerCase().includes(searchLower) ||
         order.companyName?.toLowerCase().includes(searchLower);
 
-      // Urgency filter from saved filter
       const matchesUrgency =
         !activeFilter?.urgency || activeFilter.urgency === "all" || order.urgency === activeFilter.urgency;
 
-      // Date range filter
       let matchesDate = true;
+
       if (activeFilter?.dateRange && activeFilter.dateRange !== "all" && order.created_at) {
         const orderDate = new Date(order.created_at);
+
         const now = new Date();
+
         if (activeFilter.dateRange === "today") {
           matchesDate = orderDate.toDateString() === now.toDateString();
         } else if (activeFilter.dateRange === "week") {
           const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
           matchesDate = orderDate >= weekAgo;
         } else if (activeFilter.dateRange === "month") {
           matchesDate = orderDate.getMonth() === now.getMonth() && orderDate.getFullYear() === now.getFullYear();
@@ -708,7 +789,6 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
     });
   }, [orders, selectedCompanyId, searchTerm, activeFilter]);
 
-  // Priority order for urgency sorting (lower = higher priority)
   const urgencyPriority: Record<string, number> = useMemo(
     () => ({
       urgent: 1,
@@ -719,12 +799,11 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
     [],
   );
 
-  // Item-level board: an order appears in every column where it still has
-  // quantities sitting in that stage, carrying only those items/quantities.
   const ordersByStatus = useMemo(() => {
     const sortOrders = (ordersToSort: Order[]) => {
       return [...ordersToSort].sort((a, b) => {
         const urgencyA = urgencyPriority[a.urgency || "normal"] || 3;
+
         const urgencyB = urgencyPriority[b.urgency || "normal"] || 3;
 
         if (urgencyA !== urgencyB) {
@@ -732,7 +811,9 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
         }
 
         const dateA = new Date(a.created_at || 0).getTime();
+
         const dateB = new Date(b.created_at || 0).getTime();
+
         return dateA - dateB;
       });
     };
@@ -748,18 +829,30 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
       const items = order.items || [];
 
       Object.entries(COLUMN_STAGE).forEach(([columnKey, stage]) => {
-        if (!(columnKey in buckets)) return;
+        if (!(columnKey in buckets)) {
+          return;
+        }
 
         const stageItems = items
-          .map((item) => ({ item, qty: bucketsFor(item)[stage] }))
+          .map((item) => ({
+            item,
+            qty: bucketsFor(item)[stage],
+          }))
           .filter(({ qty }) => qty > 0)
-          .map(({ item, qty }) => ({ ...item, quantity: qty, totalQuantity: item.totalQuantity ?? item.quantity }));
+          .map(({ item, qty }) => ({
+            ...item,
+            quantity: qty,
+            totalQuantity: item.totalQuantity ?? item.quantity,
+          }));
 
-        // Orders without any item rows still show in their status column
         const fallback = items.length === 0 && order.status === columnKey;
 
         if (stageItems.length > 0 || fallback) {
-          buckets[columnKey].push({ ...order, items: stageItems, boardStage: stage });
+          buckets[columnKey].push({
+            ...order,
+            items: stageItems,
+            boardStage: stage,
+          });
         }
       });
     });
@@ -779,18 +872,57 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
   return (
     <>
       <ConfettiOverlay show={showConfetti} streak={streak} />
+
       <style>{`
         @keyframes order-column-push {
           0% {
             opacity: 1;
             transform: translateY(0) scale(1);
           }
+
+          35% {
+            transform: translateY(18px) scale(0.985);
+          }
+
+          70% {
+            transform: translateY(-5px) scale(1.005);
+          }
+
+          100% {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+          }
+        }
+
+        @keyframes order-column-squish {
+          0% {
+            transform: scaleX(1);
+          }
+
           45% {
-            transform: translateY(14px) scale(0.985);
+            transform: scaleX(0.965);
           }
+
           75% {
-            transform: translateY(-4px) scale(1.005);
+            transform: scaleX(1.01);
           }
+
+          100% {
+            transform: scaleX(1);
+          }
+        }
+
+        @keyframes order-bubble-space {
+          0% {
+            opacity: 0;
+            transform: translateY(12px) scale(0.92);
+          }
+
+          55% {
+            opacity: 1;
+            transform: translateY(-3px) scale(1.015);
+          }
+
           100% {
             opacity: 1;
             transform: translateY(0) scale(1);
@@ -798,18 +930,58 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
         }
 
         .animate-column-push {
-          animation: order-column-push 560ms cubic-bezier(0.22, 1, 0.36, 1) both;
+          animation:
+            order-column-push
+            560ms
+            cubic-bezier(0.22, 1, 0.36, 1)
+            both;
+        }
+
+        .animate-column-squish {
+          animation:
+            order-column-squish
+            560ms
+            cubic-bezier(0.22, 1, 0.36, 1)
+            both;
+        }
+
+        .animate-order-bubble {
+          animation:
+            order-bubble-space
+            480ms
+            cubic-bezier(0.22, 1, 0.36, 1)
+            both;
+          transform-origin: top center;
+        }
+
+        @media (min-width: 1024px) {
+          .orders-board-bubble-open {
+            grid-template-columns: minmax(0, 1fr);
+          }
+
+          .orders-board-bubble-column {
+            width: 100%;
+          }
+
+          .orders-board-normal {
+            grid-template-columns:
+              minmax(0, 1.5fr)
+              minmax(0, 1fr)
+              minmax(0, 1fr)
+              minmax(0, 1fr);
+          }
         }
 
         @media (prefers-reduced-motion: reduce) {
-          .animate-column-push {
+          .animate-column-push,
+          .animate-column-squish,
+          .animate-order-bubble {
             animation: none !important;
           }
         }
       `}</style>
 
       <PullToRefresh onRefresh={fetchOrders} className="space-y-3 sm:space-y-4 w-full overflow-x-hidden">
-        {/* Bulk Actions Bar */}
         {selectedOrders.length > 0 && (
           <BulkActionsBar
             selectedOrders={selectedOrders}
@@ -817,40 +989,47 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
             onActionComplete={fetchOrders}
           />
         )}
-        {/* Header */}
+
         <div className="flex flex-col gap-3 sm:gap-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
               <h2 className="text-xl sm:text-2xl font-semibold text-foreground">Orders Board</h2>
+
               <p className="text-xs sm:text-sm text-muted-foreground">
-                {filteredOrders.length} order{filteredOrders.length !== 1 ? "s" : ""}
+                {filteredOrders.length} order
+                {filteredOrders.length !== 1 ? "s" : ""}
                 {selectedCompanyId !== "all" && companies.find((c) => c.id === selectedCompanyId) && (
                   <span> for {companies.find((c) => c.id === selectedCompanyId)?.name}</span>
                 )}
               </p>
             </div>
+
             <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
               <OverdueAlerts />
-              {/* Saved Filters */}
+
               <SavedFiltersBar
                 activeFilter={activeFilter}
                 onApplyFilter={(filter) => {
                   setActiveFilter(filter);
+
                   if (filter?.companyId && filter.companyId !== "all") {
                     setSelectedCompanyId(filter.companyId);
                   }
                 }}
                 companies={companies}
               />
-              {/* Company Filter */}
+
               <div className="flex items-center gap-1.5 sm:gap-2 flex-1 sm:flex-none">
                 <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
+
                 <Select value={selectedCompanyId} onValueChange={setSelectedCompanyId}>
                   <SelectTrigger className="w-full sm:w-[200px] h-9 text-sm">
                     <SelectValue placeholder="Filter by client" />
                   </SelectTrigger>
+
                   <SelectContent>
                     <SelectItem value="all">All Clients</SelectItem>
+
                     {companies.map((company) => (
                       <SelectItem key={company.id} value={company.id}>
                         {company.name}
@@ -860,7 +1039,6 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
                 </Select>
               </div>
 
-              {/* Group by Client Toggle */}
               <Button
                 size="sm"
                 variant={groupByClient ? "default" : "outline"}
@@ -868,10 +1046,10 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
                 onClick={() => setGroupByClient(!groupByClient)}
               >
                 <Users className="h-4 w-4" />
+
                 <span className="hidden sm:inline">Group</span>
               </Button>
 
-              {/* Order Templates */}
               <OrderTemplatesDialog
                 companies={companies}
                 onUseTemplate={(template) => {
@@ -884,20 +1062,27 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
                 open={createDialogOpen}
                 onOpenChange={(v) => {
                   setCreateDialogOpen(v);
-                  if (!v) setTemplatePrefill(null);
+
+                  if (!v) {
+                    setTemplatePrefill(null);
+                  }
                 }}
               >
                 <DialogTrigger asChild>
                   <Button size="sm" className="h-9 shrink-0">
                     <Plus className="h-4 w-4 sm:mr-2" />
+
                     <span className="hidden sm:inline">New Order</span>
                   </Button>
                 </DialogTrigger>
+
                 <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto mx-2 sm:mx-auto">
                   <DialogHeader>
                     <DialogTitle>Create New Order</DialogTitle>
+
                     <DialogDescription>Fill in the order details below to create a new order.</DialogDescription>
                   </DialogHeader>
+
                   <OrderForm onSubmit={handleCreateOrder} loading={submitting} templatePrefill={templatePrefill} />
                 </DialogContent>
               </Dialog>
@@ -905,7 +1090,6 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
           </div>
         </div>
 
-        {/* Kanban Board - Stacked on mobile, responsive grid on larger screens */}
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
@@ -914,21 +1098,35 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
         >
           <div
             className={cn(
-              "grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 md:gap-4 w-full overflow-visible transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]",
-              itemsBubble ? "lg:grid-cols-1" : "lg:grid-cols-[1.5fr_1fr_1fr_1fr]",
+              "grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 md:gap-4 w-full overflow-visible transition-[grid-template-columns] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]",
+              itemsBubble
+                ? "lg:grid-cols-1 orders-board-bubble-open"
+                : "lg:grid-cols-[1.5fr_1fr_1fr_1fr] orders-board-normal",
             )}
           >
-            {STATUS_COLUMNS.map((column) => {
+            {STATUS_COLUMNS.map((column, index) => {
               const isBubbleColumn = itemsBubble?.columnKey === column.key;
+
+              const hasOpenBubble = Boolean(itemsBubble);
 
               return (
                 <div
                   key={column.key}
                   className={cn(
-                    "min-w-0 transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]",
-                    itemsBubble && !isBubbleColumn ? "lg:animate-column-push" : "",
-                    itemsBubble && isBubbleColumn ? "lg:z-20" : "",
+                    "min-w-0 w-full relative transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]",
+                    hasOpenBubble && !isBubbleColumn ? "lg:animate-column-push" : "",
+                    hasOpenBubble && isBubbleColumn
+                      ? "lg:z-30 lg:animate-column-squish orders-board-bubble-column"
+                      : "",
+                    isBubbleColumn ? "relative" : "",
                   )}
+                  style={
+                    hasOpenBubble && !isBubbleColumn
+                      ? {
+                          animationDelay: `${Math.min(index * 55, 165)}ms`,
+                        }
+                      : undefined
+                  }
                 >
                   <OrderStatusColumn
                     config={column}
@@ -946,9 +1144,19 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
                     onTagsChanged={fetchTags}
                     itemsBubble={itemsBubble}
                     onOpenItemsBubble={(orderId) => {
-                      setItemsBubble({
-                        orderId,
-                        columnKey: column.key,
+                      setItemsBubble((current) => {
+                        /*
+                         * Clicking the same order toggles the bubble.
+                         * Clicking another order moves the bubble to it.
+                         */
+                        if (current?.orderId === orderId && current?.columnKey === column.key) {
+                          return null;
+                        }
+
+                        return {
+                          orderId,
+                          columnKey: column.key,
+                        };
                       });
                     }}
                     onCloseItemsBubble={() => {
@@ -958,11 +1166,13 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
                     onToggleExpand={() => {
                       setExpandedColumns((prev) => {
                         const next = new Set(prev);
+
                         if (next.has(column.key)) {
                           next.delete(column.key);
                         } else {
                           next.add(column.key);
                         }
+
                         return next;
                       });
                     }}
