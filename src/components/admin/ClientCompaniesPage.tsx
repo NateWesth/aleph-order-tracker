@@ -230,7 +230,7 @@ export default function ClientCompaniesPage() {
         }}
       />
 
-      <p className="text-xs text-muted-foreground">{filteredCompanies.length} clients</p>
+      
 
       {/* New Company Dialog */}
       <Dialog open={isNewCompanyDialogOpen} onOpenChange={handleDialogClose}>
