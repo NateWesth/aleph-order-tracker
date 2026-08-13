@@ -563,9 +563,11 @@ export default function OrdersPage({
     if (items.length === 0) return;
 
     try {
+      const movedCounters = new Map<string, ReturnType<typeof countersAfterMove>>();
       await Promise.all(items.map(item => {
         const qty = bucketsFor(item)[fromStage];
         const next = countersAfterMove(item, fromStage, toStage, qty);
+        movedCounters.set(item.id, next);
         return supabase
           .from("order_items")
           .update({ ...next, updated_at: new Date().toISOString() })
@@ -573,7 +575,25 @@ export default function OrdersPage({
           .throwOnError();
       }));
 
-      if (toStage === 'completed') celebrate();
+      if (toStage === 'completed') {
+        celebrate();
+
+        // If every item on the order is now fully completed, the order itself is
+        // delivered — send it to Completed Orders so it leaves the board for good.
+        const allItems = source?.items || [];
+        const fullyDone = allItems.length > 0 && allItems.every(item => {
+          const counters = movedCounters.get(item.id);
+          const completed = counters ? counters.qty_completed : (item.qty_completed ?? 0);
+          return completed >= (item.totalQuantity ?? item.quantity ?? 0);
+        });
+
+        if (fullyDone) {
+          await supabase
+            .from("orders")
+            .update({ status: "delivered", completed_date: new Date().toISOString() })
+            .eq("id", order.id);
+        }
+      }
 
       toast({
         title: "Items moved",
