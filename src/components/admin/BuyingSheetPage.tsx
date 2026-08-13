@@ -1117,37 +1117,53 @@ export default function BuyingSheetPage() {
           <div className="flex flex-col gap-3">
             {/* Title + actions row */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-              <div className="flex items-center gap-2 flex-wrap">
-                <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <ShoppingCart className="h-4 w-4 text-primary" />
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/15">
+                  <ShoppingCart className="h-[18px] w-[18px]" />
+                </span>
+                <div>
+                  <h1 className="text-xl font-bold tracking-tight leading-tight">Buying Sheet</h1>
+                  <p className="text-xs text-muted-foreground">
+                    {filteredRows.length} SKUs to review
+                    {zohoLoading && " · syncing Zoho..."}
+                  </p>
                 </div>
-                <h2 className="text-lg font-bold text-foreground">Buying Sheet</h2>
-                <Badge variant="outline" className="text-xs">{filteredRows.length} SKUs</Badge>
-                {zohoLoading && <Badge variant="secondary" className="gap-1 text-xs"><Loader2 className="h-3 w-3 animate-spin" />Syncing Zoho...</Badge>}
               </div>
               <div className="flex items-center gap-1.5 flex-wrap">
-                <Button variant="outline" size="sm" onClick={() => setIsFullscreen(!isFullscreen)} className="h-8">
-                  {isFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
-                </Button>
                 <Tooltip><TooltipTrigger asChild>
-                  <Button variant="outline" size="sm" onClick={() => { const next: ViewDensity = viewDensity === "compact" ? "comfortable" : "compact"; setViewDensity(next); saveDensity(next); }} className="h-8">
-                    {viewDensity === "compact" ? <AlignJustify className="h-3.5 w-3.5" /> : <AlignCenter className="h-3.5 w-3.5" />}
+                  <Button variant="outline" size="icon" onClick={() => setIsFullscreen(!isFullscreen)} className="h-9 w-9">
+                    {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+                  </Button>
+                </TooltipTrigger><TooltipContent><p className="text-xs">{isFullscreen ? "Exit" : "Enter"} fullscreen</p></TooltipContent></Tooltip>
+                <Tooltip><TooltipTrigger asChild>
+                  <Button variant="outline" size="icon" onClick={() => { const next: ViewDensity = viewDensity === "compact" ? "comfortable" : "compact"; setViewDensity(next); saveDensity(next); }} className="h-9 w-9">
+                    {viewDensity === "compact" ? <AlignJustify className="h-4 w-4" /> : <AlignCenter className="h-4 w-4" />}
                   </Button>
                 </TooltipTrigger><TooltipContent><p className="text-xs">{viewDensity === "compact" ? "Comfortable" : "Compact"} view</p></TooltipContent></Tooltip>
-                {zohoLoading && (
-                  <span className="flex items-center gap-1 text-xs text-muted-foreground px-1">
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />Syncing Zoho
-                  </span>
-                )}
-                <Button variant="outline" size="sm" onClick={handlePrint} className="h-8"><Printer className="h-3.5 w-3.5" /></Button>
-                <Button variant="outline" size="sm" onClick={handleExportCSV} className="h-8 gap-1.5"><Download className="h-3.5 w-3.5" />{selectedSkus.size > 0 ? `(${selectedSkus.size})` : "CSV"}</Button>
-                <Button variant="outline" size="sm" onClick={handleExportBySupplier} className="h-8"><FileSpreadsheet className="h-3.5 w-3.5" /></Button>
-                <Tooltip><TooltipTrigger asChild>
-                  <Button variant={snapshotSaved ? "default" : "outline"} size="sm" onClick={saveSnapshot} className="h-8"><Save className="h-3.5 w-3.5" />{snapshotSaved && <span className="text-xs ml-1">✓</span>}</Button>
-                </TooltipTrigger><TooltipContent><p className="text-xs">Save snapshot for comparison</p></TooltipContent></Tooltip>
-                {snapshotData && <Button variant={showSnapshot ? "default" : "outline"} size="sm" onClick={() => setShowSnapshot(!showSnapshot)} className="h-8 gap-1.5"><History className="h-3.5 w-3.5" />{showSnapshot ? "Hide" : "Compare"}</Button>}
+                <Button variant="outline" size="sm" onClick={handleExportCSV} className="h-9 gap-1.5">
+                  <Download className="h-4 w-4" />{selectedSkus.size > 0 ? `Export (${selectedSkus.size})` : "Export CSV"}
+                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="icon" className="h-9 w-9"><MoreHorizontal className="h-4 w-4" /></Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    <DropdownMenuItem onClick={handlePrint}><Printer className="h-4 w-4 mr-2" />Print sheet</DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleExportBySupplier}><FileSpreadsheet className="h-4 w-4 mr-2" />Export by supplier</DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={saveSnapshot}>
+                      <Save className="h-4 w-4 mr-2" />Save snapshot{snapshotSaved && " ✓"}
+                    </DropdownMenuItem>
+                    {snapshotData && (
+                      <DropdownMenuItem onClick={() => setShowSnapshot(!showSnapshot)}>
+                        <History className="h-4 w-4 mr-2" />{showSnapshot ? "Hide comparison" : "Compare to snapshot"}
+                      </DropdownMenuItem>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </div>
+
 
             {/* View mode tabs + filters row */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
