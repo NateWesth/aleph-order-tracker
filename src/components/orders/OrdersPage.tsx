@@ -34,6 +34,7 @@ import { useGlobalRealtimeOrders } from "./hooks/useGlobalRealtimeOrders";
 import { useCompanyData } from "@/components/admin/hooks/useCompanyData";
 import OrderForm from "./components/OrderForm";
 import OrderStatusColumn from "./components/OrderStatusColumn";
+import OrderItemsFloatingBubble from "./components/OrderItemsFloatingBubble";
 import BulkActionsBar from "./components/BulkActionsBar";
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import { cn } from "@/lib/utils";
@@ -225,8 +226,8 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
   /*
    * Items bubble state.
    *
-   * The selected order remains owned by OrderStatusColumn. This state only
-   * controls which column currently has its expanded item bubble open.
+   * The selected order is owned by the board so the item bubble can float
+   * above the entire column grid instead of expanding an individual column.
    */
   const [itemsBubble, setItemsBubble] = useState<{
     orderId: string;
@@ -874,108 +875,54 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
       <ConfettiOverlay show={showConfetti} streak={streak} />
 
       <style>{`
-        @keyframes order-column-push {
-          0% {
-            opacity: 1;
-            transform: translateY(0) scale(1);
-          }
-
-          35% {
-            transform: translateY(18px) scale(0.985);
-          }
-
-          70% {
-            transform: translateY(-5px) scale(1.005);
-          }
-
-          100% {
-            opacity: 1;
-            transform: translateY(0) scale(1);
-          }
-        }
-
-        @keyframes order-column-squish {
-          0% {
-            transform: scaleX(1);
-          }
-
-          45% {
-            transform: scaleX(0.965);
-          }
-
-          75% {
-            transform: scaleX(1.01);
-          }
-
-          100% {
-            transform: scaleX(1);
-          }
-        }
-
-        @keyframes order-bubble-space {
+        @keyframes order-floating-bubble-in {
           0% {
             opacity: 0;
-            transform: translateY(12px) scale(0.92);
+            transform: translateY(-18px) scale(0.94);
+            filter: blur(4px);
           }
 
           55% {
             opacity: 1;
-            transform: translateY(-3px) scale(1.015);
+            transform: translateY(3px) scale(1.012);
+            filter: blur(0);
+          }
+
+          78% {
+            transform: translateY(-1px) scale(0.997);
           }
 
           100% {
             opacity: 1;
             transform: translateY(0) scale(1);
+            filter: blur(0);
           }
         }
 
-        .animate-column-push {
-          animation:
-            order-column-push
-            560ms
-            cubic-bezier(0.22, 1, 0.36, 1)
-            both;
-        }
-
-        .animate-column-squish {
-          animation:
-            order-column-squish
-            560ms
-            cubic-bezier(0.22, 1, 0.36, 1)
-            both;
-        }
-
-        .animate-order-bubble {
-          animation:
-            order-bubble-space
-            480ms
-            cubic-bezier(0.22, 1, 0.36, 1)
-            both;
-          transform-origin: top center;
-        }
-
-        @media (min-width: 1024px) {
-          .orders-board-bubble-open {
-            grid-template-columns: minmax(0, 1fr);
+        @keyframes order-floating-bubble-content {
+          0% {
+            opacity: 0;
+            transform: translateX(26px) scale(0.985);
           }
 
-          .orders-board-bubble-column {
-            width: 100%;
+          100% {
+            opacity: 1;
+            transform: translateX(0) scale(1);
           }
+        }
 
-          .orders-board-normal {
-            grid-template-columns:
-              minmax(0, 1.5fr)
-              minmax(0, 1fr)
-              minmax(0, 1fr)
-              minmax(0, 1fr);
-          }
+        .animate-order-floating-bubble {
+          animation: order-floating-bubble-in 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+          transform-origin: center top;
+        }
+
+        .animate-order-floating-bubble-content {
+          animation: order-floating-bubble-content 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
         }
 
         @media (prefers-reduced-motion: reduce) {
-          .animate-column-push,
-          .animate-column-squish,
-          .animate-order-bubble {
+          .animate-order-floating-bubble,
+          .animate-order-floating-bubble-content {
             animation: none !important;
           }
         }
@@ -1096,90 +1043,71 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
         >
-          <div
-            className={cn(
-              "grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 md:gap-4 w-full overflow-visible transition-[grid-template-columns] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]",
-              itemsBubble
-                ? "lg:grid-cols-1 orders-board-bubble-open"
-                : "lg:grid-cols-[1.5fr_1fr_1fr_1fr] orders-board-normal",
+          <div className="relative w-full overflow-visible">
+            {itemsBubble && (
+              <div className="relative z-50 mb-4 flex w-full justify-center px-1 sm:px-2 lg:mb-5">
+                <OrderItemsFloatingBubble
+                  order={orders.find((order) => order.id === itemsBubble.orderId) || null}
+                  onClose={() => setItemsBubble(null)}
+                />
+              </div>
             )}
-          >
-            {STATUS_COLUMNS.map((column, index) => {
-              const isBubbleColumn = itemsBubble?.columnKey === column.key;
 
-              const hasOpenBubble = Boolean(itemsBubble);
+            <div
+              className={cn(
+                "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4 w-full overflow-visible",
+                "items-start",
+              )}
+            >
+              {STATUS_COLUMNS.map((column) => {
+                return (
+                  <div key={column.key} className="min-w-0 w-full relative">
+                    <OrderStatusColumn
+                      config={column}
+                      orders={ordersByStatus[column.key as keyof typeof ordersByStatus] || []}
+                      onMoveOrder={handleMoveOrder}
+                      onDeleteOrder={handleDeleteOrder}
+                      onSetItemStockStatus={handleSetItemStockStatus}
+                      onBulkSetItemsStatus={handleBulkSetItemsStatus}
+                      canEditItems={true}
+                      selectedOrderIds={selectedOrderIds}
+                      onToggleOrderSelection={toggleOrderSelection}
+                      groupByClient={groupByClient}
+                      allTags={allTags}
+                      tagAssignments={tagAssignments}
+                      onTagsChanged={fetchTags}
+                      activeItemsOrderId={itemsBubble?.orderId || null}
+                      onOpenItemsBubble={(orderId) => {
+                        setItemsBubble((current) => {
+                          if (current?.orderId === orderId) {
+                            return null;
+                          }
 
-              return (
-                <div
-                  key={column.key}
-                  className={cn(
-                    "min-w-0 w-full relative transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]",
-                    hasOpenBubble && !isBubbleColumn ? "lg:animate-column-push" : "",
-                    hasOpenBubble && isBubbleColumn
-                      ? "lg:z-30 lg:animate-column-squish orders-board-bubble-column"
-                      : "",
-                    isBubbleColumn ? "relative" : "",
-                  )}
-                  style={
-                    hasOpenBubble && !isBubbleColumn
-                      ? {
-                          animationDelay: `${Math.min(index * 55, 165)}ms`,
-                        }
-                      : undefined
-                  }
-                >
-                  <OrderStatusColumn
-                    config={column}
-                    orders={ordersByStatus[column.key as keyof typeof ordersByStatus] || []}
-                    onMoveOrder={handleMoveOrder}
-                    onDeleteOrder={handleDeleteOrder}
-                    onSetItemStockStatus={handleSetItemStockStatus}
-                    onBulkSetItemsStatus={handleBulkSetItemsStatus}
-                    canEditItems={true}
-                    selectedOrderIds={selectedOrderIds}
-                    onToggleOrderSelection={toggleOrderSelection}
-                    groupByClient={groupByClient}
-                    allTags={allTags}
-                    tagAssignments={tagAssignments}
-                    onTagsChanged={fetchTags}
-                    itemsBubble={itemsBubble}
-                    onOpenItemsBubble={(orderId) => {
-                      setItemsBubble((current) => {
-                        /*
-                         * Clicking the same order toggles the bubble.
-                         * Clicking another order moves the bubble to it.
-                         */
-                        if (current?.orderId === orderId && current?.columnKey === column.key) {
-                          return null;
-                        }
+                          return {
+                            orderId,
+                            columnKey: column.key,
+                          };
+                        });
+                      }}
+                      isExpanded={expandedColumns.has(column.key)}
+                      onToggleExpand={() => {
+                        setExpandedColumns((prev) => {
+                          const next = new Set(prev);
 
-                        return {
-                          orderId,
-                          columnKey: column.key,
-                        };
-                      });
-                    }}
-                    onCloseItemsBubble={() => {
-                      setItemsBubble(null);
-                    }}
-                    isExpanded={expandedColumns.has(column.key)}
-                    onToggleExpand={() => {
-                      setExpandedColumns((prev) => {
-                        const next = new Set(prev);
+                          if (next.has(column.key)) {
+                            next.delete(column.key);
+                          } else {
+                            next.add(column.key);
+                          }
 
-                        if (next.has(column.key)) {
-                          next.delete(column.key);
-                        } else {
-                          next.add(column.key);
-                        }
-
-                        return next;
-                      });
-                    }}
-                  />
-                </div>
-              );
-            })}
+                          return next;
+                        });
+                      }}
+                    />
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </DndContext>
       </PullToRefresh>

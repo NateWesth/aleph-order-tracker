@@ -1,4 +1,4 @@
-import { useState, useCallback, memo } from "react";
+import { useState, memo } from "react";
 import { useDroppable, useDraggable } from "@dnd-kit/core";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -19,12 +19,9 @@ import {
 } from "@/components/ui/alert-dialog";
 
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 
 import { cn } from "@/lib/utils";
-import { useTheme } from "@/contexts/ThemeContext";
 import { useIsMobile } from "@/hooks/use-mobile";
 import SwipeableCard from "@/components/ui/SwipeableCard";
 import OrderQuickPeek from "./OrderQuickPeek";
@@ -86,13 +83,8 @@ interface OrderStatusColumnProps {
   tagAssignments?: Map<string, string[]>;
   onTagsChanged?: () => void;
 
-  itemsBubble?: {
-    orderId: string;
-    columnKey: string;
-  } | null;
-
+  activeItemsOrderId?: string | null;
   onOpenItemsBubble?: (orderId: string) => void;
-  onCloseItemsBubble?: () => void;
 }
 
 function DraggableCard({ id, children, disabled }: { id: string; children: React.ReactNode; disabled?: boolean }) {
@@ -132,18 +124,14 @@ function OrderStatusColumn({
   allTags = [],
   tagAssignments,
   onTagsChanged,
-  itemsBubble,
+  activeItemsOrderId,
   onOpenItemsBubble,
-  onCloseItemsBubble,
 }: OrderStatusColumnProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: config.key,
   });
 
-  const { stockStatusColors } = useTheme();
   const isMobile = useIsMobile();
-
-  const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
 
   const [collapsedClients, setCollapsedClients] = useState<Set<string>>(new Set());
 
@@ -179,20 +167,6 @@ function OrderStatusColumn({
         return groups;
       })()
     : null;
-
-  const toggleExpanded = useCallback((orderId: string) => {
-    setExpandedOrders((prev) => {
-      const next = new Set(prev);
-
-      if (next.has(orderId)) {
-        next.delete(orderId);
-      } else {
-        next.add(orderId);
-      }
-
-      return next;
-    });
-  }, []);
 
   const getUrgencyBadge = (urgency: string | null) => {
     switch (urgency) {
@@ -242,458 +216,6 @@ function OrderStatusColumn({
 
   return (
     <>
-      <style>{`
-
-        /* ============================================================
-         * ORDER ITEMS BUBBLE — UPDATES 5 / 6 / 7
-         * ============================================================
-         *
-         * UPDATE 5
-         * ------------------------------------------------------------
-         * Shadow + glow trail follows the point where the bubble
-         * expands away from the order card.
-         *
-         * UPDATE 6
-         * ------------------------------------------------------------
-         * Animation timings are deliberately kept between
-         * approximately 500–650ms.
-         *
-         * UPDATE 7
-         * ------------------------------------------------------------
-         * Animation-only changes.
-         *
-         * No changes to:
-         * - DnD
-         * - order IDs
-         * - scrolling
-         * - mobile swipe
-         * - order movement
-         * - order deletion
-         * - selection
-         * - tags
-         * - order data
-         * - existing component structure
-         *
-         * ============================================================ */
-
-
-        /* ------------------------------------------------------------
-         * CARD RESPONSE
-         * ------------------------------------------------------------ */
-
-        @keyframes order-card-bubble-elastic {
-          0% {
-            transform: translateX(0) scale(1);
-            filter: drop-shadow(0 0 0 transparent);
-          }
-
-          18% {
-            transform: translateX(2px) scale(1.008);
-          }
-
-          38% {
-            transform: translateX(5px) scale(1.018);
-
-            filter:
-              drop-shadow(
-                7px 0 10px
-                hsl(var(--primary) / 0.08)
-              );
-          }
-
-          55% {
-            transform: translateX(3px) scale(1.007);
-
-            filter:
-              drop-shadow(
-                5px 0 8px
-                hsl(var(--primary) / 0.07)
-              );
-          }
-
-          72% {
-            transform: translateX(1px) scale(1.002);
-
-            filter:
-              drop-shadow(
-                2px 0 5px
-                hsl(var(--primary) / 0.04)
-              );
-          }
-
-          88% {
-            transform: translateX(-0.25px) scale(1.001);
-          }
-
-          100% {
-            transform: translateX(0) scale(1);
-            filter: drop-shadow(0 0 0 transparent);
-          }
-        }
-
-
-        /* ------------------------------------------------------------
-         * MAIN BUBBLE
-         * ------------------------------------------------------------ */
-
-        @keyframes order-bubble-elastic-grow {
-          0% {
-            opacity: 0;
-
-            transform-origin: left center;
-
-            transform:
-              translateX(-12px)
-              scaleX(0.08)
-              scaleY(0.78);
-
-            border-radius: 1rem;
-
-            box-shadow:
-              0 0 0 0 hsl(var(--primary) / 0),
-              0 0 0 0 hsl(var(--primary) / 0);
-          }
-
-          12% {
-            opacity: 0.18;
-
-            transform:
-              translateX(-9px)
-              scaleX(0.25)
-              scaleY(0.84);
-
-            box-shadow:
-              -5px 0 12px 1px
-              hsl(var(--primary) / 0.08);
-          }
-
-          29% {
-            opacity: 0.58;
-
-            transform:
-              translateX(-4px)
-              scaleX(0.60)
-              scaleY(0.92);
-
-            box-shadow:
-              -8px 0 18px 2px
-              hsl(var(--primary) / 0.12);
-          }
-
-          48% {
-            opacity: 1;
-
-            transform:
-              translateX(1px)
-              scaleX(1.035)
-              scaleY(1.015);
-
-            box-shadow:
-              -10px 0 24px 4px
-              hsl(var(--primary) / 0.15),
-              0 8px 28px -8px
-              hsl(var(--primary) / 0.12);
-          }
-
-          64% {
-            transform:
-              translateX(0)
-              scaleX(0.988)
-              scaleY(0.994);
-
-            box-shadow:
-              -7px 0 18px 3px
-              hsl(var(--primary) / 0.09),
-              0 6px 24px -10px
-              hsl(var(--primary) / 0.09);
-          }
-
-          79% {
-            transform:
-              translateX(0)
-              scaleX(1.009)
-              scaleY(1.005);
-
-            box-shadow:
-              -4px 0 12px 2px
-              hsl(var(--primary) / 0.055),
-              0 5px 20px -12px
-              hsl(var(--primary) / 0.07);
-          }
-
-          91% {
-            transform:
-              translateX(0)
-              scaleX(0.998)
-              scaleY(0.999);
-          }
-
-          100% {
-            opacity: 1;
-
-            transform:
-              translateX(0)
-              scaleX(1)
-              scaleY(1);
-
-            border-radius: 1rem;
-
-            box-shadow:
-              0 25px 50px -20px
-              hsl(var(--foreground) / 0.20);
-          }
-        }
-
-
-        /* ------------------------------------------------------------
-         * CONNECTOR
-         * ------------------------------------------------------------ */
-
-        @keyframes order-bubble-connector-elastic {
-          0% {
-            opacity: 0;
-
-            transform:
-              translateX(-9px)
-              rotate(45deg)
-              scale(0.18);
-          }
-
-          30% {
-            opacity: 0.58;
-
-            transform:
-              translateX(-3px)
-              rotate(45deg)
-              scale(0.75);
-          }
-
-          55% {
-            opacity: 1;
-
-            transform:
-              translateX(1px)
-              rotate(45deg)
-              scale(1.06);
-          }
-
-          74% {
-            transform:
-              translateX(-0.4px)
-              rotate(45deg)
-              scale(0.96);
-          }
-
-          100% {
-            opacity: 1;
-
-            transform:
-              translateX(0)
-              rotate(45deg)
-              scale(1);
-          }
-        }
-
-
-        /* ------------------------------------------------------------
-         * PRIMARY GLOW TRAIL
-         * ------------------------------------------------------------ */
-
-        @keyframes order-bubble-glow-trail {
-          0% {
-            opacity: 0;
-
-            transform:
-              translateX(-10px)
-              scaleX(0.30)
-              scaleY(0.72);
-          }
-
-          18% {
-            opacity: 0.68;
-
-            transform:
-              translateX(-4px)
-              scaleX(0.70)
-              scaleY(0.88);
-          }
-
-          40% {
-            opacity: 0.48;
-
-            transform:
-              translateX(3px)
-              scaleX(1.08)
-              scaleY(0.98);
-          }
-
-          63% {
-            opacity: 0.22;
-
-            transform:
-              translateX(8px)
-              scaleX(1.32)
-              scaleY(1);
-          }
-
-          100% {
-            opacity: 0;
-
-            transform:
-              translateX(16px)
-              scaleX(1.60)
-              scaleY(1.04);
-          }
-        }
-
-
-        /* ------------------------------------------------------------
-         * CONTENT RISE
-         * ------------------------------------------------------------ */
-
-        @keyframes order-bubble-content-rise {
-          0% {
-            opacity: 0;
-            transform: translateY(7px);
-          }
-
-          42% {
-            opacity: 0;
-            transform: translateY(4px);
-          }
-
-          70% {
-            opacity: 0.72;
-            transform: translateY(1px);
-          }
-
-          100% {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-
-
-        /* ------------------------------------------------------------
-         * ITEM POP
-         * ------------------------------------------------------------ */
-
-        @keyframes order-item-pop {
-          0% {
-            opacity: 0;
-            transform: translateX(-7px) scale(0.97);
-          }
-
-          62% {
-            opacity: 1;
-            transform: translateX(1px) scale(1.005);
-          }
-
-          100% {
-            opacity: 1;
-            transform: translateX(0) scale(1);
-          }
-        }
-
-
-        /* ============================================================
-         * ANIMATION CLASSES
-         * ============================================================ */
-
-        .animate-order-card-bubble-grow {
-          animation:
-            order-card-bubble-elastic
-            600ms
-            cubic-bezier(0.22, 1, 0.36, 1)
-            both;
-
-          will-change:
-            transform,
-            filter;
-        }
-
-
-        .animate-order-bubble-grow {
-          animation:
-            order-bubble-elastic-grow
-            620ms
-            cubic-bezier(0.22, 1, 0.36, 1)
-            both;
-
-          will-change:
-            transform,
-            opacity,
-            box-shadow;
-        }
-
-
-        .animate-order-bubble-connector {
-          animation:
-            order-bubble-connector-elastic
-            520ms
-            80ms
-            cubic-bezier(0.22, 1, 0.36, 1)
-            both;
-
-          will-change:
-            transform,
-            opacity;
-        }
-
-
-        .animate-order-bubble-glow-trail {
-          animation:
-            order-bubble-glow-trail
-            560ms
-            cubic-bezier(0.22, 1, 0.36, 1)
-            both;
-
-          will-change:
-            transform,
-            opacity;
-        }
-
-
-        .animate-order-bubble-content {
-          animation:
-            order-bubble-content-rise
-            560ms
-            70ms
-            cubic-bezier(0.22, 1, 0.36, 1)
-            both;
-
-          will-change:
-            transform,
-            opacity;
-        }
-
-
-        .animate-item-pop {
-          animation:
-            order-item-pop
-            300ms
-            cubic-bezier(0.22, 1, 0.36, 1)
-            both;
-        }
-
-
-        /* ============================================================
-         * ACCESSIBILITY
-         * ============================================================ */
-
-        @media (prefers-reduced-motion: reduce) {
-          .animate-order-card-bubble-grow,
-          .animate-order-bubble-grow,
-          .animate-order-bubble-connector,
-          .animate-order-bubble-glow-trail,
-          .animate-order-bubble-content,
-          .animate-item-pop {
-            animation: none !important;
-          }
-        }
-
-      `}</style>
-
       <div
         ref={setNodeRef}
         className={cn("flex flex-col w-full min-w-0", isOver && "ring-2 ring-primary/50 rounded-xl transition-all")}
@@ -846,13 +368,11 @@ function OrderStatusColumn({
   function renderOrderCard(order: Order, index: number) {
     const stockSummary = getItemStockSummary(order.items);
 
-    const isOrderExpanded = expandedOrders.has(order.id);
-
     const hasItems = order.items && order.items.length > 0;
 
     const isSelected = selectedOrderIds?.has(order.id) || false;
 
-    const isBubbleOpen = itemsBubble?.orderId === order.id;
+    const isBubbleOpen = activeItemsOrderId === order.id;
 
     const cardContent = (
       <Card
@@ -954,72 +474,33 @@ function OrderStatusColumn({
               />
             )}
 
-            {/* Collapsible Items */}
-
+            {/* Items trigger */}
             {hasItems && (
-              <Collapsible open={isOrderExpanded} onOpenChange={() => toggleExpanded(order.id)}>
-                <CollapsibleTrigger asChild>
-                  <button
-                    className={cn(
-                      "flex items-center justify-between w-full text-[10px] sm:text-xs bg-muted/50 hover:bg-muted px-2 sm:px-2.5 py-1.5 sm:py-2 rounded-lg transition-all duration-200",
+              <button
+                type="button"
+                className={cn(
+                  "flex items-center justify-between w-full text-[10px] sm:text-xs bg-muted/50 hover:bg-muted px-2 sm:px-2.5 py-1.5 sm:py-2 rounded-lg transition-all duration-200",
+                  isBubbleOpen && "ring-2 ring-primary/40 bg-primary/10",
+                )}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpenItemsBubble?.(order.id);
+                }}
+              >
+                <span className="flex items-center gap-1 sm:gap-1.5 text-muted-foreground font-medium">
+                  <Package className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                  {order.items?.length} item
+                  {order.items?.length !== 1 ? "s" : ""}
+                </span>
 
-                      itemsBubble?.orderId === order.id && "ring-2 ring-primary/40 bg-primary/10",
-                    )}
-                    onClick={(e) => {
-                      e.stopPropagation();
-
-                      if (itemsBubble?.orderId === order.id) {
-                        onCloseItemsBubble?.();
-                      } else {
-                        onOpenItemsBubble?.(order.id);
-                      }
-                    }}
-                  >
-                    <span className="flex items-center gap-1 sm:gap-1.5 text-muted-foreground font-medium">
-                      <ChevronDown
-                        className={cn(
-                          "h-3 w-3 sm:h-3.5 sm:w-3.5 transition-transform duration-200",
-                          isOrderExpanded ? "rotate-0" : "-rotate-90",
-                        )}
-                      />
-                      {order.items?.length} item
-                      {order.items?.length !== 1 ? "s" : ""}
-                    </span>
-
-                    {stockSummary && (
-                      <span className="flex items-center gap-1 font-medium text-muted-foreground">
-                        <PackageCheck className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
-                        {stockSummary.units} unit
-                        {stockSummary.units !== 1 ? "s" : ""}
-                      </span>
-                    )}
-                  </button>
-                </CollapsibleTrigger>
-
-                <CollapsibleContent className="mt-2">
-                  <div className="space-y-1.5 bg-muted/30 p-2.5 rounded-lg">
-                    {order.items?.map((item) => {
-                      const total = item.totalQuantity ?? item.quantity;
-
-                      const isPartial = total > item.quantity;
-
-                      return (
-                        <div key={item.id} className="flex items-center gap-2 text-xs py-1">
-                          <span className="flex-1 min-w-0 break-words text-foreground">
-                            <span className="font-semibold text-primary">×{item.quantity}</span>
-
-                            {isPartial && <span className="text-[10px] text-muted-foreground ml-1">of {total}</span>}
-
-                            {item.code && <span className="font-mono text-muted-foreground ml-1">[{item.code}]</span>}
-
-                            <span className="ml-1">{item.name}</span>
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
+                {stockSummary && (
+                  <span className="flex items-center gap-1 font-medium text-muted-foreground">
+                    <PackageCheck className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                    {stockSummary.units} unit
+                    {stockSummary.units !== 1 ? "s" : ""}
+                  </span>
+                )}
+              </button>
             )}
 
             {/* Actions */}
@@ -1088,284 +569,23 @@ function OrderStatusColumn({
     );
 
     /* ================================================================
-     * ITEMS BUBBLE
-     * ================================================================ */
-
-    const orderItemsBubble = isBubbleOpen ? (
-      <div
-        className={cn(
-          "relative overflow-visible rounded-2xl",
-          "border border-primary/20 bg-background/95",
-          "backdrop-blur-xl",
-          "origin-left",
-          "animate-order-bubble-grow",
-          "shadow-2xl",
-        )}
-      >
-        {/* ==========================================================
-         * UPDATE 5 — PRIMARY GLOW TRAIL
-         * ========================================================== */}
-
-        <div
-          className={cn(
-            "absolute -left-4 top-5 bottom-5 w-10",
-            "rounded-full",
-            "bg-primary/20",
-            "blur-xl",
-            "pointer-events-none",
-            "z-0",
-            "animate-order-bubble-glow-trail",
-          )}
-        />
-
-        {/* ==========================================================
-         * UPDATE 5 — SECONDARY TRAIL
-         * ========================================================== */}
-
-        <div
-          className={cn(
-            "absolute -left-2 top-8 bottom-8 w-5",
-            "rounded-full",
-            "bg-primary/15",
-            "blur-md",
-            "pointer-events-none",
-            "z-0",
-            "animate-order-bubble-glow-trail",
-          )}
-          style={{
-            animationDelay: "45ms",
-          }}
-        />
-
-        {/* ==========================================================
-         * CONNECTOR
-         * ========================================================== */}
-
-        <div
-          className={cn(
-            "absolute -left-2 top-8 h-4 w-4 rotate-45",
-            "border-l border-t border-primary/20",
-            "bg-background/95",
-            "z-10",
-            "animate-order-bubble-connector",
-          )}
-        />
-
-        {/* ==========================================================
-         * AMBIENT TOP GLOW
-         * ========================================================== */}
-
-        <div
-          className="
-              absolute
-              inset-x-0
-              top-0
-              h-16
-              bg-primary/10
-              blur-2xl
-              pointer-events-none
-              rounded-t-2xl
-            "
-        />
-
-        {/* ==========================================================
-         * BUBBLE CONTENT
-         * ========================================================== */}
-
-        <div className="relative z-10 p-4 sm:p-5 animate-order-bubble-content">
-          {/* Header */}
-
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-                  <Package className="h-4 w-4" />
-                </div>
-
-                <div className="min-w-0">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                    Order contents
-                  </p>
-
-                  <h3 className="truncate text-sm font-bold text-foreground">{order.order_number}</h3>
-                </div>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onCloseItemsBubble?.();
-              }}
-              className="
-                  flex
-                  h-7
-                  w-7
-                  shrink-0
-                  items-center
-                  justify-center
-                  rounded-full
-                  bg-muted
-                  text-muted-foreground
-                  transition-all
-                  hover:bg-destructive/10
-                  hover:text-destructive
-                  hover:scale-110
-                "
-              aria-label="Close order items"
-            >
-              ×
-            </button>
-          </div>
-
-          {/* Summary */}
-
-          <div className="mt-4 flex items-center justify-between rounded-xl bg-primary/5 px-3 py-2">
-            <span className="text-xs font-medium text-muted-foreground">Items</span>
-
-            <span className="text-sm font-bold text-primary">{order.items?.length || 0}</span>
-          </div>
-
-          {/* Items */}
-
-          <div className="mt-3 space-y-2">
-            {order.items?.map((item, itemIndex) => {
-              const total = item.totalQuantity ?? item.quantity;
-
-              const isPartial = total > item.quantity;
-
-              return (
-                <div
-                  key={item.id}
-                  className="
-                        flex
-                        items-center
-                        gap-3
-                        rounded-xl
-                        bg-muted/40
-                        px-3
-                        py-2.5
-                        text-xs
-                        animate-item-pop
-                      "
-                  style={{
-                    animationDelay: `${Math.min(itemIndex * 45 + 300, 500)}ms`,
-                  }}
-                >
-                  <div className="flex h-7 min-w-7 items-center justify-center rounded-lg bg-primary/10 px-1.5 font-bold text-primary">
-                    ×{item.quantity}
-                  </div>
-
-                  <div className="min-w-0 flex-1">
-                    <div className="break-words font-medium text-foreground">{item.name}</div>
-
-                    {isPartial && (
-                      <span className="text-[10px] text-muted-foreground">
-                        {item.quantity} of {total}
-                      </span>
-                    )}
-
-                    {item.code && (
-                      <span className="ml-1 font-mono text-[10px] text-muted-foreground">[{item.code}]</span>
-                    )}
-                  </div>
-
-                  <PackageCheck className="h-4 w-4 shrink-0 text-muted-foreground/50" />
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Total */}
-
-          {stockSummary && (
-            <div className="mt-3 flex items-center justify-end gap-1.5 text-[10px] font-medium text-muted-foreground">
-              <PackageCheck className="h-3.5 w-3.5" />
-              {stockSummary.units} total unit
-              {stockSummary.units !== 1 ? "s" : ""}
-            </div>
-          )}
-        </div>
-      </div>
-    ) : null;
-
-    /* ================================================================
      * LAYOUT
      * ================================================================ */
 
     return (
-      <div
-        className={cn(
-          "space-y-2 transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]",
-          isBubbleOpen && !isMobile && "relative z-30 lg:space-y-3",
-        )}
-      >
-        {/* ============================================================
-         * MOBILE
-         * ============================================================ */}
-
+      <div className="space-y-2">
         {isMobile ? (
-          <div className="space-y-2">
-            <SwipeableCard
-              key={`${order.id}-${config.key}`}
-              onSwipeLeft={() => onDeleteOrder(order)}
-              onSwipeRight={config.nextStatus ? () => onMoveOrder(order, config.nextStatus!) : undefined}
-              leftLabel="Delete"
-              rightLabel={config.nextLabel || "Next"}
-              rightIcon={<ArrowRight className="h-4 w-4" />}
-            >
-              {cardContent}
-            </SwipeableCard>
-
-            {orderItemsBubble}
-          </div>
-        ) : isBubbleOpen ? (
-          /* ==========================================================
-           * DESKTOP — CARD + BUBBLE
-           * ========================================================== */
-
-          <div
-            className={cn(
-              "grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(360px,0.85fr)]",
-              "gap-3 lg:gap-4 items-start",
-              "relative",
-            )}
+          <SwipeableCard
+            key={`${order.id}-${config.key}`}
+            onSwipeLeft={() => onDeleteOrder(order)}
+            onSwipeRight={config.nextStatus ? () => onMoveOrder(order, config.nextStatus!) : undefined}
+            leftLabel="Delete"
+            rightLabel={config.nextLabel || "Next"}
+            rightIcon={<ArrowRight className="h-4 w-4" />}
           >
-            {/* --------------------------------------------------------
-             * ORDER CARD
-             * -------------------------------------------------------- */}
-
-            <div className="min-w-0 animate-order-card-bubble-grow">
-              <DraggableCard key={`${order.id}-${config.key}`} id={`${order.id}::${order.boardStage || config.key}`}>
-                {cardContent}
-              </DraggableCard>
-            </div>
-
-            {/* --------------------------------------------------------
-             * BUBBLE
-             * -------------------------------------------------------- */}
-
-            <div
-              className="
-                min-w-0
-                lg:sticky
-                lg:top-3
-                relative
-                z-20
-              "
-              style={{
-                animationDelay: "40ms",
-              }}
-            >
-              {orderItemsBubble}
-            </div>
-          </div>
+            {cardContent}
+          </SwipeableCard>
         ) : (
-          /* ==========================================================
-           * NORMAL CARD
-           * ========================================================== */
-
           <DraggableCard key={`${order.id}-${config.key}`} id={`${order.id}::${order.boardStage || config.key}`}>
             {cardContent}
           </DraggableCard>
