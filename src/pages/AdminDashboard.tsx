@@ -177,7 +177,7 @@ const AdminDashboard = () => {
     <div className="min-h-screen w-full flex flex-col bg-background overflow-x-hidden relative">
       <AuroraBackground />
       {/* Modern Top Navigation Bar */}
-      <header className="sticky top-0 z-50 bg-card/80 backdrop-blur-xl border-b border-border w-full">
+      <header className="sticky top-0 z-50 bg-card/85 backdrop-blur-xl border-b-2 border-border shadow-soft w-full">
         <div className="ribbon-bar" aria-hidden />
         <div className="w-full px-2 sm:px-3 py-2 sm:py-3">
           {/* Top row: Logo/Home, Search, Actions */}
@@ -269,11 +269,11 @@ const AdminDashboard = () => {
                   }}
                   data-tour={`nav-${item.id}`}
                   className={cn(
-                    "relative flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm font-medium rounded-t-xl transition-all duration-200 whitespace-nowrap",
-                    "border-b-2 -mb-[2px]",
+                    "relative flex items-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold rounded-t-xl transition-all duration-200 whitespace-nowrap active:scale-[0.97]",
+                    "border-b-[3px] -mb-[2px]",
                     isActive
                       ? "bg-primary/10 border-primary text-primary"
-                      : "border-transparent text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                      : "border-transparent text-muted-foreground hover:text-foreground hover:bg-secondary/60"
                   )}
                 >
                   <div className="relative">

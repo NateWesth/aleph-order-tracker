@@ -209,7 +209,7 @@ const Settings = () => {
   return (
     <div className="min-h-screen bg-background overflow-x-hidden">
       {/* Header */}
-      <header className="bg-card border-b border-border shadow-sm">
+      <header className="bg-card/80 backdrop-blur-xl border-b-2 border-border shadow-soft sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-6">
             <div className="flex items-center">
@@ -217,19 +217,19 @@ const Settings = () => {
                 variant="ghost"
                 size="icon"
                 onClick={() => navigate(-1)}
-                className="mr-4 shrink-0"
+                className="mr-4 shrink-0 rounded-xl"
               >
                 <ArrowLeft className="h-5 w-5" />
               </Button>
-              <h1 className="text-2xl font-bold text-foreground truncate">Settings</h1>
+              <h1 className="font-display text-3xl md:text-4xl font-extrabold text-foreground truncate tracking-tight">Settings</h1>
             </div>
           </div>
         </div>
       </header>
 
       {/* Main content */}
-      <main className="max-w-7xl mx-auto py-4 px-3 sm:px-6 lg:px-8 overflow-x-hidden pb-24">
-        <div className="space-y-4">
+      <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8 overflow-x-hidden pb-28">
+        <div className="space-y-6">
           {/* Install App Section - Show on all platforms when not installed */}
           {!isInstalled && (
             <Card>

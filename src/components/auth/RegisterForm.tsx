@@ -135,78 +135,84 @@ const RegisterForm = () => {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="space-y-2">
-        <Label htmlFor="fullName">Full Name</Label>
+    <form onSubmit={handleSubmit} className="space-y-5">
+      <div className="space-y-2.5">
+        <Label htmlFor="fullName" className="text-base font-semibold">Full Name</Label>
         <Input
           id="fullName"
           type="text"
           value={formData.fullName}
           onChange={(e) => setFormData({...formData, fullName: e.target.value})}
           required
+          className="h-12 text-base"
         />
       </div>
       
-      <div className="space-y-2">
-        <Label htmlFor="email">Email</Label>
+      <div className="space-y-2.5">
+        <Label htmlFor="email" className="text-base font-semibold">Email</Label>
         <Input
           id="email"
           type="email"
           value={formData.email}
           onChange={(e) => setFormData({...formData, email: e.target.value})}
           required
+          className="h-12 text-base"
         />
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="phone">Phone (Optional)</Label>
+      <div className="space-y-2.5">
+        <Label htmlFor="phone" className="text-base font-semibold">Phone (Optional)</Label>
         <Input
           id="phone"
           type="tel"
           value={formData.phone}
           onChange={(e) => setFormData({...formData, phone: e.target.value})}
+          className="h-12 text-base"
         />
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="position">Position (Optional)</Label>
+      <div className="space-y-2.5">
+        <Label htmlFor="position" className="text-base font-semibold">Position (Optional)</Label>
         <Input
           id="position"
           type="text"
           value={formData.position}
           onChange={(e) => setFormData({...formData, position: e.target.value})}
+          className="h-12 text-base"
         />
       </div>
       
-      <div className="space-y-2">
-        <Label htmlFor="password">Password</Label>
+      <div className="space-y-2.5">
+        <Label htmlFor="password" className="text-base font-semibold">Password</Label>
         <Input
           id="password"
           type="password"
           value={formData.password}
           onChange={(e) => setFormData({...formData, password: e.target.value})}
           required
+          className="h-12 text-base"
         />
       </div>
       
-      <div className="space-y-2">
-        <Label htmlFor="confirmPassword">Confirm Password</Label>
+      <div className="space-y-2.5">
+        <Label htmlFor="confirmPassword" className="text-base font-semibold">Confirm Password</Label>
         <Input
           id="confirmPassword"
           type="password"
           value={formData.confirmPassword}
           onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})}
           required
+          className="h-12 text-base"
         />
       </div>
 
-      <p className="text-xs text-gray-500 dark:text-gray-400 bg-muted p-3 rounded">
+      <p className="text-xs text-muted-foreground bg-muted/60 border border-border p-3.5 rounded-xl leading-relaxed">
         Note: Your account will require approval by an administrator before you can access the system.
       </p>
       
       <Button 
         type="submit" 
-        className="w-full"
+        className="w-full h-12 text-base font-bold"
         disabled={loading}
       >
         {loading ? "Creating Account..." : "Create Account"}

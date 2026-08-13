@@ -12,77 +12,84 @@ const Auth = () => {
   const { theme, toggleTheme } = useTheme();
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4 py-10 relative overflow-hidden">
-      {/* Ambient brand glow - subtle, sampled from the ribbon, not a generic blob */}
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 px-4 py-10 relative overflow-hidden">
+      {/* Ambient brand glow - bold and vibrant */}
       <div
         aria-hidden
-        className="pointer-events-none absolute -top-40 left-1/2 -translate-x-1/2 w-[640px] h-[640px] rounded-full opacity-[0.10] blur-3xl ribbon-gradient"
+        className="pointer-events-none absolute -top-40 left-1/2 -translate-x-1/2 w-[800px] h-[800px] rounded-full opacity-[0.15] blur-3xl ribbon-gradient"
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -bottom-40 -right-40 w-[600px] h-[600px] rounded-full opacity-[0.08] blur-3xl bg-brand-magenta"
       />
 
       {/* Theme Toggle */}
-      <div className="absolute top-4 right-4 z-10">
+      <div className="absolute top-6 right-6 z-20">
         <Button
           variant="ghost"
           size="icon"
           onClick={toggleTheme}
-          className="rounded-full"
+          className="rounded-full hover:bg-primary/10"
           aria-label="Toggle theme"
         >
           {theme === 'dark' ? (
-            <Sun className="h-5 w-5 text-muted-foreground" />
+            <Sun className="h-6 w-6 text-muted-foreground" />
           ) : (
-            <Moon className="h-5 w-5 text-muted-foreground" />
+            <Moon className="h-6 w-6 text-muted-foreground" />
           )}
         </Button>
       </div>
 
       <div className="w-full max-w-md relative z-10">
-        {/* Brand mark */}
-        <div className="flex flex-col items-center gap-3 mb-8">
-          <img
-            src="/lovable-uploads/e1088147-889e-43f6-bdf0-271189b88913.png"
-            alt="Aleph Engineering & Supplies"
-            className="h-14 w-14"
-          />
+        {/* Brand mark - Enhanced */}
+        <div className="flex flex-col items-center gap-4 mb-10">
+          <div className="relative">
+            <div className="absolute inset-0 bg-primary/20 rounded-2xl blur-2xl" />
+            <img
+              src="/lovable-uploads/e1088147-889e-43f6-bdf0-271189b88913.png"
+              alt="Aleph Engineering & Supplies"
+              className="h-16 w-16 relative"
+            />
+          </div>
           <div className="text-center">
-            <h1 className="font-display text-2xl font-bold text-foreground leading-tight">Aleph</h1>
-            <p className="text-xs tracking-wide text-muted-foreground uppercase">Engineering &amp; Supplies</p>
+            <h1 className="font-display text-4xl md:text-5xl font-extrabold text-foreground leading-tight">Aleph</h1>
+            <p className="text-sm md:text-base tracking-widest text-muted-foreground uppercase font-semibold mt-2">Engineering &amp; Supplies</p>
           </div>
         </div>
 
-        <Card className="shadow-soft-lg border-border/60 overflow-hidden">
-          <div className="ribbon-bar" aria-hidden />
-          <CardHeader className="text-center px-6 pt-6">
-            <CardTitle className="text-xl md:text-2xl font-bold">
-              {isLogin ? "Welcome back" : "Create an account"}
+        <Card className="shadow-bold-lg border-primary/20 overflow-hidden relative">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-brand-blue via-brand-magenta to-brand-orange" aria-hidden />
+          <CardHeader className="text-center px-8 pt-8 pb-6">
+            <CardTitle className="text-3xl md:text-4xl font-extrabold mb-2">
+              {isLogin ? "Welcome Back" : "Create Account"}
             </CardTitle>
-            <CardDescription className="text-sm md:text-base">
+            <CardDescription className="text-base md:text-lg text-muted-foreground">
               {isLogin
-                ? "Sign in to track and manage your orders"
-                : "Fill in your details to get started"}
+                ? "Access your order management dashboard"
+                : "Join our platform today"}
             </CardDescription>
           </CardHeader>
-          <CardContent className="px-6 pb-6">
+          <CardContent className="px-8 pb-8">
             {isLogin ? <LoginForm /> : <RegisterForm />}
 
-            <div className="mt-6 text-center">
-              <p className="text-sm text-muted-foreground">
-                {isLogin ? "Don't have an account?" : "Already have an account?"}
-                <button
-                  onClick={() => setIsLogin(!isLogin)}
-                  className="ml-1 text-primary hover:text-primary/80 font-medium text-sm transition-colors"
-                >
-                  {isLogin ? "Register now" : "Login now"}
-                </button>
+            <div className="mt-8 text-center border-t border-border/40 pt-8">
+              <p className="text-base text-muted-foreground mb-4">
+                {isLogin ? "New here?" : "Already have an account?"}
               </p>
+              <button
+                onClick={() => setIsLogin(!isLogin)}
+                className="inline-flex items-center justify-center px-6 py-3 rounded-lg font-semibold text-primary hover:bg-primary/10 transition-all duration-200"
+              >
+                {isLogin ? "Create an Account" : "Sign In"}
+              </button>
             </div>
           </CardContent>
         </Card>
 
-        <p className="text-center text-xs text-muted-foreground mt-6">
+        <p className="text-center text-sm text-muted-foreground mt-8">
           Looking for the client portal?{" "}
-          <a href="/portal/login" className="text-primary hover:text-primary/80 font-medium transition-colors">
-            Sign in here
+          <a href="/portal/login" className="text-primary hover:text-primary/80 font-semibold transition-colors">
+            Access it here
           </a>
         </p>
       </div>
