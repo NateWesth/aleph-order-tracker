@@ -1123,7 +1123,15 @@ async function handleReconcileQuantities(
     return [...ids]
   }
 
-  // 2. Reset counters so everything is rebuilt from Zoho
+  // 2. Reset counters so everything is rebuilt from Zoho.
+  //    Manual completions (qty_completed) are user decisions Zoho knows nothing
+  //    about, so snapshot them and restore after the rebuild.
+  const { data: completedSnapshot } = await supabase
+    .from('order_items')
+    .select('id, qty_completed')
+    .in('order_id', orderIds)
+    .gt('qty_completed', 0)
+
   await supabase.from('order_item_po_allocations').delete().in('order_id', orderIds)
   await supabase
     .from('order_items')
