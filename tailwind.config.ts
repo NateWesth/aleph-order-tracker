@@ -10,9 +10,34 @@ export default {
 	],
 	prefix: "",
 	theme: {
+		fontSize: {
+			xs: ['0.75rem', { lineHeight: '1rem' }],
+			sm: ['0.875rem', { lineHeight: '1.25rem' }],
+			base: ['1rem', { lineHeight: '1.5rem' }],
+			lg: ['1.125rem', { lineHeight: '1.75rem' }],
+			xl: ['1.25rem', { lineHeight: '1.75rem' }],
+			'2xl': ['1.5rem', { lineHeight: '2rem' }],
+			'3xl': ['1.875rem', { lineHeight: '2.25rem' }],
+			'4xl': ['2.25rem', { lineHeight: '2.5rem' }],
+			'5xl': ['3rem', { lineHeight: '1' }],
+			'6xl': ['3.75rem', { lineHeight: '1' }],
+		},
+		fontWeight: {
+			light: '300',
+			normal: '400',
+			medium: '500',
+			semibold: '600',
+			bold: '700',
+			extrabold: '800',
+		},
 		container: {
 			center: true,
-			padding: '2rem',
+			padding: {
+				DEFAULT: '1rem',
+				sm: '1.5rem',
+				lg: '2rem',
+				xl: '2.5rem',
+			},
 			screens: {
 				'2xl': '1400px'
 			}
@@ -31,7 +56,9 @@ export default {
 				foreground: 'hsl(var(--foreground))',
 				primary: {
 					DEFAULT: 'hsl(var(--primary))',
-					foreground: 'hsl(var(--primary-foreground))'
+					foreground: 'hsl(var(--primary-foreground))',
+					light: 'hsl(205 90% 65%)',
+					dark: 'hsl(205 90% 32%)',
 				},
 				secondary: {
 					DEFAULT: 'hsl(var(--secondary))',
@@ -67,6 +94,21 @@ export default {
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
 				},
+				// Brand colors - Bold vibrant palette
+				brand: {
+					blue: 'hsl(205 95% 45%)',
+					green: 'hsl(142 70% 38%)',
+					magenta: 'hsl(330 85% 58%)',
+					orange: 'hsl(28 95% 52%)',
+					purple: 'hsl(262 80% 55%)',
+					teal: 'hsl(178 70% 40%)',
+				},
+				status: {
+					success: 'hsl(152 70% 35%)',
+					warning: 'hsl(32 95% 48%)',
+					error: 'hsl(355 85% 50%)',
+					info: 'hsl(205 90% 45%)',
+				},
 				// Legacy color tokens - aligned to the ribbon palette sampled from the real Aleph logo
 				company: {
 					green: 'hsl(142 60% 40%)',
@@ -91,14 +133,32 @@ export default {
 				sm: 'calc(var(--radius) - 4px)',
 				xl: 'calc(var(--radius) + 4px)',
 				'2xl': 'calc(var(--radius) + 8px)',
+				'3xl': 'calc(var(--radius) + 12px)',
+			},
+			spacing: {
+				xs: '0.25rem',
+				sm: '0.5rem',
+				md: '1rem',
+				lg: '1.5rem',
+				xl: '2rem',
+				'2xl': '2.5rem',
+				'3xl': '3rem',
 			},
 			boxShadow: {
+				'xs': '0 1px 2px 0 rgb(0 0 0 / 0.05)',
 				'soft': '0 2px 8px -2px rgb(0 0 0 / 0.08), 0 2px 4px -2px rgb(0 0 0 / 0.04)',
 				'soft-lg': '0 4px 12px -2px rgb(0 0 0 / 0.1), 0 2px 6px -2px rgb(0 0 0 / 0.06)',
+				'soft-xl': '0 8px 24px -4px rgb(0 0 0 / 0.12), 0 4px 8px -2px rgb(0 0 0 / 0.08)',
+				'bold': '0 4px 16px -2px rgb(0 0 0 / 0.15), 0 2px 8px -2px rgb(0 0 0 / 0.1)',
+				'bold-lg': '0 8px 24px -4px rgb(0 0 0 / 0.2), 0 4px 12px -2px rgb(0 0 0 / 0.15)',
 				'glow': '0 0 20px -5px hsl(var(--primary) / 0.3)',
 				'glow-sm': '0 0 10px -3px hsl(var(--primary) / 0.25)',
 				'glow-lg': '0 0 30px -5px hsl(var(--primary) / 0.4)',
+				'glow-xl': '0 0 40px -8px hsl(var(--primary) / 0.5)',
 				'neon': '0 0 5px hsl(var(--primary) / 0.3), 0 0 20px hsl(var(--primary) / 0.15), 0 0 40px hsl(var(--primary) / 0.05)',
+				'button-base': '0 2px 8px -1px rgb(0 0 0 / 0.1), 0 1px 3px -1px rgb(0 0 0 / 0.06)',
+				'button-hover': '0 4px 12px -2px rgb(0 0 0 / 0.15), 0 2px 6px -1px rgb(0 0 0 / 0.1)',
+				'button-active': '0 2px 4px -1px rgb(0 0 0 / 0.08)',
 			},
 			keyframes: {
 				'accordion-down': {

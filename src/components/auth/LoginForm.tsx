@@ -246,34 +246,36 @@ const LoginForm = () => {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="space-y-2">
-        <Label htmlFor="email">Email</Label>
+    <form onSubmit={handleSubmit} className="space-y-5">
+      <div className="space-y-2.5">
+        <Label htmlFor="email" className="text-base font-semibold">Email Address</Label>
         <Input
           id="email"
           type="email"
+          placeholder="you@example.com"
           value={formData.email}
           onChange={(e) => setFormData({...formData, email: e.target.value})}
           required
-          
+          className="h-12 text-base"
         />
       </div>
       
-      <div className="space-y-2">
-        <Label htmlFor="password">Password</Label>
+      <div className="space-y-2.5">
+        <Label htmlFor="password" className="text-base font-semibold">Password</Label>
         <Input
           id="password"
           type="password"
+          placeholder="Enter your password"
           value={formData.password}
           onChange={(e) => setFormData({...formData, password: e.target.value})}
           required
-          
+          className="h-12 text-base"
         />
       </div>
       
       <Button 
         type="submit" 
-        className="w-full"
+        className="w-full h-12 text-base font-bold"
         disabled={loading || biometricLoading}
       >
         {loading ? "Signing In..." : "Sign In"}
@@ -283,15 +285,15 @@ const LoginForm = () => {
       {biometricAvailable && hasSavedCredentials && (
         <Button 
           type="button"
-          variant="outline"
-          className="w-full flex items-center justify-center gap-2"
+          variant="outline-bold"
+          className="w-full h-12 text-base font-bold flex items-center justify-center gap-3"
           onClick={handleBiometricLogin}
           disabled={loading || biometricLoading}
         >
           {biometricType === BiometryType.FACE_ID || biometricType === BiometryType.FACE_AUTHENTICATION ? (
-            <ScanFace className="h-5 w-5" />
+            <ScanFace className="h-6 w-6" />
           ) : (
-            <Fingerprint className="h-5 w-5" />
+            <Fingerprint className="h-6 w-6" />
           )}
           {biometricLoading 
             ? "Authenticating..." 
@@ -306,10 +308,10 @@ const LoginForm = () => {
         </p>
       )}
       
-      <div className="text-center">
+      <div className="text-center pt-2">
         <Dialog>
           <DialogTrigger asChild>
-            <Button variant="link" className="text-sm text-muted-foreground hover:text-primary">
+            <Button variant="link" className="text-base font-semibold text-primary hover:text-primary/80">
               Forgot your password?
             </Button>
           </DialogTrigger>
