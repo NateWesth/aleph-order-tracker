@@ -245,17 +245,15 @@ export default function SuppliersPage() {
   }
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <Truck className="h-5 w-5 text-primary" />
-          <h2 className="text-lg font-semibold">Suppliers</h2>
-          <span className="text-sm text-muted-foreground">
-            ({filteredSuppliers.length})
-          </span>
-        </div>
-        <div className="flex items-center gap-2">
+    <div className="space-y-5">
+      <PageHeader
+        title="Suppliers"
+        icon={Truck}
+        description="Vendors synced from Zoho Books plus any you add manually."
+        stats={[{ label: "suppliers", value: filteredSuppliers.length, icon: Truck }]}
+      />
+      <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+        <div className="flex flex-1 flex-col sm:flex-row sm:items-center gap-2">
           <div className="relative flex-1 sm:w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
