@@ -778,6 +778,35 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
   return (
     <>
       <ConfettiOverlay show={showConfetti} streak={streak} />
+      <style>{`
+        @keyframes order-column-push {
+          0% {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+          }
+          45% {
+            transform: translateY(14px) scale(0.985);
+          }
+          75% {
+            transform: translateY(-4px) scale(1.005);
+          }
+          100% {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+          }
+        }
+
+        .animate-column-push {
+          animation: order-column-push 560ms cubic-bezier(0.22, 1, 0.36, 1) both;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .animate-column-push {
+            animation: none !important;
+          }
+        }
+      `}</style>
+
       <PullToRefresh onRefresh={fetchOrders} className="space-y-3 sm:space-y-4 w-full overflow-x-hidden">
         {/* Bulk Actions Bar */}
         {selectedOrders.length > 0 && (
@@ -882,48 +911,64 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
         >
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1.5fr_1fr_1fr_1fr] gap-2 sm:gap-3 md:gap-4 w-full overflow-hidden">
-            {STATUS_COLUMNS.map((column) => (
-              <OrderStatusColumn
-                key={column.key}
-                config={column}
-                orders={ordersByStatus[column.key as keyof typeof ordersByStatus] || []}
-                onMoveOrder={handleMoveOrder}
-                onDeleteOrder={handleDeleteOrder}
-                onSetItemStockStatus={handleSetItemStockStatus}
-                onBulkSetItemsStatus={handleBulkSetItemsStatus}
-                canEditItems={true}
-                selectedOrderIds={selectedOrderIds}
-                onToggleOrderSelection={toggleOrderSelection}
-                groupByClient={groupByClient}
-                allTags={allTags}
-                tagAssignments={tagAssignments}
-                onTagsChanged={fetchTags}
-                // Animated items bubble
-                itemsBubble={itemsBubble}
-                onOpenItemsBubble={(orderId) => {
-                  setItemsBubble({
-                    orderId,
-                    columnKey: column.key,
-                  });
-                }}
-                onCloseItemsBubble={() => {
-                  setItemsBubble(null);
-                }}
-                isExpanded={expandedColumns.has(column.key)}
-                onToggleExpand={() => {
-                  setExpandedColumns((prev) => {
-                    const next = new Set(prev);
-                    if (next.has(column.key)) {
-                      next.delete(column.key);
-                    } else {
-                      next.add(column.key);
-                    }
-                    return next;
-                  });
-                }}
-              />
-            ))}
+          <div
+            className={cn(
+              "grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 md:gap-4 w-full overflow-visible transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]",
+              itemsBubble ? "lg:grid-cols-1" : "lg:grid-cols-[1.5fr_1fr_1fr_1fr]",
+            )}
+          >
+            {STATUS_COLUMNS.map((column) => {
+              const isBubbleColumn = itemsBubble?.columnKey === column.key;
+
+              return (
+                <div
+                  key={column.key}
+                  className={cn(
+                    "min-w-0 transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]",
+                    itemsBubble && !isBubbleColumn ? "lg:animate-column-push" : "",
+                    itemsBubble && isBubbleColumn ? "lg:z-20" : "",
+                  )}
+                >
+                  <OrderStatusColumn
+                    config={column}
+                    orders={ordersByStatus[column.key as keyof typeof ordersByStatus] || []}
+                    onMoveOrder={handleMoveOrder}
+                    onDeleteOrder={handleDeleteOrder}
+                    onSetItemStockStatus={handleSetItemStockStatus}
+                    onBulkSetItemsStatus={handleBulkSetItemsStatus}
+                    canEditItems={true}
+                    selectedOrderIds={selectedOrderIds}
+                    onToggleOrderSelection={toggleOrderSelection}
+                    groupByClient={groupByClient}
+                    allTags={allTags}
+                    tagAssignments={tagAssignments}
+                    onTagsChanged={fetchTags}
+                    itemsBubble={itemsBubble}
+                    onOpenItemsBubble={(orderId) => {
+                      setItemsBubble({
+                        orderId,
+                        columnKey: column.key,
+                      });
+                    }}
+                    onCloseItemsBubble={() => {
+                      setItemsBubble(null);
+                    }}
+                    isExpanded={expandedColumns.has(column.key)}
+                    onToggleExpand={() => {
+                      setExpandedColumns((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(column.key)) {
+                          next.delete(column.key);
+                        } else {
+                          next.add(column.key);
+                        }
+                        return next;
+                      });
+                    }}
+                  />
+                </div>
+              );
+            })}
           </div>
         </DndContext>
       </PullToRefresh>
