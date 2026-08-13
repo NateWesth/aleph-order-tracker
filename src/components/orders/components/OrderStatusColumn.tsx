@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Trash2, ArrowRight, Package, PackageCheck, ChevronDown, Undo2 } from "lucide-react";
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -16,9 +17,12 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
+
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -86,6 +90,7 @@ interface OrderStatusColumnProps {
     orderId: string;
     columnKey: string;
   } | null;
+
   onOpenItemsBubble?: (orderId: string) => void;
   onCloseItemsBubble?: () => void;
 }
@@ -131,13 +136,19 @@ function OrderStatusColumn({
   onOpenItemsBubble,
   onCloseItemsBubble,
 }: OrderStatusColumnProps) {
-  const { setNodeRef, isOver } = useDroppable({ id: config.key });
+  const { setNodeRef, isOver } = useDroppable({
+    id: config.key,
+  });
+
   const { stockStatusColors } = useTheme();
   const isMobile = useIsMobile();
 
   const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
+
   const [collapsedClients, setCollapsedClients] = useState<Set<string>>(new Set());
+
   const [detailsOrder, setDetailsOrder] = useState<Order | null>(null);
+
   const [detailsTab, setDetailsTab] = useState<"details" | "pos" | "activity">("pos");
 
   const effectiveIsExpanded = isMobile ? isExpanded : true;
@@ -232,24 +243,43 @@ function OrderStatusColumn({
   return (
     <>
       <style>{`
-        /*
-         * STEPS 4–7
+
+        /* ============================================================
+         * ORDER ITEMS BUBBLE — UPDATES 5 / 6 / 7
+         * ============================================================
          *
-         * Step 4:
-         * Subtle elastic overshoot / bounce.
+         * UPDATE 5
+         * ------------------------------------------------------------
+         * Shadow + glow trail follows the point where the bubble
+         * expands away from the order card.
          *
-         * Step 5:
-         * Shadow + glow trail follows the expansion point.
+         * UPDATE 6
+         * ------------------------------------------------------------
+         * Animation timings are deliberately kept between
+         * approximately 500–650ms.
          *
-         * Step 6:
-         * Main animation is kept inside the 500–650ms range so it
-         * feels responsive enough for a real business application.
+         * UPDATE 7
+         * ------------------------------------------------------------
+         * Animation-only changes.
          *
-         * Step 7:
-         * All existing drag/drop, scrolling and mobile behavior remains
-         * untouched. These animations only affect the visual bubble/card
-         * connection when the bubble is opened.
-         */
+         * No changes to:
+         * - DnD
+         * - order IDs
+         * - scrolling
+         * - mobile swipe
+         * - order movement
+         * - order deletion
+         * - selection
+         * - tags
+         * - order data
+         * - existing component structure
+         *
+         * ============================================================ */
+
+
+        /* ------------------------------------------------------------
+         * CARD RESPONSE
+         * ------------------------------------------------------------ */
 
         @keyframes order-card-bubble-elastic {
           0% {
@@ -257,33 +287,42 @@ function OrderStatusColumn({
             filter: drop-shadow(0 0 0 transparent);
           }
 
-          20% {
-            transform: translateX(3px) scale(1.012);
+          18% {
+            transform: translateX(2px) scale(1.008);
           }
 
-          43% {
-            transform: translateX(7px) scale(1.022);
-            filter: drop-shadow(
-              8px 0 10px hsl(var(--primary) / 0.10)
-            );
+          38% {
+            transform: translateX(5px) scale(1.018);
+
+            filter:
+              drop-shadow(
+                7px 0 10px
+                hsl(var(--primary) / 0.08)
+              );
           }
 
-          61% {
-            transform: translateX(4px) scale(1.008);
-            filter: drop-shadow(
-              5px 0 8px hsl(var(--primary) / 0.08)
-            );
+          55% {
+            transform: translateX(3px) scale(1.007);
+
+            filter:
+              drop-shadow(
+                5px 0 8px
+                hsl(var(--primary) / 0.07)
+              );
           }
 
-          77% {
-            transform: translateX(1.5px) scale(1.002);
-            filter: drop-shadow(
-              2px 0 5px hsl(var(--primary) / 0.04)
-            );
+          72% {
+            transform: translateX(1px) scale(1.002);
+
+            filter:
+              drop-shadow(
+                2px 0 5px
+                hsl(var(--primary) / 0.04)
+              );
           }
 
-          89% {
-            transform: translateX(-0.5px) scale(1.001);
+          88% {
+            transform: translateX(-0.25px) scale(1.001);
           }
 
           100% {
@@ -292,128 +331,162 @@ function OrderStatusColumn({
           }
         }
 
+
+        /* ------------------------------------------------------------
+         * MAIN BUBBLE
+         * ------------------------------------------------------------ */
+
         @keyframes order-bubble-elastic-grow {
           0% {
             opacity: 0;
+
             transform-origin: left center;
+
             transform:
               translateX(-12px)
-              scaleX(0.10)
+              scaleX(0.08)
               scaleY(0.78);
+
             border-radius: 1rem;
+
             box-shadow:
               0 0 0 0 hsl(var(--primary) / 0),
               0 0 0 0 hsl(var(--primary) / 0);
           }
 
-          13% {
-            opacity: 0.22;
+          12% {
+            opacity: 0.18;
+
             transform:
-              translateX(-8px)
-              scaleX(0.28)
+              translateX(-9px)
+              scaleX(0.25)
               scaleY(0.84);
+
             box-shadow:
-              -6px 0 12px 2px hsl(var(--primary) / 0.10);
+              -5px 0 12px 1px
+              hsl(var(--primary) / 0.08);
           }
 
-          31% {
-            opacity: 0.65;
+          29% {
+            opacity: 0.58;
+
             transform:
-              translateX(-3px)
-              scaleX(0.62)
-              scaleY(0.93);
+              translateX(-4px)
+              scaleX(0.60)
+              scaleY(0.92);
+
             box-shadow:
-              -8px 0 18px 3px hsl(var(--primary) / 0.14);
+              -8px 0 18px 2px
+              hsl(var(--primary) / 0.12);
           }
 
-          52% {
+          48% {
             opacity: 1;
+
             transform:
               translateX(1px)
-              scaleX(1.045)
-              scaleY(1.018);
+              scaleX(1.035)
+              scaleY(1.015);
+
             box-shadow:
-              -10px 0 24px 4px hsl(var(--primary) / 0.16),
-              0 8px 28px -8px hsl(var(--primary) / 0.14);
+              -10px 0 24px 4px
+              hsl(var(--primary) / 0.15),
+              0 8px 28px -8px
+              hsl(var(--primary) / 0.12);
           }
 
-          68% {
+          64% {
             transform:
               translateX(0)
-              scaleX(0.985)
-              scaleY(0.993);
+              scaleX(0.988)
+              scaleY(0.994);
+
             box-shadow:
-              -7px 0 18px 3px hsl(var(--primary) / 0.10),
-              0 6px 24px -10px hsl(var(--primary) / 0.10);
+              -7px 0 18px 3px
+              hsl(var(--primary) / 0.09),
+              0 6px 24px -10px
+              hsl(var(--primary) / 0.09);
           }
 
-          82% {
+          79% {
             transform:
               translateX(0)
-              scaleX(1.012)
-              scaleY(1.006);
+              scaleX(1.009)
+              scaleY(1.005);
+
             box-shadow:
-              -4px 0 12px 2px hsl(var(--primary) / 0.06),
-              0 5px 20px -12px hsl(var(--primary) / 0.08);
+              -4px 0 12px 2px
+              hsl(var(--primary) / 0.055),
+              0 5px 20px -12px
+              hsl(var(--primary) / 0.07);
           }
 
-          92% {
+          91% {
             transform:
               translateX(0)
-              scaleX(0.997)
-              scaleY(0.998);
+              scaleX(0.998)
+              scaleY(0.999);
           }
 
           100% {
             opacity: 1;
+
             transform:
               translateX(0)
               scaleX(1)
               scaleY(1);
+
             border-radius: 1rem;
+
             box-shadow:
-              0 25px 50px -20px hsl(var(--foreground) / 0.20);
+              0 25px 50px -20px
+              hsl(var(--foreground) / 0.20);
           }
         }
 
-        /*
-         * The connector has its own small elastic motion so the visual
-         * connection between the card and bubble feels continuous.
-         */
+
+        /* ------------------------------------------------------------
+         * CONNECTOR
+         * ------------------------------------------------------------ */
+
         @keyframes order-bubble-connector-elastic {
           0% {
             opacity: 0;
+
             transform:
               translateX(-9px)
               rotate(45deg)
-              scale(0.2);
+              scale(0.18);
           }
 
-          35% {
-            opacity: 0.65;
+          30% {
+            opacity: 0.58;
+
             transform:
               translateX(-3px)
               rotate(45deg)
-              scale(0.78);
+              scale(0.75);
           }
 
-          58% {
+          55% {
             opacity: 1;
+
             transform:
               translateX(1px)
               rotate(45deg)
-              scale(1.08);
+              scale(1.06);
           }
 
-          76% {
+          74% {
             transform:
-              translateX(-0.5px)
+              translateX(-0.4px)
               rotate(45deg)
               scale(0.96);
           }
 
           100% {
             opacity: 1;
+
             transform:
               translateX(0)
               rotate(45deg)
@@ -421,51 +494,62 @@ function OrderStatusColumn({
           }
         }
 
-        /*
-         * Short glow pulse at the point where the bubble leaves the card.
-         * This creates the subtle "energy trail" without being distracting.
-         */
+
+        /* ------------------------------------------------------------
+         * PRIMARY GLOW TRAIL
+         * ------------------------------------------------------------ */
+
         @keyframes order-bubble-glow-trail {
           0% {
             opacity: 0;
+
             transform:
               translateX(-10px)
-              scaleX(0.35)
-              scaleY(0.75);
+              scaleX(0.30)
+              scaleY(0.72);
           }
 
-          20% {
-            opacity: 0.75;
+          18% {
+            opacity: 0.68;
+
             transform:
-              translateX(-3px)
-              scaleX(0.75)
-              scaleY(0.92);
+              translateX(-4px)
+              scaleX(0.70)
+              scaleY(0.88);
           }
 
-          45% {
-            opacity: 0.5;
+          40% {
+            opacity: 0.48;
+
             transform:
-              translateX(4px)
-              scaleX(1.15)
-              scaleY(1);
+              translateX(3px)
+              scaleX(1.08)
+              scaleY(0.98);
           }
 
-          70% {
+          63% {
             opacity: 0.22;
+
             transform:
-              translateX(9px)
-              scaleX(1.4)
-              scaleY(1.02);
+              translateX(8px)
+              scaleX(1.32)
+              scaleY(1);
           }
 
           100% {
             opacity: 0;
+
             transform:
               translateX(16px)
-              scaleX(1.65)
-              scaleY(1.05);
+              scaleX(1.60)
+              scaleY(1.04);
           }
         }
+
+
+        /* ------------------------------------------------------------
+         * CONTENT RISE
+         * ------------------------------------------------------------ */
 
         @keyframes order-bubble-content-rise {
           0% {
@@ -473,13 +557,13 @@ function OrderStatusColumn({
             transform: translateY(7px);
           }
 
-          45% {
+          42% {
             opacity: 0;
             transform: translateY(4px);
           }
 
-          72% {
-            opacity: 0.75;
+          70% {
+            opacity: 0.72;
             transform: translateY(1px);
           }
 
@@ -489,13 +573,18 @@ function OrderStatusColumn({
           }
         }
 
+
+        /* ------------------------------------------------------------
+         * ITEM POP
+         * ------------------------------------------------------------ */
+
         @keyframes order-item-pop {
           0% {
             opacity: 0;
             transform: translateX(-7px) scale(0.97);
           }
 
-          65% {
+          62% {
             opacity: 1;
             transform: translateX(1px) scale(1.005);
           }
@@ -506,18 +595,23 @@ function OrderStatusColumn({
           }
         }
 
-        /*
-         * 600ms = fast enough for frequent business interactions while
-         * still allowing the elastic motion to be perceived.
-         */
+
+        /* ============================================================
+         * ANIMATION CLASSES
+         * ============================================================ */
+
         .animate-order-card-bubble-grow {
           animation:
             order-card-bubble-elastic
             600ms
             cubic-bezier(0.22, 1, 0.36, 1)
             both;
-          will-change: transform, filter;
+
+          will-change:
+            transform,
+            filter;
         }
+
 
         .animate-order-bubble-grow {
           animation:
@@ -525,8 +619,13 @@ function OrderStatusColumn({
             620ms
             cubic-bezier(0.22, 1, 0.36, 1)
             both;
-          will-change: transform, opacity, box-shadow;
+
+          will-change:
+            transform,
+            opacity,
+            box-shadow;
         }
+
 
         .animate-order-bubble-connector {
           animation:
@@ -535,8 +634,12 @@ function OrderStatusColumn({
             80ms
             cubic-bezier(0.22, 1, 0.36, 1)
             both;
-          will-change: transform, opacity;
+
+          will-change:
+            transform,
+            opacity;
         }
+
 
         .animate-order-bubble-glow-trail {
           animation:
@@ -544,8 +647,12 @@ function OrderStatusColumn({
             560ms
             cubic-bezier(0.22, 1, 0.36, 1)
             both;
-          will-change: transform, opacity;
+
+          will-change:
+            transform,
+            opacity;
         }
+
 
         .animate-order-bubble-content {
           animation:
@@ -554,8 +661,12 @@ function OrderStatusColumn({
             70ms
             cubic-bezier(0.22, 1, 0.36, 1)
             both;
-          will-change: transform, opacity;
+
+          will-change:
+            transform,
+            opacity;
         }
+
 
         .animate-item-pop {
           animation:
@@ -564,6 +675,11 @@ function OrderStatusColumn({
             cubic-bezier(0.22, 1, 0.36, 1)
             both;
         }
+
+
+        /* ============================================================
+         * ACCESSIBILITY
+         * ============================================================ */
 
         @media (prefers-reduced-motion: reduce) {
           .animate-order-card-bubble-grow,
@@ -575,6 +691,7 @@ function OrderStatusColumn({
             animation: none !important;
           }
         }
+
       `}</style>
 
       <div
@@ -644,12 +761,15 @@ function OrderStatusColumn({
                 {orders.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-12 sm:py-16 text-muted-foreground">
                     <Package className="h-8 w-8 sm:h-10 sm:w-10 mb-3 opacity-30" />
+
                     <p className="text-xs sm:text-sm font-medium">No orders</p>
                   </div>
                 ) : groupByClient && clientGroups ? (
                   Array.from(clientGroups.entries()).map(([clientName, clientOrders], groupIdx) => {
                     const isClientCollapsed = collapsedClients.has(clientName);
+
                     const colorClass = CLIENT_COLORS[groupIdx % CLIENT_COLORS.length];
+
                     const initial = clientName.charAt(0).toUpperCase();
 
                     return (
@@ -725,9 +845,13 @@ function OrderStatusColumn({
 
   function renderOrderCard(order: Order, index: number) {
     const stockSummary = getItemStockSummary(order.items);
+
     const isOrderExpanded = expandedOrders.has(order.id);
+
     const hasItems = order.items && order.items.length > 0;
+
     const isSelected = selectedOrderIds?.has(order.id) || false;
+
     const isBubbleOpen = itemsBubble?.orderId === order.id;
 
     const cardContent = (
@@ -738,11 +862,14 @@ function OrderStatusColumn({
           isSelected && "ring-2 ring-primary bg-primary/5",
           isBubbleOpen && "relative z-40",
         )}
-        style={{ animationDelay: `${index * 30}ms` }}
+        style={{
+          animationDelay: `${index * 30}ms`,
+        }}
       >
         <CardContent className="p-2.5 sm:p-3">
           <div className="space-y-2 sm:space-y-2.5">
             {/* Order Header */}
+
             <div className="flex items-start justify-between gap-2">
               {onToggleOrderSelection && (
                 <Checkbox
@@ -760,6 +887,7 @@ function OrderStatusColumn({
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
+
                         setDetailsTab("pos");
                         setDetailsOrder(order);
                       }}
@@ -815,6 +943,7 @@ function OrderStatusColumn({
             </div>
 
             {/* Order Tags */}
+
             {allTags.length > 0 && onTagsChanged && (
               <OrderTags
                 orderId={order.id}
@@ -825,13 +954,15 @@ function OrderStatusColumn({
               />
             )}
 
-            {/* Collapsible Items Section */}
+            {/* Collapsible Items */}
+
             {hasItems && (
               <Collapsible open={isOrderExpanded} onOpenChange={() => toggleExpanded(order.id)}>
                 <CollapsibleTrigger asChild>
                   <button
                     className={cn(
                       "flex items-center justify-between w-full text-[10px] sm:text-xs bg-muted/50 hover:bg-muted px-2 sm:px-2.5 py-1.5 sm:py-2 rounded-lg transition-all duration-200",
+
                       itemsBubble?.orderId === order.id && "ring-2 ring-primary/40 bg-primary/10",
                     )}
                     onClick={(e) => {
@@ -869,6 +1000,7 @@ function OrderStatusColumn({
                   <div className="space-y-1.5 bg-muted/30 p-2.5 rounded-lg">
                     {order.items?.map((item) => {
                       const total = item.totalQuantity ?? item.quantity;
+
                       const isPartial = total > item.quantity;
 
                       return (
@@ -891,6 +1023,7 @@ function OrderStatusColumn({
             )}
 
             {/* Actions */}
+
             <div className="flex items-center gap-1.5 sm:gap-2 pt-1">
               {config.prevStatus && (
                 <Button
@@ -954,19 +1087,9 @@ function OrderStatusColumn({
       </Card>
     );
 
-    /*
-     * STEPS 4–7
-     *
-     * The bubble remains in the same connection container as the card.
-     * The animation is therefore visual only and does not alter:
-     *
-     * - drag/drop
-     * - DnD identifiers
-     * - scrolling
-     * - mobile swipe behavior
-     * - order actions
-     * - order data
-     */
+    /* ================================================================
+     * ITEMS BUBBLE
+     * ================================================================ */
 
     const orderItemsBubble = isBubbleOpen ? (
       <div
@@ -979,7 +1102,10 @@ function OrderStatusColumn({
           "shadow-2xl",
         )}
       >
-        {/* Moving glow / shadow trail */}
+        {/* ==========================================================
+         * UPDATE 5 — PRIMARY GLOW TRAIL
+         * ========================================================== */}
+
         <div
           className={cn(
             "absolute -left-4 top-5 bottom-5 w-10",
@@ -992,7 +1118,10 @@ function OrderStatusColumn({
           )}
         />
 
-        {/* Secondary subtle trail */}
+        {/* ==========================================================
+         * UPDATE 5 — SECONDARY TRAIL
+         * ========================================================== */}
+
         <div
           className={cn(
             "absolute -left-2 top-8 bottom-8 w-5",
@@ -1008,7 +1137,10 @@ function OrderStatusColumn({
           }}
         />
 
-        {/* Visual connector from card into bubble */}
+        {/* ==========================================================
+         * CONNECTOR
+         * ========================================================== */}
+
         <div
           className={cn(
             "absolute -left-2 top-8 h-4 w-4 rotate-45",
@@ -1019,11 +1151,30 @@ function OrderStatusColumn({
           )}
         />
 
-        {/* Soft ambient top glow */}
-        <div className="absolute inset-x-0 top-0 h-16 bg-primary/10 blur-2xl pointer-events-none rounded-t-2xl" />
+        {/* ==========================================================
+         * AMBIENT TOP GLOW
+         * ========================================================== */}
+
+        <div
+          className="
+              absolute
+              inset-x-0
+              top-0
+              h-16
+              bg-primary/10
+              blur-2xl
+              pointer-events-none
+              rounded-t-2xl
+            "
+        />
+
+        {/* ==========================================================
+         * BUBBLE CONTENT
+         * ========================================================== */}
 
         <div className="relative z-10 p-4 sm:p-5 animate-order-bubble-content">
           {/* Header */}
+
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="flex items-center gap-2">
@@ -1047,7 +1198,21 @@ function OrderStatusColumn({
                 e.stopPropagation();
                 onCloseItemsBubble?.();
               }}
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground transition-all hover:bg-destructive/10 hover:text-destructive hover:scale-110"
+              className="
+                  flex
+                  h-7
+                  w-7
+                  shrink-0
+                  items-center
+                  justify-center
+                  rounded-full
+                  bg-muted
+                  text-muted-foreground
+                  transition-all
+                  hover:bg-destructive/10
+                  hover:text-destructive
+                  hover:scale-110
+                "
               aria-label="Close order items"
             >
               ×
@@ -1055,6 +1220,7 @@ function OrderStatusColumn({
           </div>
 
           {/* Summary */}
+
           <div className="mt-4 flex items-center justify-between rounded-xl bg-primary/5 px-3 py-2">
             <span className="text-xs font-medium text-muted-foreground">Items</span>
 
@@ -1062,15 +1228,27 @@ function OrderStatusColumn({
           </div>
 
           {/* Items */}
+
           <div className="mt-3 space-y-2">
             {order.items?.map((item, itemIndex) => {
               const total = item.totalQuantity ?? item.quantity;
+
               const isPartial = total > item.quantity;
 
               return (
                 <div
                   key={item.id}
-                  className="flex items-center gap-3 rounded-xl bg-muted/40 px-3 py-2.5 text-xs animate-item-pop"
+                  className="
+                        flex
+                        items-center
+                        gap-3
+                        rounded-xl
+                        bg-muted/40
+                        px-3
+                        py-2.5
+                        text-xs
+                        animate-item-pop
+                      "
                   style={{
                     animationDelay: `${Math.min(itemIndex * 45 + 300, 500)}ms`,
                   }}
@@ -1099,7 +1277,8 @@ function OrderStatusColumn({
             })}
           </div>
 
-          {/* Total units */}
+          {/* Total */}
+
           {stockSummary && (
             <div className="mt-3 flex items-center justify-end gap-1.5 text-[10px] font-medium text-muted-foreground">
               <PackageCheck className="h-3.5 w-3.5" />
@@ -1111,6 +1290,10 @@ function OrderStatusColumn({
       </div>
     ) : null;
 
+    /* ================================================================
+     * LAYOUT
+     * ================================================================ */
+
     return (
       <div
         className={cn(
@@ -1118,6 +1301,10 @@ function OrderStatusColumn({
           isBubbleOpen && !isMobile && "relative z-30 lg:space-y-3",
         )}
       >
+        {/* ============================================================
+         * MOBILE
+         * ============================================================ */}
+
         {isMobile ? (
           <div className="space-y-2">
             <SwipeableCard
@@ -1134,6 +1321,10 @@ function OrderStatusColumn({
             {orderItemsBubble}
           </div>
         ) : isBubbleOpen ? (
+          /* ==========================================================
+           * DESKTOP — CARD + BUBBLE
+           * ========================================================== */
+
           <div
             className={cn(
               "grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(360px,0.85fr)]",
@@ -1141,16 +1332,28 @@ function OrderStatusColumn({
               "relative",
             )}
           >
-            {/* Order card */}
+            {/* --------------------------------------------------------
+             * ORDER CARD
+             * -------------------------------------------------------- */}
+
             <div className="min-w-0 animate-order-card-bubble-grow">
               <DraggableCard key={`${order.id}-${config.key}`} id={`${order.id}::${order.boardStage || config.key}`}>
                 {cardContent}
               </DraggableCard>
             </div>
 
-            {/* Bubble grows out from the right side of the card */}
+            {/* --------------------------------------------------------
+             * BUBBLE
+             * -------------------------------------------------------- */}
+
             <div
-              className="min-w-0 lg:sticky lg:top-3 relative z-20"
+              className="
+                min-w-0
+                lg:sticky
+                lg:top-3
+                relative
+                z-20
+              "
               style={{
                 animationDelay: "40ms",
               }}
@@ -1159,6 +1362,10 @@ function OrderStatusColumn({
             </div>
           </div>
         ) : (
+          /* ==========================================================
+           * NORMAL CARD
+           * ========================================================== */
+
           <DraggableCard key={`${order.id}-${config.key}`} id={`${order.id}::${order.boardStage || config.key}`}>
             {cardContent}
           </DraggableCard>
