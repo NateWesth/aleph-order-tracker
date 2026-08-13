@@ -37,6 +37,7 @@ import OrderForm from "./components/OrderForm";
 import OrderStatusColumn from "./components/OrderStatusColumn";
 import BulkActionsBar from "./components/BulkActionsBar";
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
+import { cn } from "@/lib/utils";
 
 interface OrdersPageProps {
   isAdmin?: boolean;
