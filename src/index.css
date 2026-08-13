@@ -137,19 +137,36 @@
   html.theme-transition *,
   html.theme-transition *::before,
   html.theme-transition *::after {
-    transition: background-color 0.4s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.4s ease, fill 0.3s ease, stroke 0.3s ease !important;
+    transition:
+      background-color 0.4s ease,
+      color 0.3s ease,
+      border-color 0.3s ease,
+      box-shadow 0.4s ease,
+      fill 0.3s ease,
+      stroke 0.3s ease !important;
     transition-delay: 0s !important;
   }
 
   body {
     @apply bg-background text-foreground;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+    font-family:
+      "Inter",
+      -apple-system,
+      BlinkMacSystemFont,
+      "Segoe UI",
+      Roboto,
+      sans-serif;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
     letter-spacing: -0.011em;
   }
 
   /* Clean, modern heading styles - display face gives headings their own identity */
-  h1, h2, h3, h4, h5, h6 {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     @apply font-display font-bold tracking-tight text-foreground;
   }
 
@@ -182,8 +199,9 @@
   }
 
   /* Mono font for codes */
-  code, .font-mono {
-    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  code,
+  .font-mono {
+    font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   }
 }
 
@@ -294,14 +312,30 @@
 }
 
 /* Staggered animations */
-.stagger-1 { animation-delay: 0.05s; }
-.stagger-2 { animation-delay: 0.1s; }
-.stagger-3 { animation-delay: 0.15s; }
-.stagger-4 { animation-delay: 0.2s; }
-.stagger-5 { animation-delay: 0.25s; }
-.stagger-6 { animation-delay: 0.3s; }
-.stagger-7 { animation-delay: 0.35s; }
-.stagger-8 { animation-delay: 0.4s; }
+.stagger-1 {
+  animation-delay: 0.05s;
+}
+.stagger-2 {
+  animation-delay: 0.1s;
+}
+.stagger-3 {
+  animation-delay: 0.15s;
+}
+.stagger-4 {
+  animation-delay: 0.2s;
+}
+.stagger-5 {
+  animation-delay: 0.25s;
+}
+.stagger-6 {
+  animation-delay: 0.3s;
+}
+.stagger-7 {
+  animation-delay: 0.35s;
+}
+.stagger-8 {
+  animation-delay: 0.4s;
+}
 
 /* Staggered reveal - elements start invisible and fade in */
 .stagger-reveal {
@@ -309,50 +343,70 @@
   animation: fadeIn 0.4s ease-out forwards;
 }
 
-.stagger-reveal:nth-child(1) { animation-delay: 0.04s; }
-.stagger-reveal:nth-child(2) { animation-delay: 0.08s; }
-.stagger-reveal:nth-child(3) { animation-delay: 0.12s; }
-.stagger-reveal:nth-child(4) { animation-delay: 0.16s; }
-.stagger-reveal:nth-child(5) { animation-delay: 0.2s; }
-.stagger-reveal:nth-child(6) { animation-delay: 0.24s; }
-.stagger-reveal:nth-child(7) { animation-delay: 0.28s; }
-.stagger-reveal:nth-child(8) { animation-delay: 0.32s; }
-.stagger-reveal:nth-child(9) { animation-delay: 0.36s; }
-.stagger-reveal:nth-child(10) { animation-delay: 0.4s; }
+.stagger-reveal:nth-child(1) {
+  animation-delay: 0.04s;
+}
+.stagger-reveal:nth-child(2) {
+  animation-delay: 0.08s;
+}
+.stagger-reveal:nth-child(3) {
+  animation-delay: 0.12s;
+}
+.stagger-reveal:nth-child(4) {
+  animation-delay: 0.16s;
+}
+.stagger-reveal:nth-child(5) {
+  animation-delay: 0.2s;
+}
+.stagger-reveal:nth-child(6) {
+  animation-delay: 0.24s;
+}
+.stagger-reveal:nth-child(7) {
+  animation-delay: 0.28s;
+}
+.stagger-reveal:nth-child(8) {
+  animation-delay: 0.32s;
+}
+.stagger-reveal:nth-child(9) {
+  animation-delay: 0.36s;
+}
+.stagger-reveal:nth-child(10) {
+  animation-delay: 0.4s;
+}
 
 /* ============================================
    LEGACY COLOR CLASSES (kept for compatibility)
    ============================================ */
 
-.text-aleph-green { 
+.text-aleph-green {
   @apply text-primary;
 }
 
-.text-aleph-magenta { 
+.text-aleph-magenta {
   color: hsl(var(--ribbon-1));
 }
 
-.text-aleph-accent { 
+.text-aleph-accent {
   @apply text-primary;
 }
 
-.text-aleph-orange { 
+.text-aleph-orange {
   color: hsl(var(--ribbon-6));
 }
 
-.bg-aleph-green { 
+.bg-aleph-green {
   @apply bg-primary;
 }
 
-.bg-aleph-magenta { 
+.bg-aleph-magenta {
   background-color: hsl(var(--ribbon-1));
 }
 
-.bg-aleph-accent { 
+.bg-aleph-accent {
   @apply bg-primary;
 }
 
-.bg-aleph-orange { 
+.bg-aleph-orange {
   background-color: hsl(var(--ribbon-6));
 }
 
@@ -372,10 +426,14 @@
 }
 
 .ripple-container::after {
-  content: '';
+  content: "";
   position: absolute;
   inset: 0;
-  background: radial-gradient(circle at var(--ripple-x, 50%) var(--ripple-y, 50%), hsl(var(--primary-foreground) / 0.25) 0%, transparent 60%);
+  background: radial-gradient(
+    circle at var(--ripple-x, 50%) var(--ripple-y, 50%),
+    hsl(var(--primary-foreground) / 0.25) 0%,
+    transparent 60%
+  );
   opacity: 0;
   transform: scale(0);
   transition: none;
@@ -384,7 +442,9 @@
 .ripple-container:active::after {
   opacity: 1;
   transform: scale(2.5);
-  transition: transform 0.5s ease-out, opacity 0.4s ease-out;
+  transition:
+    transform 0.5s ease-out,
+    opacity 0.4s ease-out;
 }
 
 /* Interactive hover scale */
@@ -442,14 +502,14 @@
 /* Modern elevated card */
 .card-elevated {
   @apply bg-card border border-border rounded-xl;
-  box-shadow: 
+  box-shadow:
     0 4px 16px -2px rgb(0 0 0 / 0.08),
     0 2px 8px -2px rgb(0 0 0 / 0.04),
     0 0 0 1px rgb(0 0 0 / 0.02);
 }
 
 .dark .card-elevated {
-  box-shadow: 
+  box-shadow:
     0 4px 20px -2px rgb(0 0 0 / 0.5),
     0 2px 10px -2px rgb(0 0 0 / 0.4),
     0 0 0 1px rgb(255 255 255 / 0.03);
@@ -462,13 +522,13 @@
 
 .hover-lift:hover {
   transform: translateY(-3px);
-  box-shadow: 
+  box-shadow:
     0 8px 25px -4px rgb(0 0 0 / 0.12),
     0 4px 10px -4px rgb(0 0 0 / 0.06);
 }
 
 .dark .hover-lift:hover {
-  box-shadow: 
+  box-shadow:
     0 8px 30px -4px rgb(0 0 0 / 0.6),
     0 4px 12px -4px rgb(0 0 0 / 0.4);
 }
@@ -476,14 +536,14 @@
 /* Floating surface - makes elements appear to float above the page */
 .float-surface {
   @apply bg-card border border-border/50 rounded-xl;
-  box-shadow: 
+  box-shadow:
     0 8px 30px -6px rgb(0 0 0 / 0.1),
     0 4px 12px -4px rgb(0 0 0 / 0.05),
     0 0 0 1px rgb(0 0 0 / 0.02);
 }
 
 .dark .float-surface {
-  box-shadow: 
+  box-shadow:
     0 8px 40px -6px rgb(0 0 0 / 0.6),
     0 4px 16px -4px rgb(0 0 0 / 0.4),
     0 0 0 1px rgb(255 255 255 / 0.04);
@@ -548,7 +608,8 @@
    ============================================ */
 
 /* Prevent horizontal scroll */
-html, body {
+html,
+body {
   overflow-x: hidden;
   max-width: 100vw;
 }
@@ -558,26 +619,30 @@ html, body {
     @apply bg-transparent;
     transform: none;
   }
-  
+
   .mobile-touch-target {
     min-height: 44px;
     min-width: 44px;
   }
-  
+
   .sidebar-mobile {
     transform: translateX(-100%);
     transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
-  
+
   .sidebar-mobile.open {
     transform: translateX(0);
   }
 
   /* Ensure all containers don't overflow */
-  .container, main, section, article, div {
+  .container,
+  main,
+  section,
+  article,
+  div {
     max-width: 100%;
   }
-  
+
   /* Reduce padding on mobile */
   .mobile-compact {
     padding-left: 0.5rem;
@@ -639,17 +704,14 @@ html, body {
 
 /* Dark mode subtle surface gradient for cards */
 .dark .surface-gradient {
-  background: linear-gradient(
-    145deg,
-    hsl(var(--card)) 0%,
-    hsl(var(--primary) / 0.04) 50%,
-    hsl(var(--card)) 100%
-  );
+  background: linear-gradient(145deg, hsl(var(--card)) 0%, hsl(var(--primary) / 0.04) 50%, hsl(var(--card)) 100%);
 }
 
 /* Enhanced dark mode interactive elements */
 .dark .interactive-glow:hover {
-  box-shadow: 0 0 0 1px hsl(var(--primary) / 0.2), 0 4px 16px hsl(var(--primary) / 0.1);
+  box-shadow:
+    0 0 0 1px hsl(var(--primary) / 0.2),
+    0 4px 16px hsl(var(--primary) / 0.1);
 }
 
 /* Theme-aware text gradient */
@@ -751,7 +813,8 @@ html, body {
 }
 
 /* Prevent horizontal scroll on mobile */
-html, body {
+html,
+body {
   overflow-x: hidden;
   max-width: 100vw;
 }
@@ -783,17 +846,28 @@ html, body {
   backdrop-filter: blur(14px) saturate(160%);
   -webkit-backdrop-filter: blur(14px) saturate(160%);
 }
-.ui-glass .bg-card { background-color: hsl(var(--card) / 0.65) !important; }
-.ui-glass .bg-popover { background-color: hsl(var(--popover) / 0.78) !important; }
-.ui-glass header { backdrop-filter: blur(18px) saturate(160%); -webkit-backdrop-filter: blur(18px) saturate(160%); }
-.ui-glass.dark .bg-card { background-color: hsl(var(--card) / 0.55) !important; }
+.ui-glass .bg-card {
+  background-color: hsl(var(--card) / 0.65) !important;
+}
+.ui-glass .bg-popover {
+  background-color: hsl(var(--popover) / 0.78) !important;
+}
+.ui-glass header {
+  backdrop-filter: blur(18px) saturate(160%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+}
+.ui-glass.dark .bg-card {
+  background-color: hsl(var(--card) / 0.55) !important;
+}
 .ui-glass [role="dialog"] {
   backdrop-filter: blur(20px) saturate(160%);
   -webkit-backdrop-filter: blur(20px) saturate(160%);
   background-color: hsl(var(--popover) / 0.78) !important;
   border: 1px solid hsl(var(--border) / 0.6);
 }
-.ui-glass.dark [role="dialog"] { background-color: hsl(var(--popover) / 0.6) !important; }
+.ui-glass.dark [role="dialog"] {
+  background-color: hsl(var(--popover) / 0.6) !important;
+}
 
 /* ============================================
    GLOBAL POLISH — smooth motion & tactile feedback
@@ -874,12 +948,16 @@ tbody tr {
 /* Icons inside buttons follow the press subtly */
 button svg,
 [role="button"] svg {
-  transition: transform 0.2s var(--ease-out-smooth), opacity 0.2s var(--ease-out-smooth);
+  transition:
+    transform 0.2s var(--ease-out-smooth),
+    opacity 0.2s var(--ease-out-smooth);
 }
 
 /* Focus ring eases in instead of snapping */
 :focus-visible {
-  transition: box-shadow 0.2s var(--ease-out-smooth), outline-color 0.2s var(--ease-out-smooth);
+  transition:
+    box-shadow 0.2s var(--ease-out-smooth),
+    outline-color 0.2s var(--ease-out-smooth);
 }
 
 /* Images and avatars settle in rather than pop */
@@ -996,4 +1074,47 @@ main .empty-state {
   padding: 3rem 1.5rem;
   text-align: center;
   color: hsl(var(--muted-foreground));
+}
+/* Order items bubble animation */
+@keyframes order-bubble-pop {
+  0% {
+    opacity: 0;
+    transform: translateX(-24px) scale(0.35) rotate(-3deg);
+  }
+
+  55% {
+    opacity: 1;
+    transform: translateX(8px) scale(1.04) rotate(1deg);
+  }
+
+  75% {
+    transform: translateX(-2px) scale(0.98) rotate(-0.3deg);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1) rotate(0);
+  }
+}
+
+.animate-order-bubble {
+  animation: order-bubble-pop 520ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  transform-origin: left center;
+}
+
+/* Individual products pop in after the bubble */
+@keyframes item-pop {
+  0% {
+    opacity: 0;
+    transform: translateX(-12px) scale(0.92);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+.animate-item-pop {
+  animation: item-pop 280ms ease-out both;
 }
