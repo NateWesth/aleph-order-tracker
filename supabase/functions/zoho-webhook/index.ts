@@ -1090,7 +1090,7 @@ async function handleReconcileQuantities(
   const { data: activeOrders } = await supabase
     .from('orders')
     .select('id, order_number, reference')
-    .neq('status', 'completed')
+    .not('status', 'in', '("completed","delivered")')
 
   const orderIds = (activeOrders || []).map((o: any) => o.id)
   if (!orderIds.length) {
