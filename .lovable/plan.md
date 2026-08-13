@@ -1,8 +1,6 @@
-
-
 ## Rep Commission Calculator
 
-Build a new "Commission" tab in the admin dashboard that reads Zoho invoices, maps them to reps via a manual rep-to-company assignment, and calculates commission per rep based on individual commission rates.
+Build a new "Commission" tab in the admin dashboard that reads Zoho invoices, maps them to reps via a manual rep-to-company assignent, and calculates commission per rep based on individual commission rates.
 
 ### Database changes
 
@@ -53,4 +51,3 @@ Build a new "Commission" tab in the admin dashboard that reads Zoho invoices, ma
 - Zoho invoice endpoint: `GET /books/v3/invoices?organization_id={org}&date_start={start}&date_end={end}&per_page=200`
 - Company matching: case-insensitive name match + Zoho customer_id lookup (existing pattern)
 - Commission rate stored per-rep, not per-company, keeping the model simple
-
