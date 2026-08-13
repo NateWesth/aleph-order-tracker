@@ -42,6 +42,7 @@ import {
 } from "@/components/ui/pagination";
 import { toast } from "sonner";
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
+import PageHeader from "@/components/ui/PageHeader";
 
 interface Item {
   id: string;
