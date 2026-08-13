@@ -119,13 +119,10 @@ export default function ProcessingPage({
         getUserProfile(user.id)
       ]);
 
-      console.log('ProcessingPage - User role:', role);
-      console.log('ProcessingPage - User profile:', profile);
 
       setUserRole(role);
       if (role === 'user' && profile?.company_id) {
         setUserCompanyId(profile.company_id);
-        console.log('ProcessingPage - User company ID:', profile.company_id);
       }
     } catch (error) {
       console.error("Error fetching user info:", error);
@@ -154,8 +151,6 @@ export default function ProcessingPage({
       return;
     }
     try {
-      console.log('Fetching processing orders from Supabase...');
-      console.log('User role:', userRole, 'Company ID:', userCompanyId);
       setLoading(true);
       setError(null);
       
@@ -171,11 +166,9 @@ export default function ProcessingPage({
 
       // Apply filtering based on user role
       if (userRole === 'user' && userCompanyId) {
-        console.log('Filtering processing orders by company:', userCompanyId);
         query = query.eq('company_id', userCompanyId);
       } else if (userRole === 'user' && !userCompanyId) {
         // If user role but no company ID, filter by user_id as fallback
-        console.log('Filtering processing orders by user_id as fallback');
         query = query.eq('user_id', user.id);
       }
       // For admin users, no additional filtering is needed
@@ -191,7 +184,6 @@ export default function ProcessingPage({
         return;
       }
       
-      console.log('Fetched processing orders from database:', data?.length || 0);
       
       if (data && data.length > 0) {
         const convertedOrders = data.map((dbOrder: any) => {
@@ -209,7 +201,6 @@ export default function ProcessingPage({
             items: parseOrderItems(dbOrder.description)
           };
         });
-        console.log('Converted processing orders:', convertedOrders.length);
         setOrders(convertedOrders);
       } else {
         setOrders([]);
@@ -225,7 +216,6 @@ export default function ProcessingPage({
   // Set up real-time subscriptions
   useGlobalRealtimeOrders({
     onOrdersChange: () => {
-      console.log('Real-time update detected for processing page, refreshing...');
       fetchProcessingOrders();
     },
     isAdmin,
@@ -244,7 +234,6 @@ export default function ProcessingPage({
   // Load orders when user info is available
   useEffect(() => {
     if (user?.id && (userRole === 'admin' || userCompanyId !== null)) {
-      console.log('Loading processing orders...');
       fetchProcessingOrders();
     }
   }, [user?.id, userRole, userCompanyId]);
@@ -256,7 +245,6 @@ export default function ProcessingPage({
     const orderToComplete = orders.find(order => order.id === orderId);
     
     try {
-      console.log('Marking order as completed and moving to completed status:', orderId);
       
       const { error } = await supabase
         .from('orders')
@@ -296,7 +284,6 @@ export default function ProcessingPage({
         setSelectedOrder(null);
       }
       
-      console.log('Order successfully moved to completed status');
       fetchProcessingOrders();
     } catch (error: any) {
       console.error('Error completing order:', error);
@@ -325,7 +312,6 @@ export default function ProcessingPage({
     const orderToDelete = orders.find(order => order.id === orderId);
     
     try {
-      console.log('Deleting order:', orderId);
       
       const { error } = await supabase
         .from('orders')
@@ -358,7 +344,6 @@ export default function ProcessingPage({
         setSelectedOrder(null);
       }
       
-      console.log('Order successfully deleted');
       fetchProcessingOrders();
     } catch (error: any) {
       console.error('Error deleting order:', error);

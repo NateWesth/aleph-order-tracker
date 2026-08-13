@@ -23,7 +23,6 @@ export const useRealtimeOrders = ({ onOrdersChange, isAdmin }: UseRealtimeOrders
   const { toast } = useToast();
 
   const handleOrderInsert = useCallback((payload: any) => {
-    console.log('New order created:', payload.new);
     
     // Show notification for new orders
     toast({
@@ -36,7 +35,6 @@ export const useRealtimeOrders = ({ onOrdersChange, isAdmin }: UseRealtimeOrders
   }, [toast, onOrdersChange]);
 
   const handleOrderUpdate = useCallback((payload: any) => {
-    console.log('Order updated:', payload.new);
     
     // Show notification for order updates
     toast({
@@ -49,7 +47,6 @@ export const useRealtimeOrders = ({ onOrdersChange, isAdmin }: UseRealtimeOrders
   }, [toast, onOrdersChange]);
 
   const handleOrderDelete = useCallback((payload: any) => {
-    console.log('Order deleted:', payload.old);
     
     // Show notification for deleted orders
     toast({
@@ -62,7 +59,6 @@ export const useRealtimeOrders = ({ onOrdersChange, isAdmin }: UseRealtimeOrders
   }, [toast, onOrdersChange]);
 
   useEffect(() => {
-    console.log('Setting up real-time order subscriptions...');
     
     const channel = supabase
       .channel('orders-changes')
@@ -94,11 +90,9 @@ export const useRealtimeOrders = ({ onOrdersChange, isAdmin }: UseRealtimeOrders
         handleOrderDelete
       )
       .subscribe((status) => {
-        console.log('Real-time subscription status:', status);
       });
 
     return () => {
-      console.log('Cleaning up real-time subscriptions...');
       supabase.removeChannel(channel);
     };
   }, [handleOrderInsert, handleOrderUpdate, handleOrderDelete]);

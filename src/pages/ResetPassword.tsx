@@ -22,14 +22,11 @@ const resetPasswordSchema = z.object({
 type ResetPasswordValues = z.infer<typeof resetPasswordSchema>;
 
 const ResetPassword = () => {
-  console.log('ResetPassword component loaded');
   
   // Get hash parameters from localStorage (stored in App.tsx)
   const storedParams = localStorage.getItem('resetPasswordParams');
-  console.log('Stored reset params:', storedParams);
   
   const hashParams = new URLSearchParams(storedParams || '');
-  console.log('Parsed hash params:', Object.fromEntries(hashParams.entries()));
   
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -53,14 +50,12 @@ const ResetPassword = () => {
     const refreshToken = hashParams.get('refresh_token');
     const type = hashParams.get('type');
     
-    console.log('Hash parameters from captured state:', { accessToken, refreshToken, type });
     
     // Also check query parameters as fallback
     const queryAccessToken = searchParams.get('access_token');
     const queryRefreshToken = searchParams.get('refresh_token');
     const queryType = searchParams.get('type');
     
-    console.log('Query parameters:', { queryAccessToken, queryRefreshToken, queryType });
     
     const finalAccessToken = accessToken || queryAccessToken;
     const finalRefreshToken = refreshToken || queryRefreshToken;
@@ -91,7 +86,6 @@ const ResetPassword = () => {
         });
         navigate("/");
       } else {
-        console.log('Session set successfully for password reset');
         // Successfully authenticated for password reset
         setValidToken(true);
       }

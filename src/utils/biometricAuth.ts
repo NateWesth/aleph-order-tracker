@@ -66,7 +66,6 @@ export const saveRefreshToken = async (refreshToken: string): Promise<boolean> =
       password: refreshToken,
       server: SERVER_ID,
     });
-    console.log("Refresh token saved for biometric login");
     await triggerNotificationHaptic('success');
     return true;
   } catch (error) {
@@ -106,7 +105,6 @@ export const deleteCredentials = async (): Promise<boolean> => {
     await NativeBiometric.deleteCredentials({
       server: SERVER_ID,
     });
-    console.log("Credentials deleted");
     await triggerHapticFeedback('medium');
     return true;
   } catch (error) {

@@ -150,7 +150,6 @@ export default function ProgressPage({
 
   useEffect(() => {
     if (user?.id && userRole && (userRole === 'admin' || userCompanyId !== null)) {
-      console.log('Loading progress orders...');
       loadDeliveryQuantities();
       fetchProgressOrders();
     }
@@ -214,7 +213,6 @@ export default function ProgressPage({
   // Save delivery quantities to both localStorage and database
   const saveDeliveryQuantitiesToDatabase = async (orderId: string, itemName: string, delivered: number) => {
     try {
-      console.log(`Saving to database: Order ${orderId}, Item "${itemName}", Delivered: ${delivered}`);
       
       // Get current order
       const { data: order, error: fetchError } = await supabase
@@ -226,7 +224,6 @@ export default function ProgressPage({
       if (fetchError) throw fetchError;
 
       if (order?.description) {
-        console.log('Current description:', order.description);
         
         // Parse current description and update the specific item
         const lines = order.description.split('\n');
@@ -236,7 +233,6 @@ export default function ProgressPage({
           if (deliveredMatch && deliveredMatch[1].trim() === itemName) {
             // Update existing delivered quantity
             const newLine = `${deliveredMatch[1]} (Qty: ${deliveredMatch[2]}) [Delivered: ${delivered}]`;
-            console.log(`Updated existing line: "${line}" → "${newLine}"`);
             return newLine;
           }
           
@@ -245,7 +241,6 @@ export default function ProgressPage({
           if (basicMatch && basicMatch[1].trim() === itemName) {
             // Add delivered quantity to basic format
             const newLine = `${basicMatch[1]} (Qty: ${basicMatch[2]}) [Delivered: ${delivered}]${basicMatch[3]}`;
-            console.log(`Added delivery to line: "${line}" → "${newLine}"`);
             return newLine;
           }
           
@@ -253,7 +248,6 @@ export default function ProgressPage({
         });
 
         const updatedDescription = updatedLines.join('\n');
-        console.log('Updated description:', updatedDescription);
 
         // Update the order in database
         const { error: updateError } = await supabase
@@ -266,7 +260,6 @@ export default function ProgressPage({
 
         if (updateError) throw updateError;
 
-        console.log(`Successfully saved delivery quantity for ${itemName}: ${delivered}`);
         
         // Don't refresh orders immediately - let the real-time subscription handle it
         // This prevents the race condition
@@ -284,7 +277,6 @@ export default function ProgressPage({
   // Update delivery quantity for an item with database persistence
   // When quantity delivered matches quantity ordered, move item to 'in-stock' stage
   const updateDeliveryQuantity = async (orderId: string, itemName: string, delivered: number) => {
-    console.log(`Updating delivery quantity: Order ${orderId}, Item "${itemName}", Delivered: ${delivered}`);
     
     setDeliveryQuantities(prev => {
       const updated = {
@@ -295,12 +287,10 @@ export default function ProgressPage({
         }
       };
       
-      console.log('Updated delivery quantities state:', updated);
       
       // Save to localStorage immediately
       try {
         localStorage.setItem('deliveryQuantities', JSON.stringify(updated));
-        console.log('Saved to localStorage successfully');
       } catch (error) {
         console.error('Error saving to localStorage:', error);
       }
@@ -309,7 +299,6 @@ export default function ProgressPage({
     });
 
     // Save to database for all authenticated users
-    console.log('Saving to database...');
     await saveDeliveryQuantitiesToDatabase(orderId, itemName, delivered);
 
     // Find the order and item to check if delivery is complete
@@ -325,7 +314,6 @@ export default function ProgressPage({
   // Update an individual item's progress_stage in the order_items table
   const updateItemProgressStage = async (orderId: string, itemName: string, newStage: string) => {
     try {
-      console.log(`Updating item progress stage: Order ${orderId}, Item "${itemName}" -> ${newStage}`);
 
       // Important: item names coming from the order "description" may have subtle whitespace/case differences
       // compared to the canonical `order_items.name`. We try a strict match first, then a fallback match.
@@ -353,7 +341,6 @@ export default function ProgressPage({
       }
 
       if (itemIds.length === 0) {
-        console.log(`Item "${itemName}" not found in order_items table (order_id=${orderId}).`);
         toast({
           title: "Item Not Found",
           description: `Couldn't find "${itemName}" in the item table for this order, so it couldn't be moved.`,
@@ -373,7 +360,6 @@ export default function ProgressPage({
 
       if (updateError) throw updateError;
 
-      console.log(`Successfully moved item "${itemName}" to ${newStage} (rows=${itemIds.length})`);
       toast({
         title: "Item Moved",
         description: `"${itemName}" moved to ${newStage.replace('-', ' ')}`,
@@ -395,7 +381,6 @@ export default function ProgressPage({
     
     if (!description) return deliveries;
 
-    console.log('Parsing delivery quantities from description:', description);
     
     const lines = description.split('\n');
     lines.forEach((line, index) => {
@@ -405,11 +390,9 @@ export default function ProgressPage({
         const itemName = match[1].trim();
         const deliveredQty = parseInt(match[2]);
         deliveries[itemName] = deliveredQty;
-        console.log(`Found delivered quantity for "${itemName}": ${deliveredQty}`);
       }
     });
 
-    console.log('Parsed deliveries:', deliveries);
     return deliveries;
   };
 
@@ -434,8 +417,6 @@ export default function ProgressPage({
       return;
     }
     try {
-      console.log('Fetching received and in-progress orders from Supabase...');
-      console.log('User role:', userRole, 'Company ID:', userCompanyId);
       setLoading(true);
       setError(null);
       let query = supabase.from('orders').select(`
@@ -450,11 +431,9 @@ export default function ProgressPage({
 
       // Apply filtering based on user role
       if (userRole === 'user' && userCompanyId) {
-        console.log('Filtering progress orders by company:', userCompanyId);
         query = query.eq('company_id', userCompanyId);
       } else if (userRole === 'user' && !userCompanyId) {
         // If user role but no company ID, filter by user_id as fallback
-        console.log('Filtering progress orders by user_id as fallback');
         query = query.eq('user_id', user.id);
       }
       // For admin users, no additional filtering is needed
@@ -468,7 +447,6 @@ export default function ProgressPage({
         setError(`Failed to fetch orders: ${fetchError.message}`);
         return;
       }
-      console.log('Fetched progress orders:', data?.length || 0);
       if (data && data.length > 0) {
         // Extract delivery quantities from descriptions and update state
         const allDeliveryQuantities: { [orderId: string]: { [itemName: string]: number } } = {};
@@ -511,11 +489,9 @@ export default function ProgressPage({
               };
             }
           }
-          console.log('Merged delivery quantities:', merged);
           return merged;
         });
         
-        console.log('Converted orders for progress page:', convertedOrders.length);
         setOrders(convertedOrders);
         localStorage.setItem('progressOrders', JSON.stringify(convertedOrders));
       } else {
@@ -556,7 +532,6 @@ export default function ProgressPage({
     if (!stageInfo) return;
     const orderToUpdate = orders.find(o => o.id === orderId);
     try {
-      console.log(`Updating order ${orderId} progress stage to ${stage}`);
       if (stage === 'completed') {
         // Move to processing instead of completed
         const {
@@ -587,7 +562,6 @@ export default function ProgressPage({
           title: "Order Moved to Processing",
           description: "Order has been moved to processing stage and will appear on the Processing page."
         });
-        console.log('Order successfully moved to processing status');
         fetchProgressOrders();
       } else {
         const {
@@ -694,7 +668,6 @@ export default function ProgressPage({
       return;
     }
     try {
-      console.log('Completing order and moving to processing:', orderId);
       const {
         error
       } = await supabase.from('orders').update({
@@ -711,7 +684,6 @@ export default function ProgressPage({
         description: "Order has been moved to processing stage. All users will see this update automatically."
       });
       setSelectedOrder(null);
-      console.log('Order successfully completed and moved to processing');
       fetchProgressOrders();
     } catch (error: any) {
       console.error('Error completing order:', error);
@@ -727,7 +699,6 @@ export default function ProgressPage({
   const deleteOrder = async (orderId: string, orderNumber: string) => {
     if (!isAdmin) return;
     try {
-      console.log('Deleting order:', orderId);
       const {
         error
       } = await supabase.from('orders').delete().eq('id', orderId);
@@ -747,7 +718,6 @@ export default function ProgressPage({
       if (selectedOrder && selectedOrder.id === orderId) {
         setSelectedOrder(null);
       }
-      console.log('Order successfully deleted');
       fetchProgressOrders();
     } catch (error: any) {
       console.error('Error deleting order:', error);
@@ -846,7 +816,7 @@ export default function ProgressPage({
                           {order.status}
                         </Badge>
                         <div className="flex items-center gap-2 w-full md:w-auto">
-                          <Progress value={order.progress || 0} className="w-16 md:w-20 h-2" />
+                          <Progress value={order.progress || 0} variant="ribbon" className="w-16 md:w-20 h-2" />
                           <span className="text-xs text-muted-foreground truncate">
                             {progressStages.find(s => s.id === order.progressStage)?.name || 'Not started'}
                           </span>

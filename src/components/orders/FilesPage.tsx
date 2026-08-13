@@ -57,7 +57,6 @@ export default function FilesPage({ isAdmin }: FilesPageProps) {
     if (!user?.id) return;
 
     try {
-      console.log('Fetching completed orders with files...');
       
       let ordersQuery = supabase
         .from('orders')
@@ -83,7 +82,6 @@ export default function FilesPage({ isAdmin }: FilesPageProps) {
         return;
       }
 
-      console.log('Fetched completed orders:', orders?.length || 0);
 
       // For each completed order, fetch its files
       const orderFilesPromises = (orders || []).map(async (order) => {
@@ -130,7 +128,6 @@ export default function FilesPage({ isAdmin }: FilesPageProps) {
   // Set up real-time subscriptions for order changes
   useGlobalRealtimeOrders({
     onOrdersChange: () => {
-      console.log('Real-time update detected, refreshing completed order files...');
       fetchCompletedOrderFiles();
     },
     isAdmin,

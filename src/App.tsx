@@ -54,13 +54,10 @@ const PageFallback = () => (
 );
 
 function App() {
-  console.log('App component loaded, current path:', window.location.pathname);
-  console.log('Full URL:', window.location.href);
   
   // Capture reset password parameters before router processes them
   if (window.location.pathname === '/reset-password' && window.location.hash) {
     const hashParams = window.location.hash.substring(1);
-    console.log('Storing reset params in localStorage:', hashParams);
     localStorage.setItem('resetPasswordParams', hashParams);
   }
   return (

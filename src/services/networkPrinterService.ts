@@ -35,25 +35,18 @@ export class NetworkPrinterService {
   async discoverPrinters(): Promise<NetworkPrinter[]> {
     const printers: NetworkPrinter[] = [];
     
-    console.log('🔍 Starting printer discovery...');
     
     try {
       // Method 1: Check user's network range
-      console.log('📡 Method 1: Scanning local network range...');
       const networkPrinters = await this.scanNetworkRange();
-      console.log(`📡 Found ${networkPrinters.length} printers via network scan`);
       printers.push(...networkPrinters);
 
       // Method 2: Check common printer IPs
-      console.log('🎯 Method 2: Checking common printer IPs...');
       const commonPrinters = await this.checkCommonPrinterIPs();
-      console.log(`🎯 Found ${commonPrinters.length} printers at common IPs`);
       printers.push(...commonPrinters);
 
       // Method 3: mDNS discovery (limited in browsers)
-      console.log('🔍 Method 3: Attempting mDNS discovery...');
       const mdnsPrinters = await this.discoverViaMDNS();
-      console.log(`🔍 Found ${mdnsPrinters.length} printers via mDNS`);
       printers.push(...mdnsPrinters);
 
     } catch (error) {
@@ -65,7 +58,6 @@ export class NetworkPrinterService {
       index === self.findIndex(p => p.ip === printer.ip)
     );
 
-    console.log(`✅ Discovery complete: Found ${uniquePrinters.length} unique printers`);
     this.discoveredPrinters = uniquePrinters;
     return uniquePrinters;
   }
@@ -75,7 +67,6 @@ export class NetworkPrinterService {
     const printers: NetworkPrinter[] = [];
     
     try {
-      console.log('🔍 Attempting mDNS discovery...');
       // This is a simplified implementation - real mDNS would require a service worker or WebRTC
       const commonPrinterIPs = await this.getCommonPrinterAddresses();
       
@@ -106,7 +97,6 @@ export class NetworkPrinterService {
     const printers: NetworkPrinter[] = [];
     const localIP = await this.getLocalIPAddress();
     
-    console.log('🌐 Local IP detected:', localIP);
     
     if (!localIP) {
       console.warn('⚠️ Could not determine local IP, using default range');
@@ -114,7 +104,6 @@ export class NetworkPrinterService {
     }
 
     const baseIP = localIP.substring(0, localIP.lastIndexOf('.'));
-    console.log('🔍 Scanning for connected printers on network:', `${baseIP}.x`);
     
     // Only scan likely printer IPs and nearby devices that might be printers
     const targetIPs = [];
@@ -139,9 +128,6 @@ export class NetworkPrinterService {
     // Combine: common printer IPs first (higher priority), then nearby IPs
     const scanIPs = [...commonPrinterIPs, ...targetIPs];
 
-    console.log(`🎯 Scanning ${scanIPs.length} targeted IP addresses for connected printers`);
-    console.log(`🔥 Priority printer IPs: ${commonPrinterIPs.slice(0, 8).join(', ')}...`);
-    console.log(`📍 Your device is at ${localIP}, scanning nearby range too`);
 
     // Scan in small batches to avoid overwhelming the browser
     const batchSize = 5;
@@ -152,13 +138,11 @@ export class NetworkPrinterService {
 
     for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
       const batch = batches[batchIndex];
-      console.log(`📦 Scanning batch ${batchIndex + 1}/${batches.length}: ${batch.join(', ')}`);
       
       const batchPromises = batch.map(async (ip) => {
         try {
           const printer = await this.probePrinterAtIP(ip);
           if (printer) {
-            console.log(`🎉 FOUND CONNECTED PRINTER: ${printer.name} at ${ip}`);
           }
           return printer;
         } catch (error) {
@@ -175,7 +159,6 @@ export class NetworkPrinterService {
 
       // If scanning common printer IPs and we found some, we can stop early
       if (printers.length > 0 && batchIndex < 3) {
-        console.log(`✅ Found ${printers.length} connected printer(s), stopping early scan`);
         break;
       }
 
@@ -185,7 +168,6 @@ export class NetworkPrinterService {
       }
     }
 
-    console.log(`🎯 Connected printer scan complete: ${printers.length} printers found`);
     return printers;
   }
 
@@ -193,7 +175,6 @@ export class NetworkPrinterService {
   private async discoverViaWSD(): Promise<NetworkPrinter[]> {
     // WSD discovery would require specific network protocols
     // For now, return empty array as this requires deeper network access
-    console.log('🔍 WSD discovery not implemented (requires special network access)');
     return [];
   }
 
@@ -225,14 +206,11 @@ export class NetworkPrinterService {
       '10.0.1.10', '10.0.1.100', '10.0.1.200'
     ];
     
-    console.log(`🎯 Checking ${commonIPs.length} common printer IP addresses...`);
     
     const probePromises = commonIPs.map(async (ip, index) => {
       try {
-        console.log(`🔍 [${index + 1}/${commonIPs.length}] Checking common IP ${ip}...`);
         const printer = await this.probePrinterAtIP(ip);
         if (printer) {
-          console.log(`✅ Found printer at common IP ${ip}: ${printer.name}`);
         }
         return printer;
       } catch {
@@ -247,7 +225,6 @@ export class NetworkPrinterService {
       }
     });
 
-    console.log(`🎯 Common IP check complete: ${printers.length} printers found`);
     return printers;
   }
 
@@ -256,20 +233,17 @@ export class NetworkPrinterService {
     // Common printer ports in order of likelihood
     const commonPorts = [80, 631, 443, 8080, 9100, 8000];
     
-    console.log(`🔍 Probing ${ip} on ports: ${commonPorts.join(', ')}`);
     
     for (const port of commonPorts) {
       try {
         const protocol = port === 443 ? 'https' : 'http';
         const url = `${protocol}://${ip}${port !== 80 && port !== 443 ? `:${port}` : ''}`;
         
-        console.log(`🔍 Trying ${url}...`);
         
         // Create an image element to test connectivity (works around CORS)
         const connectivity = await this.testConnectivity(ip, port);
         
         if (connectivity) {
-          console.log(`✅ Response from ${url}`);
           
           const printer: NetworkPrinter = {
             id: `printer-${ip}-${port}`,
@@ -282,16 +256,13 @@ export class NetworkPrinterService {
 
           // Try to get more details
           await this.enrichPrinterInfo(printer);
-          console.log(`📊 Printer details: ${JSON.stringify(printer)}`);
           return printer;
         }
         
       } catch (error) {
-        console.log(`❌ Port ${port} failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
     }
     
-    console.log(`❌ No printer services found at ${ip}`);
     return null;
   }
 
@@ -311,14 +282,12 @@ export class NetworkPrinterService {
         
         img.onload = () => {
           clearTimeout(timeout);
-          console.log(`✅ Image load successful for ${url}`);
           resolve(true);
         };
         
         img.onerror = () => {
           clearTimeout(timeout);
           // Even an error response means the server is responding
-          console.log(`✅ Server responding at ${url} (image error expected)`);
           resolve(true);
         };
         
@@ -326,7 +295,6 @@ export class NetworkPrinterService {
         img.src = `${url}/favicon.ico`;
       });
     } catch (error) {
-      console.log(`❌ Image test failed for ${url}`);
     }
 
     // Method 2: Try fetch with no-cors (last resort)
@@ -341,10 +309,8 @@ export class NetworkPrinterService {
       });
       
       clearTimeout(timeoutId);
-      console.log(`✅ Fetch successful for ${url}`);
       return true;
     } catch (fetchError) {
-      console.log(`❌ Fetch failed for ${url}: ${fetchError instanceof Error ? fetchError.message : 'Unknown'}`);
     }
 
     return false;
@@ -396,7 +362,6 @@ export class NetworkPrinterService {
         }
       }
     } catch (error) {
-      console.log(`🏷️ Could not identify printer at ${ip}:${port}`);
     }
     
     return null;
@@ -420,7 +385,6 @@ export class NetworkPrinterService {
   // Get local IP address to determine network range
   private async getLocalIPAddress(): Promise<string | null> {
     try {
-      console.log('🌐 Detecting local IP address...');
       
       // Use WebRTC to get local IP
       const pc = new RTCPeerConnection({ 
@@ -444,11 +408,9 @@ export class NetworkPrinterService {
               const ip = ipMatch[1];
               if (!foundIPs.includes(ip)) {
                 foundIPs.push(ip);
-                console.log(`🌐 Found local IP: ${ip}`);
                 
                 // Prefer private network ranges
                 if (ip.startsWith('192.168.') || ip.startsWith('10.') || ip.startsWith('172.')) {
-                  console.log(`✅ Using private IP: ${ip}`);
                   pc.close();
                   resolve(ip);
                   return;
@@ -467,7 +429,6 @@ export class NetworkPrinterService {
             ip.startsWith('192.168.') || ip.startsWith('10.') || ip.startsWith('172.')
           ) || foundIPs[0] || '192.168.1.1';
           
-          console.log(`⏰ Timeout reached, using: ${bestIP}`);
           resolve(bestIP);
         }, 3000);
       });
@@ -480,7 +441,6 @@ export class NetworkPrinterService {
   // Try to get additional printer information
   private async enrichPrinterInfo(printer: NetworkPrinter): Promise<void> {
     try {
-      console.log(`📊 Enriching info for ${printer.name}...`);
       
       // Use image test for common printer endpoints
       const infoEndpoints = [
@@ -511,7 +471,6 @@ export class NetworkPrinterService {
           
           if (reachable) {
             printer.status = 'online';
-            console.log(`📊 Successfully reached ${testUrl}`);
             
             // Set manufacturer based on endpoint type
             if (endpoint.includes('hp')) {
@@ -530,13 +489,10 @@ export class NetworkPrinterService {
 
   // Add a printer manually by IP
   async addPrinterByIP(ip: string): Promise<NetworkPrinter | null> {
-    console.log(`➕ Adding printer manually at IP: ${ip}`);
     const printer = await this.probePrinterAtIP(ip);
     if (printer) {
       this.discoveredPrinters.push(printer);
-      console.log(`✅ Successfully added printer: ${printer.name}`);
     } else {
-      console.log(`❌ No printer found at IP: ${ip}`);
     }
     return printer;
   }

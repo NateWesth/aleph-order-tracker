@@ -54,14 +54,10 @@ export const OrdersListPage: React.FC = () => {
     const fetchUserData = async () => {
       if (!user) return;
 
-      console.log('=== ORDERS LIST PAGE: Starting user data fetch ===');
-      console.log('User ID:', user.id);
-      console.log('Companies available:', companies.length);
 
       try {
         // Get user role
         const role = await getUserRole(user.id);
-        console.log('User role:', role);
         setUserRole(role || 'user');
 
         // Get user company if not admin
@@ -72,14 +68,11 @@ export const OrdersListPage: React.FC = () => {
             .eq('id', user.id)
             .single();
           
-          console.log('Profile data for orders list:', profile);
           
           if (profile?.company_id) {
-            console.log('Setting company ID from profile:', profile.company_id);
             setUserCompanyId(profile.company_id);
             setSelectedCompanyId(profile.company_id);
           } else if (profile?.company_code) {
-            console.log('Looking up company by code:', profile.company_code);
             // If we have a company code but no company_id, find the company by code
             const { data: company } = await supabase
               .from('companies')
@@ -87,10 +80,8 @@ export const OrdersListPage: React.FC = () => {
               .eq('code', profile.company_code)
               .single();
             
-            console.log('Company found by code:', company);
             
             if (company?.id) {
-              console.log('Setting company ID from code lookup:', company.id);
               setUserCompanyId(company.id);
               setSelectedCompanyId(company.id);
             }
@@ -118,7 +109,6 @@ export const OrdersListPage: React.FC = () => {
 
     setLoading(true);
     try {
-      console.log('Fetching orders for company:', selectedCompanyId);
       
       // Get current month start and end dates
       const now = new Date();
@@ -133,8 +123,6 @@ export const OrdersListPage: React.FC = () => {
         .lte('created_at', monthEnd.toISOString())
         .order('created_at', { ascending: false });
 
-      console.log('Orders data:', ordersData);
-      console.log('Orders error:', error);
 
       if (error) throw error;
 

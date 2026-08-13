@@ -105,7 +105,6 @@ export default function PortalInvite() {
       if (authData.user) {
         // Update invitation status - we need to do this via an edge function or RPC
         // For now, the admin can check the user's profile
-        console.log("User registered successfully:", authData.user.id);
       }
 
       toast({

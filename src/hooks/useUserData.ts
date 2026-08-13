@@ -138,7 +138,6 @@ export function useUserData(): UserData {
     setError(null);
 
     try {
-      console.log('🔄 useUserData: Fetching consolidated user data for:', user.id);
       
       // Fetch role and profile in parallel
       const [userRole, userProfile] = await Promise.all([
@@ -146,14 +145,12 @@ export function useUserData(): UserData {
         fetchUserProfile(user.id)
       ]);
 
-      console.log('✅ useUserData: Role and profile fetched:', { role: userRole, profile: !!userProfile });
       
       setRole(userRole);
       setProfile(userProfile);
 
       // Fetch companies based on role
       const companiesData = await fetchCompanies(user.id, userRole);
-      console.log('✅ useUserData: Companies fetched:', companiesData.length);
       setCompanies(companiesData);
 
     } catch (err) {

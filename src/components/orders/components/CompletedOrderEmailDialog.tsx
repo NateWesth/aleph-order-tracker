@@ -51,12 +51,10 @@ export default function CompletedOrderEmailDialog({
 
     setLoading(true);
     try {
-      console.log('Fetching users for order:', order);
 
       // Get company users based on company_id
       let companyUsers: any[] = [];
       if (order.company_id) {
-        console.log('Fetching company users for company_id:', order.company_id);
         
         const { data: companyUsersData, error: companyError } = await supabase
           .from('profiles')
@@ -68,7 +66,6 @@ export default function CompletedOrderEmailDialog({
           .eq('company_id', order.company_id)
           .not('email', 'is', null);
         
-        console.log('Company users query result:', companyUsersData, companyError);
         
         if (companyUsersData && !companyError) {
           // Get user roles for these users
@@ -78,7 +75,6 @@ export default function CompletedOrderEmailDialog({
             .select('user_id, role')
             .in('user_id', userIds);
           
-          console.log('User roles for company users:', userRolesData);
           
           companyUsers = companyUsersData.map(user => {
             const userRole = userRolesData?.find(r => r.user_id === user.id);
@@ -94,13 +90,11 @@ export default function CompletedOrderEmailDialog({
       }
 
       // Get all admin users
-      console.log('Fetching admin users...');
       const { data: adminRolesData, error: adminError } = await supabase
         .from('user_roles')
         .select('user_id, role')
         .eq('role', 'admin');
       
-      console.log('Admin roles query result:', adminRolesData, adminError);
 
       let adminUsers: any[] = [];
       if (adminRolesData && !adminError && adminRolesData.length > 0) {
@@ -111,7 +105,6 @@ export default function CompletedOrderEmailDialog({
           .in('id', adminUserIds)
           .not('email', 'is', null);
         
-        console.log('Admin profiles query result:', adminProfilesData, profilesError);
         
         if (adminProfilesData && !profilesError) {
           adminUsers = adminProfilesData.map(user => ({
@@ -124,8 +117,6 @@ export default function CompletedOrderEmailDialog({
         }
       }
 
-      console.log('Company users found:', companyUsers.length);
-      console.log('Admin users found:', adminUsers.length);
 
       // Combine and deduplicate users
       const allUsers = [...companyUsers, ...adminUsers];
@@ -133,7 +124,6 @@ export default function CompletedOrderEmailDialog({
         index === self.findIndex(u => u.id === user.id)
       );
 
-      console.log('Total unique users:', uniqueUsers.length);
       setUsers(uniqueUsers);
     } catch (error) {
       console.error('Error fetching users:', error);
