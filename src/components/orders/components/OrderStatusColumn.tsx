@@ -208,6 +208,48 @@ function OrderStatusColumn({
   };
   return (
     <>
+      <style>{`
+        @keyframes order-card-connect {
+          0% { transform: translateX(0) scale(1); }
+          45% { transform: translateX(5px) scale(1.012); }
+          72% { transform: translateX(2px) scale(1.006); }
+          100% { transform: translateX(0) scale(1); }
+        }
+
+        @keyframes order-bubble-connect {
+          0% {
+            opacity: 0;
+            transform: translateX(-18px) scaleX(0.82) scaleY(0.94);
+            transform-origin: left center;
+          }
+          45% {
+            opacity: 1;
+            transform: translateX(4px) scaleX(1.025) scaleY(1.015);
+          }
+          72% {
+            transform: translateX(-1px) scaleX(0.99) scaleY(0.995);
+          }
+          100% {
+            opacity: 1;
+            transform: translateX(0) scaleX(1) scaleY(1);
+          }
+        }
+
+        .animate-order-card-connect {
+          animation: order-card-connect 560ms cubic-bezier(0.22, 1, 0.36, 1) both;
+        }
+
+        .animate-order-bubble-connect {
+          animation: order-bubble-connect 620ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .animate-order-card-connect,
+          .animate-order-bubble-connect {
+            animation: none !important;
+          }
+        }
+      `}</style>
       <div
         ref={setNodeRef}
         className={cn("flex flex-col w-full min-w-0", isOver && "ring-2 ring-primary/50 rounded-xl transition-all")}
@@ -673,7 +715,7 @@ function OrderStatusColumn({
           </div>
         ) : isBubbleOpen ? (
           <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(360px,0.85fr)] gap-3 lg:gap-4 items-start">
-            <div className="min-w-0 animate-in fade-in zoom-in-95 duration-300">
+            <div className="min-w-0 animate-order-card-connect">
               <DraggableCard key={`${order.id}-${config.key}`} id={`${order.id}::${order.boardStage || config.key}`}>
                 {cardContent}
               </DraggableCard>
