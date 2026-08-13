@@ -1188,6 +1188,16 @@ async function handleReconcileQuantities(
     invoiceCount++
   }
 
+  // 5. Restore manual completions (trigger caps them at qty_invoiced)
+  for (const row of completedSnapshot || []) {
+    await supabase
+      .from('order_items')
+      .update({ qty_completed: row.qty_completed, updated_at: new Date().toISOString() })
+      .eq('id', row.id)
+  }
+
+
+
   await supabase.from('zoho_sync_log').insert({
     sync_type: 'reconcile_quantities',
     status: 'completed',
