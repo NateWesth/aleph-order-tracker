@@ -44,33 +44,33 @@ export default function PortalLogin() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4 relative overflow-hidden">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 px-4 py-10 relative overflow-hidden">
       <div
         aria-hidden
-        className="pointer-events-none absolute -top-40 left-1/2 -translate-x-1/2 w-[560px] h-[560px] rounded-full opacity-[0.08] blur-3xl ribbon-gradient"
+        className="pointer-events-none absolute -top-40 left-1/2 -translate-x-1/2 w-[700px] h-[700px] rounded-full opacity-[0.14] blur-3xl ribbon-gradient"
       />
-      <div className="w-full max-w-sm space-y-6 relative z-10">
+      <div className="w-full max-w-md space-y-8 relative z-10">
         {/* Logo / Brand */}
         <div className="text-center space-y-2">
           <img
             src="/lovable-uploads/e1088147-889e-43f6-bdf0-271189b88913.png"
             alt="Aleph Engineering & Supplies"
-            className="h-14 w-14 mx-auto mb-1"
+            className="h-16 w-16 mx-auto mb-2"
           />
-          <h1 className="font-display text-2xl font-bold text-foreground">Aleph Orders</h1>
-          <p className="text-sm text-muted-foreground">Client Portal</p>
+          <h1 className="font-display text-4xl font-extrabold text-foreground">Aleph Orders</h1>
+          <p className="text-sm tracking-widest uppercase font-semibold text-muted-foreground">Client Portal</p>
         </div>
 
-        <Card className="shadow-soft-lg border-border/60 overflow-hidden">
-          <div className="ribbon-bar" aria-hidden />
-          <CardHeader className="pb-4">
-            <CardTitle className="text-lg">Sign in</CardTitle>
-            <CardDescription>Access your orders and track their progress</CardDescription>
+        <Card className="shadow-bold-lg border-primary/20 overflow-hidden relative">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-brand-blue via-brand-magenta to-brand-orange" aria-hidden />
+          <CardHeader className="px-8 pt-8 pb-6">
+            <CardTitle className="text-3xl font-extrabold mb-1">Sign in</CardTitle>
+            <CardDescription className="text-base">Access your orders and track their progress</CardDescription>
           </CardHeader>
-          <CardContent>
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+          <CardContent className="px-8 pb-8">
+            <form onSubmit={handleLogin} className="space-y-5">
+              <div className="space-y-2.5">
+                <Label htmlFor="email" className="text-base font-semibold">Email</Label>
                 <Input
                   id="email"
                   type="email"
@@ -78,10 +78,11 @@ export default function PortalLogin() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
+                  className="h-12 text-base"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
+              <div className="space-y-2.5">
+                <Label htmlFor="password" className="text-base font-semibold">Password</Label>
                 <Input
                   id="password"
                   type="password"
@@ -89,12 +90,13 @@ export default function PortalLogin() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
+                  className="h-12 text-base"
                 />
               </div>
-              <Button type="submit" className="w-full" disabled={loading}>
+              <Button type="submit" className="w-full h-12 text-base font-bold" disabled={loading}>
                 {loading ? (
                   <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    <Loader2 className="h-5 w-5 mr-2 animate-spin" />
                     Signing in...
                   </>
                 ) : (
