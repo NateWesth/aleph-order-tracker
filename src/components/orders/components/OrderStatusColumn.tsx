@@ -545,21 +545,129 @@ function OrderStatusColumn({
       </Card>
     );
 
-    return isMobile ? (
-      <SwipeableCard
-        key={`${order.id}-${config.key}`}
-        onSwipeLeft={() => onDeleteOrder(order)}
-        onSwipeRight={config.nextStatus ? () => onMoveOrder(order, config.nextStatus!) : undefined}
-        leftLabel="Delete"
-        rightLabel={config.nextLabel || "Next"}
-        rightIcon={<ArrowRight className="h-4 w-4" />}
+    const isBubbleOpen = itemsBubble?.orderId === order.id;
+
+    const orderItemsBubble = isBubbleOpen ? (
+      <div
+        className={cn(
+          "relative overflow-hidden rounded-2xl",
+          "border border-primary/20 bg-background/95 shadow-2xl",
+          "backdrop-blur-xl",
+          "origin-left",
+          "animate-in fade-in zoom-in-75 slide-in-from-left-4 duration-500",
+        )}
       >
-        {cardContent}
-      </SwipeableCard>
-    ) : (
-      <DraggableCard key={`${order.id}-${config.key}`} id={`${order.id}::${order.boardStage || config.key}`}>
-        {cardContent}
-      </DraggableCard>
+        {/* Bubble connector */}
+        <div className="absolute -top-2 left-8 h-4 w-4 rotate-45 border-l border-t border-primary/20 bg-background/95" />
+
+        <div className="relative p-4 sm:p-5">
+          {/* Header */}
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  <Package className="h-4 w-4" />
+                </div>
+
+                <div className="min-w-0">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Order contents
+                  </p>
+
+                  <h3 className="truncate text-sm font-bold text-foreground">{order.order_number}</h3>
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onCloseItemsBubble?.();
+              }}
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground transition-all hover:bg-destructive/10 hover:text-destructive hover:scale-110"
+              aria-label="Close order items"
+            >
+              ×
+            </button>
+          </div>
+
+          {/* Summary */}
+          <div className="mt-4 flex items-center justify-between rounded-xl bg-primary/5 px-3 py-2">
+            <span className="text-xs font-medium text-muted-foreground">Items</span>
+
+            <span className="text-sm font-bold text-primary">{order.items?.length || 0}</span>
+          </div>
+
+          {/* Items */}
+          <div className="mt-3 space-y-2">
+            {order.items?.map((item, itemIndex) => {
+              const total = item.totalQuantity ?? item.quantity;
+              const isPartial = total > item.quantity;
+
+              return (
+                <div
+                  key={item.id}
+                  className="flex items-center gap-3 rounded-xl bg-muted/40 px-3 py-2.5 text-xs animate-in fade-in slide-in-from-left-2 duration-300"
+                  style={{ animationDelay: `${itemIndex * 60}ms` }}
+                >
+                  <div className="flex h-7 min-w-7 items-center justify-center rounded-lg bg-primary/10 px-1.5 font-bold text-primary">
+                    ×{item.quantity}
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <div className="break-words font-medium text-foreground">{item.name}</div>
+
+                    {isPartial && (
+                      <span className="text-[10px] text-muted-foreground">
+                        {item.quantity} of {total}
+                      </span>
+                    )}
+
+                    {item.code && (
+                      <span className="ml-1 font-mono text-[10px] text-muted-foreground">[{item.code}]</span>
+                    )}
+                  </div>
+
+                  <PackageCheck className="h-4 w-4 shrink-0 text-muted-foreground/50" />
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Total units */}
+          {stockSummary && (
+            <div className="mt-3 flex items-center justify-end gap-1.5 text-[10px] font-medium text-muted-foreground">
+              <PackageCheck className="h-3.5 w-3.5" />
+              {stockSummary.units} total unit
+              {stockSummary.units !== 1 ? "s" : ""}
+            </div>
+          )}
+        </div>
+      </div>
+    ) : null;
+
+    return (
+      <div className="space-y-2">
+        {isMobile ? (
+          <SwipeableCard
+            key={`${order.id}-${config.key}`}
+            onSwipeLeft={() => onDeleteOrder(order)}
+            onSwipeRight={config.nextStatus ? () => onMoveOrder(order, config.nextStatus!) : undefined}
+            leftLabel="Delete"
+            rightLabel={config.nextLabel || "Next"}
+            rightIcon={<ArrowRight className="h-4 w-4" />}
+          >
+            {cardContent}
+          </SwipeableCard>
+        ) : (
+          <DraggableCard key={`${order.id}-${config.key}`} id={`${order.id}::${order.boardStage || config.key}`}>
+            {cardContent}
+          </DraggableCard>
+        )}
+
+        {orderItemsBubble}
+      </div>
     );
   }
 }
