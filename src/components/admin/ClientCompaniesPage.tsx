@@ -10,7 +10,8 @@ import {
 } from "@/components/ui/dialog";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { Plus, Search, Users } from "lucide-react";
+import { Plus, Search, Users, Building2 } from "lucide-react";
+import PageHeader from "@/components/ui/PageHeader";
 import { Input } from "@/components/ui/input";
 
 import CompanyForm, { companySchema, type CompanyFormValues } from "./components/CompanyForm";
