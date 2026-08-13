@@ -1,12 +1,4 @@
-
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import OrderRow from "./OrderRow";
 import { OrderWithCompany } from "../types/orderTypes";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -20,27 +12,30 @@ interface OrderTableProps {
   compact?: boolean;
 }
 
-export default function OrderTable({ 
-  orders, 
-  isAdmin, 
-  onReceiveOrder, 
+export default function OrderTable({
+  orders,
+  isAdmin,
+  onReceiveOrder,
   onDeleteOrder,
   onOrderClick,
-  compact = false
+  compact = false,
 }: OrderTableProps) {
   const isMobile = useIsMobile();
 
   if (isMobile) {
     // Mobile card layout
     return (
-      <div className={compact ? 'space-y-1' : 'space-y-2'}>
+      <div className={compact ? "space-y-1" : "space-y-2"}>
         {orders.length === 0 ? (
           <div className="text-center py-6 bg-card rounded-lg">
             <p className="text-muted-foreground text-sm">No orders found.</p>
           </div>
         ) : (
           orders.map((order) => (
-            <div key={order.id} className={`float-surface glass-card glow-border hover-lift ${compact ? 'p-2' : 'p-3'}`}>
+            <div
+              key={order.id}
+              className={`float-surface glass-card glow-border hover-lift ${compact ? "p-2" : "p-3"}`}
+            >
               <OrderRow
                 order={order}
                 isAdmin={isAdmin}
