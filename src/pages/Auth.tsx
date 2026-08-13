@@ -86,13 +86,11 @@ const Auth = () => {
           </CardContent>
         </Card>
 
-        <p className="text-center text-sm text-muted-foreground mt-8 space-y-2">
-          <div>
-            Looking for the client portal?{" "}
-            <a href="/portal/login" className="text-primary hover:text-primary/80 font-semibold transition-colors">
-              Access it here
-            </a>
-          </div>
+        <p className="text-center text-sm text-muted-foreground mt-8">
+          Looking for the client portal?{" "}
+          <a href="/portal/login" className="text-primary hover:text-primary/80 font-semibold transition-colors">
+            Access it here
+          </a>
         </p>
       </div>
     </div>
