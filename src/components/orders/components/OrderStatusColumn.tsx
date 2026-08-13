@@ -68,6 +68,14 @@ interface OrderStatusColumnProps {
   allTags?: { id: string; name: string; color: string }[];
   tagAssignments?: Map<string, string[]>;
   onTagsChanged?: () => void;
+
+  // Animated order-items bubble
+  itemsBubble?: {
+    orderId: string;
+    columnKey: string;
+  } | null;
+  onOpenItemsBubble?: (orderId: string) => void;
+  onCloseItemsBubble?: () => void;
 }
 // Draggable wrapper for order cards (desktop only)
 function DraggableCard({ id, children, disabled }: { id: string; children: React.ReactNode; disabled?: boolean }) {
@@ -82,7 +90,7 @@ function DraggableCard({ id, children, disabled }: { id: string; children: React
   );
 }
 
-function OrderStatusColumn({
+fufunction OrderStatusColumn({
   config,
   orders,
   onMoveOrder,
@@ -98,6 +106,9 @@ function OrderStatusColumn({
   allTags = [],
   tagAssignments,
   onTagsChanged,
+  itemsBubble,
+  onOpenItemsBubble,
+  onCloseItemsBubble,
 }: OrderStatusColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: config.key });
   const { stockStatusColors } = useTheme();
