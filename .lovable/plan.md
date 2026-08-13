@@ -1,6 +1,6 @@
 ## Rep Commission Calculator
 
-Build a new "Commission" tab in the admin dashboard that reads Zoho invoices, maps them to reps via a manual rep-to-company assignent, and calculates commission per rep based on individual commission rates.
+Build a new "Commission" tab in the admin dashboard that reads Zoho invoices, maps them to reps via a manual rep-to-company assignment, and calculates commission per rep based on individual commission rates.
 
 ### Database changes
 
