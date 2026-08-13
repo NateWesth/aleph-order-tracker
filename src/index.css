@@ -702,3 +702,118 @@ html, body {
   border: 1px solid hsl(var(--border) / 0.6);
 }
 .ui-glass.dark [role="dialog"] { background-color: hsl(var(--popover) / 0.6) !important; }
+
+/* ============================================
+   GLOBAL POLISH — smooth motion & tactile feedback
+   ============================================ */
+
+:root {
+  --ease-out-smooth: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body,
+[data-radix-scroll-area-viewport],
+.overflow-y-auto,
+.overflow-auto,
+.overflow-x-auto {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+/* Slimmer, calmer scrollbars that fade in on hover */
+::-webkit-scrollbar-thumb {
+  background-color: hsl(var(--border) / 0.6);
+  transition: background-color 0.25s var(--ease-out-smooth);
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: hsl(var(--muted-foreground) / 0.45);
+}
+
+/* Consistent, smooth interaction feel on all controls */
+button,
+[role="button"],
+[role="tab"],
+[role="menuitem"],
+[role="option"],
+a,
+summary,
+input,
+textarea,
+select,
+[data-radix-collection-item] {
+  transition:
+    background-color 0.2s var(--ease-out-smooth),
+    color 0.2s var(--ease-out-smooth),
+    border-color 0.2s var(--ease-out-smooth),
+    box-shadow 0.25s var(--ease-out-smooth),
+    opacity 0.2s var(--ease-out-smooth),
+    transform 0.18s var(--ease-out-smooth);
+}
+
+/* Tactile press feedback */
+button:not(:disabled):active,
+[role="button"]:not([aria-disabled="true"]):active,
+[role="tab"]:active,
+[role="menuitem"]:active {
+  transform: scale(0.97);
+}
+
+/* Gentle lift on primary surfaces */
+[class*="bg-card"],
+[data-radix-popper-content-wrapper] > * {
+  transition:
+    box-shadow 0.3s var(--ease-out-smooth),
+    transform 0.3s var(--ease-out-smooth),
+    border-color 0.3s var(--ease-out-smooth),
+    background-color 0.3s var(--ease-out-smooth);
+}
+
+/* Table / list row hover polish */
+tbody tr {
+  transition: background-color 0.18s var(--ease-out-smooth);
+}
+
+/* Icons inside buttons follow the press subtly */
+button svg,
+[role="button"] svg {
+  transition: transform 0.2s var(--ease-out-smooth), opacity 0.2s var(--ease-out-smooth);
+}
+
+/* Focus ring eases in instead of snapping */
+:focus-visible {
+  transition: box-shadow 0.2s var(--ease-out-smooth), outline-color 0.2s var(--ease-out-smooth);
+}
+
+/* Images and avatars settle in rather than pop */
+img {
+  transition: opacity 0.3s var(--ease-out-smooth);
+}
+
+/* Dialogs, sheets, popovers: softer entrance curve */
+[data-state="open"][data-radix-popper-content-wrapper],
+[role="dialog"][data-state="open"],
+[data-radix-menu-content][data-state="open"],
+[data-radix-select-content][data-state="open"] {
+  animation-timing-function: var(--ease-out-smooth) !important;
+}
+
+/* Respect users who prefer less motion */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
