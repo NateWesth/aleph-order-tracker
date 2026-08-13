@@ -36,6 +36,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
+import PageHeader from "@/components/ui/PageHeader";
 
 interface Supplier {
   id: string;
