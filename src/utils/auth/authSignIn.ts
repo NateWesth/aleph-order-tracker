@@ -3,7 +3,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { getUserProfile, getUserRole } from "./index";
 
 export const signInUser = async (email: string, password: string) => {
-  console.log("Attempting to sign in user with email:", email);
   
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
@@ -19,12 +18,10 @@ export const signInUser = async (email: string, password: string) => {
     throw new Error("No user data returned from sign in");
   }
 
-  console.log("User signed in successfully:", data.user.id);
   return data;
 };
 
 export const validateUserRole = (actualRole: 'admin' | 'user', expectedUserType: string) => {
-  console.log("Validating user role - actual:", actualRole, "expected:", expectedUserType);
   
   if (expectedUserType === "admin" && actualRole !== "admin") {
     throw new Error("Access denied. Admin privileges required.");
@@ -34,7 +31,6 @@ export const validateUserRole = (actualRole: 'admin' | 'user', expectedUserType:
     throw new Error("Admin users cannot log in as regular users. Please use the admin login.");
   }
   
-  console.log("Role validation passed");
 };
 
 export const validateCompanyAssociation = async (userId: string, accessCode: string, userType: string) => {
@@ -42,7 +38,6 @@ export const validateCompanyAssociation = async (userId: string, accessCode: str
     return; // Only validate for regular users
   }
   
-  console.log("Validating company association for user:", userId, "with code:", accessCode);
   
   // Get user profile to check company association
   const profile = await getUserProfile(userId);
@@ -56,5 +51,4 @@ export const validateCompanyAssociation = async (userId: string, accessCode: str
     throw new Error("Your account is not associated with the provided company code. Please contact your administrator.");
   }
   
-  console.log("Company association validated successfully");
 };

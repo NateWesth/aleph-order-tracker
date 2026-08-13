@@ -1,6 +1,5 @@
 
 export const getErrorMessage = (error: any): string => {
-  console.log("Processing error message for:", error);
   
   if (error?.message) {
     // Handle specific Supabase auth errors

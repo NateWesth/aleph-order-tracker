@@ -49,18 +49,15 @@ export function useOptimizedRealtime({
     // Reuse existing subscription if it's still active and recent
     if (existingSubscription?.isActive && 
         (now - existingSubscription.lastActivity) < SUBSCRIPTION_TIMEOUT) {
-      console.log(`🔄 Reusing existing subscription for ${subscriptionKey}`);
       existingSubscription.lastActivity = now;
       return existingSubscription.channel;
     }
 
     // Clean up old subscription if it exists
     if (existingSubscription?.channel) {
-      console.log(`🧹 Cleaning up old subscription for ${subscriptionKey}`);
       supabase.removeChannel(existingSubscription.channel);
     }
 
-    console.log(`📡 Setting up new optimized real-time subscription for ${subscriptionKey}`);
 
     const channelName = `optimized-${subscriptionKey}-${Date.now()}`;
     let channel = supabase.channel(channelName);
@@ -76,7 +73,6 @@ export function useOptimizedRealtime({
           ...(filter && { filter: `${filter.column}=eq.${filter.value}` })
         },
         (payload) => {
-          console.log(`📥 INSERT event for ${table}:`, payload.new);
           callbacksRef.current.onInsert?.(payload);
         }
       );
@@ -92,7 +88,6 @@ export function useOptimizedRealtime({
           ...(filter && { filter: `${filter.column}=eq.${filter.value}` })
         },
         (payload) => {
-          console.log(`📝 UPDATE event for ${table}:`, payload.new);
           callbacksRef.current.onUpdate?.(payload);
         }
       );
@@ -108,7 +103,6 @@ export function useOptimizedRealtime({
           ...(filter && { filter: `${filter.column}=eq.${filter.value}` })
         },
         (payload) => {
-          console.log(`🗑️ DELETE event for ${table}:`, payload.old);
           callbacksRef.current.onDelete?.(payload);
         }
       );
@@ -116,10 +110,8 @@ export function useOptimizedRealtime({
 
     // Subscribe and handle status
     channel.subscribe((status) => {
-      console.log(`📡 Subscription status for ${subscriptionKey}:`, status);
       
       if (status === 'SUBSCRIBED') {
-        console.log(`✅ Successfully subscribed to ${subscriptionKey}`);
       } else if (status === 'CHANNEL_ERROR') {
         console.error(`❌ Subscription error for ${subscriptionKey}`);
         toast({
@@ -144,7 +136,6 @@ export function useOptimizedRealtime({
   const cleanup = useCallback(() => {
     const subscription = subscriptionManager.get(subscriptionKey);
     if (subscription) {
-      console.log(`🧹 Cleaning up subscription for ${subscriptionKey}`);
       subscription.isActive = false;
       
       // Delay actual channel removal to allow for quick re-subscriptions
@@ -153,7 +144,6 @@ export function useOptimizedRealtime({
         if (currentSubscription && !currentSubscription.isActive) {
           supabase.removeChannel(currentSubscription.channel);
           subscriptionManager.delete(subscriptionKey);
-          console.log(`🗑️ Removed subscription for ${subscriptionKey}`);
         }
       }, 1000);
     }
@@ -186,11 +176,9 @@ export function useOptimizedRealtime({
 
 // Utility function to clean up all subscriptions
 export function cleanupAllSubscriptions() {
-  console.log('🧹 Cleaning up all real-time subscriptions');
   subscriptionManager.forEach((subscription, key) => {
     subscription.isActive = false;
     supabase.removeChannel(subscription.channel);
-    console.log(`🗑️ Cleaned up subscription: ${key}`);
   });
   subscriptionManager.clear();
 }

@@ -63,7 +63,6 @@ const RegisterForm = () => {
     setLoading(true);
 
     try {
-      console.log("Attempting to sign up user with email:", formData.email);
       
       const { data, error } = await supabase.auth.signUp({
         email: formData.email,
@@ -84,7 +83,6 @@ const RegisterForm = () => {
         throw error;
       }
 
-      console.log("User signed up successfully:", data);
 
       // Notify admin about new user registration
       try {
@@ -97,7 +95,6 @@ const RegisterForm = () => {
             position: formData.position,
           },
         });
-        console.log("Admin notification sent");
       } catch (notifyError) {
         console.error("Failed to notify admin:", notifyError);
         // Don't fail registration if notification fails
@@ -147,7 +144,6 @@ const RegisterForm = () => {
           value={formData.fullName}
           onChange={(e) => setFormData({...formData, fullName: e.target.value})}
           required
-          className="dark:bg-gray-700 dark:border-gray-600"
         />
       </div>
       
@@ -159,7 +155,6 @@ const RegisterForm = () => {
           value={formData.email}
           onChange={(e) => setFormData({...formData, email: e.target.value})}
           required
-          className="dark:bg-gray-700 dark:border-gray-600"
         />
       </div>
 
@@ -170,7 +165,6 @@ const RegisterForm = () => {
           type="tel"
           value={formData.phone}
           onChange={(e) => setFormData({...formData, phone: e.target.value})}
-          className="dark:bg-gray-700 dark:border-gray-600"
         />
       </div>
 
@@ -181,7 +175,6 @@ const RegisterForm = () => {
           type="text"
           value={formData.position}
           onChange={(e) => setFormData({...formData, position: e.target.value})}
-          className="dark:bg-gray-700 dark:border-gray-600"
         />
       </div>
       
@@ -193,7 +186,6 @@ const RegisterForm = () => {
           value={formData.password}
           onChange={(e) => setFormData({...formData, password: e.target.value})}
           required
-          className="dark:bg-gray-700 dark:border-gray-600"
         />
       </div>
       
@@ -205,7 +197,6 @@ const RegisterForm = () => {
           value={formData.confirmPassword}
           onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})}
           required
-          className="dark:bg-gray-700 dark:border-gray-600"
         />
       </div>
 
@@ -215,7 +206,7 @@ const RegisterForm = () => {
       
       <Button 
         type="submit" 
-        className="w-full bg-aleph-green hover:bg-green-500"
+        className="w-full"
         disabled={loading}
       >
         {loading ? "Creating Account..." : "Create Account"}

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Package, History, BarChart3, Settings, LogOut, Building2, Home, Box, Users, Truck, FileText, Command, ShoppingCart, Percent, Sparkles } from "lucide-react";
+import { Package, History, BarChart3, Settings, LogOut, Building2, Box, Users, Truck, FileText, Command, ShoppingCart, Percent, Sparkles } from "lucide-react";
 import ChangelogDialog, { hasUnreadChangelog } from "@/components/admin/ChangelogDialog";
 import KeyboardShortcutsDialog from "@/components/admin/KeyboardShortcutsDialog";
 import { playClick, playWhoosh } from "@/utils/ambientSounds";
@@ -105,7 +105,7 @@ const AdminDashboard = () => {
       title: "Logged out",
       description: "You have been successfully logged out."
     });
-    navigate("/auth");
+    navigate("/");
   };
 
   // Keyboard shortcut for Cmd+K
@@ -178,6 +178,7 @@ const AdminDashboard = () => {
       <AuroraBackground />
       {/* Modern Top Navigation Bar */}
       <header className="sticky top-0 z-50 bg-card/80 backdrop-blur-xl border-b border-border w-full">
+        <div className="ribbon-bar" aria-hidden />
         <div className="w-full px-2 sm:px-3 py-2 sm:py-3">
           {/* Top row: Logo/Home, Search, Actions */}
           <div className="flex items-center gap-2 sm:gap-4">
@@ -186,10 +187,15 @@ const AdminDashboard = () => {
               variant={activeView === "home" ? "secondary" : "ghost"}
               size="icon"
               onClick={() => setActiveView("home")}
-              className="shrink-0 rounded-xl h-9 w-9 sm:h-10 sm:w-10"
+              className="shrink-0 rounded-xl h-9 w-9 sm:h-10 sm:w-10 p-1.5"
               data-tour="home"
+              title="Home"
             >
-              <Home className="h-4 w-4 sm:h-5 sm:w-5" />
+              <img
+                src="/lovable-uploads/e1088147-889e-43f6-bdf0-271189b88913.png"
+                alt="Aleph"
+                className="h-full w-full object-contain"
+              />
             </Button>
 
             {/* Smart Search bar - grows to fill space */}
@@ -332,7 +338,6 @@ const AdminDashboard = () => {
                 onClick={() => {
                   triggerHapticFeedback('light');
                   playClick();
-                  setActiveView(item.id);
                   setActiveView(item.id);
                 }}
                 className={cn(

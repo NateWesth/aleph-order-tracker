@@ -50,14 +50,9 @@ export default function CreateOrderDialog({
       return;
     }
     setLoading(true);
-    console.log("🚀 CreateOrderDialog: Starting order creation process");
-    console.log("📋 CreateOrderDialog: Order data received:", orderData);
-    console.log("👤 CreateOrderDialog: Current user ID:", user.id);
-    console.log("🎯 CreateOrderDialog: Order urgency:", orderData.urgency);
     try {
       // Get user role for additional context
       const userRole = await getUserRole(user.id);
-      console.log("🔐 CreateOrderDialog: User role:", userRole);
 
       // Create description from items - NOW INCLUDING NOTES
       const itemsDescription = orderData.items.filter(item => item.name && item.quantity > 0).map(item => {
@@ -67,7 +62,6 @@ export default function CreateOrderDialog({
         }
         return itemLine;
       }).join('\n');
-      console.log("📝 CreateOrderDialog: Generated description with notes:", itemsDescription);
 
       // Prepare order data for database insertion
       const orderInsertData = {
@@ -83,10 +77,6 @@ export default function CreateOrderDialog({
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
-      console.log("💾 CreateOrderDialog: Final order data for database:", orderInsertData);
-      console.log("🏢 CreateOrderDialog: Company ID being saved:", orderInsertData.company_id);
-      console.log("👤 CreateOrderDialog: User ID being saved:", orderInsertData.user_id);
-      console.log("🎯 CreateOrderDialog: Urgency being saved:", orderInsertData.urgency);
 
       // Verify company exists before creating order
       if (orderInsertData.company_id) {
@@ -98,7 +88,6 @@ export default function CreateOrderDialog({
           console.error("❌ CreateOrderDialog: Company verification failed:", companyError);
           throw new Error(`Company verification failed: ${companyError.message}`);
         }
-        console.log("✅ CreateOrderDialog: Company verified:", companyCheck);
       } else {
         console.warn("⚠️ CreateOrderDialog: No company ID provided - order will be created without company link");
       }
@@ -118,14 +107,9 @@ export default function CreateOrderDialog({
         });
         throw insertError;
       }
-      console.log("🎉 CreateOrderDialog: Order created successfully in database:", createdOrder);
-      console.log("🔍 CreateOrderDialog: Created order company_id:", createdOrder.company_id);
-      console.log("🔍 CreateOrderDialog: Created order user_id:", createdOrder.user_id);
-      console.log("🎯 CreateOrderDialog: Created order urgency:", createdOrder.urgency);
 
       // Insert purchase orders into the junction table
       if (orderData.purchaseOrders && orderData.purchaseOrders.length > 0) {
-        console.log("📦 CreateOrderDialog: Inserting purchase orders:", orderData.purchaseOrders);
         
         const poInsertData = orderData.purchaseOrders.map(po => ({
           order_id: createdOrder.id,
@@ -141,7 +125,6 @@ export default function CreateOrderDialog({
           console.error("❌ CreateOrderDialog: Failed to insert purchase orders:", poError);
           // Don't fail the order creation, just log the error
         } else {
-          console.log("✅ CreateOrderDialog: Purchase orders inserted successfully");
         }
       }
 
@@ -153,23 +136,13 @@ export default function CreateOrderDialog({
       if (verificationError) {
         console.error("❌ CreateOrderDialog: Order verification failed:", verificationError);
       } else {
-        console.log("✅ CreateOrderDialog: Order verification successful:", verificationOrder);
-        console.log("🏢 CreateOrderDialog: Verified company_id in database:", verificationOrder.company_id);
-        console.log("🎯 CreateOrderDialog: Verified urgency in database:", verificationOrder.urgency);
       }
 
       // Send email notification for new order
       try {
-        console.log("🚀 CreateOrderDialog: Starting email notification process");
         // Get company name from the companies array
         const company = companies.find(c => c.id === orderData.companyId);
         const companyName = company?.name || 'Unknown Company';
-        console.log("📧 CreateOrderDialog: Calling sendOrderNotification with:", {
-          orderId: createdOrder.id,
-          orderNumber: orderData.orderNumber,
-          companyName: companyName,
-          changeType: 'created'
-        });
         await sendOrderNotification({
           orderId: createdOrder.id,
           orderNumber: orderData.orderNumber,
@@ -178,7 +151,6 @@ export default function CreateOrderDialog({
           newStatus: 'pending',
           description: itemsDescription
         });
-        console.log("✅ CreateOrderDialog: Email notification sent successfully");
       } catch (emailError) {
         console.error("❌ CreateOrderDialog: Email notification failed:", emailError);
         // Don't fail the order creation if email fails

@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Package } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 export default function PortalLogin() {
   const [email, setEmail] = useState("");
@@ -44,18 +44,25 @@ export default function PortalLogin() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4">
-      <div className="w-full max-w-sm space-y-6">
+    <div className="min-h-screen flex items-center justify-center bg-background px-4 relative overflow-hidden">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -top-40 left-1/2 -translate-x-1/2 w-[560px] h-[560px] rounded-full opacity-[0.08] blur-3xl ribbon-gradient"
+      />
+      <div className="w-full max-w-sm space-y-6 relative z-10">
         {/* Logo / Brand */}
         <div className="text-center space-y-2">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-primary/10 mb-2">
-            <Package className="h-7 w-7 text-primary" />
-          </div>
-          <h1 className="text-2xl font-bold text-foreground">Aleph Orders</h1>
+          <img
+            src="/lovable-uploads/e1088147-889e-43f6-bdf0-271189b88913.png"
+            alt="Aleph Engineering & Supplies"
+            className="h-14 w-14 mx-auto mb-1"
+          />
+          <h1 className="font-display text-2xl font-bold text-foreground">Aleph Orders</h1>
           <p className="text-sm text-muted-foreground">Client Portal</p>
         </div>
 
-        <Card>
+        <Card className="shadow-soft-lg border-border/60 overflow-hidden">
+          <div className="ribbon-bar" aria-hidden />
           <CardHeader className="pb-4">
             <CardTitle className="text-lg">Sign in</CardTitle>
             <CardDescription>Access your orders and track their progress</CardDescription>

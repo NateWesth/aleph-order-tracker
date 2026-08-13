@@ -31,7 +31,6 @@ export const useGlobalRealtimeOrders = ({
   }, [onOrdersChange]);
 
   const syncLocalStorageWithDatabase = useCallback(async (payload: any) => {
-    console.log(`Syncing local storage with database change (${pageType}):`, payload.new);
     
     const updatedOrder = payload.new;
     const orderId = updatedOrder.id;
@@ -70,14 +69,12 @@ export const useGlobalRealtimeOrders = ({
       }
       
       localStorage.setItem(storageKey, JSON.stringify(filteredOrders));
-      console.log(`Updated ${storageKey} with ${filteredOrders.length} orders`);
     };
 
     // Update localStorage based on status
     switch (newStatus) {
       case 'received':
       case 'in-progress':
-        console.log(`Moving order ${orderId} to progress page (status: ${newStatus})`);
         updateOrderInStorage('progressOrders', true);
         updateOrderInStorage('deliveryOrders', true);
         updateOrderInStorage('processingOrders', false);
@@ -85,7 +82,6 @@ export const useGlobalRealtimeOrders = ({
         break;
       
       case 'processing':
-        console.log(`Moving order ${orderId} to processing page`);
         updateOrderInStorage('progressOrders', false);
         updateOrderInStorage('deliveryOrders', false);
         updateOrderInStorage('processingOrders', true);
@@ -93,7 +89,6 @@ export const useGlobalRealtimeOrders = ({
         break;
       
       case 'completed':
-        console.log(`Moving order ${orderId} to completed/delivery pages`);
         updateOrderInStorage('progressOrders', false);
         updateOrderInStorage('deliveryOrders', false);
         updateOrderInStorage('processingOrders', false);
@@ -101,7 +96,6 @@ export const useGlobalRealtimeOrders = ({
         break;
       
       default:
-        console.log(`Order ${orderId} status is ${newStatus}, removing from progress-related storage`);
         // For pending status, remove from all progress-related storage
         updateOrderInStorage('progressOrders', false);
         updateOrderInStorage('deliveryOrders', false);
@@ -111,12 +105,10 @@ export const useGlobalRealtimeOrders = ({
     }
     
     // Trigger refresh for all pages
-    console.log(`Triggering data refresh for ${pageType} page`);
     onOrdersChange();
   }, [onOrdersChange, pageType]);
 
   const handleOrderInsert = useCallback((payload: any) => {
-    console.log(`New order created (${pageType}):`, payload.new);
     
     // Show notification for both admin and client users
     const shouldShowNotification = isAdmin || payload.new.user_id === supabase.auth.getUser()?.then(u => u.data.user?.id);
@@ -133,14 +125,12 @@ export const useGlobalRealtimeOrders = ({
   }, [toast, debouncedRefresh, isAdmin, pageType]);
 
   const handleOrderUpdate = useCallback(async (payload: any) => {
-    console.log(`Order updated (${pageType}):`, payload.old, '->', payload.new);
     
     // Show notification for status changes and important updates
     const oldStatus = payload.old?.status;
     const newStatus = payload.new?.status;
     
     if (oldStatus !== newStatus) {
-      console.log(`Order status changed from ${oldStatus} to ${newStatus}`);
       
       // Sync with localStorage first
       await syncLocalStorageWithDatabase(payload);
@@ -176,13 +166,11 @@ export const useGlobalRealtimeOrders = ({
       }
     } else {
       // Just refresh data for other updates with debounce
-      console.log(`Order updated without status change, refreshing data`);
       debouncedRefresh();
     }
   }, [toast, debouncedRefresh, isAdmin, pageType, syncLocalStorageWithDatabase]);
 
   const handleOrderDelete = useCallback(async (payload: any) => {
-    console.log(`Order deleted (${pageType}):`, payload.old);
     
     // Remove from all localStorage arrays
     const orderId = payload.old.id;
@@ -190,7 +178,6 @@ export const useGlobalRealtimeOrders = ({
       const existingOrders = JSON.parse(localStorage.getItem(storageKey) || '[]');
       const filteredOrders = existingOrders.filter((order: any) => order.id !== orderId);
       localStorage.setItem(storageKey, JSON.stringify(filteredOrders));
-      console.log(`Removed order ${orderId} from ${storageKey}`);
     });
     
     // Check if this user should receive notifications
@@ -210,7 +197,6 @@ export const useGlobalRealtimeOrders = ({
   }, [toast, debouncedRefresh, isAdmin, pageType]);
 
   useEffect(() => {
-    console.log(`Setting up enhanced real-time order subscriptions for ${pageType}...`);
     
     // Create a unique channel name per page type to avoid conflicts
     const channelName = `orders-realtime-enhanced-${pageType}`;
@@ -252,7 +238,6 @@ export const useGlobalRealtimeOrders = ({
           table: 'order_items'
         },
         (payload) => {
-          console.log(`Order item changed (${pageType}):`, payload);
           debouncedRefresh();
         }
       )
@@ -264,21 +249,17 @@ export const useGlobalRealtimeOrders = ({
           table: 'order_purchase_orders'
         },
         (payload) => {
-          console.log(`Order PO changed (${pageType}):`, payload);
           debouncedRefresh();
         }
       )
       .subscribe((status) => {
-        console.log(`Enhanced real-time subscription status for ${pageType}:`, status);
         if (status === 'SUBSCRIBED') {
-          console.log(`✅ Successfully subscribed to enhanced real-time updates for ${pageType}`);
         } else if (status === 'CHANNEL_ERROR') {
           console.error(`❌ Enhanced real-time subscription error for ${pageType}`);
         }
       });
 
     return () => {
-      console.log(`Cleaning up enhanced real-time subscriptions for ${pageType}...`);
       if (debounceTimer.current) {
         clearTimeout(debounceTimer.current);
       }

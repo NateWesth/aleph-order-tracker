@@ -5,8 +5,11 @@ import { cn } from "@/lib/utils"
 
 const Progress = React.forwardRef<
   React.ElementRef<typeof ProgressPrimitive.Root>,
-  React.ComponentPropsWithoutRef<typeof ProgressPrimitive.Root>
->(({ className, value, ...props }, ref) => (
+  React.ComponentPropsWithoutRef<typeof ProgressPrimitive.Root> & {
+    /** "ribbon" ties the fill color to how far along the value is, using the brand spectrum. Default stays a solid primary fill. */
+    variant?: "default" | "ribbon"
+  }
+>(({ className, value, variant = "default", ...props }, ref) => (
   <ProgressPrimitive.Root
     ref={ref}
     className={cn(
@@ -16,8 +19,18 @@ const Progress = React.forwardRef<
     {...props}
   >
     <ProgressPrimitive.Indicator
-      className="h-full w-full flex-1 bg-primary transition-all"
-      style={{ transform: `translateX(-${100 - (value || 0)}%)` }}
+      className={cn(
+        "h-full w-full flex-1 transition-all",
+        variant === "ribbon" ? "ribbon-progress-fill" : "bg-primary"
+      )}
+      style={
+        variant === "ribbon"
+          ? {
+              transform: `translateX(-${100 - (value || 0)}%)`,
+              backgroundPosition: `${value || 0}% 0`,
+            }
+          : { transform: `translateX(-${100 - (value || 0)}%)` }
+      }
     />
   </ProgressPrimitive.Root>
 ))

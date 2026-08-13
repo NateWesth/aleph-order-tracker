@@ -29,7 +29,6 @@ export const AdminCompanySelector = ({
           <Select 
             value={field.value || ""} 
             onValueChange={(value) => {
-              console.log("🏢 AdminCompanySelector: Company selected:", value);
               field.onChange(value);
             }}
           >

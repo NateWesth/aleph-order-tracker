@@ -4,89 +4,120 @@
 
 @layer base {
   :root {
-    /* Clean, professional light theme - inspired by modern design systems */
-    --background: 0 0% 98%;
-    --foreground: 220 13% 18%;
+    /* Aleph brand theme — grounded in the logo: charcoal ink wordmark
+       + a confident blue anchor, with the ribbon-star's spectrum reserved
+       as a deliberate signature (progress, active states) rather than decoration. */
+    --background: 210 20% 98%;
+    --foreground: 222 40% 13%;
 
     --card: 0 0% 100%;
-    --card-foreground: 220 13% 18%;
+    --card-foreground: 222 40% 13%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 220 13% 18%;
+    --popover-foreground: 222 40% 13%;
 
-    /* Deep purple - bold and modern */
-    --primary: 270 76% 52%;
+    /* Aleph blue - from the logo's ribbon */
+    --primary: 205 90% 42%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 220 14% 96%;
-    --secondary-foreground: 220 13% 18%;
+    --secondary: 210 20% 95%;
+    --secondary-foreground: 222 40% 13%;
 
-    --muted: 220 14% 96%;
-    --muted-foreground: 220 9% 46%;
+    --muted: 210 16% 95%;
+    --muted-foreground: 220 10% 45%;
 
-    --accent: 270 76% 95%;
-    --accent-foreground: 270 76% 30%;
+    --accent: 205 90% 95%;
+    --accent-foreground: 205 90% 28%;
 
-    --destructive: 0 84% 60%;
+    --destructive: 355 78% 52%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 220 13% 91%;
-    --input: 220 13% 91%;
-    --ring: 270 76% 52%;
+    --success: 152 65% 34%;
+    --success-foreground: 0 0% 100%;
+    --warning: 32 92% 48%;
+    --warning-foreground: 26 45% 12%;
+    --info: 190 80% 38%;
+    --info-foreground: 0 0% 100%;
+
+    /* Ribbon spectrum - sampled from the Aleph star logo, used only as a
+       deliberate signature (order progress, active nav, one hero moment) */
+    --ribbon-1: 330 82% 55%;
+    --ribbon-2: 262 75% 58%;
+    --ribbon-3: 205 90% 50%;
+    --ribbon-4: 178 65% 38%;
+    --ribbon-5: 142 60% 40%;
+    --ribbon-6: 28 90% 54%;
+
+    --border: 214 18% 89%;
+    --input: 214 18% 89%;
+    --ring: 205 90% 42%;
 
     --radius: 0.75rem;
 
     /* Sidebar */
     --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 220 13% 18%;
-    --sidebar-primary: 270 76% 52%;
+    --sidebar-foreground: 222 40% 13%;
+    --sidebar-primary: 205 90% 42%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 270 76% 96%;
-    --sidebar-accent-foreground: 270 76% 30%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 270 76% 52%;
+    --sidebar-accent: 205 90% 95%;
+    --sidebar-accent-foreground: 205 90% 28%;
+    --sidebar-border: 214 18% 89%;
+    --sidebar-ring: 205 90% 42%;
   }
 
   .dark {
-    /* Deep, refined dark theme with richer contrast */
-    --background: 225 18% 7%;
-    --foreground: 210 20% 95%;
+    /* Deep charcoal-navy dark theme, same brand blue brightened for contrast */
+    --background: 222 32% 8%;
+    --foreground: 210 25% 96%;
 
-    --card: 225 16% 10%;
-    --card-foreground: 210 20% 95%;
+    --card: 222 28% 11%;
+    --card-foreground: 210 25% 96%;
 
-    --popover: 225 16% 10%;
-    --popover-foreground: 210 20% 95%;
+    --popover: 222 28% 11%;
+    --popover-foreground: 210 25% 96%;
 
-    /* Vibrant purple for dark mode - slightly brighter */
-    --primary: 270 76% 65%;
-    --primary-foreground: 225 18% 7%;
+    --primary: 205 90% 58%;
+    --primary-foreground: 222 32% 8%;
 
-    --secondary: 225 14% 14%;
-    --secondary-foreground: 210 20% 92%;
+    --secondary: 222 20% 15%;
+    --secondary-foreground: 210 25% 92%;
 
-    --muted: 225 14% 14%;
-    --muted-foreground: 215 12% 58%;
+    --muted: 222 20% 15%;
+    --muted-foreground: 215 14% 60%;
 
-    --accent: 270 50% 18%;
-    --accent-foreground: 270 80% 78%;
+    --accent: 205 55% 20%;
+    --accent-foreground: 205 90% 80%;
 
-    --destructive: 0 72% 55%;
+    --destructive: 355 75% 58%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 225 14% 16%;
-    --input: 225 14% 14%;
-    --ring: 270 76% 65%;
+    --success: 152 55% 45%;
+    --success-foreground: 222 32% 8%;
+    --warning: 32 90% 55%;
+    --warning-foreground: 26 45% 12%;
+    --info: 190 75% 50%;
+    --info-foreground: 222 32% 8%;
+
+    --ribbon-1: 330 85% 63%;
+    --ribbon-2: 262 80% 68%;
+    --ribbon-3: 205 90% 62%;
+    --ribbon-4: 178 65% 48%;
+    --ribbon-5: 142 55% 50%;
+    --ribbon-6: 28 90% 60%;
+
+    --border: 222 18% 18%;
+    --input: 222 18% 16%;
+    --ring: 205 90% 58%;
 
     /* Sidebar */
-    --sidebar-background: 225 18% 9%;
-    --sidebar-foreground: 210 20% 95%;
-    --sidebar-primary: 270 76% 65%;
-    --sidebar-primary-foreground: 225 18% 7%;
-    --sidebar-accent: 225 14% 13%;
-    --sidebar-accent-foreground: 210 20% 92%;
-    --sidebar-border: 225 14% 14%;
-    --sidebar-ring: 270 76% 65%;
+    --sidebar-background: 222 30% 9%;
+    --sidebar-foreground: 210 25% 96%;
+    --sidebar-primary: 205 90% 58%;
+    --sidebar-primary-foreground: 222 32% 8%;
+    --sidebar-accent: 222 20% 15%;
+    --sidebar-accent-foreground: 210 25% 92%;
+    --sidebar-border: 222 18% 18%;
+    --sidebar-ring: 205 90% 58%;
   }
 }
 
@@ -117,9 +148,10 @@
     letter-spacing: -0.011em;
   }
 
-  /* Clean, modern heading styles */
+  /* Clean, modern heading styles - display face gives headings their own identity */
   h1, h2, h3, h4, h5, h6 {
     @apply font-semibold tracking-tight text-foreground;
+    font-family: 'Space Grotesk', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   }
 
   h1 {
@@ -282,7 +314,7 @@
 }
 
 .text-aleph-magenta { 
-  color: hsl(316 100% 50%);
+  color: hsl(var(--ribbon-1));
 }
 
 .text-aleph-accent { 
@@ -290,7 +322,7 @@
 }
 
 .text-aleph-orange { 
-  color: hsl(30 100% 50%);
+  color: hsl(var(--ribbon-6));
 }
 
 .bg-aleph-green { 
@@ -298,7 +330,7 @@
 }
 
 .bg-aleph-magenta { 
-  background-color: hsl(316 100% 50%);
+  background-color: hsl(var(--ribbon-1));
 }
 
 .bg-aleph-accent { 
@@ -306,7 +338,7 @@
 }
 
 .bg-aleph-orange { 
-  background-color: hsl(30 100% 50%);
+  background-color: hsl(var(--ribbon-6));
 }
 
 /* Auth screen green */
@@ -488,7 +520,7 @@
    ============================================ */
 
 .hero-gradient {
-  background: linear-gradient(135deg, hsl(152 69% 42%) 0%, hsl(316 100% 50%) 50%, hsl(30 100% 50%) 100%);
+  background: linear-gradient(135deg, hsl(var(--ribbon-3)) 0%, hsl(var(--ribbon-1)) 50%, hsl(var(--ribbon-6)) 100%);
 }
 
 /* Subtle gradient backgrounds */
@@ -655,7 +687,52 @@ html, body {
 
 .ring-aleph-magenta {
   @apply focus:ring-2 focus:ring-offset-2 focus:ring-offset-background;
-  --tw-ring-color: hsl(316 100% 50%);
+  --tw-ring-color: hsl(var(--ribbon-1));
+}
+
+/* ============================================
+   RIBBON SIGNATURE — the one deliberate brand
+   flourish, drawn from the Aleph logo's spectrum.
+   Used sparingly: order progress, active nav,
+   the auth screen. Not for general decoration.
+   ============================================ */
+
+.ribbon-gradient {
+  background: linear-gradient(
+    90deg,
+    hsl(var(--ribbon-1)) 0%,
+    hsl(var(--ribbon-2)) 20%,
+    hsl(var(--ribbon-3)) 40%,
+    hsl(var(--ribbon-4)) 60%,
+    hsl(var(--ribbon-5)) 80%,
+    hsl(var(--ribbon-6)) 100%
+  );
+}
+
+.ribbon-gradient-text {
+  @apply bg-clip-text text-transparent ribbon-gradient;
+}
+
+/* Thin accent bar - use once per screen, at the very top of the app shell */
+.ribbon-bar {
+  height: 3px;
+  width: 100%;
+  @apply ribbon-gradient;
+}
+
+/* Maps a 0-100 progress value to a position along the ribbon spectrum,
+   so color genuinely encodes "how far along" rather than decorating it. */
+.ribbon-progress-fill {
+  background: linear-gradient(
+    90deg,
+    hsl(var(--ribbon-1)),
+    hsl(var(--ribbon-2)),
+    hsl(var(--ribbon-3)),
+    hsl(var(--ribbon-4)),
+    hsl(var(--ribbon-5)),
+    hsl(var(--ribbon-6))
+  );
+  background-size: 600% 100%;
 }
 
 /* Prevent horizontal scroll on mobile */

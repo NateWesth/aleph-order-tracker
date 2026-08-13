@@ -65,7 +65,6 @@ export default function ProcessingOrderFilesDialog({
     if (!order?.id || !user?.id) return;
     setLoading(true);
     try {
-      console.log('Fetching files for order:', order.id);
       const { data, error } = await supabase
         .from('order_files')
         .select('*')
@@ -77,7 +76,6 @@ export default function ProcessingOrderFilesDialog({
         throw error;
       }
 
-      console.log('Files fetched successfully:', data?.length || 0);
       const transformedFiles: OrderFile[] = (data || []).map(file => ({
         id: file.id,
         file_name: file.file_name,
@@ -109,21 +107,12 @@ export default function ProcessingOrderFilesDialog({
       return;
     }
 
-    console.log('Starting file upload:', {
-      fileName: file.name,
-      fileType,
-      orderId: order.id,
-      userId: user.id,
-      isAdmin
-    });
-
     setUploadingFiles(prev => ({ ...prev, [fileType]: true }));
 
     try {
       const fileExt = file.name.split('.').pop();
       const fileName = `${order.id}/${fileType}/${Date.now()}.${fileExt}`;
 
-      console.log('Uploading to storage:', fileName);
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('order-files')
         .upload(fileName, file);
@@ -133,12 +122,10 @@ export default function ProcessingOrderFilesDialog({
         throw uploadError;
       }
 
-      console.log('File uploaded to storage successfully:', uploadData);
       const { data: urlData } = supabase.storage
         .from('order-files')
         .getPublicUrl(fileName);
 
-      console.log('Public URL generated:', urlData.publicUrl);
 
       const fileRecord = {
         order_id: order.id,
@@ -151,7 +138,6 @@ export default function ProcessingOrderFilesDialog({
         mime_type: file.type
       };
 
-      console.log('Inserting file record:', fileRecord);
       const { error: dbError } = await supabase
         .from('order_files')
         .insert(fileRecord);
@@ -161,7 +147,6 @@ export default function ProcessingOrderFilesDialog({
         throw dbError;
       }
 
-      console.log('File record inserted successfully');
       toast({
         title: "File Uploaded",
         description: `${file.name} has been uploaded successfully.`
@@ -200,13 +185,6 @@ export default function ProcessingOrderFilesDialog({
       return;
     }
 
-    console.log('Starting file deletion:', {
-      fileName: file.file_name,
-      fileId: file.id,
-      userId: user.id,
-      isAdmin
-    });
-
     setDeletingFiles(prev => ({ ...prev, [file.id]: true }));
 
     try {
@@ -216,7 +194,6 @@ export default function ProcessingOrderFilesDialog({
       const orderId = order?.id;
       const filePath = `${orderId}/${fileType}/${fileName}`;
 
-      console.log('Deleting from storage:', filePath);
       const { error: storageError } = await supabase.storage
         .from('order-files')
         .remove([filePath]);
@@ -225,7 +202,6 @@ export default function ProcessingOrderFilesDialog({
         console.error('Storage deletion error:', storageError);
       }
 
-      console.log('File deleted from storage, now deleting database record');
       const { error: dbError } = await supabase
         .from('order_files')
         .delete()
@@ -236,7 +212,6 @@ export default function ProcessingOrderFilesDialog({
         throw dbError;
       }
 
-      console.log('File record deleted from database successfully');
       toast({
         title: "File Deleted",
         description: `${file.file_name} has been deleted successfully.`
@@ -312,7 +287,6 @@ export default function ProcessingOrderFilesDialog({
     const inputId = `file-upload-${fileType}`;
     
     if (!canUploadFileType(fileType)) {
-      console.log('Upload not allowed for file type:', fileType);
       return null;
     }
     
@@ -422,7 +396,6 @@ export default function ProcessingOrderFilesDialog({
 
   useEffect(() => {
     if (isOpen && order) {
-      console.log('Dialog opened for order:', order.id);
       fetchOrderFiles();
     }
   }, [isOpen, order?.id]);
@@ -430,7 +403,6 @@ export default function ProcessingOrderFilesDialog({
   useEffect(() => {
     if (!order?.id) return;
     
-    console.log('Setting up real-time subscription for order files:', order.id);
     const channel = supabase
       .channel(`order-files-${order.id}`)
       .on('postgres_changes', {
@@ -439,13 +411,11 @@ export default function ProcessingOrderFilesDialog({
         table: 'order_files',
         filter: `order_id=eq.${order.id}`
       }, (payload) => {
-        console.log('Real-time file change detected:', payload);
         fetchOrderFiles();
       })
       .subscribe();
 
     return () => {
-      console.log('Cleaning up real-time subscription for order files');
       supabase.removeChannel(channel);
     };
   }, [order?.id]);

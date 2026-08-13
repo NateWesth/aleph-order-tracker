@@ -42,7 +42,6 @@ export const PWAUpdatePrompt = () => {
 
         return () => clearInterval(intervalId);
       } catch (error) {
-        console.log('Error checking for SW updates:', error);
       }
     };
 

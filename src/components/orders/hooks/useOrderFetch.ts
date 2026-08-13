@@ -53,13 +53,11 @@ export function useOrderFetch() {
 
   const fetchOrders = async () => {
     if (!user?.id || !userRole) {
-      console.log("No user ID or role available for fetching orders");
       setLoading(false);
       return;
     }
 
     try {
-      console.log("Fetching orders for user:", user.id);
       
       // All authenticated users can see all orders (no company filtering)
       const { data, error } = await supabase
@@ -73,7 +71,6 @@ export function useOrderFetch() {
         throw error;
       }
       
-      console.log("Orders fetched successfully:", data);
       
       // Parse items from description for each order
       const ordersWithItems = (data || []).map(order => ({

@@ -13,7 +13,6 @@ interface EmailNotificationParams {
 
 export const sendOrderNotification = async (params: EmailNotificationParams) => {
   try {
-    console.log('Starting order notification process with params:', params);
     
     const { data, error } = await supabase.functions.invoke('send-order-notifications', {
       body: params
@@ -24,7 +23,6 @@ export const sendOrderNotification = async (params: EmailNotificationParams) => 
       throw new Error(`Function invoke failed: ${error.message}`);
     }
 
-    console.log('Order notification function response:', data);
     
     // Check if the response indicates any issues
     if (data?.error) {
@@ -36,12 +34,6 @@ export const sendOrderNotification = async (params: EmailNotificationParams) => 
       console.warn(`Some emails failed to send: ${data.failed} failed, ${data.sent} sent`);
     }
 
-    console.log('Order notification process completed successfully:', {
-      sent: data?.sent || 0,
-      failed: data?.failed || 0,
-      recipients: data?.recipients || 0
-    });
-    
     return data;
   } catch (error) {
     console.error('Failed to send order notification:', error);

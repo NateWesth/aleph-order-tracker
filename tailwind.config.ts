@@ -20,6 +20,7 @@ export default {
 		extend: {
 			fontFamily: {
 				sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+				display: ['Space Grotesk', 'Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
 				mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
 			},
 			colors: {
@@ -66,21 +67,22 @@ export default {
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
 				},
-				// Legacy color tokens
+				// Legacy color tokens - aligned to the ribbon palette sampled from the real Aleph logo
 				company: {
-					green: 'hsl(152 69% 42%)',
-					darkgreen: 'hsl(152 69% 36%)',
+					green: 'hsl(142 60% 40%)',
+					darkgreen: 'hsl(142 60% 34%)',
 					gray: 'hsl(215 16% 47%)',
 					lightgray: 'hsl(210 40% 96%)',
-					accent: 'hsl(152 69% 42%)',
-					magenta: 'hsl(316 100% 50%)',
-					orange: 'hsl(30 100% 50%)',
+					accent: 'hsl(205 90% 42%)',
+					magenta: 'hsl(330 82% 55%)',
+					orange: 'hsl(28 90% 54%)',
 				},
 				aleph: {
-					green: 'hsl(152 69% 42%)',
-					magenta: 'hsl(316 100% 50%)',
-					accent: 'hsl(152 69% 36%)',
-					orange: 'hsl(30 100% 50%)',
+					blue: 'hsl(205 90% 42%)',
+					green: 'hsl(142 60% 40%)',
+					magenta: 'hsl(330 82% 55%)',
+					accent: 'hsl(205 90% 42%)',
+					orange: 'hsl(28 90% 54%)',
 				},
 			},
 			borderRadius: {

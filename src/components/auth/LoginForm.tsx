@@ -49,7 +49,6 @@ const LoginForm = () => {
 
   const performLogin = async (email: string, password: string, saveForBiometric: boolean = false) => {
     try {
-      console.log("Attempting to sign in user with email:", email);
       
       const { data, error } = await supabase.auth.signInWithPassword({
         email: email,
@@ -65,7 +64,6 @@ const LoginForm = () => {
         throw new Error("No user data returned from sign in");
       }
 
-      console.log("User signed in successfully:", data.user.id);
 
       // Check if user is approved
       const { data: profile, error: profileError } = await supabase
@@ -100,7 +98,6 @@ const LoginForm = () => {
         const saved = await saveRefreshToken(data.session.refresh_token);
         if (saved) {
           setHasSavedCredentials(true);
-          console.log("Refresh token saved for future biometric login");
         }
       }
 
@@ -258,7 +255,7 @@ const LoginForm = () => {
           value={formData.email}
           onChange={(e) => setFormData({...formData, email: e.target.value})}
           required
-          className="dark:bg-gray-700 dark:border-gray-600"
+          
         />
       </div>
       
@@ -270,13 +267,13 @@ const LoginForm = () => {
           value={formData.password}
           onChange={(e) => setFormData({...formData, password: e.target.value})}
           required
-          className="dark:bg-gray-700 dark:border-gray-600"
+          
         />
       </div>
       
       <Button 
         type="submit" 
-        className="w-full bg-aleph-green hover:bg-green-500"
+        className="w-full"
         disabled={loading || biometricLoading}
       >
         {loading ? "Signing In..." : "Sign In"}
