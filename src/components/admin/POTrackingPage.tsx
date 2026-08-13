@@ -260,51 +260,34 @@ export default function POTrackingPage() {
   if (loading) return <PageSkeleton variant="table" />;
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <FileText className="h-5 w-5 text-primary" />
-          <h2 className="text-lg font-semibold">Outstanding Purchase Orders</h2>
-        </div>
-        <div className="flex items-center gap-3 text-sm text-muted-foreground">
-          <span className="flex items-center gap-1">
-            <Truck className="h-4 w-4" />
-            {vendorGroups.length} suppliers
-          </span>
-          <span className="flex items-center gap-1">
-            <FileText className="h-4 w-4" />
-            {pos.length} POs
-          </span>
-          <span className="flex items-center gap-1">
-            <Package className="h-4 w-4" />
-            {totalOutstandingUnits} units · {money(totalOutstandingValue)}
-          </span>
-          {refreshing && (
-            <span className="flex items-center gap-1">
-              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Updating
-            </span>
-          )}
-        </div>
-      </div>
+    <div className="space-y-5">
+      <PageHeader
+        title="Outstanding Purchase Orders"
+        icon={FileText}
+        description={
+          fetchedAt
+            ? `${isCached ? "Cached" : "Live from Zoho"} · updated ${format(new Date(fetchedAt), "dd MMM yyyy HH:mm")} · auto-updates every 5 minutes · POs disappear once a vendor bill is raised`
+            : "Live from Zoho · POs disappear once a vendor bill is raised"
+        }
+        stats={[
+          { label: "suppliers", value: vendorGroups.length, icon: Truck },
+          { label: "POs", value: pos.length, icon: FileText },
+          { label: `units · ${money(totalOutstandingValue)}`, value: totalOutstandingUnits, icon: Package },
+          ...(refreshing ? [{ label: "Updating", value: "", icon: Loader2 }] : []),
+        ]}
+        toolbar={
+          <div className="relative w-full">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by supplier, PO number, SKU, item, or linked order..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+        }
+      />
 
-      {fetchedAt && (
-        <p className="text-xs text-muted-foreground">
-          {isCached ? "Cached" : "Live from Zoho"} · updated {format(new Date(fetchedAt), "dd MMM yyyy HH:mm")}
-          {" · live · auto-updates every 5 minutes · POs disappear once a vendor bill is raised"}
-        </p>
-      )}
-
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search by supplier, PO number, SKU, item, or linked order..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-9"
-        />
-      </div>
 
       {vendorGroups.length === 0 ? (
         <Card>
