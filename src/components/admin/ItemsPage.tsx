@@ -325,37 +325,35 @@ const ItemsPage = () => {
         </Card>
       )}
 
-      {/* Header */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search items..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-9 h-9"
-          />
-        </div>
-        <div className="flex items-center gap-2">
-          <Button 
-            onClick={handleImportCSV} 
-            size="sm" 
-            variant="outline"
-            disabled={importing}
-          >
-            <Upload className="h-4 w-4 mr-1" />
-            Import CSV
-          </Button>
-          <Button onClick={openCreateDialog} size="sm">
-            <Plus className="h-4 w-4 mr-1" />
-            Add Item
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        title="Items"
+        icon={Package}
+        description={`Showing ${rangeStart}-${rangeEnd} of ${totalCount} catalogue items`}
+        actions={
+          <>
+            <Button onClick={handleImportCSV} variant="outline" disabled={importing}>
+              <Upload className="h-4 w-4 mr-2" />
+              Import CSV
+            </Button>
+            <Button onClick={openCreateDialog}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Item
+            </Button>
+          </>
+        }
+        toolbar={
+          <div className="relative w-full sm:max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search items..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+        }
+      />
 
-      <div className="text-sm text-muted-foreground">
-        Showing {rangeStart}-{rangeEnd} of {totalCount}
-      </div>
 
       {/* Table */}
       <Card>
