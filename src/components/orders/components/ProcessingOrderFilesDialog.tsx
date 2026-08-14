@@ -291,10 +291,10 @@ export default function ProcessingOrderFilesDialog({
     }
     
     return (
-      <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 space-y-4">
+      <div className="border-2 border-dashed border-border rounded-lg p-6 space-y-4">
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="flex-1">
-            <Label htmlFor={inputId} className="text-sm font-medium text-gray-700">
+            <Label htmlFor={inputId} className="text-sm font-medium text-foreground">
               Upload {fileTypeLabels[fileType]}
             </Label>
             <div className="mt-1">
@@ -313,14 +313,14 @@ export default function ProcessingOrderFilesDialog({
                 className="w-full"
               />
             </div>
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               Supported formats: PDF, DOC, DOCX, XLS, XLSX, CSV, PNG, JPG, JPEG, GIF, ZIP, RAR (Max 10MB)
             </p>
           </div>
         </div>
         
         {uploadingFiles[fileType] && (
-          <div className="flex items-center gap-2 text-sm text-gray-600">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Upload className="h-4 w-4 animate-spin" />
             Uploading...
           </div>
@@ -340,7 +340,7 @@ export default function ProcessingOrderFilesDialog({
         }`} />
         <div>
           <p className="font-medium">{file.file_name}</p>
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-muted-foreground">
             Uploaded by {file.uploaded_by_role} • {new Date(file.created_at).toLocaleDateString()}
           </p>
         </div>
@@ -451,7 +451,7 @@ export default function ProcessingOrderFilesDialog({
                 <FileRow key={file.id} file={file} />
               ))}
               {getFilesByType('quote').length === 0 && (
-                <p className="text-center text-gray-500 py-8">No quote files uploaded yet.</p>
+                <p className="text-center text-muted-foreground py-8">No quote files uploaded yet.</p>
               )}
             </div>
 
@@ -469,7 +469,7 @@ export default function ProcessingOrderFilesDialog({
                 <FileRow key={file.id} file={file} />
               ))}
               {getFilesByType('purchase-order').length === 0 && (
-                <p className="text-center text-gray-500 py-8">No purchase order files uploaded yet.</p>
+                <p className="text-center text-muted-foreground py-8">No purchase order files uploaded yet.</p>
               )}
             </div>
 
@@ -487,7 +487,7 @@ export default function ProcessingOrderFilesDialog({
                 <FileRow key={file.id} file={file} />
               ))}
               {getFilesByType('invoice').length === 0 && (
-                <p className="text-center text-gray-500 py-8">No invoice files uploaded yet.</p>
+                <p className="text-center text-muted-foreground py-8">No invoice files uploaded yet.</p>
               )}
             </div>
 
@@ -505,7 +505,7 @@ export default function ProcessingOrderFilesDialog({
                 <FileRow key={file.id} file={file} />
               ))}
               {getFilesByType('delivery-note').length === 0 && (
-                <p className="text-center text-gray-500 py-8">No delivery note files uploaded yet.</p>
+                <p className="text-center text-muted-foreground py-8">No delivery note files uploaded yet.</p>
               )}
             </div>
 

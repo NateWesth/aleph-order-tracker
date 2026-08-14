@@ -253,7 +253,7 @@ export default function CompletedOrderEmailDialog({
           <div className="space-y-6">
             {/* Order info */}
             <div className="bg-muted/50 p-4 rounded-lg">
-              <h3 className="font-medium mb-2">Order Details</h3>
+              <h3 className="font-medium mb-2 text-sm">Order Details</h3>
               <p className="text-sm text-muted-foreground">
                 Order #{order?.orderNumber} for {order?.companyName}
               </p>

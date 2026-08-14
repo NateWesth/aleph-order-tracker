@@ -26,7 +26,7 @@ export const ClientCompanyDisplay = ({
         <Input 
           value={userCompany ? `${userCompany.name} (${userCompany.code})` : "No company assigned"} 
           readOnly 
-          className="bg-gray-50"
+          className="bg-muted"
         />
       </FormControl>
       <input 

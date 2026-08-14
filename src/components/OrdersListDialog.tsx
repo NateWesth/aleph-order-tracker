@@ -108,7 +108,7 @@ export const OrdersListDialog: React.FC<OrdersListDialogProps> = ({
       case 'completed':
         return 'bg-green-100 text-green-800 border-green-200';
       default:
-        return 'bg-gray-100 text-gray-800 border-gray-200';
+        return 'bg-muted text-muted-foreground border-border';
     }
   };
 
@@ -121,9 +121,9 @@ export const OrdersListDialog: React.FC<OrdersListDialogProps> = ({
       case 'normal':
         return 'bg-blue-100 text-blue-800 border-blue-200';
       case 'low':
-        return 'bg-gray-100 text-gray-800 border-gray-200';
+        return 'bg-muted text-muted-foreground border-border';
       default:
-        return 'bg-gray-100 text-gray-800 border-gray-200';
+        return 'bg-muted text-muted-foreground border-border';
     }
   };
 

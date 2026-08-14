@@ -116,16 +116,16 @@ export default function Portal() {
     switch (status?.toLowerCase()) {
       case "completed":
       case "delivered":
-        return "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400";
+        return "bg-success/10 text-success dark:bg-success/20";
       case "in-progress":
       case "processing":
-        return "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400";
+        return "bg-info/10 text-info dark:bg-info/20";
       case "in-stock":
-        return "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400";
+        return "bg-[hsl(var(--ribbon-4))]/10 text-[hsl(var(--ribbon-4))] dark:bg-[hsl(var(--ribbon-4))]/20";
       case "ordered":
-        return "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400";
+        return "bg-warning/10 text-warning dark:bg-warning/20";
       case "ready":
-        return "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400";
+        return "bg-[hsl(var(--ribbon-2))]/10 text-[hsl(var(--ribbon-2))] dark:bg-[hsl(var(--ribbon-2))]/20";
       default:
         return "bg-muted text-muted-foreground";
     }
@@ -145,15 +145,15 @@ export default function Portal() {
   const getProgressColor = (stage: string) => {
     switch (stage) {
       case "completed":
-        return "bg-emerald-500";
+        return "bg-success";
       case "delivery":
-        return "bg-orange-500";
+        return "bg-[hsl(var(--ribbon-6))]";
       case "packing":
-        return "bg-purple-500";
+        return "bg-[hsl(var(--ribbon-2))]";
       case "in-stock":
-        return "bg-blue-500";
+        return "bg-info";
       default:
-        return "bg-amber-500";
+        return "bg-warning";
     }
   };
 
@@ -177,10 +177,18 @@ export default function Portal() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="sticky top-0 z-50 border-b bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
+        <div className="ribbon-bar" aria-hidden />
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div>
-            <h1 className="text-lg font-bold text-foreground">Aleph Orders</h1>
-            <p className="text-xs text-muted-foreground">{companyName}</p>
+          <div className="flex items-center gap-2.5">
+            <img
+              src="/lovable-uploads/e1088147-889e-43f6-bdf0-271189b88913.png"
+              alt="Aleph"
+              className="h-8 w-8 shrink-0"
+            />
+            <div>
+              <h1 className="text-lg font-bold text-foreground leading-tight">Aleph Orders</h1>
+              <p className="text-xs text-muted-foreground">{companyName}</p>
+            </div>
           </div>
           <Button variant="ghost" size="sm" onClick={handleSignOut}>
             <LogOut className="h-4 w-4 mr-1.5" />
