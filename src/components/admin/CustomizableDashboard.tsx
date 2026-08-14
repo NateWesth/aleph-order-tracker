@@ -37,6 +37,13 @@ import { cn } from "@/lib/utils";
 
 const LAYOUT_KEY = "dashboard-widget-layout";
 
+function getGreeting() {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Good morning";
+  if (hour < 18) return "Good afternoon";
+  return "Good evening";
+}
+
 const toTransformString = (
   transform: { x: number; y: number; scaleX?: number; scaleY?: number } | null
 ) => {
@@ -486,29 +493,32 @@ export default function CustomizableDashboard({ userName, onNavigate }: Customiz
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Greeting + Controls */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
-            Welcome{userName ? `, ${userName}` : ''}
-          </h1>
-          <p className="text-muted-foreground mt-1">Here's what's happening with your orders today.</p>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <Button
-            variant={isEditing ? "default" : "outline"}
-            size="sm"
-            onClick={() => setIsEditing(!isEditing)}
-            className="rounded-xl gap-1.5"
-          >
-            <LayoutGrid className="h-3.5 w-3.5" />
-            {isEditing ? "Done" : "Customize"}
-          </Button>
-          {isEditing && (
-            <Button variant="ghost" size="sm" onClick={resetLayout} className="rounded-xl gap-1.5 text-muted-foreground">
-              <RotateCcw className="h-3.5 w-3.5" />
-              Reset
+      <div className="relative overflow-hidden rounded-2xl border-2 border-border bg-card shadow-soft">
+        <div className="ribbon-bar" aria-hidden />
+        <div className="flex items-start justify-between gap-4 p-5 sm:p-6">
+          <div>
+            <h1 className="font-display text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
+              {getGreeting()}{userName ? `, ${userName.split(' ')[0]}` : ''}
+            </h1>
+            <p className="text-muted-foreground mt-1">Here's what's happening with your orders today.</p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <Button
+              variant={isEditing ? "default" : "outline"}
+              size="sm"
+              onClick={() => setIsEditing(!isEditing)}
+              className="rounded-xl gap-1.5"
+            >
+              <LayoutGrid className="h-3.5 w-3.5" />
+              {isEditing ? "Done" : "Customize"}
             </Button>
-          )}
+            {isEditing && (
+              <Button variant="ghost" size="sm" onClick={resetLayout} className="rounded-xl gap-1.5 text-muted-foreground">
+                <RotateCcw className="h-3.5 w-3.5" />
+                Reset
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 

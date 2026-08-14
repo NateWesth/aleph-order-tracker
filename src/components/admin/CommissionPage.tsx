@@ -17,7 +17,8 @@ import {
 import { format, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { Printer, AlertTriangle } from "lucide-react";
+import { Printer, AlertTriangle, Percent } from "lucide-react";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { UnresolvedCostsPanel, saveCost as saveOverrideCost } from "./UnresolvedCostsPanel";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import CommissionRepManagementDialog from "./CommissionRepManagementDialog";
@@ -1153,6 +1154,11 @@ const CommissionPage = () => {
 
   return (
     <div className="space-y-4">
+      <PageHeader
+        title="Commission"
+        icon={Percent}
+        description="Monthly rep commission reports and rate management."
+      />
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="report"><FileText className="h-4 w-4 mr-1.5" />Commission Report</TabsTrigger>
@@ -1171,7 +1177,7 @@ const CommissionPage = () => {
           </div>
 
           {reportNotice && (
-            <div className="flex items-start gap-2 p-3 rounded-lg border border-amber-500/40 bg-amber-500/10 text-sm text-amber-700 dark:text-amber-300">
+            <div className="flex items-start gap-2 p-3 rounded-lg border-2 border-warning/30 bg-warning/10 text-sm text-warning">
               <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
               <p>{reportNotice}</p>
             </div>

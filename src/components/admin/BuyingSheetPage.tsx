@@ -1116,15 +1116,17 @@ export default function BuyingSheetPage() {
       <div className={`space-y-4 ${isFullscreen ? "fixed inset-0 z-50 bg-background p-4 overflow-auto" : ""}`} ref={printRef}>
         {/* ── Sticky Header ── */}
         <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm pb-3 -mx-1 px-1 border-b border-transparent">
-          <div className="flex flex-col gap-3">
+          <div className="rounded-2xl border-2 border-border bg-card shadow-soft overflow-hidden mb-3">
+            <div className="ribbon-bar" aria-hidden />
+            <div className="flex flex-col gap-3 p-4">
             {/* Title + actions row */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
               <div className="flex items-center gap-2.5 flex-wrap">
-                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/15">
-                  <ShoppingCart className="h-[18px] w-[18px]" />
+                <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary ring-1 ring-primary/15 shadow-sm">
+                  <ShoppingCart className="h-5 w-5" />
                 </span>
                 <div>
-                  <h1 className="text-xl font-bold tracking-tight leading-tight">Buying Sheet</h1>
+                  <h1 className="font-display text-xl font-bold tracking-tight leading-tight">Buying Sheet</h1>
                   <p className="text-xs text-muted-foreground">
                     {filteredRows.length} SKUs to review
                     {zohoLoading && " · syncing Zoho..."}
@@ -1190,6 +1192,7 @@ export default function BuyingSheetPage() {
               <Button variant={showOnlyNeedOrder ? "default" : "outline"} size="sm" onClick={() => setShowOnlyNeedOrder(!showOnlyNeedOrder)} className="h-8 text-xs gap-1.5 whitespace-nowrap">
                 <AlertTriangle className="h-3.5 w-3.5" />{showOnlyNeedOrder ? "Needs Order" : "Show All"}
               </Button>
+            </div>
             </div>
           </div>
         </div>
