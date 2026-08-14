@@ -264,7 +264,7 @@ export default function FilesPage({ isAdmin }: FilesPageProps) {
       {/* Files by Month */}
       <div className="space-y-4">
         {monthGroups.length === 0 && (
-          <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
+          <div className="bg-card rounded-lg shadow-soft p-8 text-center text-muted-foreground">
             No completed order files found.
           </div>
         )}
@@ -273,7 +273,7 @@ export default function FilesPage({ isAdmin }: FilesPageProps) {
           <div key={monthGroup.month} className="bg-white rounded-lg shadow">
             <Collapsible open={monthGroup.isOpen} onOpenChange={() => toggleMonthGroup(monthIndex)}>
               <CollapsibleTrigger asChild>
-                <div className="p-4 border-b cursor-pointer hover:bg-gray-50 flex items-center justify-between">
+                <div className="p-4 border-b cursor-pointer hover:bg-muted flex items-center justify-between">
                   <div className="flex items-center space-x-2">
                     {monthGroup.isOpen ? (
                       <ChevronDown className="h-4 w-4" />
@@ -292,8 +292,8 @@ export default function FilesPage({ isAdmin }: FilesPageProps) {
                     <div key={orderFile.orderNumber} className="p-4">
                       <div className="mb-3">
                         <h3 className="font-medium text-aleph-blue">Order #{orderFile.orderNumber}</h3>
-                        <p className="text-sm text-gray-600">{orderFile.companyName}</p>
-                        <p className="text-sm text-gray-500">
+                        <p className="text-sm text-muted-foreground">{orderFile.companyName}</p>
+                        <p className="text-sm text-muted-foreground">
                           Completed: {format(orderFile.completedDate, 'MMM d, yyyy')}
                         </p>
                         <Badge variant="outline" className="mt-1">
@@ -302,7 +302,7 @@ export default function FilesPage({ isAdmin }: FilesPageProps) {
                       </div>
                       
                       {orderFile.files.length === 0 ? (
-                        <p className="text-sm text-gray-500 italic">No files uploaded for this order</p>
+                        <p className="text-sm text-muted-foreground italic">No files uploaded for this order</p>
                       ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                           {orderFile.files.map((file) => (
@@ -311,7 +311,7 @@ export default function FilesPage({ isAdmin }: FilesPageProps) {
                                 <FileText className="h-8 w-8 text-aleph-blue mr-2 flex-shrink-0" />
                                 <div className="flex-grow min-w-0">
                                   <h4 className="font-medium truncate text-sm" title={file.name}>{file.name}</h4>
-                                  <div className="flex items-center text-xs text-gray-500 mt-1">
+                                  <div className="flex items-center text-xs text-muted-foreground mt-1">
                                     <span className="capitalize">{file.type.replace('-', ' ')}</span>
                                     <span className="mx-1">•</span>
                                     <span>{format(file.uploadDate, 'MMM d')}</span>

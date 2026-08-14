@@ -117,7 +117,7 @@ export default function ChangelogDialog({ open, onOpenChange }: Props) {
                     </Badge>
                     <span className="text-xs text-muted-foreground">{entry.date}</span>
                   </div>
-                  <h3 className="mt-1 font-medium">{entry.title}</h3>
+                  <h3 className="mt-1 font-medium text-sm">{entry.title}</h3>
                   <ul className="mt-2 space-y-1 text-sm text-muted-foreground list-disc list-inside marker:text-primary/60">
                     {entry.items.map((item, i) => <li key={i}>{item}</li>)}
                   </ul>

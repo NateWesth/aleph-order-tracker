@@ -144,7 +144,7 @@ export default function TodoList() {
       case 'processing':
         return 'bg-purple-100 text-purple-800';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-muted text-muted-foreground';
     }
   };
   const formatDate = (dateString: string) => {
@@ -195,9 +195,9 @@ export default function TodoList() {
       </CardHeader>
       <CardContent>
         {items.length === 0 ? <div className="text-center py-4">
-            <div className="text-sm text-gray-500">{emptyMessage}</div>
+            <div className="text-sm text-muted-foreground">{emptyMessage}</div>
           </div> : <div className="space-y-3 max-h-64 overflow-y-auto">
-            {items.map(item => <div key={item.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => handleOrderClick(item)}>
+            {items.map(item => <div key={item.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted transition-colors cursor-pointer" onClick={() => handleOrderClick(item)}>
                 <div className="flex items-center gap-3 flex-1">
                   {getPriorityIcon(item.priority)}
                   <div className="flex-1">
@@ -209,14 +209,14 @@ export default function TodoList() {
                       {item.urgency === 'urgent' && <Badge variant="outline" className="bg-red-100 text-red-800">
                           Urgent
                         </Badge>}
-                      {item.progress_stage && <Badge variant="outline" className="bg-gray-100 text-gray-800">
+                      {item.progress_stage && <Badge variant="outline" className="bg-muted text-muted-foreground">
                           {item.progress_stage}
                         </Badge>}
                     </div>
-                    <div className="text-sm text-gray-600">
+                    <div className="text-sm text-muted-foreground">
                       {item.action_needed} • {item.company_name}
                     </div>
-                    <div className="text-xs text-gray-500">
+                    <div className="text-xs text-muted-foreground">
                       Created: {formatDate(item.created_at)}
                     </div>
                   </div>
@@ -232,8 +232,8 @@ export default function TodoList() {
     </Card>;
   return <div className="space-y-6 w-full">
       <div className="text-center">
-        <h2 className="text-lg font-semibold text-gray-800 mb-2">Order Management Dashboard</h2>
-        <p className="text-sm text-gray-600">Track and manage orders across different stages</p>
+        <h2 className="text-lg font-semibold text-foreground mb-2">Order Management Dashboard</h2>
+        <p className="text-sm text-muted-foreground">Track and manage orders across different stages</p>
       </div>
       
       {/* Priority Section */}
@@ -247,7 +247,7 @@ export default function TodoList() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3 max-h-64 overflow-y-auto">
-                {priorityItems.map(item => <div key={item.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => handleOrderClick(item)}>
+                {priorityItems.map(item => <div key={item.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted transition-colors cursor-pointer" onClick={() => handleOrderClick(item)}>
                     <div className="flex items-center gap-3 flex-1">
                       {getPriorityIcon(item.priority)}
                       <div className="flex-1">
@@ -259,14 +259,14 @@ export default function TodoList() {
                           {item.urgency === 'urgent' && <Badge variant="outline" className="bg-red-100 text-red-800">
                               Urgent
                             </Badge>}
-                          {item.progress_stage && <Badge variant="outline" className="bg-gray-100 text-gray-800">
+                          {item.progress_stage && <Badge variant="outline" className="bg-muted text-muted-foreground">
                               {item.progress_stage}
                             </Badge>}
                         </div>
-                        <div className="text-sm text-gray-600">
+                        <div className="text-sm text-muted-foreground">
                           {item.action_needed} • {item.company_name}
                         </div>
-                        <div className="text-xs text-gray-500">
+                        <div className="text-xs text-muted-foreground">
                           Created: {formatDate(item.created_at)}
                         </div>
                       </div>
@@ -293,8 +293,8 @@ export default function TodoList() {
       {todoItems.length === 0 && <Card>
           <CardContent className="text-center py-8">
             <CheckCircle className="h-12 w-12 text-aleph-green mx-auto mb-4" />
-            <div className="text-lg font-medium text-gray-600">All caught up!</div>
-            <div className="text-sm text-gray-500">No orders need immediate attention</div>
+            <div className="text-lg font-medium text-muted-foreground">All caught up!</div>
+            <div className="text-sm text-muted-foreground">No orders need immediate attention</div>
           </CardContent>
         </Card>}
     </div>;

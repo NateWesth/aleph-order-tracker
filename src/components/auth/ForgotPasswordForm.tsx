@@ -74,7 +74,7 @@ const ForgotPasswordForm = ({ onSuccess }: ForgotPasswordFormProps) => {
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-        <p className="text-sm text-gray-600 mb-4">
+        <p className="text-sm text-muted-foreground mb-4">
           Enter your email address and we'll send you a link to reset your password.
         </p>
         

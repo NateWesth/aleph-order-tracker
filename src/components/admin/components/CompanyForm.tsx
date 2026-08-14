@@ -144,8 +144,8 @@ export default function CompanyForm({ form, onSubmit, isEdit = false }: CompanyF
         </div>
 
         {!isEdit && (
-          <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-md">
-            <p className="text-sm text-gray-600 dark:text-gray-300">
+          <div className="bg-muted p-3 rounded-md">
+            <p className="text-sm text-muted-foreground">
               A unique company code will be automatically generated when you add this company.
               Client users will need this code to link their account to this company during registration.
             </p>
