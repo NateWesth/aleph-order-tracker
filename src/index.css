@@ -888,9 +888,9 @@ body,
 .overflow-auto,
 .overflow-x-auto {
   -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
   scrollbar-width: thin;
 }
+
 
 /* Slimmer, calmer scrollbars that fade in on hover */
 ::-webkit-scrollbar-thumb {
