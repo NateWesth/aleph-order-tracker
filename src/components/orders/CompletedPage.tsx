@@ -18,6 +18,8 @@ import {
 } from "@/components/ui/select";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { format } from "date-fns";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { CheckCircle2 } from "lucide-react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
@@ -251,40 +253,39 @@ export default function CompletedPage({
 
   return (
     <PullToRefresh onRefresh={fetchCompletedOrders} className="w-full">
-      <div className={`flex flex-col gap-2 ${isMobile ? 'mb-3' : 'gap-4 mb-6'}`}>
-        <div className="flex items-center justify-between">
-          <h1 className={`font-bold text-foreground ${isMobile ? 'text-base' : 'text-lg md:text-xl'}`}>
-            Order History
-          </h1>
-          <span className="text-sm text-muted-foreground">
-            {filteredOrders.length} order{filteredOrders.length !== 1 ? 's' : ''}
-          </span>
-        </div>
-        
-        <div className={`flex ${isMobile ? 'flex-col' : 'flex-row'} gap-2`}>
-          <div className="flex-1">
-            <OrdersHeader 
-              searchTerm={searchTerm} 
-              onSearchChange={setInternalSearchTerm}
-            />
-          </div>
-          
-          {userRole === 'admin' && companies.length > 0 && (
-            <Select value={selectedCompanyFilter} onValueChange={setSelectedCompanyFilter}>
-              <SelectTrigger className={`${isMobile ? 'w-full' : 'w-48'}`}>
-                <SelectValue placeholder="All Companies" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Companies</SelectItem>
-                {companies.map((company) => (
-                  <SelectItem key={company.id} value={company.id}>
-                    {company.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-        </div>
+      <div className={isMobile ? 'mb-3' : 'mb-6'}>
+        <PageHeader
+          title="Order History"
+          icon={CheckCircle2}
+          description="Completed orders, grouped by month."
+          stats={[{ label: filteredOrders.length !== 1 ? 'orders' : 'order', value: filteredOrders.length, icon: CheckCircle2 }]}
+          toolbar={
+            <div className={`flex ${isMobile ? 'flex-col' : 'flex-row'} gap-2 w-full`}>
+              <div className="flex-1">
+                <OrdersHeader
+                  searchTerm={searchTerm}
+                  onSearchChange={setInternalSearchTerm}
+                />
+              </div>
+
+              {userRole === 'admin' && companies.length > 0 && (
+                <Select value={selectedCompanyFilter} onValueChange={setSelectedCompanyFilter}>
+                  <SelectTrigger className={`${isMobile ? 'w-full' : 'w-48'}`}>
+                    <SelectValue placeholder="All Companies" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Companies</SelectItem>
+                    {companies.map((company) => (
+                      <SelectItem key={company.id} value={company.id}>
+                        {company.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+          }
+        />
       </div>
 
       {loading ? (

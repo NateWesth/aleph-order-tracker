@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { User, Shield, Search, Check, X, Clock, UserCog, Percent } from "lucide-react";
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
+import { PageHeader } from "@/components/ui/PageHeader";
 
 interface UserProfile {
   id: string;
@@ -192,30 +193,35 @@ export default function UsersManagementPage() {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-8">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-primary">User Management</h1>
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-          <Input
-            placeholder="Search users..."
-            className="pl-10 w-64"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="User Management"
+        icon={UserCog}
+        description="Approve requests and manage team access."
+        stats={[{ label: "users", value: users.length, icon: User }]}
+        toolbar={
+          <div className="relative w-full sm:max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
+            <Input
+              placeholder="Search users..."
+              className="pl-9"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+        }
+      />
 
       {/* Pending Approval Section */}
       {pendingUsers.length > 0 && (
-        <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-lg p-4 border border-yellow-200 dark:border-yellow-800">
+        <div className="bg-warning/10 rounded-2xl p-4 border-2 border-warning/20">
           <div className="flex items-center gap-2 mb-4">
-            <Clock className="h-5 w-5 text-yellow-600" />
-            <h2 className="text-lg font-semibold text-yellow-800 dark:text-yellow-200">
+            <Clock className="h-5 w-5 text-warning" />
+            <h2 className="font-display text-lg font-semibold text-warning">
               Pending Approval ({pendingUsers.length})
             </h2>
           </div>
-          <div className="bg-card rounded-lg shadow">
+          <div className="bg-card rounded-xl shadow-soft">
             <Table>
               <TableHeader>
                 <TableRow>
