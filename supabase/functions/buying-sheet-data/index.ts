@@ -42,10 +42,23 @@ type VendorCandidate = VendorSummary & {
   poDate: string
 }
 
+const CACHE_ID = 'buying-sheet'
+const CACHE_TTL_MS = 15 * 60 * 1000
+
+async function readCache(supabase: any) {
+  const { data } = await supabase
+    .from('buying_sheet_cache')
+    .select('payload, fetched_at')
+    .eq('id', CACHE_ID)
+    .maybeSingle()
+  return data as { payload: any; fetched_at: string } | null
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
+
 
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL')!,
