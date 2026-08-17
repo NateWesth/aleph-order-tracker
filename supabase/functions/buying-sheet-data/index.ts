@@ -185,21 +185,49 @@ Deno.serve(async (req) => {
       }
     }
 
+    const fetchedAt = new Date().toISOString()
+    await supabase.from('buying_sheet_cache').upsert({
+      id: CACHE_ID,
+      payload: result,
+      fetched_at: fetchedAt,
+    })
+
     return new Response(JSON.stringify({
       success: true,
       data: result,
       itemCount: activeSkus.size,
+      fetchedAt,
+      cached: false,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (error) {
     console.error('Buying sheet data error:', error)
+
+    // Zoho quota / transient failure: fall back to the last known good snapshot
+    // instead of blanking the page with a 500.
+    try {
+      const cached = await readCache(supabase)
+      if (cached?.payload) {
+        return new Response(JSON.stringify({
+          success: true,
+          data: cached.payload,
+          itemCount: Object.keys(cached.payload || {}).length,
+          fetchedAt: cached.fetched_at,
+          cached: true,
+          stale: true,
+          warning: error instanceof Error ? error.message : 'Zoho unavailable',
+        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+    } catch (_e) { /* ignore */ }
+
     return new Response(JSON.stringify({
       error: error instanceof Error ? error.message : 'Failed to fetch Zoho data',
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
+
   }
 })
 
