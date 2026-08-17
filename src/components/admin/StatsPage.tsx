@@ -314,7 +314,7 @@ export default function StatsPage() {
       {/* Main Charts Row */}
       <div className="grid lg:grid-cols-3 gap-4">
         {/* Orders Trend */}
-        <div className="lg:col-span-2 bg-card border border-border rounded-xl p-5">
+        <div className="lg:col-span-2 bg-card border-2 border-border rounded-2xl p-5 shadow-soft">
           <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
             <BarChart3 className="h-4 w-4 text-primary" />
             Orders Over Time
@@ -356,7 +356,7 @@ export default function StatsPage() {
         </div>
 
         {/* Status Breakdown */}
-        <div className="bg-card border border-border rounded-xl p-5">
+        <div className="bg-card border-2 border-border rounded-2xl p-5 shadow-soft">
           <h3 className="text-sm font-semibold mb-4">Status Breakdown</h3>
           {stats.ordersByStatus.length > 0 ? (
             <div className="space-y-4">
@@ -397,7 +397,7 @@ export default function StatsPage() {
       {/* Most Popular Items & Top Clients */}
       <div className="grid lg:grid-cols-2 gap-4">
         {/* Most Popular Items */}
-        <div className="bg-card border border-border rounded-xl p-5">
+        <div className="bg-card border-2 border-border rounded-2xl p-5 shadow-soft">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-semibold flex items-center gap-2">
               <Award className="h-4 w-4 text-primary" />
@@ -465,7 +465,7 @@ export default function StatsPage() {
         </div>
 
         {/* Top Clients */}
-        <div className="bg-card border border-border rounded-xl p-5">
+        <div className="bg-card border-2 border-border rounded-2xl p-5 shadow-soft">
           <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
             <Users className="h-4 w-4 text-primary" />
             Top Clients
@@ -526,20 +526,20 @@ function KPICard({
 }) {
   return (
     <div className={cn(
-      "rounded-xl border p-4 transition-all",
+      "rounded-2xl border-2 p-4 transition-all shadow-soft hover:shadow-soft-lg hover:-translate-y-0.5",
       accent 
         ? "bg-primary/5 border-primary/20" 
         : "bg-card border-border",
       className
     )}>
       <div className={cn(
-        "inline-flex items-center justify-center w-7 h-7 rounded-lg mb-3",
+        "inline-flex items-center justify-center w-8 h-8 rounded-xl mb-3",
         accent ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"
       )}>
         {icon}
       </div>
-      <p className="text-xl font-bold tracking-tight">{value}</p>
-      <p className="text-[11px] text-muted-foreground mt-0.5">{label}</p>
+      <p className="font-display text-2xl font-bold tracking-tight">{value}</p>
+      <p className="text-[11px] text-muted-foreground mt-0.5 font-medium">{label}</p>
     </div>
   );
 }

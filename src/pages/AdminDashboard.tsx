@@ -293,10 +293,9 @@ const AdminDashboard = () => {
       </header>
 
       {/* Main content area with activity sidebar */}
-      <div className="flex-1 flex w-full">
+      <div className="flex-1 flex min-h-0 overflow-hidden">
         {/* Main content - Add bottom padding on mobile for bottom nav */}
-        <main className="flex-1 overflow-x-hidden w-full pb-16 sm:pb-0">
-
+        <main className="flex-1 min-h-0 overflow-x-hidden overflow-y-auto w-full pb-16 sm:pb-0">
           <div
             className={cn(
               "w-full px-3 sm:px-5 lg:px-6 py-4 sm:py-6",

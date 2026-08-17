@@ -7,7 +7,13 @@ const corsHeaders = {
 
 const ZOHO_AUTH_URL = 'https://accounts.zoho.com/oauth/v2'
 const ZOHO_API_URL = 'https://www.zohoapis.com'
-const OPEN_PO_STATUSES = ['open', 'draft']
+// Statuses that mean a PO can no longer contribute outstanding quantity.
+// IMPORTANT: this must NOT be a narrow "which statuses count as open" allow-list -
+// Zoho marks a PO 'partially_billed' (not 'open') once any of it has been billed,
+// even though it can still have plenty of outstanding quantity left. An allow-list
+// of just ['open', 'draft'] silently drops every partially-billed PO, which is why
+// "on order" quantities were showing as 0 for items with in-progress purchase orders.
+const EXCLUDED_PO_STATUSES = ['cancelled', 'closed', 'rejected', 'draft', 'void', 'billed']
 const MAX_RECENT_PO_DETAILS = 100
 const MAX_RECENT_BILL_DETAILS = 150
 
@@ -230,44 +236,60 @@ async function fetchOpenPurchaseOrderData(accessToken: string, orgId: string, ac
   const poQtyMap = new Map<string, number>()
   const poVendorMap = new Map<string, VendorCandidate>()
 
-  for (const status of OPEN_PO_STATUSES) {
-    let page = 1
-    let hasMore = true
+  let page = 1
+  let hasMore = true
 
-    while (hasMore) {
-      const data = await fetchZohoPage(
-        accessToken,
-        `${ZOHO_API_URL}/books/v3/purchaseorders?organization_id=${orgId}&status=${status}&page=${page}&per_page=200`
-      )
+  while (hasMore) {
+    const data = await fetchZohoPage(
+      accessToken,
+      `${ZOHO_API_URL}/books/v3/purchaseorders?organization_id=${orgId}&page=${page}&per_page=200`
+    )
 
-      const purchaseOrders = data.purchaseorders || []
-      if (!purchaseOrders.length) {
-        hasMore = false
-        break
-      }
+    const purchaseOrders = data.purchaseorders || []
+    if (!purchaseOrders.length) {
+      hasMore = false
+      break
+    }
 
-      for (const poSummary of purchaseOrders) {
-        const po = await fetchPurchaseOrderDetail(accessToken, orgId, poSummary.purchaseorder_id)
-        const vendorName = po.vendor_name || poSummary.vendor_name || ''
-        const vendorEmail = po.vendor_email || poSummary.vendor_email || ''
-        const poDate = extractPoDate(po, poSummary)
-        const lineItems = Array.isArray(po.line_items) ? po.line_items : []
+    for (const poSummary of purchaseOrders) {
+      const summaryStatus = String(poSummary.status || '').toLowerCase()
+      const summaryBilled = String(poSummary.billed_status || '').toLowerCase()
+      if (EXCLUDED_PO_STATUSES.includes(summaryStatus)) continue
+      if (summaryBilled === 'billed') continue
 
-        for (const lineItem of lineItems) {
-          const sku = normalizeSku(lineItem.sku || lineItem.item_id)
-          if (!sku || !activeSkus.has(sku)) continue
+      const po = await fetchPurchaseOrderDetail(accessToken, orgId, poSummary.purchaseorder_id)
+      const status = String(po.status || summaryStatus).toLowerCase()
+      const billedStatus = String(po.billed_status || summaryBilled).toLowerCase()
+      if (EXCLUDED_PO_STATUSES.includes(status)) continue
+      if (billedStatus === 'billed') continue
 
-          poQtyMap.set(sku, (poQtyMap.get(sku) || 0) + Number(lineItem.quantity || 0))
+      const vendorName = po.vendor_name || poSummary.vendor_name || ''
+      const vendorEmail = po.vendor_email || poSummary.vendor_email || ''
+      const poDate = extractPoDate(po, poSummary)
+      const lineItems = Array.isArray(po.line_items) ? po.line_items : []
 
-          if (vendorName) {
-            upsertLatestVendor(poVendorMap, sku, { vendorName, vendorEmail, poDate })
-          }
+      for (const lineItem of lineItems) {
+        const sku = normalizeSku(lineItem.sku || lineItem.item_id)
+        if (!sku || !activeSkus.has(sku)) continue
+
+        // Net off whatever's already been billed/received so a partially-billed
+        // PO contributes only its remaining outstanding quantity, not the full
+        // original order quantity.
+        const quantity = Number(lineItem.quantity || 0)
+        const billed = Number(lineItem.quantity_billed ?? 0)
+        const outstanding = Math.max(0, quantity - billed)
+        if (outstanding <= 0) continue
+
+        poQtyMap.set(sku, (poQtyMap.get(sku) || 0) + outstanding)
+
+        if (vendorName) {
+          upsertLatestVendor(poVendorMap, sku, { vendorName, vendorEmail, poDate })
         }
       }
-
-      hasMore = data.page_context?.has_more_page ?? false
-      page++
     }
+
+    hasMore = data.page_context?.has_more_page ?? false
+    page++
   }
 
   return { poQtyMap, poVendorMap }

@@ -24,15 +24,15 @@ interface CompanyTableProps {
 
 export default function CompanyTable({ companies, onCopyCode, onEditCompany, onDeleteCompany }: CompanyTableProps) {
   return (
-    <div className="float-surface glass-card glow-border overflow-hidden">
+    <div className="rounded-2xl border-2 border-border bg-card shadow-soft overflow-hidden">
       <table className="w-full text-sm">
         <thead className="bg-muted/50">
-          <tr className="border-b border-border">
-            <th className="px-3 py-2 text-left font-medium text-muted-foreground">Name</th>
-            <th className="px-3 py-2 text-left font-medium text-muted-foreground">Code</th>
-            <th className="px-3 py-2 text-left font-medium text-muted-foreground">Contact</th>
-            <th className="px-3 py-2 text-left font-medium text-muted-foreground">Email</th>
-            <th className="px-3 py-2 text-right font-medium text-muted-foreground">Actions</th>
+          <tr className="border-b-2 border-border">
+            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Name</th>
+            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Code</th>
+            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Contact</th>
+            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Email</th>
+            <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">Actions</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-border">
@@ -44,11 +44,11 @@ export default function CompanyTable({ companies, onCopyCode, onEditCompany, onD
             </tr>
           ) : (
             companies.map((company) => (
-              <tr key={company.id} className="hover:bg-muted/30 transition-colors">
-                <td className="px-3 py-2">
+              <tr key={company.id} className="hover:bg-primary/5 transition-colors">
+                <td className="px-4 py-3">
                   <span className="font-medium text-foreground">{company.name}</span>
                 </td>
-                <td className="px-3 py-2">
+                <td className="px-4 py-3">
                   <button
                     onClick={() => onCopyCode(company.code)}
                     className="inline-flex items-center gap-1 font-mono text-xs bg-muted px-2 py-0.5 rounded hover:bg-muted/80 transition-colors"
@@ -57,13 +57,13 @@ export default function CompanyTable({ companies, onCopyCode, onEditCompany, onD
                     <Copy className="h-3 w-3 text-muted-foreground" />
                   </button>
                 </td>
-                <td className="px-3 py-2 text-muted-foreground">
+                <td className="px-4 py-3 text-muted-foreground">
                   {company.contact_person || '—'}
                 </td>
-                <td className="px-3 py-2 text-muted-foreground">
+                <td className="px-4 py-3 text-muted-foreground">
                   {company.email || '—'}
                 </td>
-                <td className="px-3 py-2">
+                <td className="px-4 py-3">
                   <div className="flex justify-end gap-1">
                     <Button 
                       variant="ghost" 

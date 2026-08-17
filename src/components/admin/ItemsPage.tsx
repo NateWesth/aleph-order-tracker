@@ -357,7 +357,7 @@ const ItemsPage = () => {
 
 
       {/* Table */}
-      <Card>
+      <Card className="border-2 shadow-soft overflow-hidden">
         <CardContent className="p-0">
           <Table>
             <TableHeader>

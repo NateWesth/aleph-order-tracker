@@ -13,7 +13,7 @@ const EXCLUDED_PO_STATUSES = ['cancelled', 'closed', 'rejected', 'draft', 'void'
 // Ignore anything older than this - stale POs are effectively dead
 const MAX_PO_AGE_DAYS = 180
 const MAX_PO_DETAILS = 250
-const DETAIL_CONCURRENCY = 4
+const DETAIL_CONCURRENCY = 8
 const CACHE_TTL_MS = 15 * 60 * 1000
 const CACHE_ID = '00000000-0000-0000-0000-000000000003'
 
@@ -179,8 +179,8 @@ async function fetchOutstandingPurchaseOrders(accessToken: string, orgId: string
         break
       }
 
-      const status = String(summary.status || '').toLowerCase()
-      const billedStatus = String(summary.billed_status || '').toLowerCase()
+      const status = String(summary.status || '').trim().toLowerCase()
+      const billedStatus = String(summary.billed_status || '').trim().toLowerCase()
       if (EXCLUDED_PO_STATUSES.includes(status)) continue
       if (billedStatus === 'billed') continue
       candidates.push(summary)
@@ -211,8 +211,8 @@ async function fetchOutstandingPurchaseOrders(accessToken: string, orgId: string
     for (const entry of details) {
       if (!entry) continue
       const { summary, po } = entry
-      const status = String(po.status || summary.status || '').toLowerCase()
-      const detailBilled = String(po.billed_status || summary.billed_status || '').toLowerCase()
+      const status = String(po.status || summary.status || '').trim().toLowerCase()
+      const detailBilled = String(po.billed_status || summary.billed_status || '').trim().toLowerCase()
       if (EXCLUDED_PO_STATUSES.includes(status)) continue
       if (detailBilled === 'billed') continue
 
@@ -300,27 +300,39 @@ async function fetchBilledQuantities(
   const bills = Array.isArray(po.bills) ? po.bills : []
   if (!bills.length) return map
 
-  for (const b of bills) {
-    const billId = String(b.bill_id || '')
-    if (!billId) continue
-    try {
-      let bill = cache.get(billId)
-      if (!bill) {
-        const data = await fetchZohoPage(
-          accessToken,
-          `${ZOHO_API_URL}/books/v3/bills/${billId}?organization_id=${orgId}`
-        )
-        bill = data.bill || {}
-        cache.set(billId, bill)
+  // Fetch every linked bill for this PO in parallel instead of one at a time -
+  // POs with several bills were previously adding a full serial round trip per
+  // bill on top of an already-limited detail concurrency, which was the main
+  // reason the page took so long to load.
+  const fetched = await Promise.all(
+    bills.map(async (b: any) => {
+      const billId = String(b.bill_id || '')
+      if (!billId) return null
+      try {
+        let bill = cache.get(billId)
+        if (!bill) {
+          const data = await fetchZohoPage(
+            accessToken,
+            `${ZOHO_API_URL}/books/v3/bills/${billId}?organization_id=${orgId}`
+          )
+          bill = data.bill || {}
+          cache.set(billId, bill)
+        }
+        return bill
+      } catch (e) {
+        console.error(`Failed to fetch bill ${billId}:`, e)
+        return null
       }
-      const status = String(bill.status || '').toLowerCase()
-      if (status === 'void' || status === 'cancelled') continue
-      for (const bl of bill.line_items || []) {
-        const key = lineKey(bl.sku, bl.name, bl.description)
-        map.set(key, (map.get(key) ?? 0) + Number(bl.quantity || 0))
-      }
-    } catch (e) {
-      console.error(`Failed to fetch bill ${billId}:`, e)
+    })
+  )
+
+  for (const bill of fetched) {
+    if (!bill) continue
+    const status = String(bill.status || '').toLowerCase()
+    if (status === 'void' || status === 'cancelled') continue
+    for (const bl of bill.line_items || []) {
+      const key = lineKey(bl.sku, bl.name, bl.description)
+      map.set(key, (map.get(key) ?? 0) + Number(bl.quantity || 0))
     }
   }
 

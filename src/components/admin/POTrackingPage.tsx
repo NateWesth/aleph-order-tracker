@@ -36,6 +36,7 @@ import { OrderWithCompany } from "@/components/orders/types/orderTypes";
 import { useLiveData } from "@/hooks/useLiveData";
 import OrderDetailsDialog from "@/components/orders/components/OrderDetailsDialog";
 import PageHeader from "@/components/ui/PageHeader";
+import { cn } from "@/lib/utils";
 
 interface POLine {
   sku: string;
@@ -275,6 +276,18 @@ export default function POTrackingPage() {
           { label: `units · ${money(totalOutstandingValue)}`, value: totalOutstandingUnits, icon: Package },
           ...(refreshing ? [{ label: "Updating", value: "", icon: Loader2 }] : []),
         ]}
+        actions={
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => fetchData(true)}
+            disabled={refreshing}
+            className="gap-1.5"
+          >
+            <RefreshCw className={cn("h-3.5 w-3.5", refreshing && "animate-spin")} />
+            Refresh
+          </Button>
+        }
         toolbar={
           <div className="relative w-full">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -302,7 +315,7 @@ export default function POTrackingPage() {
       ) : (
         <div className="space-y-3">
           {vendorGroups.map((group) => (
-            <Card key={group.vendorName} className="overflow-hidden">
+            <Card key={group.vendorName} className="overflow-hidden border-2 hover:border-primary/25 transition-colors">
               <Collapsible
                 open={openVendors.has(group.vendorName)}
                 onOpenChange={() => toggle(openVendors, group.vendorName, setOpenVendors)}
