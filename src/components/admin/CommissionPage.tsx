@@ -12,7 +12,21 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
-  Plus, Pencil, Trash2, Users, DollarSign, FileText, Download, ChevronDown, ChevronRight, Loader2, RefreshCw, AlertCircle, Lock, Unlock, Settings2
+  Plus,
+  Pencil,
+  Trash2,
+  Users,
+  DollarSign,
+  FileText,
+  Download,
+  ChevronDown,
+  ChevronRight,
+  Loader2,
+  RefreshCw,
+  AlertCircle,
+  Lock,
+  Unlock,
+  Settings2,
 } from "lucide-react";
 import { format, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import jsPDF from "jspdf";
@@ -24,7 +38,6 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import CommissionRepManagementDialog from "./CommissionRepManagementDialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLiveData } from "@/hooks/useLiveData";
-
 
 type CommissionMethod = "margin_scaled" | "half_markup_below_25";
 
@@ -64,7 +77,7 @@ type CommissionLineItem = {
   base_commission_rate?: number;
   commission_rate: number;
   commission: number;
-  excluded_reason?: 'zero_cost' | 'negative_margin' | 'unknown_cost';
+  excluded_reason?: "zero_cost" | "negative_margin" | "unknown_cost";
   discount_applied?: number;
 };
 
@@ -135,7 +148,6 @@ type CommissionResult = {
   unresolved_cost_items?: UnresolvedCostItem[];
 };
 
-
 type MissingGroup = { key: string; name: string; description: string; count: number; value: number };
 
 const MissingCostsEditor = ({
@@ -173,7 +185,11 @@ const MissingCostsEditor = ({
     setSaving((s) => ({ ...s, [g.key]: true }));
     try {
       await saveOverrideCost({ item_name: g.name, item_description: g.description }, cost);
-      setSavedKeys((s) => { const n = new Set(s); n.add(g.key); return n; });
+      setSavedKeys((s) => {
+        const n = new Set(s);
+        n.add(g.key);
+        return n;
+      });
       setValues((v) => ({ ...v, [g.key]: "" }));
       if (!opts?.silent) toast({ title: "Cost saved", description: `${g.name} — R${cost.toFixed(2)}` });
       onSaved();
@@ -198,7 +214,10 @@ const MissingCostsEditor = ({
 
   const saveOne = async (g: MissingGroup) => {
     const existing = debounceRef.current.get(g.key);
-    if (existing) { clearTimeout(existing); debounceRef.current.delete(g.key); }
+    if (existing) {
+      clearTimeout(existing);
+      debounceRef.current.delete(g.key);
+    }
     const raw = values[g.key];
     const cost = Number(raw);
     if (!raw || !Number.isFinite(cost) || cost <= 0) {
@@ -225,14 +244,21 @@ const MissingCostsEditor = ({
       return;
     }
     setSavingAll(true);
-    let ok = 0, failed = 0;
+    let ok = 0,
+      failed = 0;
     for (const g of pending) {
       try {
         await saveOverrideCost({ item_name: g.name, item_description: g.description }, Number(values[g.key]));
         ok++;
-        setSavedKeys((s) => { const n = new Set(s); n.add(g.key); return n; });
+        setSavedKeys((s) => {
+          const n = new Set(s);
+          n.add(g.key);
+          return n;
+        });
         setValues((v) => ({ ...v, [g.key]: "" }));
-      } catch { failed++; }
+      } catch {
+        failed++;
+      }
     }
     setSavingAll(false);
     toast({
@@ -252,7 +278,8 @@ const MissingCostsEditor = ({
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <Badge variant="outline" className="text-xs">
-          {visible.length} of {groups.length} unique · {missingCount} line{missingCount === 1 ? "" : "s"} · {formatCurrency(totalValue)}
+          {visible.length} of {groups.length} unique · {missingCount} line{missingCount === 1 ? "" : "s"} ·{" "}
+          {formatCurrency(totalValue)}
         </Badge>
         <div className="flex items-center gap-2">
           <Input
@@ -262,7 +289,8 @@ const MissingCostsEditor = ({
             className="h-8 w-48 text-xs"
           />
           <Button size="sm" variant="outline" onClick={onExport}>
-            <Download className="h-4 w-4 mr-1.5" />Export CSV
+            <Download className="h-4 w-4 mr-1.5" />
+            Export CSV
           </Button>
           <Button size="sm" onClick={saveAll} disabled={savingAll || pendingCount === 0}>
             {savingAll ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : null}
@@ -271,7 +299,8 @@ const MissingCostsEditor = ({
         </div>
       </div>
       <p className="text-xs text-muted-foreground">
-        Enter the cost (ex VAT) for each item — it auto-saves shortly after you stop typing or when you leave the field. Press Enter to save immediately.
+        Enter the cost (ex VAT) for each item — it auto-saves shortly after you stop typing or when you leave the field.
+        Press Enter to save immediately.
       </p>
       {visible.length === 0 ? (
         <div className="rounded-md border bg-emerald-500/5 border-emerald-500/40 p-4 text-sm text-emerald-700 dark:text-emerald-300">
@@ -280,7 +309,7 @@ const MissingCostsEditor = ({
             : "No items match the current filter."}
         </div>
       ) : (
-        <div className="rounded-md border overflow-x-auto max-h-[60vh]">
+        <div className="rounded-md border overflow-hidden max-h-[60vh]">
           <table className="w-full text-xs">
             <thead className="bg-muted/50 sticky top-0 z-10">
               <tr className="text-left">
@@ -315,13 +344,19 @@ const MissingCostsEditor = ({
                         }}
                         onBlur={() => {
                           const existing = debounceRef.current.get(g.key);
-                          if (existing) { clearTimeout(existing); debounceRef.current.delete(g.key); }
+                          if (existing) {
+                            clearTimeout(existing);
+                            debounceRef.current.delete(g.key);
+                          }
                           const raw = values[g.key];
                           const cost = Number(raw);
                           if (raw && Number.isFinite(cost) && cost > 0) persist(g, cost, { silent: true });
                         }}
                         onKeyDown={(e) => {
-                          if (e.key === "Enter") { e.preventDefault(); saveOne(g); }
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            saveOne(g);
+                          }
                         }}
                         className="h-8 w-28 ml-auto"
                         disabled={busy}
@@ -342,10 +377,6 @@ const MissingCostsEditor = ({
     </div>
   );
 };
-
-
-
-
 
 type ExportColumn = { key: string; label: string; group: "invoice" | "line" };
 
@@ -387,7 +418,12 @@ const CommissionPage = () => {
   const [assignments, setAssignments] = useState<RepAssignment[]>([]);
   const [repDialogOpen, setRepDialogOpen] = useState(false);
   const [editingRep, setEditingRep] = useState<Rep | null>(null);
-  const [repForm, setRepForm] = useState({ name: "", email: "", commission_rate: "5", commission_method: "margin_scaled" as CommissionMethod });
+  const [repForm, setRepForm] = useState({
+    name: "",
+    email: "",
+    commission_rate: "5",
+    commission_method: "margin_scaled" as CommissionMethod,
+  });
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [assignRepId, setAssignRepId] = useState<string | null>(null);
   const [selectedCompanies, setSelectedCompanies] = useState<Set<string>>(new Set());
@@ -417,7 +453,6 @@ const CommissionPage = () => {
     return () => window.removeEventListener("keydown", handler);
   }, []);
 
-
   const [methodFilter, setMethodFilter] = useState<"all" | CommissionMethod>("all");
 
   // Commission report state - default to PREVIOUS month
@@ -435,7 +470,11 @@ const CommissionPage = () => {
   const { user } = useAuth();
   useEffect(() => {
     if (!user) return;
-    supabase.from("user_roles").select("role").eq("user_id", user.id).maybeSingle()
+    supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user.id)
+      .maybeSingle()
       .then(({ data }) => setIsAdmin(data?.role === "admin"));
   }, [user]);
 
@@ -447,9 +486,15 @@ const CommissionPage = () => {
       saveTimersRef.current.clear();
       const pending = Array.from(pendingSavesRef.current.values());
       pendingSavesRef.current.clear();
-      pending.forEach((fn) => { try { fn(); } catch {} });
+      pending.forEach((fn) => {
+        try {
+          fn();
+        } catch {}
+      });
     };
-    const onHide = () => { if (document.visibilityState === "hidden") flushAll(); };
+    const onHide = () => {
+      if (document.visibilityState === "hidden") flushAll();
+    };
     window.addEventListener("pagehide", flushAll);
     document.addEventListener("visibilitychange", onHide);
     return () => {
@@ -471,13 +516,15 @@ const CommissionPage = () => {
       if (companiesRes.data) {
         const zohoCompanies = companiesRes.data.filter(isZohoCompany);
         const dedupedCompanies = Array.from(
-          zohoCompanies.reduce((map, company) => {
-            const normalizedName = normalizeCompanyName(company.name);
-            if (!map.has(normalizedName)) {
-              map.set(normalizedName, company);
-            }
-            return map;
-          }, new Map<string, Company>()).values()
+          zohoCompanies
+            .reduce((map, company) => {
+              const normalizedName = normalizeCompanyName(company.name);
+              if (!map.has(normalizedName)) {
+                map.set(normalizedName, company);
+              }
+              return map;
+            }, new Map<string, Company>())
+            .values(),
         );
 
         setCompanies(dedupedCompanies);
@@ -490,24 +537,36 @@ const CommissionPage = () => {
     }
   }, []);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   // Rep CRUD
   const handleSaveRep = async () => {
     const rate = parseFloat(repForm.commission_rate);
     if (!repForm.name.trim() || isNaN(rate) || rate < 0) {
-      toast({ title: "Invalid input", description: "Please enter a valid name and commission rate.", variant: "destructive" });
+      toast({
+        title: "Invalid input",
+        description: "Please enter a valid name and commission rate.",
+        variant: "destructive",
+      });
       return;
     }
 
     if (editingRep) {
-      const { error } = await supabase.from("reps").update({
-        name: repForm.name.trim(),
-        email: repForm.email.trim() || null,
-        commission_rate: rate,
-        commission_method: repForm.commission_method,
-      }).eq("id", editingRep.id);
-      if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
+      const { error } = await supabase
+        .from("reps")
+        .update({
+          name: repForm.name.trim(),
+          email: repForm.email.trim() || null,
+          commission_rate: rate,
+          commission_method: repForm.commission_method,
+        })
+        .eq("id", editingRep.id);
+      if (error) {
+        toast({ title: "Error", description: error.message, variant: "destructive" });
+        return;
+      }
       toast({ title: "Rep updated" });
     } else {
       const { error } = await supabase.from("reps").insert({
@@ -516,7 +575,10 @@ const CommissionPage = () => {
         commission_rate: rate,
         commission_method: repForm.commission_method,
       });
-      if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
+      if (error) {
+        toast({ title: "Error", description: error.message, variant: "destructive" });
+        return;
+      }
       toast({ title: "Rep added" });
     }
 
@@ -528,7 +590,10 @@ const CommissionPage = () => {
 
   const handleDeleteRep = async (id: string) => {
     const { error } = await supabase.from("reps").delete().eq("id", id);
-    if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+      return;
+    }
     toast({ title: "Rep deleted" });
     fetchData();
   };
@@ -546,8 +611,8 @@ const CommissionPage = () => {
 
   const openAssignDialog = (repId: string) => {
     setAssignRepId(repId);
-    const currentAssigns = assignments.filter(a => a.rep_id === repId);
-    setSelectedCompanies(new Set(currentAssigns.map(a => a.company_id)));
+    const currentAssigns = assignments.filter((a) => a.rep_id === repId);
+    setSelectedCompanies(new Set(currentAssigns.map((a) => a.company_id)));
     const overrides = new Map<string, string>();
     for (const a of currentAssigns) {
       if (a.commission_rate !== null) {
@@ -561,10 +626,10 @@ const CommissionPage = () => {
   const handleSaveAssignments = async () => {
     if (!assignRepId) return;
 
-    const currentAssigned = assignments.filter(a => a.rep_id === assignRepId).map(a => a.company_id);
-    const toAdd = [...selectedCompanies].filter(c => !currentAssigned.includes(c));
-    const toRemove = currentAssigned.filter(c => !selectedCompanies.has(c));
-    const toUpdate = [...selectedCompanies].filter(c => currentAssigned.includes(c));
+    const currentAssigned = assignments.filter((a) => a.rep_id === assignRepId).map((a) => a.company_id);
+    const toAdd = [...selectedCompanies].filter((c) => !currentAssigned.includes(c));
+    const toRemove = currentAssigned.filter((c) => !selectedCompanies.has(c));
+    const toUpdate = [...selectedCompanies].filter((c) => currentAssigned.includes(c));
 
     for (const companyId of toRemove) {
       await supabase.from("rep_company_assignments").delete().eq("rep_id", assignRepId).eq("company_id", companyId);
@@ -582,7 +647,8 @@ const CommissionPage = () => {
     // Update override rates for existing assignments
     for (const companyId of toUpdate) {
       const overrideRate = companyRateOverrides.get(companyId);
-      await supabase.from("rep_company_assignments")
+      await supabase
+        .from("rep_company_assignments")
         .update({ commission_rate: overrideRate ? parseFloat(overrideRate) : null })
         .eq("rep_id", assignRepId)
         .eq("company_id", companyId);
@@ -594,251 +660,295 @@ const CommissionPage = () => {
   };
 
   // Apply manual line overrides (admin edits) on top of edge-function result, recomputing all dependent values.
-  const applyLineOverrides = useCallback(async (result: CommissionResult): Promise<CommissionResult> => {
-    if (!result?.data?.length) return result;
-    const invoiceIds = Array.from(new Set(result.data.flatMap(r => r.invoices.map(i => i.invoice_id)).filter(Boolean)));
-    if (invoiceIds.length === 0) return result;
+  const applyLineOverrides = useCallback(
+    async (result: CommissionResult): Promise<CommissionResult> => {
+      if (!result?.data?.length) return result;
+      const invoiceIds = Array.from(
+        new Set(result.data.flatMap((r) => r.invoices.map((i) => i.invoice_id)).filter(Boolean)),
+      );
+      if (invoiceIds.length === 0) return result;
 
-    const { data: ovRows } = await supabase
-      .from("commission_line_overrides")
-      .select("rep_id, invoice_id, line_index, sell_rate, cost, sub_total, commission_rate, commission")
-      .in("invoice_id", invoiceIds);
+      const { data: ovRows } = await supabase
+        .from("commission_line_overrides")
+        .select("rep_id, invoice_id, line_index, sell_rate, cost, sub_total, commission_rate, commission")
+        .in("invoice_id", invoiceIds);
 
-    if (!ovRows || ovRows.length === 0) return result;
+      if (!ovRows || ovRows.length === 0) return result;
 
-    // Index overrides by rep::invoice::lineIndex
-    const ovMap = new Map<string, any>();
-    for (const r of ovRows) {
-      ovMap.set(`${r.rep_id}::${r.invoice_id}::${r.line_index}`, r);
-    }
+      // Index overrides by rep::invoice::lineIndex
+      const ovMap = new Map<string, any>();
+      for (const r of ovRows) {
+        ovMap.set(`${r.rep_id}::${r.invoice_id}::${r.line_index}`, r);
+      }
 
-    // Look up each rep's commission method from local state (fallback keeps original commission untouched)
-    const repMethodById = new Map(reps.map(r => [r.id, r.commission_method] as const));
+      // Look up each rep's commission method from local state (fallback keeps original commission untouched)
+      const repMethodById = new Map(reps.map((r) => [r.id, r.commission_method] as const));
 
-    let summaryInvoicedDelta = 0;
-    let summaryCommissionDelta = 0;
+      let summaryInvoicedDelta = 0;
+      let summaryCommissionDelta = 0;
 
-    const newData = result.data.map(rep => {
-      const method = repMethodById.get(rep.rep_id) || "half_markup_below_25";
-      let repInvoicedDelta = 0;
-      let repCommissionDelta = 0; // unlocked only — matches what's shown as "commission_earned"
-      let repLockedCommissionDelta = 0;
-      let repTouched = false;
+      const newData = result.data.map((rep) => {
+        const method = repMethodById.get(rep.rep_id) || "half_markup_below_25";
+        let repInvoicedDelta = 0;
+        let repCommissionDelta = 0; // unlocked only — matches what's shown as "commission_earned"
+        let repLockedCommissionDelta = 0;
+        let repTouched = false;
 
-      const newInvoices = rep.invoices.map(inv => {
-        const origLines = inv.line_items || [];
-        let invTouched = false;
+        const newInvoices = rep.invoices.map((inv) => {
+          const origLines = inv.line_items || [];
+          let invTouched = false;
 
-        const newLines = origLines.map((li, idx) => {
-          const ov = ovMap.get(`${rep.rep_id}::${inv.invoice_id}::${idx}`);
-          if (!ov) return li;
-          invTouched = true;
-          repTouched = true;
+          const newLines = origLines.map((li, idx) => {
+            const ov = ovMap.get(`${rep.rep_id}::${inv.invoice_id}::${idx}`);
+            if (!ov) return li;
+            invTouched = true;
+            repTouched = true;
 
-          const qty = li.quantity ?? 0;
+            const qty = li.quantity ?? 0;
 
-          // Keep sell rate and subtotal consistent:
-          // - override sub_total only (no sell_rate) -> derive sell = sub_total / qty
-          // - override sell_rate only (no sub_total) -> derive sub_total = sell * qty
-          let sell = ov.sell_rate != null ? Number(ov.sell_rate) : li.rate;
-          let sub_total = ov.sub_total != null ? Number(ov.sub_total) : sell * qty;
-          if (ov.sub_total != null && ov.sell_rate == null && qty > 0) {
-            sell = sub_total / qty;
-          }
-
-          const cost = ov.cost != null ? Number(ov.cost) : li.cost;
-          // Any positive cost counts — items can legitimately cost less than R1.
-          const effectiveCost = (cost != null && cost > 0) ? cost : null;
-
-
-          const isManualCommissionRate = ov.commission_rate != null;
-          const commission_rate = isManualCommissionRate
-            ? Number(ov.commission_rate)
-            : (li.base_commission_rate ?? li.commission_rate);
-          const margin_percent = (effectiveCost != null && effectiveCost > 0 && sell > 0)
-            ? Number((((sell - effectiveCost) / effectiveCost) * 100).toFixed(2))
-            : null;
-
-          let commission: number;
-          if (ov.commission != null) {
-            // Explicit commission amount override wins
-            commission = Number(ov.commission);
-          } else if (isManualCommissionRate) {
-            // Explicit rate override -> straight rate × subtotal (bypasses half-markup rule)
-            commission = sub_total * (commission_rate / 100);
-          } else if (method === "half_markup_below_25") {
-            // Unknown/placeholder cost -> skip (never overpay on unverifiable lines)
-            if (effectiveCost == null) commission = 0;
-            else {
-              const profit = (sell - effectiveCost) * qty;
-              if (profit <= 0) commission = 0;
-              // Strict >= 25% markup-on-cost: full rate applies to cost × qty per line
-              else if (margin_percent != null && margin_percent >= 25) commission = (effectiveCost * qty) * (commission_rate / 100);
-              else commission = profit * 0.5;
+            // Keep sell rate and subtotal consistent:
+            // - override sub_total only (no sell_rate) -> derive sell = sub_total / qty
+            // - override sell_rate only (no sub_total) -> derive sub_total = sell * qty
+            let sell = ov.sell_rate != null ? Number(ov.sell_rate) : li.rate;
+            let sub_total = ov.sub_total != null ? Number(ov.sub_total) : sell * qty;
+            if (ov.sub_total != null && ov.sell_rate == null && qty > 0) {
+              sell = sub_total / qty;
             }
+
+            const cost = ov.cost != null ? Number(ov.cost) : li.cost;
+            // Any positive cost counts — items can legitimately cost less than R1.
+            const effectiveCost = cost != null && cost > 0 ? cost : null;
+
+            const isManualCommissionRate = ov.commission_rate != null;
+            const commission_rate = isManualCommissionRate
+              ? Number(ov.commission_rate)
+              : (li.base_commission_rate ?? li.commission_rate);
+            const margin_percent =
+              effectiveCost != null && effectiveCost > 0 && sell > 0
+                ? Number((((sell - effectiveCost) / effectiveCost) * 100).toFixed(2))
+                : null;
+
+            let commission: number;
+            if (ov.commission != null) {
+              // Explicit commission amount override wins
+              commission = Number(ov.commission);
+            } else if (isManualCommissionRate) {
+              // Explicit rate override -> straight rate × subtotal (bypasses half-markup rule)
+              commission = sub_total * (commission_rate / 100);
+            } else if (method === "half_markup_below_25") {
+              // Unknown/placeholder cost -> skip (never overpay on unverifiable lines)
+              if (effectiveCost == null) commission = 0;
+              else {
+                const profit = (sell - effectiveCost) * qty;
+                if (profit <= 0) commission = 0;
+                // Strict >= 25% markup-on-cost: full rate applies to cost × qty per line
+                else if (margin_percent != null && margin_percent >= 25)
+                  commission = effectiveCost * qty * (commission_rate / 100);
+                else commission = profit * 0.5;
+              }
+            } else {
+              commission = sub_total * (commission_rate / 100);
+            }
+
+            const displayCommissionRate =
+              sub_total > 0 && !isManualCommissionRate
+                ? Number(((commission / sub_total) * 100).toFixed(2))
+                : commission_rate;
+
+            return {
+              ...li,
+              rate: sell,
+              cost,
+              sub_total,
+              commission_rate: displayCommissionRate,
+              margin_percent,
+              commission: Number(commission.toFixed(2)),
+            };
+          });
+
+          if (!invTouched) return inv;
+
+          // Compute deltas relative to original line values so non-line totals (shipping etc.) stay intact
+          const origLinesSubtotal = origLines.reduce((s, l) => s + Number(l.sub_total || 0), 0);
+          const newLinesSubtotal = newLines.reduce((s, l) => s + Number(l.sub_total || 0), 0);
+          const origLinesCommission = origLines.reduce((s, l) => s + Number(l.commission || 0), 0);
+          const newLinesCommission = newLines.reduce((s, l) => s + Number(l.commission || 0), 0);
+
+          const subDelta = newLinesSubtotal - origLinesSubtotal;
+          const commDelta = newLinesCommission - origLinesCommission;
+
+          repInvoicedDelta += subDelta;
+          if (inv.locked) {
+            repLockedCommissionDelta += commDelta;
           } else {
-            commission = sub_total * (commission_rate / 100);
+            repCommissionDelta += commDelta;
           }
 
-          const displayCommissionRate = sub_total > 0 && !isManualCommissionRate
-            ? Number(((commission / sub_total) * 100).toFixed(2))
-            : commission_rate;
-
-          return { ...li, rate: sell, cost, sub_total, commission_rate: displayCommissionRate, margin_percent, commission: Number(commission.toFixed(2)) };
+          return {
+            ...inv,
+            line_items: newLines,
+            sub_total: Number((Number(inv.sub_total || 0) + subDelta).toFixed(2)),
+            commission: Number((Number(inv.commission || 0) + commDelta).toFixed(2)),
+          };
         });
 
-        if (!invTouched) return inv;
+        if (!repTouched) return rep;
 
-        // Compute deltas relative to original line values so non-line totals (shipping etc.) stay intact
-        const origLinesSubtotal = origLines.reduce((s, l) => s + Number(l.sub_total || 0), 0);
-        const newLinesSubtotal = newLines.reduce((s, l) => s + Number(l.sub_total || 0), 0);
-        const origLinesCommission = origLines.reduce((s, l) => s + Number(l.commission || 0), 0);
-        const newLinesCommission = newLines.reduce((s, l) => s + Number(l.commission || 0), 0);
-
-        const subDelta = newLinesSubtotal - origLinesSubtotal;
-        const commDelta = newLinesCommission - origLinesCommission;
-
-        repInvoicedDelta += subDelta;
-        if (inv.locked) {
-          repLockedCommissionDelta += commDelta;
-        } else {
-          repCommissionDelta += commDelta;
-        }
+        summaryInvoicedDelta += repInvoicedDelta;
+        summaryCommissionDelta += repCommissionDelta;
 
         return {
-          ...inv,
-          line_items: newLines,
-          sub_total: Number((Number(inv.sub_total || 0) + subDelta).toFixed(2)),
-          commission: Number((Number(inv.commission || 0) + commDelta).toFixed(2)),
+          ...rep,
+          invoices: newInvoices,
+          total_invoiced: Number((Number(rep.total_invoiced || 0) + repInvoicedDelta).toFixed(2)),
+          commission_earned: Number((Number(rep.commission_earned || 0) + repCommissionDelta).toFixed(2)),
+          locked_commission: Number((Number(rep.locked_commission || 0) + repLockedCommissionDelta).toFixed(2)),
         };
       });
 
-      if (!repTouched) return rep;
-
-      summaryInvoicedDelta += repInvoicedDelta;
-      summaryCommissionDelta += repCommissionDelta;
-
       return {
-        ...rep,
-        invoices: newInvoices,
-        total_invoiced: Number((Number(rep.total_invoiced || 0) + repInvoicedDelta).toFixed(2)),
-        commission_earned: Number((Number(rep.commission_earned || 0) + repCommissionDelta).toFixed(2)),
-        locked_commission: Number((Number(rep.locked_commission || 0) + repLockedCommissionDelta).toFixed(2)),
+        ...result,
+        data: newData,
+        summary: {
+          ...result.summary,
+          totalInvoiced: Number((result.summary.totalInvoiced + summaryInvoicedDelta).toFixed(2)),
+          totalCommission: Number((result.summary.totalCommission + summaryCommissionDelta).toFixed(2)),
+        },
       };
-    });
-
-    return {
-      ...result,
-      data: newData,
-      summary: {
-        ...result.summary,
-        totalInvoiced: Number((result.summary.totalInvoiced + summaryInvoicedDelta).toFixed(2)),
-        totalCommission: Number((result.summary.totalCommission + summaryCommissionDelta).toFixed(2)),
-      },
-    };
-  }, [reps]);
+    },
+    [reps],
+  );
 
   // Commission report - uses previous month by default. Auto-runs whenever the
   // Report tab is opened OR the selected month changes.
-  const fetchCommissionReport = useCallback(async (forceRefresh = false) => {
-    const requestKey = `${selectedMonth}:${forceRefresh ? "refresh" : "cache"}`;
-    if (reportRequestRef.current === requestKey) return;
-    reportRequestRef.current = requestKey;
-    setLoadingReport(true);
-    try {
-      const [year, month] = selectedMonth.split("-").map(Number);
-      const dateStart = format(startOfMonth(new Date(year, month - 1)), "yyyy-MM-dd");
-      const dateEnd = format(endOfMonth(new Date(year, month - 1)), "yyyy-MM-dd");
+  const fetchCommissionReport = useCallback(
+    async (forceRefresh = false) => {
+      const requestKey = `${selectedMonth}:${forceRefresh ? "refresh" : "cache"}`;
+      if (reportRequestRef.current === requestKey) return;
+      reportRequestRef.current = requestKey;
+      setLoadingReport(true);
+      try {
+        const [year, month] = selectedMonth.split("-").map(Number);
+        const dateStart = format(startOfMonth(new Date(year, month - 1)), "yyyy-MM-dd");
+        const dateEnd = format(endOfMonth(new Date(year, month - 1)), "yyyy-MM-dd");
 
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { toast({ title: "Not authenticated", variant: "destructive" }); return; }
-
-      const response = await supabase.functions.invoke("rep-commission-data", {
-        body: { date_start: dateStart, date_end: dateEnd, force_refresh: forceRefresh },
-      });
-
-      if (response.error) {
-        let message = response.error.message || "Failed to fetch commission data";
-        const context = (response.error as any).context;
-        if (context && typeof context.json === "function") {
-          try {
-            const body = await context.json();
-            if (body?.error) message = body.error;
-          } catch {
-            // Keep the Supabase fallback message.
-          }
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        if (!session) {
+          toast({ title: "Not authenticated", variant: "destructive" });
+          return;
         }
-        throw new Error(message);
+
+        const response = await supabase.functions.invoke("rep-commission-data", {
+          body: { date_start: dateStart, date_end: dateEnd, force_refresh: forceRefresh },
+        });
+
+        if (response.error) {
+          let message = response.error.message || "Failed to fetch commission data";
+          const context = (response.error as any).context;
+          if (context && typeof context.json === "function") {
+            try {
+              const body = await context.json();
+              if (body?.error) message = body.error;
+            } catch {
+              // Keep the Supabase fallback message.
+            }
+          }
+          throw new Error(message);
+        }
+        if (response.data?.rate_limited) {
+          setReportNotice(response.data.error || "Zoho API rate limit reached. Please refresh later.");
+          return;
+        }
+        setReportNotice(null);
+        const withOverrides = await applyLineOverrides(response.data as CommissionResult);
+        setCommissionData(withOverrides);
+        if (response.data?.cached && response.data?.refreshed_at) {
+          const cachedAt = format(new Date(response.data.refreshed_at), "PPp");
+          setReportNotice(
+            response.data.stale_due_to_rate_limit
+              ? `Zoho API rate limit reached. Showing cached data from ${cachedAt}.`
+              : `Showing cached Zoho data from ${cachedAt}. Use Refresh from Zoho only when you need the latest invoices.`,
+          );
+        }
+      } catch (e: any) {
+        console.error("Commission report error:", e);
+        toast({ title: "Error", description: e.message, variant: "destructive" });
+      } finally {
+        if (reportRequestRef.current === requestKey) reportRequestRef.current = null;
+        setLoadingReport(false);
       }
-      if (response.data?.rate_limited) {
-        setReportNotice(response.data.error || "Zoho API rate limit reached. Please refresh later.");
-        return;
-      }
-      setReportNotice(null);
-      const withOverrides = await applyLineOverrides(response.data as CommissionResult);
-      setCommissionData(withOverrides);
-      if (response.data?.cached && response.data?.refreshed_at) {
-        const cachedAt = format(new Date(response.data.refreshed_at), "PPp");
-        setReportNotice(response.data.stale_due_to_rate_limit
-          ? `Zoho API rate limit reached. Showing cached data from ${cachedAt}.`
-          : `Showing cached Zoho data from ${cachedAt}. Use Refresh from Zoho only when you need the latest invoices.`);
-      }
-    } catch (e: any) {
-      console.error("Commission report error:", e);
-      toast({ title: "Error", description: e.message, variant: "destructive" });
-    } finally {
-      if (reportRequestRef.current === requestKey) reportRequestRef.current = null;
-      setLoadingReport(false);
-    }
-  }, [selectedMonth, toast, applyLineOverrides]);
+    },
+    [selectedMonth, toast, applyLineOverrides],
+  );
 
   // Save (or clear) a single line-item field override, then refresh the report.
-  const saveLineOverride = useCallback(async (
-    repId: string,
-    invoiceId: string,
-    lineIndex: number,
-    field: "sell_rate" | "cost" | "sub_total" | "commission_rate" | "commission",
-    rawValue: string,
-  ) => {
-    const trimmed = rawValue.trim();
-    const value = trimmed === "" ? null : Number(trimmed);
-    if (value !== null && Number.isNaN(value)) {
-      toast({ title: "Invalid number", variant: "destructive" });
-      return;
-    }
-    const { data: existing } = await supabase
-      .from("commission_line_overrides")
-      .select("id, sell_rate, cost, sub_total, commission_rate, commission")
-      .eq("rep_id", repId)
-      .eq("invoice_id", invoiceId)
-      .eq("line_index", lineIndex)
-      .maybeSingle();
-
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (existing) {
-      const updated: Record<string, any> = { [field]: value };
-      // If clearing every override field, delete the row.
-      const remaining = { ...existing, ...updated } as Record<string, any>;
-      const allNull = ["sell_rate","cost","sub_total","commission_rate","commission"].every(k => remaining[k] == null);
-      if (allNull) {
-        const { error } = await supabase.from("commission_line_overrides").delete().eq("id", existing.id);
-        if (error) { toast({ title: "Failed to clear override", description: error.message, variant: "destructive" }); return; }
-      } else {
-        const { error } = await supabase.from("commission_line_overrides").update(updated).eq("id", existing.id);
-        if (error) { toast({ title: "Save failed", description: error.message, variant: "destructive" }); return; }
+  const saveLineOverride = useCallback(
+    async (
+      repId: string,
+      invoiceId: string,
+      lineIndex: number,
+      field: "sell_rate" | "cost" | "sub_total" | "commission_rate" | "commission",
+      rawValue: string,
+    ) => {
+      const trimmed = rawValue.trim();
+      const value = trimmed === "" ? null : Number(trimmed);
+      if (value !== null && Number.isNaN(value)) {
+        toast({ title: "Invalid number", variant: "destructive" });
+        return;
       }
-    } else {
-      if (value === null) return; // nothing to insert
-      const { error } = await supabase.from("commission_line_overrides").insert({
-        rep_id: repId, invoice_id: invoiceId, line_index: lineIndex,
-        [field]: value, created_by: user?.id ?? null,
-      });
-      if (error) { toast({ title: "Save failed", description: error.message, variant: "destructive" }); return; }
-    }
-    toast({ title: "Updated" });
-    fetchCommissionReport(false);
-  }, [fetchCommissionReport, toast]);
+      const { data: existing } = await supabase
+        .from("commission_line_overrides")
+        .select("id, sell_rate, cost, sub_total, commission_rate, commission")
+        .eq("rep_id", repId)
+        .eq("invoice_id", invoiceId)
+        .eq("line_index", lineIndex)
+        .maybeSingle();
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (existing) {
+        const updated: Record<string, any> = { [field]: value };
+        // If clearing every override field, delete the row.
+        const remaining = { ...existing, ...updated } as Record<string, any>;
+        const allNull = ["sell_rate", "cost", "sub_total", "commission_rate", "commission"].every(
+          (k) => remaining[k] == null,
+        );
+        if (allNull) {
+          const { error } = await supabase.from("commission_line_overrides").delete().eq("id", existing.id);
+          if (error) {
+            toast({ title: "Failed to clear override", description: error.message, variant: "destructive" });
+            return;
+          }
+        } else {
+          const { error } = await supabase.from("commission_line_overrides").update(updated).eq("id", existing.id);
+          if (error) {
+            toast({ title: "Save failed", description: error.message, variant: "destructive" });
+            return;
+          }
+        }
+      } else {
+        if (value === null) return; // nothing to insert
+        const { error } = await supabase.from("commission_line_overrides").insert({
+          rep_id: repId,
+          invoice_id: invoiceId,
+          line_index: lineIndex,
+          [field]: value,
+          created_by: user?.id ?? null,
+        });
+        if (error) {
+          toast({ title: "Save failed", description: error.message, variant: "destructive" });
+          return;
+        }
+      }
+      toast({ title: "Updated" });
+      fetchCommissionReport(false);
+    },
+    [fetchCommissionReport, toast],
+  );
 
   // Auto-fetch whenever the Report tab is the active tab or the month changes.
   useEffect(() => {
@@ -856,17 +966,23 @@ const CommissionPage = () => {
 
   // Lock all currently-unlocked invoices for a single rep into commission_payouts.
   const lockRepPayout = async (rep: CommissionRepData) => {
-    const unlocked = rep.invoices.filter(i => !i.locked);
+    const unlocked = rep.invoices.filter((i) => !i.locked);
     if (unlocked.length === 0) {
       toast({ title: "Nothing to lock", description: "All invoices for this rep are already locked." });
       return;
     }
-    if (!confirm(`Lock ${unlocked.length} invoice(s) totalling ${formatCurrency(rep.commission_earned)} commission for ${rep.rep_name}? This marks the payout as paid and excludes these invoices from future calculations.`)) {
+    if (
+      !confirm(
+        `Lock ${unlocked.length} invoice(s) totalling ${formatCurrency(rep.commission_earned)} commission for ${rep.rep_name}? This marks the payout as paid and excludes these invoices from future calculations.`,
+      )
+    ) {
       return;
     }
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     const periodMonth = `${selectedMonth}-01`;
-    const rows = unlocked.map(inv => ({
+    const rows = unlocked.map((inv) => ({
       rep_id: rep.rep_id,
       period_month: periodMonth,
       invoice_id: inv.invoice_id,
@@ -889,9 +1005,12 @@ const CommissionPage = () => {
   };
 
   const unlockRepPayout = async (rep: CommissionRepData) => {
-    const locked = rep.invoices.filter(i => i.locked);
+    const locked = rep.invoices.filter((i) => i.locked);
     if (locked.length === 0) return;
-    if (!confirm(`Unlock ${locked.length} invoice(s) for ${rep.rep_name}? They will be re-included in the calculation.`)) return;
+    if (
+      !confirm(`Unlock ${locked.length} invoice(s) for ${rep.rep_name}? They will be re-included in the calculation.`)
+    )
+      return;
     const periodMonth = `${selectedMonth}-01`;
     const { error } = await supabase
       .from("commission_payouts")
@@ -907,14 +1026,15 @@ const CommissionPage = () => {
   };
 
   const toggleExpanded = (repId: string) => {
-    setExpandedReps(prev => {
+    setExpandedReps((prev) => {
       const next = new Set(prev);
-      if (next.has(repId)) next.delete(repId); else next.add(repId);
+      if (next.has(repId)) next.delete(repId);
+      else next.add(repId);
       return next;
     });
   };
 
-  const selectedExportColumns = () => EXPORT_COLUMNS.filter(c => exportColumns.includes(c.key));
+  const selectedExportColumns = () => EXPORT_COLUMNS.filter((c) => exportColumns.includes(c.key));
 
   // Every numeric value in exports/prints is rendered with exactly 2 decimals.
   const num2 = (v: unknown): string => {
@@ -925,63 +1045,85 @@ const CommissionPage = () => {
 
   const invoiceCellValue = (repName: string, inv: any, key: string): string => {
     switch (key) {
-      case "rep_name": return repName;
-      case "invoice_number": return inv.invoice_number || "";
-      case "customer_name": return inv.customer_name || "";
-      case "date": return inv.date || "";
-      case "status": return inv.locked || inv.is_locked ? "paid" : "due";
-      case "sub_total": return num2(inv.sub_total);
-      case "commission_rate": return num2(inv.commission_rate);
-      case "credited": return num2(inv.credited_sub_total || 0);
-      case "write_off": return num2(inv.write_off_amount || 0);
-      case "discount": return num2(inv.invoice_discount || 0);
-      case "commission": return num2(inv.commission);
-      default: return "";
+      case "rep_name":
+        return repName;
+      case "invoice_number":
+        return inv.invoice_number || "";
+      case "customer_name":
+        return inv.customer_name || "";
+      case "date":
+        return inv.date || "";
+      case "status":
+        return inv.locked || inv.is_locked ? "paid" : "due";
+      case "sub_total":
+        return num2(inv.sub_total);
+      case "commission_rate":
+        return num2(inv.commission_rate);
+      case "credited":
+        return num2(inv.credited_sub_total || 0);
+      case "write_off":
+        return num2(inv.write_off_amount || 0);
+      case "discount":
+        return num2(inv.invoice_discount || 0);
+      case "commission":
+        return num2(inv.commission);
+      default:
+        return "";
     }
   };
 
   const lineCellValue = (li: any, key: string): string => {
     switch (key) {
-      case "li_code": return li.code || "";
-      case "li_name": return li.name || "";
-      case "li_quantity": return num2(li.quantity);
-      case "li_rate": return num2(li.rate);
-      case "li_cost": return num2(li.cost);
-      case "li_sub_total": return num2(li.sub_total);
-      case "li_margin": return num2(li.margin_percent);
-      case "li_commission_rate": return num2(li.commission_rate);
-      case "li_commission": return num2(li.commission);
-      case "li_excluded": return li.excluded_reason || "";
-      default: return "";
+      case "li_code":
+        return li.code || "";
+      case "li_name":
+        return li.name || "";
+      case "li_quantity":
+        return num2(li.quantity);
+      case "li_rate":
+        return num2(li.rate);
+      case "li_cost":
+        return num2(li.cost);
+      case "li_sub_total":
+        return num2(li.sub_total);
+      case "li_margin":
+        return num2(li.margin_percent);
+      case "li_commission_rate":
+        return num2(li.commission_rate);
+      case "li_commission":
+        return num2(li.commission);
+      case "li_excluded":
+        return li.excluded_reason || "";
+      default:
+        return "";
     }
   };
-
 
   const exportCsv = () => {
     if (!commissionData?.data) return;
     const cols = selectedExportColumns();
     if (cols.length === 0) return;
-    const invoiceCols = cols.filter(c => c.group === "invoice");
-    const lineCols = cols.filter(c => c.group === "line");
+    const invoiceCols = cols.filter((c) => c.group === "invoice");
+    const lineCols = cols.filter((c) => c.group === "line");
     const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
 
-    const rows: string[][] = [cols.map(c => c.label)];
+    const rows: string[][] = [cols.map((c) => c.label)];
     for (const d of commissionData.data) {
       for (const inv of d.invoices) {
-        const invValues = invoiceCols.map(c => invoiceCellValue(d.rep_name, inv, c.key));
+        const invValues = invoiceCols.map((c) => invoiceCellValue(d.rep_name, inv, c.key));
         const lines = (inv.line_items || []) as any[];
         if (lineCols.length === 0 || lines.length === 0) {
-          rows.push(cols.map(c => (c.group === "invoice" ? invValues[invoiceCols.indexOf(c)] : "")));
+          rows.push(cols.map((c) => (c.group === "invoice" ? invValues[invoiceCols.indexOf(c)] : "")));
         } else {
           for (const li of lines) {
-            rows.push(cols.map(c =>
-              c.group === "invoice" ? invValues[invoiceCols.indexOf(c)] : lineCellValue(li, c.key)
-            ));
+            rows.push(
+              cols.map((c) => (c.group === "invoice" ? invValues[invoiceCols.indexOf(c)] : lineCellValue(li, c.key))),
+            );
           }
         }
       }
     }
-    const csv = rows.map(r => r.map(esc).join(",")).join("\n");
+    const csv = rows.map((r) => r.map(esc).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -990,7 +1132,6 @@ const CommissionPage = () => {
     a.click();
     URL.revokeObjectURL(url);
   };
-
 
   const exportRepStatement = (d: CommissionRepData) => {
     const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
@@ -1007,30 +1148,76 @@ const CommissionPage = () => {
     rows.push(["Paid/Locked Commission", String(d.locked_commission)]);
     rows.push([]);
     rows.push([
-      "Invoice #", "Customer", "Date", "Status",
-      "Sub Total (excl. VAT)", "Credited", "Write-off", "Discount",
-      "Effective Rate %", "Commission",
-      "Line Item", "SKU", "Qty", "Sell Rate", "Cost", "Margin %", "Line Sub Total", "Line Rate %", "Line Commission", "Excluded Reason",
+      "Invoice #",
+      "Customer",
+      "Date",
+      "Status",
+      "Sub Total (excl. VAT)",
+      "Credited",
+      "Write-off",
+      "Discount",
+      "Effective Rate %",
+      "Commission",
+      "Line Item",
+      "SKU",
+      "Qty",
+      "Sell Rate",
+      "Cost",
+      "Margin %",
+      "Line Sub Total",
+      "Line Rate %",
+      "Line Commission",
+      "Excluded Reason",
     ]);
     for (const inv of d.invoices) {
       const status = (inv as any).is_locked ? "paid" : "due";
       const lines = inv.line_items || [];
       if (lines.length === 0) {
         rows.push([
-          inv.invoice_number, inv.customer_name, inv.date, status,
-          num2(inv.sub_total), num2(inv.credited_sub_total || 0), num2(inv.write_off_amount || 0), num2(inv.invoice_discount || 0),
-          num2(inv.commission_rate), num2(inv.commission),
-          "", "", "", "", "", "", "", "", "", "",
+          inv.invoice_number,
+          inv.customer_name,
+          inv.date,
+          status,
+          num2(inv.sub_total),
+          num2(inv.credited_sub_total || 0),
+          num2(inv.write_off_amount || 0),
+          num2(inv.invoice_discount || 0),
+          num2(inv.commission_rate),
+          num2(inv.commission),
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
         ]);
       } else {
         for (const li of lines) {
           rows.push([
-            inv.invoice_number, inv.customer_name, inv.date, status,
-            num2(inv.sub_total), num2(inv.credited_sub_total || 0), num2(inv.write_off_amount || 0), num2(inv.invoice_discount || 0),
-            num2(inv.commission_rate), num2(inv.commission),
-            li.name, li.code || "", num2(li.quantity), num2(li.rate), num2(li.cost),
+            inv.invoice_number,
+            inv.customer_name,
+            inv.date,
+            status,
+            num2(inv.sub_total),
+            num2(inv.credited_sub_total || 0),
+            num2(inv.write_off_amount || 0),
+            num2(inv.invoice_discount || 0),
+            num2(inv.commission_rate),
+            num2(inv.commission),
+            li.name,
+            li.code || "",
+            num2(li.quantity),
+            num2(li.rate),
+            num2(li.cost),
             num2(li.margin_percent),
-            num2(li.sub_total), num2(li.commission_rate), num2(li.commission), li.excluded_reason || "",
+            num2(li.sub_total),
+            num2(li.commission_rate),
+            num2(li.commission),
+            li.excluded_reason || "",
           ]);
         }
       }
@@ -1074,43 +1261,51 @@ const CommissionPage = () => {
     y += 6;
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
-    doc.text(`Total Invoiced (excl. VAT): ${formatCurrency(commissionData.summary.totalInvoiced)}`, 14, y); y += 5;
-    doc.text(`Total Commission Due: ${formatCurrency(commissionData.summary.totalCommission)}`, 14, y); y += 5;
-    doc.text(`Invoices Matched: ${commissionData.summary.totalInvoices}`, 14, y); y += 8;
+    doc.text(`Total Invoiced (excl. VAT): ${formatCurrency(commissionData.summary.totalInvoiced)}`, 14, y);
+    y += 5;
+    doc.text(`Total Commission Due: ${formatCurrency(commissionData.summary.totalCommission)}`, 14, y);
+    y += 5;
+    doc.text(`Invoices Matched: ${commissionData.summary.totalInvoices}`, 14, y);
+    y += 8;
 
     const cols = selectedExportColumns();
-    const invoiceCols = cols.filter(c => c.group === "invoice");
-    const lineCols = cols.filter(c => c.group === "line");
+    const invoiceCols = cols.filter((c) => c.group === "invoice");
+    const lineCols = cols.filter((c) => c.group === "line");
 
     // Per rep
     for (const rep of commissionData.data) {
-      if (y > 250) { doc.addPage(); y = 20; }
+      if (y > 250) {
+        doc.addPage();
+        y = 20;
+      }
       doc.setFontSize(13);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(0);
-      doc.text(rep.rep_name, 14, y); y += 5;
+      doc.text(rep.rep_name, 14, y);
+      y += 5;
       doc.setFontSize(9);
       doc.setFont("helvetica", "normal");
       doc.setTextColor(80);
       doc.text(
         `${rep.rep_email || "—"}  |  Rate: ${Number(rep.commission_rate).toFixed(2)}%  |  Invoices: ${rep.invoice_count}  |  Invoiced: ${formatCurrency(rep.total_invoiced)}  |  Commission: ${formatCurrency(rep.commission_earned)}`,
-        14, y,
+        14,
+        y,
       );
       y += 5;
 
       const body: string[][] = [];
       for (const inv of rep.invoices) {
-        const invValues = invoiceCols.map(c => invoiceCellValue(rep.rep_name, inv, c.key));
+        const invValues = invoiceCols.map((c) => invoiceCellValue(rep.rep_name, inv, c.key));
         const items = (inv.line_items || []) as any[];
         if (lineCols.length === 0 || items.length === 0) {
-          body.push(cols.map(c => (c.group === "invoice" ? invValues[invoiceCols.indexOf(c)] : "—")));
+          body.push(cols.map((c) => (c.group === "invoice" ? invValues[invoiceCols.indexOf(c)] : "—")));
         } else {
           for (const li of items) {
-            body.push(cols.map(c =>
-              c.group === "invoice"
-                ? invValues[invoiceCols.indexOf(c)]
-                : (lineCellValue(li, c.key) || "—")
-            ));
+            body.push(
+              cols.map((c) =>
+                c.group === "invoice" ? invValues[invoiceCols.indexOf(c)] : lineCellValue(li, c.key) || "—",
+              ),
+            );
           }
         }
       }
@@ -1118,7 +1313,7 @@ const CommissionPage = () => {
       if (body.length > 0 && cols.length > 0) {
         autoTable(doc, {
           startY: y,
-          head: [cols.map(c => c.label)],
+          head: [cols.map((c) => c.label)],
           body,
           styles: { fontSize: 7, cellPadding: 1.5, overflow: "linebreak" },
           headStyles: { fillColor: [16, 185, 129], fontSize: 7 },
@@ -1139,40 +1334,50 @@ const CommissionPage = () => {
     doc.save(`commission-report-${selectedMonth}.pdf`);
   };
 
-
-  const formatCurrency = (n: number) => `R ${n.toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const formatCurrency = (n: number) =>
+    `R ${n.toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   const getRepAssignedCompanies = (repId: string) =>
-    assignments.filter(a => a.rep_id === repId).map(a => {
-      const company = companies.find(c => c.id === a.company_id);
-      return company ? { name: company.name, overrideRate: a.commission_rate } : null;
-    }).filter(Boolean) as { name: string; overrideRate: number | null }[];
+    assignments
+      .filter((a) => a.rep_id === repId)
+      .map((a) => {
+        const company = companies.find((c) => c.id === a.company_id);
+        return company ? { name: company.name, overrideRate: a.commission_rate } : null;
+      })
+      .filter(Boolean) as { name: string; overrideRate: number | null }[];
 
   // Determine which month label to show
   const selectedDate = new Date(selectedMonth + "-01");
   const isPreviousMonth = format(subMonths(new Date(), 1), "yyyy-MM") === selectedMonth;
 
   return (
-    <div className="space-y-4">
-      <PageHeader
-        title="Commission"
-        icon={Percent}
-        description="Monthly rep commission reports and rate management."
-      />
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList>
-          <TabsTrigger value="report"><FileText className="h-4 w-4 mr-1.5" />Commission Report</TabsTrigger>
-          <TabsTrigger value="reps"><Users className="h-4 w-4 mr-1.5" />Manage Reps</TabsTrigger>
+    <div className="commission-page app-no-x-scroll min-w-0 w-full max-w-full space-y-5 overflow-x-hidden">
+      <PageHeader title="Commission" icon={Percent} description="Monthly rep commission reports and rate management." />
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="min-w-0">
+        <TabsList className="grid w-full max-w-md grid-cols-2 rounded-2xl bg-muted/60 p-1">
+          <TabsTrigger value="report">
+            <FileText className="h-4 w-4 mr-1.5" />
+            Commission Report
+          </TabsTrigger>
+          <TabsTrigger value="reps">
+            <Users className="h-4 w-4 mr-1.5" />
+            Manage Reps
+          </TabsTrigger>
         </TabsList>
 
         {/* Commission Report Tab */}
-        <TabsContent value="report" className="space-y-4">
+        <TabsContent value="report" className="space-y-5 min-w-0">
           {/* Info banner */}
-          <div className="flex items-start gap-2 p-3 rounded-lg bg-muted/50 text-sm text-muted-foreground">
+          <div className="commission-info flex items-start gap-3 rounded-2xl border border-border/60 bg-card/70 p-4 text-sm text-muted-foreground shadow-sm">
             <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
             <div>
-              <p className="font-medium text-foreground">Commission is calculated on amounts excluding VAT (sub-total)</p>
-              <p>This month's commission due = last month's sales. Default view shows previous month ({format(subMonths(new Date(), 1), "MMMM yyyy")}).</p>
+              <p className="font-medium text-foreground">
+                Commission is calculated on amounts excluding VAT (sub-total)
+              </p>
+              <p>
+                This month's commission due = last month's sales. Default view shows previous month (
+                {format(subMonths(new Date(), 1), "MMMM yyyy")}).
+              </p>
             </div>
           </div>
 
@@ -1190,8 +1395,7 @@ const CommissionPage = () => {
             />
           )}
 
-
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="commission-actions flex flex-wrap items-center gap-2 rounded-2xl border border-border/60 bg-card/75 p-3 shadow-sm">
             <Input
               type="month"
               value={selectedMonth}
@@ -1200,220 +1404,270 @@ const CommissionPage = () => {
             />
             {loadingReport && (
               <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />Calculating...
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Calculating...
               </span>
             )}
-            {commissionData && (() => {
-              type MissingRow = {
-                rep_name: string; invoice_number: string; customer_name: string;
-                date: string; code: string; name: string; description: string; quantity: number; sub_total: number;
-              };
-              const unresolved = commissionData.unresolved_cost_items || [];
-              const sigOf = (name: string, desc: string) =>
-                `${(name || "").toLowerCase().trim()}||${(desc || "").toLowerCase().trim()}`;
-              // Build per-line missing list from unresolved_cost_items (has name+description)
-              const missing: MissingRow[] = unresolved.map((u: any) => ({
-                rep_name: "",
-                invoice_number: u.invoice_number || "",
-                customer_name: u.customer_name || "",
-                date: "",
-                code: "",
-                name: u.item_name || "—",
-                description: u.item_description || "",
-                quantity: u.quantity || 0,
-                sub_total: u.sub_total || 0,
-              }));
-              // Group by (name + description) so each unique costable item is one editable row
-              type Group = { name: string; description: string; count: number; value: number; sample: MissingRow };
-              const byKey = new Map<string, Group>();
-              for (const m of missing) {
-                const k = sigOf(m.name, m.description);
-                const cur = byKey.get(k) || { name: m.name, description: m.description, count: 0, value: 0, sample: m };
-                cur.count += 1; cur.value += m.sub_total;
-                byKey.set(k, cur);
-              }
-              const groups = Array.from(byKey.entries())
-                .map(([k, g]) => ({ key: k, ...g }))
-                .sort((a, b) => b.value - a.value);
-              const totalValue = missing.reduce((s, m) => s + m.sub_total, 0);
-              const downloadMissingCsv = () => {
-                const rows = [["Item", "Description", "Occurrences", "Total Value (excl. VAT)"]];
-                for (const g of groups) rows.push([g.name, g.description, String(g.count), String(g.value)]);
-                const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
-                const blob = new Blob([csv], { type: "text/csv" });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement("a"); a.href = url; a.download = `missing-costs-${selectedMonth}.csv`; a.click();
-                URL.revokeObjectURL(url);
-              };
-              return (
-                <div className="contents">
-                  <Button variant="outline" onClick={() => setExportTarget("csv")}>
-                    <Download className="h-4 w-4 mr-1.5" />Export CSV
-                  </Button>
-                  <Button variant="outline" onClick={() => setExportTarget("pdf")}>
-                    <Printer className="h-4 w-4 mr-1.5" />Print Full Report
-                  </Button>
+            {commissionData &&
+              (() => {
+                type MissingRow = {
+                  rep_name: string;
+                  invoice_number: string;
+                  customer_name: string;
+                  date: string;
+                  code: string;
+                  name: string;
+                  description: string;
+                  quantity: number;
+                  sub_total: number;
+                };
+                const unresolved = commissionData.unresolved_cost_items || [];
+                const sigOf = (name: string, desc: string) =>
+                  `${(name || "").toLowerCase().trim()}||${(desc || "").toLowerCase().trim()}`;
+                // Build per-line missing list from unresolved_cost_items (has name+description)
+                const missing: MissingRow[] = unresolved.map((u: any) => ({
+                  rep_name: "",
+                  invoice_number: u.invoice_number || "",
+                  customer_name: u.customer_name || "",
+                  date: "",
+                  code: "",
+                  name: u.item_name || "—",
+                  description: u.item_description || "",
+                  quantity: u.quantity || 0,
+                  sub_total: u.sub_total || 0,
+                }));
+                // Group by (name + description) so each unique costable item is one editable row
+                type Group = { name: string; description: string; count: number; value: number; sample: MissingRow };
+                const byKey = new Map<string, Group>();
+                for (const m of missing) {
+                  const k = sigOf(m.name, m.description);
+                  const cur = byKey.get(k) || {
+                    name: m.name,
+                    description: m.description,
+                    count: 0,
+                    value: 0,
+                    sample: m,
+                  };
+                  cur.count += 1;
+                  cur.value += m.sub_total;
+                  byKey.set(k, cur);
+                }
+                const groups = Array.from(byKey.entries())
+                  .map(([k, g]) => ({ key: k, ...g }))
+                  .sort((a, b) => b.value - a.value);
+                const totalValue = missing.reduce((s, m) => s + m.sub_total, 0);
+                const downloadMissingCsv = () => {
+                  const rows = [["Item", "Description", "Occurrences", "Total Value (excl. VAT)"]];
+                  for (const g of groups) rows.push([g.name, g.description, String(g.count), String(g.value)]);
+                  const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+                  const blob = new Blob([csv], { type: "text/csv" });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = `missing-costs-${selectedMonth}.csv`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                };
+                return (
+                  <div className="contents">
+                    <Button variant="outline" onClick={() => setExportTarget("csv")}>
+                      <Download className="h-4 w-4 mr-1.5" />
+                      Export CSV
+                    </Button>
+                    <Button variant="outline" onClick={() => setExportTarget("pdf")}>
+                      <Printer className="h-4 w-4 mr-1.5" />
+                      Print Full Report
+                    </Button>
 
-                  <Dialog open={exportTarget !== null} onOpenChange={(o) => !o && setExportTarget(null)}>
-                    <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
-                      <DialogHeader>
-                        <DialogTitle>
-                          {exportTarget === "pdf" ? "Print Full Report — choose columns" : "Export CSV — choose columns"}
-                        </DialogTitle>
-                      </DialogHeader>
-                      <div className="space-y-4 py-1">
-                        <div className="flex items-center justify-between">
-                          <p className="text-sm text-muted-foreground">
-                            Invoice #, Customer, Date and Commission are always included.
-                          </p>
-                          <div className="flex gap-1">
-                            <Button
-                              variant="ghost" size="sm" className="h-7 px-2 text-xs"
-                              onClick={() => setExportColumns(EXPORT_COLUMNS.map(c => c.key))}
-                            >All</Button>
-                            <Button
-                              variant="ghost" size="sm" className="h-7 px-2 text-xs"
-                              onClick={() => setExportColumns([...LOCKED_EXPORT_COLUMNS])}
-                            >Reset</Button>
-                          </div>
-                        </div>
-
-                        {(["invoice", "line"] as const).map(group => (
-                          <div key={group} className="space-y-2">
-                            <Label className="text-xs uppercase tracking-wide text-muted-foreground">
-                              {group === "invoice" ? "Invoice columns" : "Line item columns"}
-                            </Label>
-                            <div className="grid grid-cols-2 gap-2 rounded-md border border-border p-3">
-                              {EXPORT_COLUMNS.filter(c => c.group === group).map(col => {
-                                const locked = LOCKED_EXPORT_COLUMNS.includes(col.key);
-                                return (
-                                  <label
-                                    key={col.key}
-                                    className={cn("flex items-center gap-2 text-sm", locked ? "opacity-70" : "cursor-pointer")}
-                                  >
-                                    <Checkbox
-                                      checked={exportColumns.includes(col.key)}
-                                      disabled={locked}
-                                      onCheckedChange={() =>
-                                        setExportColumns(prev =>
-                                          prev.includes(col.key)
-                                            ? prev.filter(k => k !== col.key)
-                                            : [...prev, col.key]
-                                        )
-                                      }
-                                    />
-                                    <span>{col.label}</span>
-                                  </label>
-                                );
-                              })}
+                    <Dialog open={exportTarget !== null} onOpenChange={(o) => !o && setExportTarget(null)}>
+                      <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+                        <DialogHeader>
+                          <DialogTitle>
+                            {exportTarget === "pdf"
+                              ? "Print Full Report — choose columns"
+                              : "Export CSV — choose columns"}
+                          </DialogTitle>
+                        </DialogHeader>
+                        <div className="space-y-4 py-1">
+                          <div className="flex items-center justify-between">
+                            <p className="text-sm text-muted-foreground">
+                              Invoice #, Customer, Date and Commission are always included.
+                            </p>
+                            <div className="flex gap-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 px-2 text-xs"
+                                onClick={() => setExportColumns(EXPORT_COLUMNS.map((c) => c.key))}
+                              >
+                                All
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 px-2 text-xs"
+                                onClick={() => setExportColumns([...LOCKED_EXPORT_COLUMNS])}
+                              >
+                                Reset
+                              </Button>
                             </div>
                           </div>
-                        ))}
-                      </div>
-                      <DialogFooter>
-                        <Button variant="outline" onClick={() => setExportTarget(null)}>Cancel</Button>
-                        <Button
-                          onClick={() => {
-                            if (exportTarget === "pdf") printPdfReport(); else exportCsv();
-                            setExportTarget(null);
-                          }}
-                        >
-                          {exportTarget === "pdf" ? "Print report" : "Download CSV"}
-                        </Button>
-                      </DialogFooter>
-                    </DialogContent>
-                  </Dialog>
 
+                          {(["invoice", "line"] as const).map((group) => (
+                            <div key={group} className="space-y-2">
+                              <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                                {group === "invoice" ? "Invoice columns" : "Line item columns"}
+                              </Label>
+                              <div className="grid grid-cols-2 gap-2 rounded-md border border-border p-3">
+                                {EXPORT_COLUMNS.filter((c) => c.group === group).map((col) => {
+                                  const locked = LOCKED_EXPORT_COLUMNS.includes(col.key);
+                                  return (
+                                    <label
+                                      key={col.key}
+                                      className={cn(
+                                        "flex items-center gap-2 text-sm",
+                                        locked ? "opacity-70" : "cursor-pointer",
+                                      )}
+                                    >
+                                      <Checkbox
+                                        checked={exportColumns.includes(col.key)}
+                                        disabled={locked}
+                                        onCheckedChange={() =>
+                                          setExportColumns((prev) =>
+                                            prev.includes(col.key)
+                                              ? prev.filter((k) => k !== col.key)
+                                              : [...prev, col.key],
+                                          )
+                                        }
+                                      />
+                                      <span>{col.label}</span>
+                                    </label>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        <DialogFooter>
+                          <Button variant="outline" onClick={() => setExportTarget(null)}>
+                            Cancel
+                          </Button>
+                          <Button
+                            onClick={() => {
+                              if (exportTarget === "pdf") printPdfReport();
+                              else exportCsv();
+                              setExportTarget(null);
+                            }}
+                          >
+                            {exportTarget === "pdf" ? "Print report" : "Download CSV"}
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
 
-
-                  <TooltipProvider delayDuration={150}>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="outline"
-                          onClick={() => setMissingDialogOpen(true)}
-                          className={cn(
-                            "gap-1.5 relative transition-all",
-                            missing.length > 0 &&
-                              "border-amber-500/70 text-amber-600 hover:text-amber-700 hover:bg-amber-500/10 dark:text-amber-400 dark:hover:text-amber-300 shadow-[0_0_0_3px_rgba(245,158,11,0.15)] ring-1 ring-amber-500/40"
-                          )}
-                        >
-                          {missing.length > 0 && (
-                            <span className="relative flex h-2 w-2">
-                              <span className="absolute inline-flex h-full w-full rounded-full bg-amber-500 opacity-75 animate-ping" />
-                              <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
-                            </span>
-                          )}
-                          <AlertTriangle className="h-4 w-4" />
-                          Missing Costs{missing.length > 0 ? ` (${missing.length})` : ""}
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent side="bottom" className="max-w-xs">
-                        {missing.length > 0 ? (
-                          <div className="space-y-1">
-                            <p className="font-semibold text-amber-500">
-                              {missing.length} item{missing.length === 1 ? "" : "s"} need a cost
-                            </p>
+                    <TooltipProvider delayDuration={150}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="outline"
+                            onClick={() => setMissingDialogOpen(true)}
+                            className={cn(
+                              "gap-1.5 relative transition-all",
+                              missing.length > 0 &&
+                                "border-amber-500/70 text-amber-600 hover:text-amber-700 hover:bg-amber-500/10 dark:text-amber-400 dark:hover:text-amber-300 shadow-[0_0_0_3px_rgba(245,158,11,0.15)] ring-1 ring-amber-500/40",
+                            )}
+                          >
+                            {missing.length > 0 && (
+                              <span className="relative flex h-2 w-2">
+                                <span className="absolute inline-flex h-full w-full rounded-full bg-amber-500 opacity-75 animate-ping" />
+                                <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
+                              </span>
+                            )}
+                            <AlertTriangle className="h-4 w-4" />
+                            Missing Costs{missing.length > 0 ? ` (${missing.length})` : ""}
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" className="max-w-xs">
+                          {missing.length > 0 ? (
+                            <div className="space-y-1">
+                              <p className="font-semibold text-amber-500">
+                                {missing.length} item{missing.length === 1 ? "" : "s"} need a cost
+                              </p>
+                              <p className="text-xs">
+                                These invoice lines have no matching vendor-bill cost, so their commission can't be
+                                calculated. Click to enter the cost (excl. VAT) for each item — the report refreshes
+                                automatically once saved.
+                              </p>
+                            </div>
+                          ) : (
                             <p className="text-xs">
-                              These invoice lines have no matching vendor-bill cost, so their commission can't be calculated. Click to enter the cost (excl. VAT) for each item — the report refreshes automatically once saved.
+                              All items have a matched vendor-bill cost. Open to review or manually override any item
+                              cost.
                             </p>
-                          </div>
-                        ) : (
-                          <p className="text-xs">
-                            All items have a matched vendor-bill cost. Open to review or manually override any item cost.
-                          </p>
-                        )}
+                          )}
                           <p className="mt-1 text-[10px] uppercase tracking-wide text-muted-foreground">
                             Shortcut: Shift + M
                           </p>
                         </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                  <Dialog open={missingDialogOpen} onOpenChange={setMissingDialogOpen}>
-                    <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
-                      <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2">
-                          <AlertTriangle className="h-4 w-4 text-amber-500" />
-                          Items with Missing Cost
-                        </DialogTitle>
-                      </DialogHeader>
-                      <MissingCostsEditor
-                        groups={groups}
-                        missingCount={missing.length}
-                        totalValue={totalValue}
-                        onExport={downloadMissingCsv}
-                        onSaved={() => fetchCommissionReport(true)}
-                        formatCurrency={formatCurrency}
-                      />
-                    </DialogContent>
-                  </Dialog>
-                </div>
-              );
-            })()}
+                      </Tooltip>
+                    </TooltipProvider>
+                    <Dialog open={missingDialogOpen} onOpenChange={setMissingDialogOpen}>
+                      <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+                        <DialogHeader>
+                          <DialogTitle className="flex items-center gap-2">
+                            <AlertTriangle className="h-4 w-4 text-amber-500" />
+                            Items with Missing Cost
+                          </DialogTitle>
+                        </DialogHeader>
+                        <MissingCostsEditor
+                          groups={groups}
+                          missingCount={missing.length}
+                          totalValue={totalValue}
+                          onExport={downloadMissingCsv}
+                          onSaved={() => fetchCommissionReport(true)}
+                          formatCurrency={formatCurrency}
+                        />
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+                );
+              })()}
             {isPreviousMonth && (
-              <Badge variant="default" className="text-xs">Commission Due This Month</Badge>
+              <Badge variant="default" className="text-xs">
+                Commission Due This Month
+              </Badge>
             )}
           </div>
 
           {/* Summary Cards */}
           {commissionData && (
             <div className="contents">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <Card>
-                  <CardContent className="pt-4 pb-3">
-                    <p className="text-xs text-muted-foreground">Total Invoiced (excl. VAT)</p>
-                    <p className="text-2xl font-bold text-foreground">{formatCurrency(commissionData.summary.totalInvoiced)}</p>
+              <div className="commission-kpis grid grid-cols-1 md:grid-cols-3 gap-3">
+                <Card className="commission-kpi rounded-[22px] border-border/60 shadow-sm overflow-hidden">
+                  <CardContent className="pt-5 pb-4">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                      Total Invoiced (excl. VAT)
+                    </p>
+                    <p className="text-2xl font-bold text-foreground">
+                      {formatCurrency(commissionData.summary.totalInvoiced)}
+                    </p>
                   </CardContent>
                 </Card>
-                <Card>
-                  <CardContent className="pt-4 pb-3">
-                    <p className="text-xs text-muted-foreground">Total Commission Due</p>
-                    <p className="text-2xl font-bold text-primary">{formatCurrency(commissionData.summary.totalCommission)}</p>
+                <Card className="commission-kpi commission-kpi-primary rounded-[22px] border-primary/20 shadow-sm overflow-hidden">
+                  <CardContent className="pt-5 pb-4">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                      Total Commission Due
+                    </p>
+                    <p className="text-2xl font-bold text-primary">
+                      {formatCurrency(commissionData.summary.totalCommission)}
+                    </p>
                   </CardContent>
                 </Card>
-                <Card>
-                  <CardContent className="pt-4 pb-3">
-                    <p className="text-xs text-muted-foreground">Invoices Matched</p>
+                <Card className="commission-kpi rounded-[22px] border-border/60 shadow-sm overflow-hidden">
+                  <CardContent className="pt-5 pb-4">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                      Invoices Matched
+                    </p>
                     <p className="text-2xl font-bold text-foreground">{commissionData.summary.totalInvoices}</p>
                   </CardContent>
                 </Card>
@@ -1422,14 +1676,24 @@ const CommissionPage = () => {
               {/* Missing Costs are shown via a small trigger in the action bar above; details open in a dialog. */}
               <div className="space-y-3">
                 {commissionData.data.map((d) => (
-                  <Card key={d.rep_id} className={cn(d.is_locked && "opacity-70")}>
+                  <Card
+                    key={d.rep_id}
+                    className={cn(
+                      "commission-rep-card rounded-[22px] border-border/60 shadow-sm overflow-hidden transition-all hover:shadow-md",
+                      d.is_locked && "opacity-70",
+                    )}
+                  >
                     <CardHeader className="pb-2">
                       <div className="flex items-center justify-between gap-3 flex-wrap">
                         <div
                           className="flex items-center gap-2 cursor-pointer flex-1 min-w-0"
                           onClick={() => toggleExpanded(d.rep_id)}
                         >
-                          {expandedReps.has(d.rep_id) ? <ChevronDown className="h-4 w-4 shrink-0" /> : <ChevronRight className="h-4 w-4 shrink-0" />}
+                          {expandedReps.has(d.rep_id) ? (
+                            <ChevronDown className="h-4 w-4 shrink-0" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4 shrink-0" />
+                          )}
                           <CardTitle className="text-base truncate">{d.rep_name}</CardTitle>
                           <Badge variant="secondary">{Number(d.commission_rate).toFixed(2)}% default</Badge>
                           {d.locked_invoice_count > 0 && (
@@ -1441,11 +1705,15 @@ const CommissionPage = () => {
                         </div>
                         <div className="flex items-center gap-3 text-sm">
                           <div className="text-right">
-                            <div className="text-xs text-muted-foreground">{d.invoice_count} due • {formatCurrency(d.total_invoiced)}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {d.invoice_count} due • {formatCurrency(d.total_invoiced)}
+                            </div>
                             <div className="font-bold text-primary">{formatCurrency(d.commission_earned)}</div>
                             {typeof d.adjustments_total === "number" && d.adjustments_total !== 0 && (
                               <div className="text-[10px] text-muted-foreground">
-                                {d.adjustments_total > 0 ? "+" : ""}{formatCurrency(d.adjustments_total)} adj → net {formatCurrency(d.net_commission ?? d.commission_earned)}
+                                {d.adjustments_total > 0 ? "+" : ""}
+                                {formatCurrency(d.adjustments_total)} adj → net{" "}
+                                {formatCurrency(d.net_commission ?? d.commission_earned)}
                               </div>
                             )}
                             {(d.open_adjustment_count ?? 0) > 0 && (
@@ -1457,7 +1725,10 @@ const CommissionPage = () => {
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={(e) => { e.stopPropagation(); setManageRep(d); }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setManageRep(d);
+                            }}
                             className="gap-1"
                             title="Payout batches & adjustments"
                           >
@@ -1468,7 +1739,10 @@ const CommissionPage = () => {
                             <Button
                               size="sm"
                               variant="default"
-                              onClick={(e) => { e.stopPropagation(); lockRepPayout(d); }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                lockRepPayout(d);
+                              }}
                               className="gap-1"
                             >
                               <Lock className="h-3.5 w-3.5" />
@@ -1478,18 +1752,24 @@ const CommissionPage = () => {
                             <Button
                               size="sm"
                               variant="ghost"
-                              onClick={(e) => { e.stopPropagation(); unlockRepPayout(d); }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                unlockRepPayout(d);
+                              }}
                               className="gap-1 text-muted-foreground"
                             >
                               <Unlock className="h-3.5 w-3.5" />
                               Unlock
                             </Button>
                           ) : null}
-                          {(d.invoices.length > 0) && (
+                          {d.invoices.length > 0 && (
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={(e) => { e.stopPropagation(); exportRepStatement(d); }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                exportRepStatement(d);
+                              }}
                               className="gap-1"
                               title="Download rep statement (CSV)"
                             >
@@ -1520,7 +1800,9 @@ const CommissionPage = () => {
                             <p className="text-xs font-medium mb-2 text-muted-foreground">Assigned clients</p>
                             <ul className="space-y-1 text-sm">
                               {d.companies.map((c, idx) => (
-                                <li key={idx} className="truncate">{c}</li>
+                                <li key={idx} className="truncate">
+                                  {c}
+                                </li>
                               ))}
                             </ul>
                           </PopoverContent>
@@ -1547,82 +1829,108 @@ const CommissionPage = () => {
                                 const isOpen = expandedInvoices.has(invKey);
                                 const lines = inv.line_items || [];
                                 const hasLines = lines.length > 0;
-                                const itemCommissionTotal = lines.reduce((sum, line) => sum + Number(line.commission || 0), 0);
+                                const itemCommissionTotal = lines.reduce(
+                                  (sum, line) => sum + Number(line.commission || 0),
+                                  0,
+                                );
                                 return [
-                                    <tr
-                                      key={`${invKey}-row`}
-                                      className={cn(
-                                        "border-t",
-                                        hasLines && "cursor-pointer hover:bg-muted/40",
-                                        inv.locked && "opacity-60"
-                                      )}
-                                      onClick={() => {
-                                        if (!hasLines) return;
-                                        setExpandedInvoices(prev => {
-                                          const next = new Set(prev);
-                                          if (next.has(invKey)) next.delete(invKey); else next.add(invKey);
-                                          return next;
-                                        });
-                                      }}
-                                    >
-                                      <td className="p-2">
-                                        <span className="inline-flex items-center gap-1">
-                                          {hasLines && (isOpen
-                                            ? <ChevronDown className="h-3 w-3 text-muted-foreground" />
-                                            : <ChevronRight className="h-3 w-3 text-muted-foreground" />)}
-                                          {inv.invoice_number}
-                                          {inv.locked && <Lock className="h-3 w-3 text-muted-foreground ml-1" />}
-                                          {(inv.credited_sub_total ?? 0) > 0 && (
-                                            <Badge variant="outline" className="text-[10px] ml-1 border-amber-500/60 text-amber-700 dark:text-amber-300">
-                                              −{formatCurrency(inv.credited_sub_total || 0)} credited
-                                            </Badge>
-                                          )}
-                                          {(inv.write_off_amount ?? 0) > 0 && (
-                                            <Badge variant="outline" className="text-[10px] ml-1 border-red-500/60 text-red-700 dark:text-red-300">
-                                              −{formatCurrency(inv.write_off_amount || 0)} written off
-                                            </Badge>
-                                          )}
-                                          {(inv.invoice_discount ?? 0) > 0 && (
-                                            <Badge variant="outline" className="text-[10px] ml-1 border-blue-500/60 text-blue-700 dark:text-blue-300">
-                                              −{formatCurrency(inv.invoice_discount || 0)} discount
-                                            </Badge>
-                                          )}
-                                          {(inv.excluded_line_count ?? 0) > 0 && (
-                                            <Badge variant="outline" className="text-[10px] ml-1 border-muted-foreground/40 text-muted-foreground">
-                                              {inv.excluded_line_count} excluded
-                                            </Badge>
-                                          )}
-                                        </span>
-                                      </td>
-                                      <td className="p-2">{inv.customer_name}</td>
-                                      <td className="p-2">{inv.date}</td>
-                                      <td className="p-2 text-right">
-                                        {formatCurrency(inv.sub_total)}
-                                        {(inv.credited_sub_total ?? 0) > 0 && (inv.gross_sub_total ?? 0) > 0 && (
-                                          <div className="text-[10px] text-muted-foreground line-through">
-                                            {formatCurrency(inv.gross_sub_total || 0)}
-                                          </div>
+                                  <tr
+                                    key={`${invKey}-row`}
+                                    className={cn(
+                                      "border-t",
+                                      hasLines && "cursor-pointer hover:bg-muted/40",
+                                      inv.locked && "opacity-60",
+                                    )}
+                                    onClick={() => {
+                                      if (!hasLines) return;
+                                      setExpandedInvoices((prev) => {
+                                        const next = new Set(prev);
+                                        if (next.has(invKey)) next.delete(invKey);
+                                        else next.add(invKey);
+                                        return next;
+                                      });
+                                    }}
+                                  >
+                                    <td className="p-2">
+                                      <span className="inline-flex items-center gap-1">
+                                        {hasLines &&
+                                          (isOpen ? (
+                                            <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                                          ) : (
+                                            <ChevronRight className="h-3 w-3 text-muted-foreground" />
+                                          ))}
+                                        {inv.invoice_number}
+                                        {inv.locked && <Lock className="h-3 w-3 text-muted-foreground ml-1" />}
+                                        {(inv.credited_sub_total ?? 0) > 0 && (
+                                          <Badge
+                                            variant="outline"
+                                            className="text-[10px] ml-1 border-amber-500/60 text-amber-700 dark:text-amber-300"
+                                          >
+                                            −{formatCurrency(inv.credited_sub_total || 0)} credited
+                                          </Badge>
                                         )}
-                                      </td>
-                                      <td className="p-2 text-right">
-                                        <Badge variant={inv.commission_rate !== d.commission_rate ? "outline" : "secondary"} className="text-xs">
-                                          {Number(inv.commission_rate).toFixed(2)}%
-                                        </Badge>
-                                      </td>
-                                      <td className="p-2 text-right font-medium text-primary">{formatCurrency(inv.commission)}</td>
-                                    </tr>,
-                                    isOpen && hasLines ? (
-                                      <tr key={`${invKey}-items`} className="bg-muted/20">
-                                        <td colSpan={6} className="p-0">
-                                          <div className="px-4 py-3">
-                                            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                                              <p className="text-xs font-medium text-muted-foreground">Line items ({lines.length})</p>
-                                              <Badge variant="secondary" className="text-xs">
-                                                Item commission total: {formatCurrency(itemCommissionTotal)}
-                                              </Badge>
-                                            </div>
-                                            <div className="overflow-x-auto">
-                                            <table className="min-w-[920px] w-full text-xs">
+                                        {(inv.write_off_amount ?? 0) > 0 && (
+                                          <Badge
+                                            variant="outline"
+                                            className="text-[10px] ml-1 border-red-500/60 text-red-700 dark:text-red-300"
+                                          >
+                                            −{formatCurrency(inv.write_off_amount || 0)} written off
+                                          </Badge>
+                                        )}
+                                        {(inv.invoice_discount ?? 0) > 0 && (
+                                          <Badge
+                                            variant="outline"
+                                            className="text-[10px] ml-1 border-blue-500/60 text-blue-700 dark:text-blue-300"
+                                          >
+                                            −{formatCurrency(inv.invoice_discount || 0)} discount
+                                          </Badge>
+                                        )}
+                                        {(inv.excluded_line_count ?? 0) > 0 && (
+                                          <Badge
+                                            variant="outline"
+                                            className="text-[10px] ml-1 border-muted-foreground/40 text-muted-foreground"
+                                          >
+                                            {inv.excluded_line_count} excluded
+                                          </Badge>
+                                        )}
+                                      </span>
+                                    </td>
+                                    <td className="p-2">{inv.customer_name}</td>
+                                    <td className="p-2">{inv.date}</td>
+                                    <td className="p-2 text-right">
+                                      {formatCurrency(inv.sub_total)}
+                                      {(inv.credited_sub_total ?? 0) > 0 && (inv.gross_sub_total ?? 0) > 0 && (
+                                        <div className="text-[10px] text-muted-foreground line-through">
+                                          {formatCurrency(inv.gross_sub_total || 0)}
+                                        </div>
+                                      )}
+                                    </td>
+                                    <td className="p-2 text-right">
+                                      <Badge
+                                        variant={inv.commission_rate !== d.commission_rate ? "outline" : "secondary"}
+                                        className="text-xs"
+                                      >
+                                        {Number(inv.commission_rate).toFixed(2)}%
+                                      </Badge>
+                                    </td>
+                                    <td className="p-2 text-right font-medium text-primary">
+                                      {formatCurrency(inv.commission)}
+                                    </td>
+                                  </tr>,
+                                  isOpen && hasLines ? (
+                                    <tr key={`${invKey}-items`} className="bg-muted/20">
+                                      <td colSpan={6} className="p-0">
+                                        <div className="px-4 py-3">
+                                          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                                            <p className="text-xs font-medium text-muted-foreground">
+                                              Line items ({lines.length})
+                                            </p>
+                                            <Badge variant="secondary" className="text-xs">
+                                              Item commission total: {formatCurrency(itemCommissionTotal)}
+                                            </Badge>
+                                          </div>
+                                          <div className="overflow-hidden">
+                                            <table className="commission-line-table w-full table-fixed text-xs">
                                               <thead className="text-muted-foreground">
                                                 <tr>
                                                   <th className="text-left py-1 font-medium">Item</th>
@@ -1638,64 +1946,104 @@ const CommissionPage = () => {
                                               <tbody>
                                                 {lines.map((li, j) => {
                                                   const editDisabled = inv.locked;
-                                                  const cellInputClass = "w-24 ml-auto h-7 text-xs text-right px-1.5 bg-transparent border border-transparent hover:border-border focus:border-primary focus:bg-background rounded transition-colors disabled:opacity-60 disabled:cursor-not-allowed";
-                                                  const handleBlur = (
-                                                    field: "sell_rate" | "cost" | "sub_total" | "commission_rate" | "commission",
-                                                    original: number | null,
-                                                  ) => (e: FocusEvent<HTMLInputElement>) => {
-                                                    const key = `${d.rep_id}|${inv.invoice_id}|${j}|${field}`;
-                                                    const t = saveTimersRef.current.get(key);
-                                                    if (t) { clearTimeout(t); saveTimersRef.current.delete(key); }
-                                                    pendingSavesRef.current.delete(key);
-                                                    const newVal = e.target.value.trim();
-                                                    const orig = original == null ? "" : String(original);
-                                                    if (newVal === orig) return;
-                                                    saveLineOverride(d.rep_id, inv.invoice_id, j, field, newVal);
-                                                  };
-                                                  const handleChange = (
-                                                    field: "sell_rate" | "cost" | "sub_total" | "commission_rate" | "commission",
-                                                    original: number | null,
-                                                  ) => (e: React.ChangeEvent<HTMLInputElement>) => {
-                                                    const key = `${d.rep_id}|${inv.invoice_id}|${j}|${field}`;
-                                                    const newVal = e.target.value.trim();
-                                                    const orig = original == null ? "" : String(original);
-                                                    const existing = saveTimersRef.current.get(key);
-                                                    if (existing) clearTimeout(existing);
-                                                    if (newVal === orig) {
-                                                      saveTimersRef.current.delete(key);
+                                                  const cellInputClass =
+                                                    "w-24 ml-auto h-7 text-xs text-right px-1.5 bg-transparent border border-transparent hover:border-border focus:border-primary focus:bg-background rounded transition-colors disabled:opacity-60 disabled:cursor-not-allowed";
+                                                  const handleBlur =
+                                                    (
+                                                      field:
+                                                        | "sell_rate"
+                                                        | "cost"
+                                                        | "sub_total"
+                                                        | "commission_rate"
+                                                        | "commission",
+                                                      original: number | null,
+                                                    ) =>
+                                                    (e: FocusEvent<HTMLInputElement>) => {
+                                                      const key = `${d.rep_id}|${inv.invoice_id}|${j}|${field}`;
+                                                      const t = saveTimersRef.current.get(key);
+                                                      if (t) {
+                                                        clearTimeout(t);
+                                                        saveTimersRef.current.delete(key);
+                                                      }
                                                       pendingSavesRef.current.delete(key);
-                                                      return;
-                                                    }
-                                                    const run = () => {
-                                                      saveTimersRef.current.delete(key);
-                                                      pendingSavesRef.current.delete(key);
+                                                      const newVal = e.target.value.trim();
+                                                      const orig = original == null ? "" : String(original);
+                                                      if (newVal === orig) return;
                                                       saveLineOverride(d.rep_id, inv.invoice_id, j, field, newVal);
                                                     };
-                                                    pendingSavesRef.current.set(key, run);
-                                                    saveTimersRef.current.set(key, setTimeout(run, 700));
-                                                  };
+                                                  const handleChange =
+                                                    (
+                                                      field:
+                                                        | "sell_rate"
+                                                        | "cost"
+                                                        | "sub_total"
+                                                        | "commission_rate"
+                                                        | "commission",
+                                                      original: number | null,
+                                                    ) =>
+                                                    (e: React.ChangeEvent<HTMLInputElement>) => {
+                                                      const key = `${d.rep_id}|${inv.invoice_id}|${j}|${field}`;
+                                                      const newVal = e.target.value.trim();
+                                                      const orig = original == null ? "" : String(original);
+                                                      const existing = saveTimersRef.current.get(key);
+                                                      if (existing) clearTimeout(existing);
+                                                      if (newVal === orig) {
+                                                        saveTimersRef.current.delete(key);
+                                                        pendingSavesRef.current.delete(key);
+                                                        return;
+                                                      }
+                                                      const run = () => {
+                                                        saveTimersRef.current.delete(key);
+                                                        pendingSavesRef.current.delete(key);
+                                                        saveLineOverride(d.rep_id, inv.invoice_id, j, field, newVal);
+                                                      };
+                                                      pendingSavesRef.current.set(key, run);
+                                                      saveTimersRef.current.set(key, setTimeout(run, 700));
+                                                    };
                                                   return (
-                                                    <tr key={j} className={cn("border-t border-border/40", li.excluded_reason && "opacity-60") }>
+                                                    <tr
+                                                      key={j}
+                                                      className={cn(
+                                                        "border-t border-border/40",
+                                                        li.excluded_reason && "opacity-60",
+                                                      )}
+                                                    >
                                                       <td className="py-1.5 pr-2">
                                                         <div className="font-medium text-foreground flex items-center gap-1.5 flex-wrap">
                                                           <span>{li.name || "—"}</span>
                                                           {li.excluded_reason && (
-                                                            <Badge variant="outline" className="text-[9px] px-1 py-0 border-muted-foreground/40 text-muted-foreground uppercase">
-                                                              {li.excluded_reason === 'zero_cost' ? 'Zero cost' : li.excluded_reason === 'negative_margin' ? 'Below cost' : 'No cost'}
+                                                            <Badge
+                                                              variant="outline"
+                                                              className="text-[9px] px-1 py-0 border-muted-foreground/40 text-muted-foreground uppercase"
+                                                            >
+                                                              {li.excluded_reason === "zero_cost"
+                                                                ? "Zero cost"
+                                                                : li.excluded_reason === "negative_margin"
+                                                                  ? "Below cost"
+                                                                  : "No cost"}
                                                             </Badge>
                                                           )}
                                                           {(li.discount_applied ?? 0) > 0 && (
-                                                            <Badge variant="outline" className="text-[9px] px-1 py-0 border-blue-500/50 text-blue-600 dark:text-blue-300">
+                                                            <Badge
+                                                              variant="outline"
+                                                              className="text-[9px] px-1 py-0 border-blue-500/50 text-blue-600 dark:text-blue-300"
+                                                            >
                                                               −{formatCurrency(li.discount_applied || 0)} disc
                                                             </Badge>
                                                           )}
                                                         </div>
-                                                        {li.code && <div className="text-[10px] text-muted-foreground">{li.code}</div>}
+                                                        {li.code && (
+                                                          <div className="text-[10px] text-muted-foreground">
+                                                            {li.code}
+                                                          </div>
+                                                        )}
                                                       </td>
                                                       <td className="py-1.5 text-right">{li.quantity}</td>
                                                       <td className="py-1.5 text-right">
                                                         <input
-                                                          type="number" step="0.01" disabled={editDisabled}
+                                                          type="number"
+                                                          step="0.01"
+                                                          disabled={editDisabled}
                                                           defaultValue={li.rate ?? ""}
                                                           onChange={handleChange("sell_rate", li.rate)}
                                                           onBlur={handleBlur("sell_rate", li.rate)}
@@ -1705,7 +2053,9 @@ const CommissionPage = () => {
                                                       </td>
                                                       <td className="py-1.5 text-right text-muted-foreground">
                                                         <input
-                                                          type="number" step="0.01" disabled={editDisabled}
+                                                          type="number"
+                                                          step="0.01"
+                                                          disabled={editDisabled}
                                                           defaultValue={li.cost ?? ""}
                                                           placeholder="—"
                                                           onChange={handleChange("cost", li.cost)}
@@ -1716,16 +2066,24 @@ const CommissionPage = () => {
                                                       </td>
                                                       <td className="py-1.5 text-right">
                                                         {li.margin_percent !== null ? (
-                                                          <span className={cn(
-                                                            li.margin_percent >= 25 ? "text-primary" : "text-destructive"
-                                                          )}>
+                                                          <span
+                                                            className={cn(
+                                                              li.margin_percent >= 25
+                                                                ? "text-primary"
+                                                                : "text-destructive",
+                                                            )}
+                                                          >
                                                             {Number(li.margin_percent).toFixed(2)}%
                                                           </span>
-                                                        ) : <span className="text-muted-foreground">—</span>}
+                                                        ) : (
+                                                          <span className="text-muted-foreground">—</span>
+                                                        )}
                                                       </td>
                                                       <td className="py-1.5 text-right">
                                                         <input
-                                                          type="number" step="0.01" disabled={editDisabled}
+                                                          type="number"
+                                                          step="0.01"
+                                                          disabled={editDisabled}
                                                           defaultValue={li.sub_total ?? ""}
                                                           onChange={handleChange("sub_total", li.sub_total)}
                                                           onBlur={handleBlur("sub_total", li.sub_total)}
@@ -1735,7 +2093,9 @@ const CommissionPage = () => {
                                                       </td>
                                                       <td className="py-1.5 text-right">
                                                         <input
-                                                          type="number" step="0.01" disabled={editDisabled}
+                                                          type="number"
+                                                          step="0.01"
+                                                          disabled={editDisabled}
                                                           defaultValue={li.commission_rate ?? ""}
                                                           onChange={handleChange("commission_rate", li.commission_rate)}
                                                           onBlur={handleBlur("commission_rate", li.commission_rate)}
@@ -1745,7 +2105,9 @@ const CommissionPage = () => {
                                                       </td>
                                                       <td className="py-1.5 text-right font-medium text-primary">
                                                         <input
-                                                          type="number" step="0.01" disabled={editDisabled}
+                                                          type="number"
+                                                          step="0.01"
+                                                          disabled={editDisabled}
                                                           defaultValue={li.commission ?? ""}
                                                           onChange={handleChange("commission", li.commission)}
                                                           onBlur={handleBlur("commission", li.commission)}
@@ -1758,12 +2120,12 @@ const CommissionPage = () => {
                                                 })}
                                               </tbody>
                                             </table>
-                                            </div>
                                           </div>
-                                        </td>
-                                      </tr>
-                                    ) : null,
-                                  ].filter(Boolean);
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  ) : null,
+                                ].filter(Boolean);
                               })}
                             </tbody>
                           </table>
@@ -1794,7 +2156,7 @@ const CommissionPage = () => {
         </TabsContent>
 
         {/* Manage Reps Tab */}
-        <TabsContent value="reps" className="space-y-4">
+        <TabsContent value="reps" className="space-y-5 min-w-0">
           <div className="flex justify-between items-center flex-wrap gap-2">
             <h2 className="text-lg font-semibold">Sales Reps</h2>
             <div className="flex items-center gap-2 flex-wrap">
@@ -1813,7 +2175,8 @@ const CommissionPage = () => {
                   className="h-7 text-xs"
                   onClick={() => setMethodFilter("margin_scaled")}
                 >
-                  Margin-scaled ({reps.filter(r => (r.commission_method || "margin_scaled") === "margin_scaled").length})
+                  Margin-scaled (
+                  {reps.filter((r) => (r.commission_method || "margin_scaled") === "margin_scaled").length})
                 </Button>
                 <Button
                   size="sm"
@@ -1821,17 +2184,26 @@ const CommissionPage = () => {
                   className="h-7 text-xs"
                   onClick={() => setMethodFilter("half_markup_below_25")}
                 >
-                  Half-markup ({reps.filter(r => r.commission_method === "half_markup_below_25").length})
+                  Half-markup ({reps.filter((r) => r.commission_method === "half_markup_below_25").length})
                 </Button>
               </div>
-              <Button onClick={() => { setEditingRep(null); setRepForm({ name: "", email: "", commission_rate: "5", commission_method: "margin_scaled" }); setRepDialogOpen(true); }}>
-                <Plus className="h-4 w-4 mr-1.5" />Add Rep
+              <Button
+                onClick={() => {
+                  setEditingRep(null);
+                  setRepForm({ name: "", email: "", commission_rate: "5", commission_method: "margin_scaled" });
+                  setRepDialogOpen(true);
+                }}
+              >
+                <Plus className="h-4 w-4 mr-1.5" />
+                Add Rep
               </Button>
             </div>
           </div>
 
           {loadingReps ? (
-            <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+            <div className="flex justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
           ) : reps.length === 0 ? (
             <Card>
               <CardContent className="py-8 text-center text-muted-foreground">
@@ -1841,49 +2213,56 @@ const CommissionPage = () => {
           ) : (
             <div className="grid gap-3">
               {reps
-                .filter(rep => methodFilter === "all" || (rep.commission_method || "margin_scaled") === methodFilter)
+                .filter((rep) => methodFilter === "all" || (rep.commission_method || "margin_scaled") === methodFilter)
                 .map((rep) => {
-                const assignedCompanies = getRepAssignedCompanies(rep.id);
-                const method = (rep.commission_method || "margin_scaled") as CommissionMethod;
-                return (
-                  <Card key={rep.id}>
-                    <CardContent className="py-4 flex items-center justify-between gap-3">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-medium">{rep.name}</span>
-                          <Badge variant="secondary">{Number(rep.commission_rate).toFixed(2)}% default</Badge>
-                          <Badge variant="outline" className="text-xs">
-                            {method === "margin_scaled" ? "Margin-scaled" : "Half-markup <25%"}
-                          </Badge>
-                        </div>
-                        {rep.email && <p className="text-xs text-muted-foreground">{rep.email}</p>}
-                        {assignedCompanies.length > 0 ? (
-                          <div className="flex flex-wrap gap-1 mt-1.5">
-                            {assignedCompanies.map((c, i) => (
-                              <Badge key={i} variant="outline" className="text-xs">
-                                {c.name}{c.overrideRate !== null ? ` (${c.overrideRate}%)` : ''}
-                              </Badge>
-                            ))}
+                  const assignedCompanies = getRepAssignedCompanies(rep.id);
+                  const method = (rep.commission_method || "margin_scaled") as CommissionMethod;
+                  return (
+                    <Card key={rep.id}>
+                      <CardContent className="py-4 flex items-center justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-medium">{rep.name}</span>
+                            <Badge variant="secondary">{Number(rep.commission_rate).toFixed(2)}% default</Badge>
+                            <Badge variant="outline" className="text-xs">
+                              {method === "margin_scaled" ? "Margin-scaled" : "Half-markup <25%"}
+                            </Badge>
                           </div>
-                        ) : (
-                          <p className="text-xs text-destructive mt-1">No companies assigned</p>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <Button variant="outline" size="sm" onClick={() => openAssignDialog(rep.id)}>
-                          <Users className="h-3.5 w-3.5 mr-1" />Assign
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => openEditRep(rep)}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="text-destructive" onClick={() => handleDeleteRep(rep.id)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
+                          {rep.email && <p className="text-xs text-muted-foreground">{rep.email}</p>}
+                          {assignedCompanies.length > 0 ? (
+                            <div className="flex flex-wrap gap-1 mt-1.5">
+                              {assignedCompanies.map((c, i) => (
+                                <Badge key={i} variant="outline" className="text-xs">
+                                  {c.name}
+                                  {c.overrideRate !== null ? ` (${c.overrideRate}%)` : ""}
+                                </Badge>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-xs text-destructive mt-1">No companies assigned</p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <Button variant="outline" size="sm" onClick={() => openAssignDialog(rep.id)}>
+                            <Users className="h-3.5 w-3.5 mr-1" />
+                            Assign
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={() => openEditRep(rep)}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-destructive"
+                            onClick={() => handleDeleteRep(rep.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
             </div>
           )}
         </TabsContent>
@@ -1898,16 +2277,33 @@ const CommissionPage = () => {
           <div className="space-y-3">
             <div>
               <Label>Name *</Label>
-              <Input value={repForm.name} onChange={e => setRepForm(f => ({ ...f, name: e.target.value }))} placeholder="John Smith" />
+              <Input
+                value={repForm.name}
+                onChange={(e) => setRepForm((f) => ({ ...f, name: e.target.value }))}
+                placeholder="John Smith"
+              />
             </div>
             <div>
               <Label>Email</Label>
-              <Input value={repForm.email} onChange={e => setRepForm(f => ({ ...f, email: e.target.value }))} placeholder="john@example.com" />
+              <Input
+                value={repForm.email}
+                onChange={(e) => setRepForm((f) => ({ ...f, email: e.target.value }))}
+                placeholder="john@example.com"
+              />
             </div>
             <div>
               <Label>Default Commission Rate (%)</Label>
-              <Input type="number" step="0.5" min="0" max="100" value={repForm.commission_rate} onChange={e => setRepForm(f => ({ ...f, commission_rate: e.target.value }))} />
-              <p className="text-xs text-muted-foreground mt-1">This is the default rate. You can override per-company in assignments.</p>
+              <Input
+                type="number"
+                step="0.5"
+                min="0"
+                max="100"
+                value={repForm.commission_rate}
+                onChange={(e) => setRepForm((f) => ({ ...f, commission_rate: e.target.value }))}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                This is the default rate. You can override per-company in assignments.
+              </p>
             </div>
             <div>
               <Label>Commission Calculation Method</Label>
@@ -1918,7 +2314,7 @@ const CommissionPage = () => {
                     name="commission_method"
                     className="mt-1"
                     checked={repForm.commission_method === "margin_scaled"}
-                    onChange={() => setRepForm(f => ({ ...f, commission_method: "margin_scaled" }))}
+                    onChange={() => setRepForm((f) => ({ ...f, commission_method: "margin_scaled" }))}
                   />
                   <div className="text-sm">
                     <div className="font-medium">Margin-scaled rate</div>
@@ -1933,7 +2329,7 @@ const CommissionPage = () => {
                     name="commission_method"
                     className="mt-1"
                     checked={repForm.commission_method === "half_markup_below_25"}
-                    onChange={() => setRepForm(f => ({ ...f, commission_method: "half_markup_below_25" }))}
+                    onChange={() => setRepForm((f) => ({ ...f, commission_method: "half_markup_below_25" }))}
                   />
                   <div className="text-sm">
                     <div className="font-medium">Half-markup below 25%</div>
@@ -1946,7 +2342,9 @@ const CommissionPage = () => {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setRepDialogOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setRepDialogOpen(false)}>
+              Cancel
+            </Button>
             <Button onClick={handleSaveRep}>{editingRep ? "Save" : "Add"}</Button>
           </DialogFooter>
         </DialogContent>
@@ -1956,10 +2354,11 @@ const CommissionPage = () => {
       <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
         <DialogContent className="max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Assign Companies to {reps.find(r => r.id === assignRepId)?.name}</DialogTitle>
+            <DialogTitle>Assign Companies to {reps.find((r) => r.id === assignRepId)?.name}</DialogTitle>
           </DialogHeader>
           <p className="text-xs text-muted-foreground">
-            Leave rate blank to use the rep's default rate ({reps.find(r => r.id === assignRepId)?.commission_rate}%). Set a custom rate per company if profit margins differ.
+            Leave rate blank to use the rep's default rate ({reps.find((r) => r.id === assignRepId)?.commission_rate}%).
+            Set a custom rate per company if profit margins differ.
           </p>
           <div className="space-y-2 max-h-[50vh] overflow-y-auto">
             {companies.map((company) => {
@@ -1969,13 +2368,14 @@ const CommissionPage = () => {
                   <Checkbox
                     checked={isSelected}
                     onCheckedChange={(checked) => {
-                      setSelectedCompanies(prev => {
+                      setSelectedCompanies((prev) => {
                         const next = new Set(prev);
-                        if (checked) next.add(company.id); else next.delete(company.id);
+                        if (checked) next.add(company.id);
+                        else next.delete(company.id);
                         return next;
                       });
                       if (!checked) {
-                        setCompanyRateOverrides(prev => {
+                        setCompanyRateOverrides((prev) => {
                           const next = new Map(prev);
                           next.delete(company.id);
                           return next;
@@ -1983,7 +2383,9 @@ const CommissionPage = () => {
                       }
                     }}
                   />
-                  <span className="text-sm flex-1">{company.name} <span className="text-xs text-muted-foreground">({company.code})</span></span>
+                  <span className="text-sm flex-1">
+                    {company.name} <span className="text-xs text-muted-foreground">({company.code})</span>
+                  </span>
                   {isSelected && (
                     <Input
                       type="number"
@@ -1993,7 +2395,7 @@ const CommissionPage = () => {
                       placeholder="Default"
                       value={companyRateOverrides.get(company.id) || ""}
                       onChange={(e) => {
-                        setCompanyRateOverrides(prev => {
+                        setCompanyRateOverrides((prev) => {
                           const next = new Map(prev);
                           if (e.target.value) next.set(company.id, e.target.value);
                           else next.delete(company.id);
@@ -2008,7 +2410,9 @@ const CommissionPage = () => {
             })}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setAssignDialogOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setAssignDialogOpen(false)}>
+              Cancel
+            </Button>
             <Button onClick={handleSaveAssignments}>Save Assignments</Button>
           </DialogFooter>
         </DialogContent>
@@ -2017,7 +2421,9 @@ const CommissionPage = () => {
       {manageRep && (
         <CommissionRepManagementDialog
           open={!!manageRep}
-          onOpenChange={(v) => { if (!v) setManageRep(null); }}
+          onOpenChange={(v) => {
+            if (!v) setManageRep(null);
+          }}
           repId={manageRep.rep_id}
           repName={manageRep.rep_name}
           periodMonth={selectedMonth}
