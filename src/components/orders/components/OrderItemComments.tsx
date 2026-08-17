@@ -123,7 +123,7 @@ export default function OrderItemComments({ orderItemId, className }: OrderItemC
             "relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
             "text-muted-foreground transition-all duration-200",
             "hover:bg-primary/10 hover:text-primary hover:scale-105",
-            comments.length > 0 && "text-primary bg-primary/5",
+            comments.length > 0 && "text-blue-500 bg-blue-500/10 shadow-[0_0_18px_rgba(59,130,246,0.18)]",
             className,
           )}
           aria-label={`${commentCountLabel} for this item`}
@@ -132,12 +132,12 @@ export default function OrderItemComments({ orderItemId, className }: OrderItemC
           <MessageCircle className="h-4 w-4" />
           {comments.length > 0 && (
             <span
-              className="absolute right-0.5 top-0.5 h-2.5 w-2.5 rounded-full bg-primary ring-2 ring-background animate-pulse"
+              className="absolute right-0.5 top-0.5 h-2.5 w-2.5 rounded-full bg-blue-500 ring-2 ring-background animate-pulse shadow-[0_0_10px_rgba(59,130,246,0.95)]"
               aria-hidden="true"
             />
           )}
           {comments.length > 0 && (
-            <span className="absolute -right-1 -top-1 min-w-4 rounded-full bg-primary px-1 text-[8px] font-bold leading-4 text-primary-foreground">
+            <span className="absolute -right-1 -top-1 min-w-4 rounded-full bg-blue-500 px-1 text-[8px] font-bold leading-4 text-white shadow-[0_0_10px_rgba(59,130,246,0.55)]">
               {comments.length > 9 ? "9+" : comments.length}
             </span>
           )}
@@ -155,9 +155,7 @@ export default function OrderItemComments({ orderItemId, className }: OrderItemC
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-xs font-semibold text-foreground">Item comments</p>
-              <p className="text-[10px] text-muted-foreground">
-                Shared with everyone who can access this order
-              </p>
+              <p className="text-[10px] text-muted-foreground">Shared with everyone who can access this order</p>
             </div>
             {comments.length > 0 && (
               <span className="rounded-full bg-primary/10 px-2 py-1 text-[10px] font-semibold text-primary">
@@ -176,9 +174,7 @@ export default function OrderItemComments({ orderItemId, className }: OrderItemC
             <div className="rounded-xl bg-muted/40 px-3 py-5 text-center">
               <MessageCircle className="mx-auto mb-2 h-5 w-5 text-muted-foreground/50" />
               <p className="text-xs font-medium text-foreground">No comments yet</p>
-              <p className="mt-0.5 text-[10px] text-muted-foreground">
-                Add a note for the team.
-              </p>
+              <p className="mt-0.5 text-[10px] text-muted-foreground">Add a note for the team.</p>
             </div>
           ) : (
             comments.map((comment) => (
@@ -187,13 +183,9 @@ export default function OrderItemComments({ orderItemId, className }: OrderItemC
                   <span className="text-[10px] font-semibold text-foreground">
                     {comment.author?.full_name || (comment.user_id === user?.id ? "You" : "Team member")}
                   </span>
-                  <span className="text-[9px] text-muted-foreground">
-                    {formatCommentTime(comment.created_at)}
-                  </span>
+                  <span className="text-[9px] text-muted-foreground">{formatCommentTime(comment.created_at)}</span>
                 </div>
-                <p className="mt-1 whitespace-pre-wrap break-words text-xs text-foreground/90">
-                  {comment.body}
-                </p>
+                <p className="mt-1 whitespace-pre-wrap break-words text-xs text-foreground/90">{comment.body}</p>
               </div>
             ))
           )}
