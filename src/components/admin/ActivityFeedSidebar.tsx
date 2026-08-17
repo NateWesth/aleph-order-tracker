@@ -43,7 +43,7 @@ const ACTIVITY_CONFIG: Record<string, { icon: typeof Package; color: string; bg:
 
 const DEFAULT_CONFIG = { icon: Activity, color: "text-muted-foreground", bg: "bg-muted" };
 
-export default function ActivityFeedSidebar() {
+export default function ActivityFeedSidebar({ topOffset = 0 }: { topOffset?: number }) {
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [collapsed, setCollapsed] = useState(true);
@@ -77,18 +77,12 @@ export default function ActivityFeedSidebar() {
 
       // Fetch profiles and order numbers in parallel
       const [profilesRes, ordersRes] = await Promise.all([
-        userIds.length > 0
-          ? supabase.from("profiles").select("id, full_name").in("id", userIds)
-          : { data: [] },
+        userIds.length > 0 ? supabase.from("profiles").select("id, full_name").in("id", userIds) : { data: [] },
         supabase.from("orders").select("id, order_number").in("id", orderIds),
       ]);
 
-      const profileMap = new Map(
-        (profilesRes.data || []).map((p) => [p.id, p.full_name])
-      );
-      const orderMap = new Map(
-        (ordersRes.data || []).map((o) => [o.id, o.order_number])
-      );
+      const profileMap = new Map((profilesRes.data || []).map((p) => [p.id, p.full_name]));
+      const orderMap = new Map((ordersRes.data || []).map((o) => [o.id, o.order_number]));
 
       const enriched: ActivityItem[] = logs.map((log) => ({
         ...log,
@@ -99,9 +93,7 @@ export default function ActivityFeedSidebar() {
 
       // Track new items since last fetch
       if (lastFetchRef.current) {
-        const newItems = enriched.filter(
-          (a) => a.created_at > lastFetchRef.current!
-        );
+        const newItems = enriched.filter((a) => a.created_at > lastFetchRef.current!);
         if (newItems.length > 0 && collapsed) {
           setNewCount((prev) => prev + newItems.length);
         }
@@ -122,13 +114,9 @@ export default function ActivityFeedSidebar() {
     // Real-time subscription
     const channel = supabase
       .channel("activity-feed")
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "order_activity_log" },
-        () => {
-          fetchActivities();
-        }
-      )
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "order_activity_log" }, () => {
+        fetchActivities();
+      })
       .subscribe();
 
     return () => {
@@ -155,10 +143,14 @@ export default function ActivityFeedSidebar() {
   return (
     <div
       className={cn(
-        "hidden lg:flex flex-col transition-all duration-300 shrink-0 relative overflow-hidden h-full self-stretch",
+        "hidden lg:flex flex-col transition-all duration-300 shrink-0 relative overflow-hidden self-start sticky",
         "border-l border-white/10 dark:border-white/[0.06]",
-        collapsed ? "w-12" : "w-72 xl:w-80"
+        collapsed ? "w-12" : "w-72 xl:w-80",
       )}
+      style={{
+        top: topOffset,
+        height: `calc(100vh - ${topOffset}px)`,
+      }}
     >
       {/* Background matches app background in every theme */}
       <div className="absolute inset-0 pointer-events-none bg-background" />
@@ -254,16 +246,14 @@ export default function ActivityFeedSidebar() {
               const config = getConfig(activity.activity_type);
               const Icon = config.icon;
               const isNew =
-                index === 0 &&
-                activity.created_at &&
-                Date.now() - new Date(activity.created_at).getTime() < 60000;
+                index === 0 && activity.created_at && Date.now() - new Date(activity.created_at).getTime() < 60000;
 
               return (
                 <div
                   key={activity.id}
                   className={cn(
                     "group flex gap-2.5 p-2 rounded-lg transition-all duration-200 hover:bg-accent/40 dark:hover:bg-white/[0.04] cursor-default hover:shadow-soft",
-                    isNew && "bg-primary/5 animate-fade-in"
+                    isNew && "bg-primary/5 animate-fade-in",
                   )}
                 >
                   {/* Avatar */}
@@ -275,12 +265,7 @@ export default function ActivityFeedSidebar() {
                         getInitials(activity.user_name || "?")
                       )}
                     </div>
-                    <div
-                      className={cn(
-                        "absolute -bottom-0.5 -right-0.5 p-0.5 rounded-full",
-                        config.bg
-                      )}
-                    >
+                    <div className={cn("absolute -bottom-0.5 -right-0.5 p-0.5 rounded-full", config.bg)}>
                       <Icon className={cn("h-2.5 w-2.5", config.color)} />
                     </div>
                   </div>
@@ -288,26 +273,17 @@ export default function ActivityFeedSidebar() {
                   {/* Content */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-1">
-                      <p className="text-xs font-medium text-foreground leading-tight line-clamp-2">
-                        {activity.title}
-                      </p>
+                      <p className="text-xs font-medium text-foreground leading-tight line-clamp-2">{activity.title}</p>
                     </div>
                     <div className="flex items-center gap-1.5 mt-0.5">
-                      <span className="text-[10px] text-muted-foreground truncate">
-                        {activity.user_name}
-                      </span>
+                      <span className="text-[10px] text-muted-foreground truncate">{activity.user_name}</span>
                       <span className="text-[10px] text-muted-foreground">·</span>
-                      <Badge
-                        variant="outline"
-                        className="text-[9px] h-4 px-1 shrink-0"
-                      >
+                      <Badge variant="outline" className="text-[9px] h-4 px-1 shrink-0">
                         {activity.order_number}
                       </Badge>
                     </div>
                     {activity.description && (
-                      <p className="text-[10px] text-muted-foreground mt-0.5 line-clamp-1">
-                        {activity.description}
-                      </p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5 line-clamp-1">{activity.description}</p>
                     )}
                     <span className="text-[10px] text-muted-foreground/70 mt-0.5 block">
                       {formatDistanceToNow(new Date(activity.created_at), {
