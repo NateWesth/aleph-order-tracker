@@ -97,6 +97,32 @@ Deno.serve(async (req) => {
       })
     }
 
+    // Serve fresh cache first — Zoho enforces a hard daily API call quota
+    let force = false
+    if (req.method === 'POST') {
+      try {
+        const body = await req.json()
+        force = body?.force === true
+      } catch (_e) { /* no body */ }
+    }
+
+    if (!force) {
+      const cached = await readCache(supabase)
+      if (cached?.payload && cached.fetched_at) {
+        const age = Date.now() - new Date(cached.fetched_at).getTime()
+        if (age < CACHE_TTL_MS) {
+          return new Response(JSON.stringify({
+            success: true,
+            data: cached.payload,
+            itemCount: Object.keys(cached.payload || {}).length,
+            fetchedAt: cached.fetched_at,
+            cached: true,
+          }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+        }
+      }
+    }
+
+
     const { skus: activeSkus, nameToSku } = await getActiveBuyingSheetSkus(supabase)
     console.log(`Resolved ${activeSkus.size} active buying sheet SKUs`)
 
