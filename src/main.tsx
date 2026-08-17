@@ -61,6 +61,13 @@ async function disablePwaCachingInNative() {
 // instead of only finding out on the next full navigation.
 async function registerServiceWorkerWithForcedUpdates() {
   if (Capacitor.isNativePlatform()) return;
+  if (isPreviewEnv()) {
+    // Never let a stale worker serve the preview.
+    await nukeServiceWorkersAndCaches();
+    return;
+  }
+
+
 
   try {
     const { registerSW } = await import("virtual:pwa-register");
