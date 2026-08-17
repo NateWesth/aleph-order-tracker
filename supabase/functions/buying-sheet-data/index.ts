@@ -42,10 +42,23 @@ type VendorCandidate = VendorSummary & {
   poDate: string
 }
 
+const CACHE_ID = 'buying-sheet'
+const CACHE_TTL_MS = 15 * 60 * 1000
+
+async function readCache(supabase: any) {
+  const { data } = await supabase
+    .from('buying_sheet_cache')
+    .select('payload, fetched_at')
+    .eq('id', CACHE_ID)
+    .maybeSingle()
+  return data as { payload: any; fetched_at: string } | null
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
+
 
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL')!,
@@ -83,6 +96,32 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
+
+    // Serve fresh cache first — Zoho enforces a hard daily API call quota
+    let force = false
+    if (req.method === 'POST') {
+      try {
+        const body = await req.json()
+        force = body?.force === true
+      } catch (_e) { /* no body */ }
+    }
+
+    if (!force) {
+      const cached = await readCache(supabase)
+      if (cached?.payload && cached.fetched_at) {
+        const age = Date.now() - new Date(cached.fetched_at).getTime()
+        if (age < CACHE_TTL_MS) {
+          return new Response(JSON.stringify({
+            success: true,
+            data: cached.payload,
+            itemCount: Object.keys(cached.payload || {}).length,
+            fetchedAt: cached.fetched_at,
+            cached: true,
+          }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+        }
+      }
+    }
+
 
     const { skus: activeSkus, nameToSku } = await getActiveBuyingSheetSkus(supabase)
     console.log(`Resolved ${activeSkus.size} active buying sheet SKUs`)
@@ -146,21 +185,49 @@ Deno.serve(async (req) => {
       }
     }
 
+    const fetchedAt = new Date().toISOString()
+    await supabase.from('buying_sheet_cache').upsert({
+      id: CACHE_ID,
+      payload: result,
+      fetched_at: fetchedAt,
+    })
+
     return new Response(JSON.stringify({
       success: true,
       data: result,
       itemCount: activeSkus.size,
+      fetchedAt,
+      cached: false,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (error) {
     console.error('Buying sheet data error:', error)
+
+    // Zoho quota / transient failure: fall back to the last known good snapshot
+    // instead of blanking the page with a 500.
+    try {
+      const cached = await readCache(supabase)
+      if (cached?.payload) {
+        return new Response(JSON.stringify({
+          success: true,
+          data: cached.payload,
+          itemCount: Object.keys(cached.payload || {}).length,
+          fetchedAt: cached.fetched_at,
+          cached: true,
+          stale: true,
+          warning: error instanceof Error ? error.message : 'Zoho unavailable',
+        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+    } catch (_e) { /* ignore */ }
+
     return new Response(JSON.stringify({
       error: error instanceof Error ? error.message : 'Failed to fetch Zoho data',
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
+
   }
 })
 

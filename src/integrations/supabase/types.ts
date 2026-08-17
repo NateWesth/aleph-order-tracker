@@ -14,6 +14,24 @@ export type Database = {
   }
   public: {
     Tables: {
+      buying_sheet_cache: {
+        Row: {
+          fetched_at: string
+          id: string
+          payload: Json
+        }
+        Insert: {
+          fetched_at?: string
+          id: string
+          payload: Json
+        }
+        Update: {
+          fetched_at?: string
+          id?: string
+          payload?: Json
+        }
+        Relationships: []
+      }
       client_invitations: {
         Row: {
           accepted_at: string | null
