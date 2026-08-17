@@ -252,9 +252,8 @@ export default function SuppliersPage() {
         icon={Truck}
         description="Vendors synced from Zoho Books plus any you add manually."
         stats={[{ label: "suppliers", value: filteredSuppliers.length, icon: Truck }]}
-      />
-      <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-        <div className="flex flex-1 flex-col sm:flex-row sm:items-center gap-2">
+        toolbar={
+          <div className="flex flex-1 flex-col sm:flex-row sm:items-center gap-2">
           <div className="relative flex-1 sm:w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -401,8 +400,9 @@ export default function SuppliersPage() {
               </form>
             </DialogContent>
           </Dialog>
-        </div>
-      </div>
+          </div>
+        }
+      />
 
       {/* Suppliers List */}
       {isMobile ? (

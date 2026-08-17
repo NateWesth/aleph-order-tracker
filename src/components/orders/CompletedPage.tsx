@@ -291,9 +291,12 @@ export default function CompletedPage({
       {loading ? (
         <PageSkeleton variant="table" />
       ) : monthGroups.length === 0 ? (
-        <div className="text-center py-16 text-muted-foreground">
-          <p className="text-lg">No completed orders yet</p>
-          <p className="text-sm mt-1">Completed orders will appear here grouped by month</p>
+        <div className="text-center py-16 rounded-2xl border-2 border-dashed border-border">
+          <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-success/10 text-success mb-3">
+            <CheckCircle2 className="h-6 w-6" />
+          </span>
+          <p className="text-lg font-semibold text-foreground">No completed orders yet</p>
+          <p className="text-sm mt-1 text-muted-foreground">Completed orders will appear here grouped by month</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -302,23 +305,27 @@ export default function CompletedPage({
               key={group.monthKey} 
               open={group.isOpen}
               onOpenChange={() => toggleMonth(group.monthKey)}
+              className="rounded-2xl border-2 border-border bg-card shadow-soft overflow-hidden"
             >
               <CollapsibleTrigger className="w-full">
-                <div className="flex items-center justify-between p-3 bg-muted/50 hover:bg-muted rounded-lg transition-colors cursor-pointer">
-                  <div className="flex items-center gap-2">
+                <div className="flex items-center justify-between px-4 py-3.5 hover:bg-muted/50 transition-colors cursor-pointer">
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-success/10 text-success">
+                      <CheckCircle2 className="h-4 w-4" />
+                    </span>
+                    <span className="font-display font-semibold text-foreground">{group.month}</span>
                     {group.isOpen ? (
                       <ChevronDown className="h-4 w-4 text-muted-foreground" />
                     ) : (
                       <ChevronRight className="h-4 w-4 text-muted-foreground" />
                     )}
-                    <span className="font-medium text-foreground">{group.month}</span>
                   </div>
-                  <span className="text-sm text-muted-foreground">
+                  <span className="text-sm font-medium text-muted-foreground bg-muted rounded-full px-2.5 py-0.5">
                     {group.orders.length} order{group.orders.length !== 1 ? 's' : ''}
                   </span>
                 </div>
               </CollapsibleTrigger>
-              <CollapsibleContent className="pt-2">
+              <CollapsibleContent className="border-t border-border">
                 <OrderTable
                   orders={group.orders}
                   isAdmin={false}
