@@ -282,9 +282,14 @@ export function AlephLoadingMark({ label = "Preparing your workspace" }: { label
   return (
     <div className="aleph-loading-mark" role="status" aria-live="polite">
       <div className="aleph-loading-orbit" aria-hidden="true">
-        <span className="aleph-loading-chaser" />
-        <span className="aleph-loading-chaser aleph-loading-chaser-two" />
-        <img src="/lovable-uploads/e1088147-889e-43f6-bdf0-271189b88913.png" alt="" />
+        <div className="aleph-loading-snake">
+          {Array.from({ length: 9 }, (_, index) => (
+            <span key={index}>
+              <img src="/lovable-uploads/e1088147-889e-43f6-bdf0-271189b88913.png" alt="" />
+            </span>
+          ))}
+        </div>
+        <img className="aleph-loading-core" src="/lovable-uploads/e1088147-889e-43f6-bdf0-271189b88913.png" alt="" />
       </div>
       <p>{label}</p>
     </div>
