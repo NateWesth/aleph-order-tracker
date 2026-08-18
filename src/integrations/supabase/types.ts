@@ -14,6 +14,24 @@ export type Database = {
   }
   public: {
     Tables: {
+      buying_sheet_cache: {
+        Row: {
+          fetched_at: string
+          id: string
+          payload: Json
+        }
+        Insert: {
+          fetched_at?: string
+          id: string
+          payload: Json
+        }
+        Update: {
+          fetched_at?: string
+          id?: string
+          payload?: Json
+        }
+        Relationships: []
+      }
       client_invitations: {
         Row: {
           accepted_at: string | null
@@ -654,51 +672,6 @@ export type Database = {
           },
           {
             foreignKeyName: "order_item_po_allocations_order_item_id_fkey"
-            columns: ["order_item_id"]
-            isOneToOne: false
-            referencedRelation: "order_items"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      order_item_comments: {
-        Row: {
-          author_id: string
-          author_name: string
-          content: string
-          created_at: string
-          id: string
-          order_id: string
-          order_item_id: string
-        }
-        Insert: {
-          author_id: string
-          author_name: string
-          content: string
-          created_at?: string
-          id?: string
-          order_id: string
-          order_item_id: string
-        }
-        Update: {
-          author_id?: string
-          author_name?: string
-          content?: string
-          created_at?: string
-          id?: string
-          order_id?: string
-          order_item_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "order_item_comments_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "order_item_comments_order_item_id_fkey"
             columns: ["order_item_id"]
             isOneToOne: false
             referencedRelation: "order_items"
