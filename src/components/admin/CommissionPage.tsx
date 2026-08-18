@@ -1172,24 +1172,31 @@ const CommissionPage = () => {
   return (
     <div className="commission-page aleph-page-workspace aleph-commission-workspace app-no-x-scroll min-w-0 w-full max-w-full space-y-5 overflow-x-hidden">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="min-w-0">
-        <section className="commission-command-hero relative overflow-hidden rounded-[30px] border border-border/65 bg-card p-5 shadow-soft sm:p-6">
-          <div className="relative z-10 grid gap-5 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-end">
-            <div className="flex items-start gap-4">
-              <span className="grid h-16 w-16 shrink-0 place-items-center rounded-[22px] bg-primary text-primary-foreground shadow-xl shadow-primary/25">
-                <Percent className="h-7 w-7" />
-              </span>
+        <div className="commission-statement-shell grid gap-5 lg:grid-cols-[245px_minmax(0,1fr)]">
+          <aside className="commission-statement-nav rounded-[26px] border border-border/65 bg-foreground p-4 text-background shadow-xl lg:sticky lg:top-4 lg:self-start">
+            <div className="flex items-center gap-3 border-b border-background/15 pb-4">
+              <span className="grid h-11 w-11 place-items-center rounded-2xl bg-background text-foreground"><Percent className="h-5 w-5" /></span>
               <div>
-                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-primary">Revenue operations</p>
-                <h1 className="mt-1 font-display text-3xl font-black tracking-[-0.04em]">Commission Control Room</h1>
-                <p className="mt-1 max-w-2xl text-sm text-muted-foreground">Calculate monthly earnings, resolve costs, lock paid invoices and manage every representative from one ledger.</p>
+                <p className="text-[8px] font-black uppercase tracking-[0.2em] text-background/55">Finance workspace</p>
+                <h1 className="font-display text-lg font-black">Commission</h1>
               </div>
             </div>
-            <TabsList className="grid h-auto w-full grid-cols-2 gap-2 rounded-[22px] border border-border/60 bg-background/60 p-2">
-              <TabsTrigger value="report" className="h-14 rounded-2xl gap-2 data-[state=active]:shadow-lg"><FileText className="h-4 w-4" /><span className="text-left"><strong className="block text-xs">Monthly Ledger</strong><span className="hidden text-[9px] font-normal opacity-65 sm:block">Earnings and payouts</span></span></TabsTrigger>
-              <TabsTrigger value="reps" className="h-14 rounded-2xl gap-2 data-[state=active]:shadow-lg"><Users className="h-4 w-4" /><span className="text-left"><strong className="block text-xs">Rep Directory</strong><span className="hidden text-[9px] font-normal opacity-65 sm:block">Rates and assignments</span></span></TabsTrigger>
+
+            <div className="my-4 rounded-2xl bg-background/8 p-3 ring-1 ring-background/10">
+              <p className="text-[8px] font-bold uppercase tracking-[0.18em] text-background/50">Active statement</p>
+              <p className="mt-1 text-base font-black">{format(selectedDate, "MMMM yyyy")}</p>
+              <p className="mt-1 text-[10px] text-background/55">{isPreviousMonth ? "Standard payout period" : "Custom reporting period"}</p>
+            </div>
+
+            <TabsList className="flex h-auto w-full flex-col gap-2 bg-transparent p-0">
+              <TabsTrigger value="report" className="h-12 w-full justify-start rounded-2xl px-3 text-background/65 data-[state=active]:bg-background data-[state=active]:text-foreground"><FileText className="mr-2 h-4 w-4" /><span className="text-left"><strong className="block text-xs">Statements</strong><span className="block text-[8px] font-normal opacity-60">Earnings and payouts</span></span></TabsTrigger>
+              <TabsTrigger value="reps" className="h-12 w-full justify-start rounded-2xl px-3 text-background/65 data-[state=active]:bg-background data-[state=active]:text-foreground"><Users className="mr-2 h-4 w-4" /><span className="text-left"><strong className="block text-xs">Representatives</strong><span className="block text-[8px] font-normal opacity-60">Rates and assignments</span></span></TabsTrigger>
             </TabsList>
-          </div>
-        </section>
+
+            <p className="mt-5 border-t border-background/15 pt-4 text-[9px] leading-relaxed text-background/45">Commission is calculated from invoice subtotals excluding VAT. Paid lines can be locked to protect finalized statements.</p>
+          </aside>
+
+          <main className="commission-statement-content min-w-0">
 
         {/* Commission Report Tab */}
         <TabsContent value="report" className="space-y-5 min-w-0">
@@ -1913,6 +1920,8 @@ const CommissionPage = () => {
             </div>
           )}
         </TabsContent>
+          </main>
+        </div>
       </Tabs>
 
       {/* Add/Edit Rep Dialog */}

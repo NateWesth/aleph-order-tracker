@@ -261,30 +261,23 @@ function OrderStatusColumn({
         ) : (
           <div
             className={cn(
-              "order-lane-header w-full rounded-t-[26px] px-4 py-4 text-left",
+              "order-lane-header w-full rounded-t-[22px] px-3 py-2.5 text-left",
               !config.customColor && config.bgColor,
             )}
             style={config.customColor ? { backgroundColor: config.customColor } : undefined}
           >
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex min-w-0 items-center gap-3">
-                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-white/16 text-lg font-black text-white ring-1 ring-white/20">
+            <div className="flex items-center gap-2.5">
+              <div className="flex min-w-0 flex-1 items-center gap-2.5">
+                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-white/16 text-xs font-black text-white ring-1 ring-white/20">
                   {String(stagePosition).padStart(2, "0")}
                 </span>
                 <div className="min-w-0">
-                  <p className="text-[9px] font-black uppercase tracking-[0.2em] text-white/65">Workflow stage</p>
-                  <h3 className={cn("truncate text-sm font-black uppercase tracking-wide", config.color)}>{config.label}</h3>
+                  <p className="text-[7px] font-black uppercase tracking-[0.18em] text-white/60">Stage {stagePosition}</p>
+                  <h3 className={cn("truncate text-xs font-black uppercase tracking-wide", config.color)}>{config.label}</h3>
                 </div>
               </div>
-              <span className="rounded-2xl bg-black/12 px-3 py-2 text-center text-white ring-1 ring-white/15">
-                <strong className="block text-lg leading-none">{orders.length}</strong>
-                <span className="text-[8px] font-bold uppercase tracking-wider text-white/65">orders</span>
-              </span>
-            </div>
-            <div className="mt-3 flex items-center gap-2 text-[9px] font-bold uppercase tracking-wider text-white/70">
-              <span className="rounded-full bg-white/12 px-2 py-1">{totalUnits} units</span>
-              {urgentOrders > 0 && <span className="rounded-full bg-white/18 px-2 py-1 text-white">{urgentOrders} priority</span>}
-              <span className="ml-auto">Drag orders here</span>
+              <span className="rounded-xl bg-black/12 px-2 py-1.5 text-center text-white ring-1 ring-white/15"><strong className="text-sm">{orders.length}</strong><span className="ml-1 text-[7px] uppercase opacity-65">orders</span></span>
+              <span className="hidden rounded-xl bg-white/12 px-2 py-1.5 text-[8px] font-bold uppercase text-white/75 2xl:inline">{totalUnits} units{urgentOrders > 0 ? ` · ${urgentOrders} priority` : ""}</span>
             </div>
           </div>
         )}

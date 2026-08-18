@@ -328,8 +328,8 @@ const AdminDashboard = () => {
       {/* The application frame is viewport-locked. Only the active page canvas
           (or an Orders Board column) owns vertical scrolling. */}
       <div className="aleph-shell-workspace flex min-h-0 w-full flex-1 items-stretch overflow-hidden">
-        <aside className="aleph-workspace-rail fixed left-0 hidden w-[220px] shrink-0 flex-col border-r border-border/55 bg-card/95 px-3 py-5 backdrop-blur-xl lg:flex" style={{ top: headerHeight, height: `calc(100dvh - ${headerHeight}px)` }}>
-          <div className="mb-4 px-2">
+        <aside className="aleph-workspace-rail group fixed left-0 hidden w-[64px] shrink-0 flex-col overflow-hidden border-r border-border/55 bg-card/95 px-2 py-5 backdrop-blur-xl transition-[width,padding] duration-300 hover:w-[220px] hover:px-3 focus-within:w-[220px] focus-within:px-3 lg:flex" style={{ top: headerHeight, height: `calc(100dvh - ${headerHeight}px)` }}>
+          <div className="aleph-rail-copy mb-4 whitespace-nowrap px-2 opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-within:opacity-100">
             <p className="text-[10px] font-black uppercase tracking-[0.22em] text-primary">Control centre</p>
             <p className="mt-1 text-xs text-muted-foreground">Move between live workspaces</p>
           </div>
@@ -340,9 +340,9 @@ const AdminDashboard = () => {
                 <button
                   key={item.id}
                   type="button"
-                  onClick={() => { playClick(); setActiveView(item.id); }}
+                  onClick={(event) => { playClick(); setActiveView(item.id); event.currentTarget.blur(); }}
                   className={cn(
-                    "group relative flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left text-sm font-bold transition-all duration-200",
+                    "relative flex w-full items-center gap-3 rounded-2xl px-1.5 py-2.5 text-left text-sm font-bold transition-all duration-200 group-hover:px-3 group-focus-within:px-3",
                     isActive
                       ? "bg-primary text-primary-foreground shadow-[0_14px_30px_-18px_hsl(var(--primary))]"
                       : "text-muted-foreground hover:bg-primary/8 hover:text-foreground",
@@ -351,9 +351,9 @@ const AdminDashboard = () => {
                   <span className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-colors", isActive ? "bg-white/15" : "bg-muted/70 group-hover:bg-primary/10")}>
                     <item.icon className="h-[18px] w-[18px]" />
                   </span>
-                  <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                  <span className="aleph-rail-label min-w-0 flex-1 truncate opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-within:opacity-100">{item.label}</span>
                   {item.badge > 0 && (
-                    <span className={cn("min-w-5 rounded-full px-1.5 py-0.5 text-center text-[9px] font-black", isActive ? "bg-white/20 text-white" : "bg-primary/10 text-primary")}>
+                    <span className={cn("min-w-5 rounded-full px-1.5 py-0.5 text-center text-[9px] font-black opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100", isActive ? "bg-white/20 text-white" : "bg-primary/10 text-primary")}> 
                       {item.badge > 99 ? "99+" : item.badge}
                     </span>
                   )}
@@ -361,12 +361,12 @@ const AdminDashboard = () => {
               );
             })}
           </nav>
-          <button type="button" onClick={() => navigate('/settings')} className="mt-3 flex items-center gap-3 rounded-2xl border border-border/60 bg-background/55 px-3 py-2.5 text-sm font-bold text-muted-foreground transition-colors hover:border-primary/25 hover:text-foreground">
+          <button type="button" onClick={() => navigate('/settings')} className="mt-3 flex items-center gap-3 rounded-2xl border border-border/60 bg-background/55 px-1.5 py-2.5 text-sm font-bold text-muted-foreground transition-all hover:border-primary/25 hover:px-3 hover:text-foreground group-focus-within:px-3">
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-muted/70"><Settings className="h-[18px] w-[18px]" /></span>
-            Preferences
+            <span className="aleph-rail-label opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-within:opacity-100">Preferences</span>
           </button>
         </aside>
-        <main className="aleph-content-scroll h-full min-h-0 min-w-0 flex-1 w-full overflow-x-hidden overflow-y-auto pb-16 sm:pb-0 lg:ml-[220px]">
+        <main className="aleph-content-scroll h-full min-h-0 min-w-0 flex-1 w-full overflow-x-hidden overflow-y-auto pb-16 sm:pb-0 lg:ml-[64px]">
           <div
             className={cn(
               "app-page-stage w-full px-3 sm:px-5 lg:px-6 py-4 sm:py-6",

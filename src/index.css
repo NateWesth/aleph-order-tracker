@@ -2573,6 +2573,220 @@ html.toolbar-glass .aleph-toolbar-search-input {
 }
 
 /* ============================================================
+   ALEPH WORKSPACE V10 — COMPACT RAIL + NEW DESKS
+   ============================================================ */
+
+.aleph-workspace-rail {
+  width: 4rem;
+  z-index: 45;
+  box-shadow: 16px 0 44px -38px hsl(var(--foreground) / .6);
+}
+
+.aleph-workspace-rail:hover,
+.aleph-workspace-rail:focus-within {
+  width: 13.75rem;
+  box-shadow: 24px 0 58px -34px hsl(var(--foreground) / .58);
+}
+
+.aleph-workspace-rail .aleph-rail-label,
+.aleph-workspace-rail .aleph-rail-copy {
+  pointer-events: none;
+}
+
+.orders-board-console {
+  background:
+    linear-gradient(100deg, hsl(var(--foreground) / .035), transparent 35%),
+    hsl(var(--card) / .94);
+}
+
+.orders-board-console::before {
+  content: "";
+  display: block;
+  height: 3px;
+  background: linear-gradient(90deg, hsl(var(--workspace-accent)), hsl(var(--workspace-accent) / .16), transparent 75%);
+}
+
+.order-workflow-lane {
+  border-radius: 1.4rem;
+  border: 1px solid hsl(var(--border) / .58);
+  background: hsl(var(--card) / .55);
+}
+
+.order-lane-header {
+  min-height: 3.6rem;
+  border-radius: 1.35rem 1.35rem 0 0;
+}
+
+.order-lane-body {
+  border-radius: 0 0 1.35rem 1.35rem !important;
+  border-color: transparent;
+  background:
+    repeating-linear-gradient(135deg, transparent 0 24px, hsl(var(--border) / .08) 24px 25px),
+    hsl(var(--muted) / .2);
+}
+
+.order-ticket {
+  border-radius: 1.1rem !important;
+  background: hsl(var(--card) / .98) !important;
+}
+
+.order-ticket:nth-child(even) {
+  transform: translateX(0);
+}
+
+.commission-statement-shell {
+  align-items: start;
+}
+
+.commission-statement-nav {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  background:
+    radial-gradient(circle at 120% -10%, hsl(var(--workspace-accent) / .42), transparent 15rem),
+    hsl(var(--foreground));
+}
+
+.commission-statement-nav::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: auto -4rem -5rem auto;
+  width: 11rem;
+  height: 11rem;
+  border: 1px solid hsl(var(--background) / .09);
+  border-radius: 999px;
+  box-shadow: 0 0 0 1.7rem hsl(var(--background) / .025), 0 0 0 3.4rem hsl(var(--background) / .018);
+}
+
+.commission-statement-content > [data-state="active"] {
+  margin-top: 0;
+}
+
+.commission-statement-content .commission-info {
+  border-left: 4px solid hsl(var(--workspace-accent));
+  border-radius: .75rem 1.4rem 1.4rem .75rem;
+}
+
+.commission-statement-content .commission-actions {
+  position: sticky;
+  top: .5rem;
+  z-index: 12;
+  border-radius: 1.25rem;
+  backdrop-filter: blur(18px);
+}
+
+.commission-statement-content .commission-kpis {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0,1fr));
+  gap: .75rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.commission-statement-content .commission-kpi:first-child {
+  grid-row: span 2;
+}
+
+.commission-statement-content .commission-rep-card {
+  border-radius: 1.25rem !important;
+  box-shadow: none;
+}
+
+.analytics-studio-hero {
+  isolation: isolate;
+  background:
+    radial-gradient(circle at 84% -30%, hsl(var(--workspace-accent) / .6), transparent 24rem),
+    hsl(var(--foreground));
+}
+
+.analytics-studio-hero::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: -8rem -5rem auto auto;
+  width: 25rem;
+  height: 25rem;
+  border: 1px solid hsl(var(--background) / .08);
+  border-radius: 999px;
+  box-shadow: 0 0 0 3rem hsl(var(--background) / .022), 0 0 0 6rem hsl(var(--background) / .015);
+}
+
+.analytics-scoreboard {
+  align-items: stretch;
+}
+
+.analytics-primary-score::after {
+  content: "";
+  position: absolute;
+  inset: -4rem -3rem auto auto;
+  width: 11rem;
+  height: 11rem;
+  border: 1px solid hsl(var(--primary-foreground) / .16);
+  border-radius: 999px;
+  box-shadow: 0 0 0 1.5rem hsl(var(--primary-foreground) / .035), 0 0 0 3rem hsl(var(--primary-foreground) / .025);
+}
+
+.analytics-scoreboard > div:last-child > div {
+  min-height: 150px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  border-width: 1px;
+  border-radius: 1.35rem;
+}
+
+.analytics-hero-grid {
+  grid-template-columns: minmax(0, 1.7fr) minmax(280px, .7fr);
+}
+
+.analytics-hero-grid > div:first-child {
+  min-height: 360px;
+}
+
+.analytics-ranking-grid {
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, .75fr);
+}
+
+.analytics-operations-grid > * {
+  min-width: 0;
+  height: 100%;
+}
+
+@media (max-width: 1199px) {
+  .analytics-hero-grid,
+  .analytics-ranking-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 1023px) {
+  .commission-statement-nav {
+    position: relative;
+  }
+
+  .commission-statement-nav [role="tablist"] {
+    display: grid;
+    grid-template-columns: repeat(2,minmax(0,1fr));
+  }
+}
+
+@media (max-width: 767px) {
+  .commission-statement-content .commission-kpis {
+    grid-template-columns: 1fr;
+  }
+
+  .commission-statement-content .commission-kpi:first-child {
+    grid-row: auto;
+  }
+
+  .analytics-scoreboard > div:last-child > div {
+    min-height: 125px;
+  }
+}
+
+/* ============================================================
    ALEPH WORKSPACE V7 — PURPOSE-BUILT PAGE LAYOUTS
    The global toolbar remains independent from these page styles.
    ============================================================ */

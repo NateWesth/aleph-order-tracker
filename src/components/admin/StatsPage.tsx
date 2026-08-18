@@ -250,66 +250,57 @@ export default function StatsPage() {
 
   return (
     <div className="aleph-page-workspace aleph-stats-workspace space-y-6 pb-8">
-      <PageHeader
-        title="Analytics"
-        icon={BarChart3}
-        description={`${format(dateRange.from, "MMM d, yyyy")} — ${format(dateRange.to, "MMM d, yyyy")}`}
-        actions={<ReportGenerator />}
-      />
-
-
-      {/* Date Range Selector */}
-      <div className="analytics-period-switcher flex items-center gap-2 flex-wrap">
-        <div className="inline-flex items-center rounded-lg border border-border bg-card p-0.5 gap-0.5">
-          {PRESETS.map(preset => (
-            <button
-              key={preset.key}
-              onClick={() => handlePresetClick(preset.key)}
-              className={cn(
-                "px-3 py-1.5 text-xs font-medium rounded-md transition-all",
-                activePreset === preset.key && !isCustom
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
-              )}
-            >
-              {preset.label}
-            </button>
-          ))}
+      <section className="analytics-studio-hero relative overflow-hidden rounded-[30px] border border-border/65 bg-foreground p-5 text-background shadow-xl sm:p-7">
+        <div className="relative z-10 grid gap-6 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end">
+          <div className="flex items-start gap-4">
+            <span className="grid h-14 w-14 shrink-0 place-items-center rounded-[20px] bg-background text-foreground"><BarChart3 className="h-6 w-6" /></span>
+            <div>
+              <p className="text-[9px] font-black uppercase tracking-[0.22em] text-background/50">Executive intelligence</p>
+              <h1 className="mt-1 font-display text-3xl font-black tracking-[-0.05em] sm:text-4xl">Performance Studio</h1>
+              <p className="mt-2 text-sm text-background/60">{format(dateRange.from, "MMM d, yyyy")} — {format(dateRange.to, "MMM d, yyyy")} · operational demand, velocity and client concentration</p>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="inline-flex items-center gap-1 rounded-2xl bg-background/10 p-1 ring-1 ring-background/10">
+              {PRESETS.map(preset => (
+                <button
+                  key={preset.key}
+                  onClick={() => handlePresetClick(preset.key)}
+                  className={cn(
+                    "rounded-xl px-3 py-2 text-[10px] font-bold transition-all",
+                    activePreset === preset.key && !isCustom ? "bg-background text-foreground shadow-sm" : "text-background/55 hover:bg-background/10 hover:text-background"
+                  )}
+                >{preset.label}</button>
+              ))}
+            </div>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="h-10 gap-1.5 rounded-xl border-background/15 bg-background/10 text-background hover:bg-background hover:text-foreground">
+                  <Calendar className="h-3.5 w-3.5" />{isCustom && customRange.from && customRange.to ? `${format(customRange.from, "MMM d")} – ${format(customRange.to, "MMM d")}` : "Custom"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="end"><CalendarComponent mode="range" selected={customRange as any} onSelect={handleCustomDateSelect as any} numberOfMonths={2} className="pointer-events-auto" /></PopoverContent>
+            </Popover>
+            <ReportGenerator />
+          </div>
         </div>
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button
-              variant={isCustom ? "default" : "outline"}
-              size="sm"
-              className="text-xs gap-1.5 h-8"
-            >
-              <Calendar className="h-3.5 w-3.5" />
-              {isCustom && customRange.from && customRange.to
-                ? `${format(customRange.from, "MMM d")} – ${format(customRange.to, "MMM d")}`
-                : "Custom"
-              }
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
-            <CalendarComponent
-              mode="range"
-              selected={customRange as any}
-              onSelect={handleCustomDateSelect as any}
-              numberOfMonths={2}
-              className="pointer-events-auto"
-            />
-          </PopoverContent>
-        </Popover>
-      </div>
+      </section>
 
       {/* KPI Cards */}
-      <div className="analytics-kpi-ribbon grid grid-cols-2 lg:grid-cols-5 gap-3">
-        <KPICard icon={<Package className="h-4 w-4" />} label="Total Orders" value={stats.totalOrders} />
-        <KPICard icon={<ShoppingBag className="h-4 w-4" />} label="In Period" value={stats.ordersInRange} accent />
-        <KPICard icon={<TrendingUp className="h-4 w-4" />} label="Active" value={stats.activeOrders} />
-        <KPICard icon={<Clock className="h-4 w-4" />} label="Avg. Completion" value={`${stats.avgCompletionDays}d`} />
-        <KPICard icon={<Users className="h-4 w-4" />} label="Clients" value={stats.totalClients} className="col-span-2 lg:col-span-1" />
-      </div>
+      <section className="analytics-scoreboard grid gap-3 lg:grid-cols-[1.15fr_1.85fr]">
+        <div className="analytics-primary-score relative overflow-hidden rounded-[28px] bg-primary p-6 text-primary-foreground shadow-xl shadow-primary/18">
+          <ShoppingBag className="h-6 w-6 opacity-70" />
+          <p className="mt-8 text-[10px] font-black uppercase tracking-[0.2em] opacity-65">Orders in selected period</p>
+          <p className="mt-1 text-6xl font-black tracking-[-0.07em]">{stats.ordersInRange}</p>
+          <div className="mt-5 flex items-center gap-3 text-xs"><span className="rounded-full bg-white/14 px-3 py-1.5">{stats.activeOrders} active</span><span className="rounded-full bg-white/14 px-3 py-1.5">{stats.completedInRange} completed</span></div>
+        </div>
+        <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+          <KPICard icon={<Package className="h-4 w-4" />} label="All-time orders" value={stats.totalOrders} />
+          <KPICard icon={<TrendingUp className="h-4 w-4" />} label="Currently active" value={stats.activeOrders} accent />
+          <KPICard icon={<Clock className="h-4 w-4" />} label="Avg. completion" value={`${stats.avgCompletionDays}d`} />
+          <KPICard icon={<Users className="h-4 w-4" />} label="Client network" value={stats.totalClients} />
+        </div>
+      </section>
 
       {/* Main Charts Row */}
       <div className="analytics-hero-grid grid lg:grid-cols-3 gap-4">
@@ -508,11 +499,10 @@ export default function StatsPage() {
         </div>
       </div>
 
-      {/* Activity Heatmap */}
-      <OrderActivityHeatmap />
-
-      {/* Supplier Scorecard */}
-      <SupplierScorecard />
+      <section className="analytics-operations-grid grid gap-4 2xl:grid-cols-2">
+        <OrderActivityHeatmap />
+        <SupplierScorecard />
+      </section>
     </div>
   );
 }
