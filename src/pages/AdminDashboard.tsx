@@ -407,8 +407,8 @@ const AdminDashboard = () => {
           id="aleph-workspace-navigation"
           data-expanded={railExpanded}
           className={cn(
-            "aleph-workspace-rail fixed left-0 hidden shrink-0 flex-col overflow-visible border-r border-border/55 bg-card/95 py-4 backdrop-blur-xl lg:flex",
-            railExpanded ? "w-[248px] px-3" : "w-[72px] px-2",
+            "aleph-workspace-rail fixed left-0 z-40 hidden shrink-0 flex-col overflow-visible border-r border-border/55 bg-card py-4 lg:flex",
+            railExpanded ? "w-[248px] px-3" : "w-[56px] px-1.5",
           )}
           style={{ top: headerHeight, height: `calc(100dvh - ${headerHeight}px)` }}
         >
@@ -436,20 +436,20 @@ const AdminDashboard = () => {
                   title={railExpanded ? undefined : item.label}
                   aria-current={isActive ? "page" : undefined}
                   className={cn(
-                    "aleph-rail-item relative flex w-full items-center gap-3 overflow-hidden rounded-2xl py-2.5 text-left text-sm font-bold transition-all duration-300",
+                    "aleph-rail-item relative flex w-full items-center gap-3 overflow-hidden rounded-2xl py-2.5 text-left text-sm font-bold transition-opacity duration-200",
                     railExpanded ? "px-3" : "justify-center px-1.5",
                     isActive
                       ? "bg-primary text-primary-foreground shadow-[0_14px_30px_-18px_hsl(var(--primary))]"
                       : "text-muted-foreground hover:bg-primary/8 hover:text-foreground",
                   )}
                 >
-                  <span className={cn("relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-all duration-300", isActive ? "bg-white/15" : "bg-muted/70 group-hover:bg-primary/10")}>
+                  <span className={cn("relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-opacity duration-200", isActive ? "bg-white/15" : "bg-muted/70 group-hover:bg-primary/10")}>
                     <item.icon className="h-[18px] w-[18px]" />
                     {!railExpanded && item.badge > 0 && <span className="absolute -right-1.5 -top-1.5 h-2.5 w-2.5 rounded-full bg-amber-400 ring-2 ring-card" />}
                   </span>
-                  <span className={cn("aleph-rail-label min-w-0 flex-1 truncate transition-all duration-300", railExpanded ? "translate-x-0 opacity-100" : "pointer-events-none absolute translate-x-3 opacity-0")}>{item.label}</span>
+                  <span className={cn("aleph-rail-label min-w-0 flex-1 truncate transition-opacity duration-200", railExpanded ? "translate-x-0 opacity-100" : "pointer-events-none absolute translate-x-3 opacity-0")}>{item.label}</span>
                   {item.badge > 0 && (
-                    <span className={cn("min-w-5 rounded-full px-1.5 py-0.5 text-center text-[9px] font-black transition-all duration-300", railExpanded ? "translate-x-0 opacity-100" : "pointer-events-none absolute translate-x-3 opacity-0", isActive ? "bg-white/20 text-white" : "bg-primary/10 text-primary")}> 
+                    <span className={cn("min-w-5 rounded-full px-1.5 py-0.5 text-center text-[9px] font-black transition-opacity duration-200", railExpanded ? "translate-x-0 opacity-100" : "pointer-events-none absolute translate-x-3 opacity-0", isActive ? "bg-white/20 text-white" : "bg-primary/10 text-primary")}> 
                       {item.badge > 99 ? "99+" : item.badge}
                     </span>
                   )}
@@ -464,9 +464,9 @@ const AdminDashboard = () => {
           </nav>
 
           <div className="mt-3 shrink-0 space-y-1 border-t border-border/55 pt-3">
-            <button type="button" onClick={() => navigate('/settings')} title={railExpanded ? undefined : "Preferences"} className={cn("aleph-rail-footer-action flex w-full items-center gap-3 rounded-2xl py-2 text-sm font-bold text-muted-foreground transition-all duration-300 hover:bg-primary/8 hover:text-foreground", railExpanded ? "px-3" : "justify-center px-1")}>
+            <button type="button" onClick={() => navigate('/settings')} title={railExpanded ? undefined : "Preferences"} className={cn("aleph-rail-footer-action flex w-full items-center gap-3 rounded-2xl py-2 text-sm font-bold text-muted-foreground transition-opacity duration-200 hover:bg-primary/8 hover:text-foreground", railExpanded ? "px-3" : "justify-center px-1")}>
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-muted/70"><Settings className="h-[18px] w-[18px]" /></span>
-              <span className={cn("aleph-rail-label min-w-0 flex-1 text-left transition-all duration-300", railExpanded ? "translate-x-0 opacity-100" : "pointer-events-none absolute translate-x-3 opacity-0")}>Preferences</span>
+              <span className={cn("aleph-rail-label min-w-0 flex-1 text-left transition-opacity duration-200", railExpanded ? "translate-x-0 opacity-100" : "pointer-events-none absolute translate-x-3 opacity-0")}>Preferences</span>
             </button>
           </div>
           </div>
@@ -474,20 +474,20 @@ const AdminDashboard = () => {
           <button
             type="button"
             onClick={() => setRailExpanded(prev => !prev)}
-            className="aleph-rail-ribbon-toggle group/toggle absolute top-1/2 -right-[22px] z-50 flex h-16 w-[22px] -translate-y-1/2 items-center justify-center text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+            className="aleph-rail-ribbon-toggle group/toggle absolute bottom-[58px] -right-[16px] z-50 flex h-[34px] w-[17px] items-center justify-center text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
             aria-expanded={railExpanded}
             aria-controls="aleph-workspace-navigation"
             title={`${railExpanded ? "Collapse" : "Expand"} control centre (Ctrl+\\)`}
           >
             <span className="relative flex h-4 w-4 items-center justify-center">
-              <PanelLeftClose className={cn("h-3.5 w-3.5 transition-all duration-300", railExpanded ? "rotate-0 scale-100 opacity-100" : "-rotate-90 scale-50 opacity-0")} />
-              <PanelLeftOpen className={cn("absolute h-3.5 w-3.5 transition-all duration-300", railExpanded ? "rotate-90 scale-50 opacity-0" : "rotate-0 scale-100 opacity-100")} />
+              <PanelLeftClose className={cn("h-3 w-3 transition-all duration-150", railExpanded ? "rotate-0 scale-100 opacity-100" : "-rotate-90 scale-50 opacity-0")} />
+              <PanelLeftOpen className={cn("absolute h-3 w-3 transition-all duration-150", railExpanded ? "rotate-90 scale-50 opacity-0" : "rotate-0 scale-100 opacity-100")} />
             </span>
             <span className="sr-only">{railExpanded ? "Collapse" : "Expand"} control centre</span>
           </button>
 
         </aside>
-        <main ref={contentScrollRef} className={cn("aleph-content-scroll h-full min-h-0 min-w-0 flex-1 w-full overflow-x-hidden overflow-y-auto pb-16 transition-[margin-left] duration-500 ease-[cubic-bezier(.22,1,.36,1)] sm:pb-0", railExpanded ? "lg:ml-[248px]" : "lg:ml-[72px]")}>
+        <main ref={contentScrollRef} className={cn("aleph-content-scroll h-full min-h-0 min-w-0 flex-1 w-full overflow-x-hidden overflow-y-auto pb-16 transition-[margin-left] duration-[280ms] ease-[cubic-bezier(.4,0,.2,1)] sm:pb-0", railExpanded ? "lg:ml-[248px]" : "lg:ml-[56px]")}>
           <div
             className={cn(
               "app-page-stage w-full px-3 sm:px-5 lg:px-6 py-4 sm:py-6",
