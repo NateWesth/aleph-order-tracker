@@ -148,7 +148,7 @@ export default function AIInsightsPanel() {
   };
 
   return (
-    <div className="bg-card border border-border rounded-xl flex flex-col h-[500px] sm:h-[600px]">
+    <div className="bg-card border border-border/70 rounded-2xl flex flex-col h-[min(540px,calc(100dvh-7rem))] sm:h-[min(620px,calc(100dvh-7rem))] overflow-hidden shadow-2xl">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border">
         <div className="flex items-center gap-2">

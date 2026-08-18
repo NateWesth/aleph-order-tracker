@@ -40,6 +40,7 @@ export default function OrderItemComments({ orderItemId, className }: OrderItemC
   const { user } = useAuth();
   const { toast } = useToast();
   const [comments, setComments] = useState<OrderItemComment[]>([]);
+  const [commentCount, setCommentCount] = useState(0);
   const [open, setOpen] = useState(false);
   const [body, setBody] = useState("");
   const [loading, setLoading] = useState(false);
@@ -58,11 +59,27 @@ export default function OrderItemComments({ orderItemId, className }: OrderItemC
 
       if (error) throw error;
       setComments((data || []) as unknown as OrderItemComment[]);
+      setCommentCount(data?.length || 0);
     } catch (error) {
       console.error("Error loading item comments:", error);
+      toast({ title: "Comments could not load", description: "Please check your connection and try again.", variant: "destructive" });
     } finally {
       setLoading(false);
     }
+  }, [orderItemId, toast]);
+
+  // A lightweight count keeps the important note indicator visible before the
+  // popover opens, without loading full messages or opening realtime sockets.
+  useEffect(() => {
+    let active = true;
+    void supabase
+      .from("order_item_comments")
+      .select("id", { count: "exact", head: true })
+      .eq("order_item_id", orderItemId)
+      .then(({ count, error }) => {
+        if (active && !error) setCommentCount(count || 0);
+      });
+    return () => { active = false; };
   }, [orderItemId]);
 
   useEffect(() => {
@@ -91,8 +108,8 @@ export default function OrderItemComments({ orderItemId, className }: OrderItemC
   }, [open, orderItemId, fetchComments]);
 
   const commentCountLabel = useMemo(
-    () => `${comments.length} comment${comments.length === 1 ? "" : "s"}`,
-    [comments.length],
+    () => `${commentCount} comment${commentCount === 1 ? "" : "s"}`,
+    [commentCount],
   );
 
   const handleSend = async () => {
@@ -110,6 +127,7 @@ export default function OrderItemComments({ orderItemId, className }: OrderItemC
       author: { id: user.id, full_name: user.user_metadata?.full_name || null },
     };
     setComments(previous => [...previous, optimistic]);
+    setCommentCount(previous => previous + 1);
     setBody("");
     try {
       const { error } = await supabase.from("order_item_comments").insert({
@@ -124,6 +142,7 @@ export default function OrderItemComments({ orderItemId, className }: OrderItemC
     } catch (error) {
       console.error("Error adding item comment:", error);
       setComments(previous => previous.filter(comment => comment.id !== optimisticId));
+      setCommentCount(previous => Math.max(0, previous - 1));
       setBody(trimmed);
       toast({ title: "Comment not sent", description: "Your message was restored. Check your connection and try again.", variant: "destructive" });
     } finally {
@@ -141,22 +160,22 @@ export default function OrderItemComments({ orderItemId, className }: OrderItemC
             "relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
             "text-muted-foreground transition-all duration-200",
             "hover:bg-primary/10 hover:text-primary hover:scale-105",
-            comments.length > 0 && "text-blue-500 bg-blue-500/10 shadow-[0_0_18px_rgba(59,130,246,0.18)]",
+            commentCount > 0 && "text-blue-500 bg-blue-500/10 shadow-[0_0_18px_rgba(59,130,246,0.18)]",
             className,
           )}
           aria-label={`${commentCountLabel} for this item`}
           title={commentCountLabel}
         >
           <MessageCircle className="h-4 w-4" />
-          {comments.length > 0 && (
+          {commentCount > 0 && (
             <span
               className="absolute right-0.5 top-0.5 h-2.5 w-2.5 rounded-full bg-blue-500 ring-2 ring-background animate-pulse shadow-[0_0_10px_rgba(59,130,246,0.95)]"
               aria-hidden="true"
             />
           )}
-          {comments.length > 0 && (
+          {commentCount > 0 && (
             <span className="absolute -right-1 -top-1 min-w-4 rounded-full bg-blue-500 px-1 text-[8px] font-bold leading-4 text-white shadow-[0_0_10px_rgba(59,130,246,0.55)]">
-              {comments.length > 9 ? "9+" : comments.length}
+              {commentCount > 9 ? "9+" : commentCount}
             </span>
           )}
         </button>
@@ -177,9 +196,9 @@ export default function OrderItemComments({ orderItemId, className }: OrderItemC
                 Shared with everyone who can access this order
               </p>
             </div>
-            {comments.length > 0 && (
+            {commentCount > 0 && (
               <span className="rounded-full bg-primary/10 px-2 py-1 text-[10px] font-semibold text-primary">
-                {comments.length}
+                {commentCount}
               </span>
             )}
           </div>

@@ -676,7 +676,14 @@ export default function OrderDetailsDialog({
                     <tbody className="divide-y divide-border">
                       {displayItems.map((item) => (
                         <tr key={item.id} className="hover:bg-muted/30">
-                          <td className="px-4 py-3 text-sm font-medium">{item.name}</td>
+                          <td className="px-4 py-3">
+                            <div className="text-sm font-semibold text-foreground">{item.name}</div>
+                            {item.notes && (
+                              <div className="mt-1 max-w-xl whitespace-pre-wrap text-xs leading-relaxed text-muted-foreground">
+                                {item.notes}
+                              </div>
+                            )}
+                          </td>
                           <td className="px-4 py-3 text-center text-sm text-muted-foreground">{item.quantity}</td>
                           <td className="px-4 py-3 text-center">
                             {!item.id.startsWith("item-") && <OrderItemComments orderItemId={item.id} />}

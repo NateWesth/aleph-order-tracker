@@ -4,7 +4,7 @@ interface PageSkeletonProps {
   variant?: "default" | "table" | "kanban" | "stats" | "cards" | "dashboard" | "suppliers" | "heatmap" | "scorecard";
 }
 
-export function PageSkeleton({ variant = "default" }: PageSkeletonProps) {
+function PageSkeletonBody({ variant = "default" }: PageSkeletonProps) {
   if (variant === "dashboard") {
     return (
       <div className="space-y-6">
@@ -273,6 +273,32 @@ export function PageSkeleton({ variant = "default" }: PageSkeletonProps) {
         <Skeleton className="h-4 w-full" />
         <Skeleton className="h-4 w-full" />
         <Skeleton className="h-4 w-3/4" />
+      </div>
+    </div>
+  );
+}
+
+export function AlephLoadingMark({ label = "Preparing your workspace" }: { label?: string }) {
+  return (
+    <div className="aleph-loading-mark" role="status" aria-live="polite">
+      <div className="aleph-loading-orbit" aria-hidden="true">
+        <span className="aleph-loading-chaser" />
+        <span className="aleph-loading-chaser aleph-loading-chaser-two" />
+        <img src="/lovable-uploads/e1088147-889e-43f6-bdf0-271189b88913.png" alt="" />
+      </div>
+      <p>{label}</p>
+    </div>
+  );
+}
+
+export function PageSkeleton({ variant = "default" }: PageSkeletonProps) {
+  return (
+    <div className="relative min-h-[min(620px,calc(100dvh-10rem))]" aria-busy="true">
+      <div className="opacity-35 blur-[.15px]" aria-hidden="true">
+        <PageSkeletonBody variant={variant} />
+      </div>
+      <div className="absolute inset-0 z-10 flex items-center justify-center rounded-3xl bg-background/35 backdrop-blur-[2px]">
+        <AlephLoadingMark />
       </div>
     </div>
   );

@@ -121,6 +121,34 @@ export default function BuyingSheetPage() {
     return () => window.removeEventListener("keydown", handler);
   }, [isFullscreen]);
 
+  useEffect(() => {
+    const syncFullscreenState = () => {
+      if (document.fullscreenElement) setIsFullscreen(document.fullscreenElement === printRef.current);
+    };
+    document.addEventListener("fullscreenchange", syncFullscreenState);
+    return () => document.removeEventListener("fullscreenchange", syncFullscreenState);
+  }, []);
+
+  const toggleFullscreen = useCallback(async () => {
+    const target = printRef.current;
+    if (!target) return;
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+        setIsFullscreen(false);
+      } else if (target.requestFullscreen) {
+        await target.requestFullscreen();
+        setIsFullscreen(true);
+      } else {
+        // iOS/PWA fallback when the browser Fullscreen API is unavailable.
+        setIsFullscreen(value => !value);
+      }
+    } catch (error) {
+      console.warn("Fullscreen API unavailable, using app fullscreen:", error);
+      setIsFullscreen(value => !value);
+    }
+  }, []);
+
   // Auto-refresh timer
   useEffect(() => {
     if (autoRefreshInterval <= 0) return;
@@ -805,18 +833,6 @@ export default function BuyingSheetPage() {
     return multi;
   }, [rows]);
 
-  // Top supplier chips for quick filtering
-  const topSupplierChips = useMemo(() => {
-    const map = new Map<string, { id: string | null; count: number; toOrder: number }>();
-    rows.forEach(r => {
-      const key = r.supplierName;
-      const existing = map.get(key);
-      if (existing) { existing.count++; existing.toOrder += r.toOrder; }
-      else map.set(key, { id: r.supplierId, count: 1, toOrder: r.toOrder });
-    });
-    return Array.from(map.entries()).sort((a, b) => b[1].toOrder - a[1].toOrder).slice(0, 8);
-  }, [rows]);
-
   const groupedRows = useMemo(() => {
     if (!groupBySupplier) return null;
     const groups = new Map<string, BuyingSheetRow[]>();
@@ -1117,7 +1133,7 @@ export default function BuyingSheetPage() {
 
   return (
     <TooltipProvider>
-      <div className={`procurement-page app-no-x-scroll min-w-0 w-full max-w-full space-y-5 overflow-x-hidden ${isFullscreen ? "fixed inset-0 z-50 bg-background p-4 overflow-y-auto overflow-x-hidden" : ""}`} ref={printRef}>
+      <div className={`procurement-page app-no-x-scroll min-w-0 w-full max-w-full space-y-5 overflow-x-hidden ${isFullscreen ? "fixed inset-0 z-[100] h-[100dvh] bg-background p-3 sm:p-5 overflow-y-auto overflow-x-hidden overscroll-contain" : ""}`} ref={printRef}>
         {/* ── Sticky Header ── */}
         <div className="sticky top-0 z-20 -mx-1 px-1 pb-3 bg-background/88 backdrop-blur-xl supports-[backdrop-filter]:bg-background/72">
           <div className="procurement-command-center rounded-[24px] border border-border/60 bg-card/92 shadow-xl shadow-black/[0.04] overflow-hidden mb-3">
@@ -1139,7 +1155,7 @@ export default function BuyingSheetPage() {
               </div>
               <div className="flex items-center gap-1.5 flex-wrap">
                 <Tooltip><TooltipTrigger asChild>
-                  <Button variant="outline" size="icon" onClick={() => setIsFullscreen(!isFullscreen)} className="h-9 w-9">
+                  <Button variant="outline" size="icon" onClick={toggleFullscreen} className="h-9 w-9" aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}>
                     {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
                   </Button>
                 </TooltipTrigger><TooltipContent><p className="text-xs">{isFullscreen ? "Exit" : "Enter"} fullscreen</p></TooltipContent></Tooltip>
@@ -1215,19 +1231,6 @@ export default function BuyingSheetPage() {
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             {lastRefreshedAt && <span>Last refreshed: {lastRefreshedAt.toLocaleTimeString()}</span>}
             {autoRefreshInterval > 0 && <span className="flex items-center gap-1"><RotateCw className="h-3 w-3 animate-spin" style={{ animationDuration: "3s" }} />Next in {Math.floor(autoRefreshCountdown / 60)}:{String(autoRefreshCountdown % 60).padStart(2, "0")}</span>}
-          </div>
-        )}
-
-        {/* Supplier Quick-Filter Chips */}
-        {topSupplierChips.length > 1 && (
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-[10px] text-muted-foreground uppercase tracking-wider mr-1">Suppliers:</span>
-            <button onClick={() => setSupplierFilter("all")} className={`px-2 py-0.5 rounded-full text-xs transition-colors border ${supplierFilter === "all" ? "bg-primary text-primary-foreground border-primary" : "bg-muted/50 text-muted-foreground border-border hover:bg-muted"}`}>All</button>
-            {topSupplierChips.map(([name, info]) => (
-              <button key={name} onClick={() => { if (info.id) setSupplierFilter(info.id); }} className={`px-2 py-0.5 rounded-full text-xs transition-colors border ${info.id && supplierFilter === info.id ? "bg-primary text-primary-foreground border-primary" : "bg-muted/50 text-muted-foreground border-border hover:bg-muted"}`}>
-                {name} <span className="opacity-60">({info.toOrder})</span>
-              </button>
-            ))}
           </div>
         )}
 

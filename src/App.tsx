@@ -1,7 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Skeleton } from '@/components/ui/skeleton';
+import { PageSkeleton } from '@/components/ui/PageSkeleton';
 import { AuthProvider } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
@@ -42,17 +42,7 @@ const queryClient = new QueryClient({
 });
 
 // Loading fallback component
-const PageFallback = () => (
-  <div className="min-h-screen bg-background p-8 space-y-4">
-    <Skeleton className="h-8 w-64" />
-    <Skeleton className="h-4 w-96" />
-    <div className="space-y-2">
-      <Skeleton className="h-4 w-full" />
-      <Skeleton className="h-4 w-full" />
-      <Skeleton className="h-4 w-3/4" />
-    </div>
-  </div>
-);
+const PageFallback = () => <div className="min-h-screen bg-background p-4 sm:p-8"><PageSkeleton /></div>;
 
 function App() {
   useGlobalDocumentScroll();
