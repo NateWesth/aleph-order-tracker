@@ -269,7 +269,7 @@ export default function POTrackingPage() {
   if (loading) return <PageSkeleton variant="table" />;
 
   return (
-    <div className="space-y-5">
+    <div className="aleph-page-workspace aleph-po-workspace space-y-5">
       <PageHeader
         title="Outstanding Purchase Orders"
         icon={FileText}

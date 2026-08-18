@@ -1133,7 +1133,7 @@ export default function BuyingSheetPage() {
 
   return (
     <TooltipProvider>
-      <div className={`procurement-page app-no-x-scroll min-w-0 w-full max-w-full space-y-5 overflow-x-hidden ${isFullscreen ? "fixed inset-0 z-[100] h-[100dvh] bg-background p-3 sm:p-5 overflow-y-auto overflow-x-hidden overscroll-contain" : ""}`} ref={printRef}>
+      <div className={`procurement-page aleph-page-workspace aleph-buying-workspace app-no-x-scroll min-w-0 w-full max-w-full space-y-5 overflow-x-hidden ${isFullscreen ? "fixed inset-0 z-[100] h-[100dvh] bg-background p-3 sm:p-5 overflow-y-auto overflow-x-hidden overscroll-contain" : ""}`} ref={printRef}>
         {/* ── Sticky Header ── */}
         <div className="sticky top-0 z-20 -mx-1 px-1 pb-3 bg-background/88 backdrop-blur-xl supports-[backdrop-filter]:bg-background/72">
           <div className="procurement-command-center rounded-[24px] border border-border/60 bg-card/92 shadow-xl shadow-black/[0.04] overflow-hidden mb-3">

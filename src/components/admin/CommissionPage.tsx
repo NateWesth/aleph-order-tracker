@@ -1170,7 +1170,7 @@ const CommissionPage = () => {
   const isPreviousMonth = format(subMonths(new Date(), 1), "yyyy-MM") === selectedMonth;
 
   return (
-    <div className="commission-page app-no-x-scroll min-w-0 w-full max-w-full space-y-5 overflow-x-hidden">
+    <div className="commission-page aleph-page-workspace aleph-commission-workspace app-no-x-scroll min-w-0 w-full max-w-full space-y-5 overflow-x-hidden">
       <PageHeader
         title="Commission"
         icon={Percent}

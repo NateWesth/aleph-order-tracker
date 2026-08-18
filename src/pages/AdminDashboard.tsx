@@ -326,7 +326,7 @@ const AdminDashboard = () => {
           Keep scrolling on the document itself. A nested overflow-y-auto here
           creates a trapped scroll region and makes wheel hit-testing unreliable. */}
       <div className="flex w-full items-start min-w-0 overflow-x-hidden">
-        <aside className="aleph-workspace-rail sticky hidden w-[220px] shrink-0 flex-col border-r border-border/55 bg-card/55 px-3 py-5 backdrop-blur-xl lg:flex" style={{ top: headerHeight, height: `calc(100dvh - ${headerHeight}px)` }}>
+        <aside className="aleph-workspace-rail fixed left-0 hidden w-[220px] shrink-0 flex-col border-r border-border/55 bg-card/95 px-3 py-5 backdrop-blur-xl lg:flex" style={{ top: headerHeight, height: `calc(100dvh - ${headerHeight}px)` }}>
           <div className="mb-4 px-2">
             <p className="text-[10px] font-black uppercase tracking-[0.22em] text-primary">Control centre</p>
             <p className="mt-1 text-xs text-muted-foreground">Move between live workspaces</p>
@@ -365,7 +365,7 @@ const AdminDashboard = () => {
           </button>
         </aside>
         {/* Main content uses natural document scrolling. */}
-        <main className="min-w-0 flex-1 overflow-x-hidden w-full pb-16 sm:pb-0">
+        <main className="min-w-0 flex-1 overflow-x-hidden w-full pb-16 sm:pb-0 lg:ml-[220px]">
           <div
             className={cn(
               "app-page-stage w-full px-3 sm:px-5 lg:px-6 py-4 sm:py-6",

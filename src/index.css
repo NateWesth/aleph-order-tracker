@@ -2212,3 +2212,231 @@ html.toolbar-glass .aleph-toolbar-search-input {
   .aleph-home-button { width: 3rem; height: 3rem; }
   .aleph-toolbar-search-input { height: 2.75rem; }
 }
+
+/* ============================================================
+   ALEPH WORKSPACE V4 — PAGE-BODY MAKEOVER + VIEWPORT ANCHORS
+   ============================================================ */
+
+.aleph-workspace-rail {
+  position: fixed !important;
+  left: 0;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.aleph-workspace-rail::after {
+  content: "";
+  position: absolute;
+  inset: auto -4rem -5rem auto;
+  width: 12rem;
+  height: 12rem;
+  border-radius: 999px;
+  background: hsl(var(--primary) / .08);
+  filter: blur(36px);
+  pointer-events: none;
+}
+
+.aleph-ai-bubble,
+.aleph-ai-panel {
+  position: fixed !important;
+  margin: 0 !important;
+  transform: none;
+  contain: layout style;
+}
+
+.aleph-ai-bubble {
+  right: max(1.5rem, env(safe-area-inset-right, 0px)) !important;
+  bottom: max(1.5rem, env(safe-area-inset-bottom, 0px)) !important;
+  z-index: 1002 !important;
+  box-shadow: 0 20px 48px -18px hsl(var(--primary) / .7) !important;
+}
+
+.aleph-ai-panel {
+  right: max(1.5rem, env(safe-area-inset-right, 0px)) !important;
+  bottom: calc(max(1.5rem, env(safe-area-inset-bottom, 0px)) + 4.5rem) !important;
+  z-index: 1001 !important;
+}
+
+.aleph-page-workspace {
+  --workspace-accent: var(--primary);
+  position: relative;
+}
+
+.aleph-clients-workspace { --workspace-accent: 158 64% 42%; }
+.aleph-suppliers-workspace { --workspace-accent: 32 92% 52%; }
+.aleph-users-workspace { --workspace-accent: 262 78% 60%; }
+.aleph-po-workspace { --workspace-accent: 205 88% 50%; }
+.aleph-items-workspace { --workspace-accent: 220 78% 56%; }
+.aleph-history-workspace { --workspace-accent: 142 70% 40%; }
+.aleph-buying-workspace { --workspace-accent: 278 70% 55%; }
+.aleph-commission-workspace { --workspace-accent: 44 94% 48%; }
+.aleph-stats-workspace { --workspace-accent: 190 82% 44%; }
+.aleph-orders-workspace { --workspace-accent: 225 78% 56%; }
+
+.aleph-page-workspace .aleph-command-header {
+  border-color: hsl(var(--workspace-accent) / .22);
+  background:
+    linear-gradient(115deg, hsl(var(--workspace-accent) / .08), transparent 38%),
+    hsl(var(--card) / .9);
+}
+
+.aleph-page-workspace .aleph-command-header > div:first-child {
+  background: linear-gradient(to bottom, hsl(var(--workspace-accent)), hsl(var(--workspace-accent) / .15));
+}
+
+@media (min-width: 768px) {
+  /* Entity/history/status tables become card workspaces. The Buying Sheet's
+     procurement grid opts out because its columns are an editing instrument. */
+  .aleph-page-workspace .aleph-data-deck:has(table:not(.procurement-data-table)) {
+    overflow: visible;
+    padding: 0;
+    background: transparent;
+  }
+
+  .aleph-page-workspace .aleph-data-deck table:not(.procurement-data-table),
+  .aleph-page-workspace .aleph-data-deck table:not(.procurement-data-table) tbody {
+    display: block;
+    width: 100%;
+  }
+
+  .aleph-page-workspace .aleph-data-deck table:not(.procurement-data-table) thead {
+    display: none;
+  }
+
+  .aleph-page-workspace .aleph-data-deck table:not(.procurement-data-table) tbody {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 330px), 1fr));
+    gap: 1rem;
+  }
+
+  .aleph-page-workspace .aleph-data-deck table:not(.procurement-data-table) tbody > tr {
+    position: relative;
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid hsl(var(--border) / .62);
+    border-radius: 1.35rem;
+    background:
+      linear-gradient(145deg, hsl(var(--workspace-accent) / .055), transparent 42%),
+      hsl(var(--card) / .9);
+    box-shadow: 0 24px 54px -42px hsl(var(--foreground) / .48);
+    transition: transform .2s cubic-bezier(.22,1,.36,1), border-color .2s ease, box-shadow .2s ease;
+  }
+
+  .aleph-page-workspace .aleph-data-deck table:not(.procurement-data-table) tbody > tr::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 3px;
+    background: linear-gradient(to bottom, hsl(var(--workspace-accent)), transparent 80%);
+  }
+
+  .aleph-page-workspace .aleph-data-deck table:not(.procurement-data-table) tbody > tr:hover {
+    transform: translateY(-3px);
+    border-color: hsl(var(--workspace-accent) / .28);
+    box-shadow: 0 30px 64px -42px hsl(var(--workspace-accent) / .5);
+  }
+
+  .aleph-page-workspace .aleph-data-deck table:not(.procurement-data-table) tbody > tr:has(td[data-span="full"]) {
+    grid-column: 1 / -1;
+  }
+
+  .aleph-page-workspace .aleph-data-deck table:not(.procurement-data-table) tbody > tr > td {
+    display: grid;
+    grid-template-columns: minmax(5.5rem, .38fr) minmax(0, 1fr);
+    align-items: center;
+    gap: .75rem;
+    min-width: 0;
+    min-height: 3.15rem;
+    padding: .7rem 1rem;
+    border: 0 !important;
+    border-bottom: 1px solid hsl(var(--border) / .4) !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    text-align: left !important;
+  }
+
+  .aleph-page-workspace .aleph-data-deck table:not(.procurement-data-table) tbody > tr > td:last-child {
+    border-bottom: 0 !important;
+  }
+
+  .aleph-page-workspace .aleph-data-deck table:not(.procurement-data-table) tbody > tr > td::before {
+    content: attr(data-label);
+    overflow: hidden;
+    color: hsl(var(--muted-foreground));
+    font-size: .59rem;
+    font-weight: 850;
+    letter-spacing: .11em;
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .aleph-page-workspace .aleph-data-deck table:not(.procurement-data-table) tbody > tr > td:first-child {
+    min-height: 3.8rem;
+    background: hsl(var(--workspace-accent) / .065) !important;
+  }
+
+  .aleph-page-workspace .aleph-data-deck table:not(.procurement-data-table) tbody > tr > td[data-span="full"] {
+    display: block;
+    padding: 1.1rem;
+  }
+
+  .aleph-page-workspace .aleph-data-deck table:not(.procurement-data-table) tbody > tr > td[data-span="full"]::before {
+    margin-bottom: .55rem;
+  }
+}
+
+.aleph-history-workspace [data-radix-collapsible-content] {
+  background: hsl(var(--background) / .3);
+}
+
+.aleph-po-workspace > .grid,
+.aleph-users-workspace > .grid {
+  gap: 1rem;
+}
+
+.aleph-buying-workspace .procurement-command-center {
+  border-radius: 1.75rem;
+  border-color: hsl(var(--workspace-accent) / .22);
+  background:
+    radial-gradient(circle at 8% 0, hsl(var(--workspace-accent) / .1), transparent 24rem),
+    hsl(var(--card) / .94);
+}
+
+.aleph-orders-workspace > .flex:first-of-type {
+  overflow: hidden;
+  border: 1px solid hsl(var(--workspace-accent) / .2);
+  border-radius: 1.65rem;
+  padding: 1rem;
+  background:
+    linear-gradient(120deg, hsl(var(--workspace-accent) / .09), transparent 44%),
+    hsl(var(--card) / .9);
+  box-shadow: 0 25px 55px -44px hsl(var(--foreground) / .48);
+}
+
+.aleph-orders-workspace > .flex:first-of-type h2 {
+  font-family: var(--font-display, inherit);
+  font-size: clamp(1.55rem, 2vw, 2.1rem);
+  font-weight: 900;
+  letter-spacing: -.04em;
+}
+
+.aleph-orders-workspace [class*="grid-cols-4"] > div {
+  border-radius: 1.35rem;
+}
+
+@media (max-width: 767px) {
+  .aleph-ai-bubble {
+    right: max(.9rem, env(safe-area-inset-right, 0px)) !important;
+    bottom: calc(max(.8rem, env(safe-area-inset-bottom, 0px)) + 4.25rem) !important;
+  }
+
+  .aleph-ai-panel {
+    right: max(.75rem, env(safe-area-inset-right, 0px)) !important;
+    bottom: calc(max(.8rem, env(safe-area-inset-bottom, 0px)) + 8rem) !important;
+  }
+}
