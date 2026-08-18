@@ -407,31 +407,18 @@ const AdminDashboard = () => {
           id="aleph-workspace-navigation"
           data-expanded={railExpanded}
           className={cn(
-            "aleph-workspace-rail fixed left-0 hidden shrink-0 flex-col overflow-hidden border-r border-border/55 bg-card/95 py-4 backdrop-blur-xl lg:flex",
+            "aleph-workspace-rail fixed left-0 hidden shrink-0 flex-col overflow-visible border-r border-border/55 bg-card/95 py-4 backdrop-blur-xl lg:flex",
             railExpanded ? "w-[248px] px-3" : "w-[72px] px-2",
           )}
           style={{ top: headerHeight, height: `calc(100dvh - ${headerHeight}px)` }}
         >
-          <div className={cn("aleph-rail-head mb-3 flex h-12 shrink-0 items-center", railExpanded ? "justify-between gap-2 px-1" : "justify-center")}>
-            <div className={cn("aleph-rail-copy min-w-0 whitespace-nowrap", railExpanded ? "translate-x-0 opacity-100" : "pointer-events-none absolute -translate-x-3 opacity-0")}>
-              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-primary">Control centre</p>
-              <p className="mt-0.5 text-xs text-muted-foreground">Your live workspaces</p>
+          <div className="relative flex h-full w-full flex-col overflow-hidden">
+            <div className={cn("aleph-rail-head mb-3 flex h-12 shrink-0 items-center", railExpanded ? "justify-between gap-2 px-1" : "justify-center")}>
+              <div className={cn("aleph-rail-copy min-w-0 whitespace-nowrap", railExpanded ? "translate-x-0 opacity-100" : "pointer-events-none absolute -translate-x-3 opacity-0")}>
+                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-primary">Control centre</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">Your live workspaces</p>
+              </div>
             </div>
-            <button
-              type="button"
-              onClick={() => setRailExpanded(prev => !prev)}
-              className="aleph-rail-toggle group/toggle flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-border/60 bg-background/80 text-muted-foreground shadow-sm transition-all duration-300 hover:scale-105 hover:border-primary/40 hover:bg-primary/10 hover:text-primary hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 active:scale-95"
-              aria-expanded={railExpanded}
-              aria-controls="aleph-workspace-navigation"
-              title={`${railExpanded ? "Collapse" : "Expand"} control centre (Ctrl+\\)`}
-            >
-              <span className="relative flex h-[18px] w-[18px] items-center justify-center">
-                <PanelLeftClose className={cn("h-[16px] w-[16px] transition-all duration-300", railExpanded ? "rotate-0 scale-100 opacity-100" : "-rotate-90 scale-50 opacity-0")} />
-                <PanelLeftOpen className={cn("absolute h-[16px] w-[16px] transition-all duration-300", railExpanded ? "rotate-90 scale-50 opacity-0" : "rotate-0 scale-100 opacity-100")} />
-              </span>
-              <span className="sr-only">{railExpanded ? "Collapse" : "Expand"} control centre</span>
-            </button>
-          </div>
 
           <div className={cn("aleph-rail-search relative shrink-0 overflow-hidden", railExpanded ? "mb-3 max-h-12 translate-y-0 opacity-100" : "mb-0 max-h-0 -translate-y-2 opacity-0")}>
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -491,6 +478,22 @@ const AdminDashboard = () => {
               <span className={cn("aleph-rail-label min-w-0 flex-1 text-left transition-all duration-300", railExpanded ? "translate-x-0 opacity-100" : "pointer-events-none absolute translate-x-3 opacity-0")}>Preferences</span>
             </button>
           </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setRailExpanded(prev => !prev)}
+            className="aleph-rail-ribbon-toggle group/toggle absolute -right-3.5 top-24 z-50 flex items-start justify-center text-muted-foreground transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+            aria-expanded={railExpanded}
+            aria-controls="aleph-workspace-navigation"
+            title={`${railExpanded ? "Collapse" : "Expand"} control centre (Ctrl+\\)`}
+          >
+            <span className="relative flex h-4 w-4 items-center justify-center pt-2.5">
+              <PanelLeftClose className={cn("h-3.5 w-3.5 transition-all duration-300", railExpanded ? "rotate-0 scale-100 opacity-100" : "-rotate-90 scale-50 opacity-0")} />
+              <PanelLeftOpen className={cn("absolute h-3.5 w-3.5 transition-all duration-300", railExpanded ? "rotate-90 scale-50 opacity-0" : "rotate-0 scale-100 opacity-100")} />
+            </span>
+            <span className="sr-only">{railExpanded ? "Collapse" : "Expand"} control centre</span>
+          </button>
         </aside>
         <main ref={contentScrollRef} className={cn("aleph-content-scroll h-full min-h-0 min-w-0 flex-1 w-full overflow-x-hidden overflow-y-auto pb-16 transition-[margin-left] duration-500 ease-[cubic-bezier(.22,1,.36,1)] sm:pb-0", railExpanded ? "lg:ml-[248px]" : "lg:ml-[72px]")}>
           <div
