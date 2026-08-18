@@ -407,7 +407,7 @@ const AdminDashboard = () => {
           id="aleph-workspace-navigation"
           data-expanded={railExpanded}
           className={cn(
-            "aleph-workspace-rail fixed left-0 hidden shrink-0 flex-col overflow-visible border-r border-border/55 bg-card/95 py-4 backdrop-blur-xl lg:flex",
+            "aleph-workspace-rail fixed left-0 z-40 hidden shrink-0 flex-col overflow-visible border-r border-border/55 bg-card/95 py-4 backdrop-blur-xl lg:flex",
             railExpanded ? "w-[248px] px-3" : "w-[72px] px-2",
           )}
           style={{ top: headerHeight, height: `calc(100dvh - ${headerHeight}px)` }}
