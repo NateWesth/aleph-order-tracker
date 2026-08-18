@@ -312,7 +312,7 @@ const ItemsPage = () => {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="aleph-page-workspace aleph-items-workspace space-y-5">
       {/* Import Progress */}
       {importing && (
         <Card className="p-4">

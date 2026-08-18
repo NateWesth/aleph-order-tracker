@@ -249,7 +249,7 @@ export default function StatsPage() {
   );
 
   return (
-    <div className="space-y-6 pb-8">
+    <div className="aleph-page-workspace aleph-stats-workspace space-y-6 pb-8">
       <PageHeader
         title="Analytics"
         icon={BarChart3}

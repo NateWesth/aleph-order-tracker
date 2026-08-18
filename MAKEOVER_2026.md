@@ -52,6 +52,15 @@
 - Batched order/item comment counts into the Orders query and added glowing comment activity badges to parent order cards.
 - Added database-backed item-comment broadcasts that create parent-order activity and realtime notifications for other approved users.
 
+## Viewport and page-layout correction pass 6
+
+- Changed the desktop Control Centre from sticky document content to a fixed viewport rail beneath the measured toolbar height; the main workspace now reserves its width independently.
+- Rendered Aleph AI through a document-body portal and enforced viewport-fixed positioning, safe-area offsets, and top-level stacking for both the bubble and open panel.
+- Converted ordinary desktop entity tables into actual responsive card-grid page bodies. Items, Clients, Suppliers, Users, History, PO lines, and eligible Commission records now present each record as a labelled card rather than a spreadsheet row.
+- Added page-specific workspace accents and command surfaces so each operational area has distinct structure and visual identity.
+- Preserved the Buying Sheet procurement table only in its optional Data view, where side-by-side quantities are required for editing; Queue and Suppliers remain the primary workflow views.
+- Reframed the Orders Board controls as a dedicated command surface while retaining its drag-and-drop workflow columns.
+
 ## Deployment
 
 1. Install dependencies and build the Vite app.

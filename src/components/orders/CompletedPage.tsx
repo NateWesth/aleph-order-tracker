@@ -252,7 +252,7 @@ export default function CompletedPage({
   };
 
   return (
-    <PullToRefresh onRefresh={fetchCompletedOrders} className="w-full">
+    <PullToRefresh onRefresh={fetchCompletedOrders} className="aleph-page-workspace aleph-history-workspace w-full">
       <div className={isMobile ? 'mb-3' : 'mb-6'}>
         <PageHeader
           title="Order History"

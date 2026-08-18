@@ -186,7 +186,7 @@ export default function ClientCompaniesPage() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="aleph-page-workspace aleph-clients-workspace space-y-5">
       <PageHeader
         title="Clients"
         icon={Building2}

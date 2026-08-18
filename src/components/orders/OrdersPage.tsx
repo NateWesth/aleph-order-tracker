@@ -961,7 +961,7 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
         }
       `}</style>
 
-      <PullToRefresh onRefresh={fetchOrders} className="space-y-3 sm:space-y-4 w-full overflow-x-hidden">
+      <PullToRefresh onRefresh={fetchOrders} className="aleph-page-workspace aleph-orders-workspace space-y-3 sm:space-y-4 w-full overflow-x-hidden">
         {selectedOrders.length > 0 && (
           <BulkActionsBar
             selectedOrders={selectedOrders}

@@ -193,7 +193,7 @@ export default function UsersManagementPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="aleph-page-workspace aleph-users-workspace space-y-6">
       <PageHeader
         title="User Management"
         icon={UserCog}
