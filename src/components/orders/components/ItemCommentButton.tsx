@@ -108,11 +108,10 @@ export default function ItemCommentButton({ orderItemId, orderId, itemName, clas
 
     const { error } = await supabase.from("order_item_comments").insert({
       order_item_id: orderItemId,
-      order_id: orderId,
-      author_id: user.id,
-      author_name: authorName,
-      content,
+      user_id: user.id,
+      body: content,
     });
+
 
     setSending(false);
     if (!error) {
