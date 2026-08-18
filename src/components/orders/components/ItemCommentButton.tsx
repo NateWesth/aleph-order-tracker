@@ -10,10 +10,10 @@ import { cn } from "@/lib/utils";
 
 interface ItemComment {
   id: string;
-  content: string;
-  author_name: string;
-  author_id: string;
+  body: string;
+  user_id: string;
   created_at: string;
+  author_name?: string;
 }
 
 interface ItemCommentButtonProps {
@@ -81,10 +81,15 @@ export default function ItemCommentButton({ orderItemId, orderId, itemName, clas
     if (loaded) return;
     const { data } = await supabase
       .from("order_item_comments")
-      .select("id, content, author_name, author_id, created_at")
+      .select("id, body, user_id, created_at")
       .eq("order_item_id", orderItemId)
       .order("created_at", { ascending: true });
-    setComments(data ?? []);
+    setComments(
+      (data ?? []).map((comment) => ({
+        ...comment,
+        author_name: comment.user_id === user?.id ? "You" : "Team member",
+      })),
+    );
     setLoaded(true);
   };
 
@@ -120,7 +125,7 @@ export default function ItemCommentButton({ orderItemId, orderId, itemName, clas
       // it immediately for a snappy feel rather than waiting on the round trip.
       setComments((prev) => [
         ...prev,
-        { id: crypto.randomUUID(), content, author_name: authorName, author_id: user.id, created_at: new Date().toISOString() },
+        { id: crypto.randomUUID(), body: content, author_name: authorName, user_id: user.id, created_at: new Date().toISOString() },
       ]);
       setCount((c) => c + 1);
     }
@@ -164,12 +169,12 @@ export default function ItemCommentButton({ orderItemId, orderId, itemName, clas
             comments.map((c) => (
               <div key={c.id} className="text-sm">
                 <div className="flex items-baseline justify-between gap-2">
-                  <span className="text-xs font-semibold text-foreground">{c.author_name}</span>
+                  <span className="text-xs font-semibold text-foreground">{c.author_name ?? (c.user_id === user?.id ? "You" : "Team member")}</span>
                   <span className="text-[10px] text-muted-foreground shrink-0">
                     {formatDistanceToNow(new Date(c.created_at), { addSuffix: true })}
                   </span>
                 </div>
-                <p className="mt-0.5 text-xs text-muted-foreground break-words">{c.content}</p>
+                <p className="mt-0.5 text-xs text-muted-foreground break-words">{c.body}</p>
               </div>
             ))
           )}
