@@ -2678,6 +2678,10 @@ html.toolbar-glass .aleph-toolbar-search-input {
 }
 
 @media (min-width: 1024px) {
+  html:has(.aleph-orders-workspace) {
+    overflow-y: hidden !important;
+  }
+
   .app-shell main.aleph-content-scroll:has(.aleph-orders-workspace) {
     overflow-y: hidden !important;
   }
