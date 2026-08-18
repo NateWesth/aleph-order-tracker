@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { Package, PackageCheck, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import ItemCommentButton from "./ItemCommentButton";
 
 interface OrderItem {
   id: string;
@@ -213,7 +212,6 @@ export default function OrderItemsFloatingBubble({ order, onClose }: OrderItemsF
                   </div>
 
                   <PackageCheck className="h-4 w-4 shrink-0 text-muted-foreground/45" />
-                  <ItemCommentButton orderItemId={item.id} orderId={visibleOrder.id} itemName={item.name} />
                 </div>
               );
             })

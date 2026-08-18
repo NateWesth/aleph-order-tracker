@@ -14,15 +14,15 @@ export default defineConfig(({ mode }) => ({
     react(),
     mode === 'development' && componentTagger(),
     VitePWA({
-      registerType: 'prompt',
+      registerType: 'autoUpdate',
       injectRegister: false,
       includeAssets: ['favicon.ico', 'lovable-uploads/*.png'],
       manifest: {
         name: 'Aleph Order Tracker',
         short_name: 'Aleph Orders',
         description: 'Aleph Engineering and Supplies - Order Management System',
-        theme_color: '#0d84b8',
-        background_color: '#f7f9fb',
+        theme_color: '#7c3aed',
+        background_color: '#f8fafc',
         display: 'standalone',
         orientation: 'portrait',
         scope: '/',
@@ -46,12 +46,8 @@ export default defineConfig(({ mode }) => ({
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5MB limit
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         cleanupOutdatedCaches: true,
-        // Deliberately NOT setting skipWaiting/clientsClaim here - the new
-        // worker should sit in the "waiting" state until main.tsx's
-        // onNeedRefresh handler explicitly tells it to take over via
-        // updateSW(true). That handshake is what guarantees a clean,
-        // one-time reload onto the new version instead of a silent
-        // in-place swap that can leave a tab stuck on stale JS.
+        clientsClaim: true,
+        skipWaiting: true,
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,

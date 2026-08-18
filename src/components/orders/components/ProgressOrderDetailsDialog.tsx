@@ -270,7 +270,7 @@ export default function ProgressOrderDetailsDialog({
 
         <div className="mt-6">
           <h3 className="text-xl font-semibold mb-4">Items & Stock Status</h3>
-          <div className="overflow-x-auto">
+          <div className="overflow-x-hidden min-w-0 max-w-full">
             <table className="min-w-full divide-y divide-border">
               <thead className="bg-muted/50">
                 <tr>

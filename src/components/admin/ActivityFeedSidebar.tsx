@@ -43,7 +43,7 @@ const ACTIVITY_CONFIG: Record<string, { icon: typeof Package; color: string; bg:
 
 const DEFAULT_CONFIG = { icon: Activity, color: "text-muted-foreground", bg: "bg-muted" };
 
-export default function ActivityFeedSidebar() {
+export default function ActivityFeedSidebar({ topOffset = 0 }: { topOffset?: number }) {
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [collapsed, setCollapsed] = useState(true);
@@ -155,13 +155,13 @@ export default function ActivityFeedSidebar() {
   return (
     <div
       className={cn(
-        "hidden lg:flex flex-col transition-all duration-300 shrink-0 relative overflow-hidden sticky",
+        "hidden lg:flex flex-col transition-all duration-300 shrink-0 relative overflow-hidden self-start sticky",
         "border-l border-white/10 dark:border-white/[0.06]",
         collapsed ? "w-12" : "w-72 xl:w-80"
       )}
       style={{
-        top: "var(--app-header-h, 64px)",
-        height: "calc(100vh - var(--app-header-h, 64px))",
+        top: topOffset,
+        height: `calc(100vh - ${topOffset}px)`,
       }}
     >
       {/* Background matches app background in every theme */}

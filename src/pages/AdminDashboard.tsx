@@ -40,21 +40,6 @@ const AdminDashboard = () => {
   const { toast } = useToast();
   const { user, signOut } = useAuth();
   const [activeView, setActiveView] = useState("orders");
-  const headerRef = useRef<HTMLElement>(null);
-
-  // Measure the header's real (responsive) height so the activity sidebar can
-  // stick exactly below it once the page uses natural whole-page scrolling.
-  useEffect(() => {
-    const el = headerRef.current;
-    if (!el) return;
-    const setVar = () => {
-      document.documentElement.style.setProperty("--app-header-h", `${el.offsetHeight}px`);
-    };
-    setVar();
-    const observer = new ResizeObserver(setVar);
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
   const [searchTerm] = useState("");
   const [userProfile, setUserProfile] = useState<any>(null);
   const [userRole, setUserRole] = useState<'admin' | 'user'>('user');
@@ -63,6 +48,21 @@ const AdminDashboard = () => {
   const [changelogOpen, setChangelogOpen] = useState(false);
   const [hasNewChangelog, setHasNewChangelog] = useState(false);
   const isMobile = useIsMobile();
+  const headerRef = useRef<HTMLElement | null>(null);
+  const [headerHeight, setHeaderHeight] = useState(0);
+
+  useEffect(() => {
+    const header = headerRef.current;
+    if (!header) return;
+
+    const updateHeaderHeight = () => setHeaderHeight(header.getBoundingClientRect().height);
+
+    updateHeaderHeight();
+    const observer = new ResizeObserver(updateHeaderHeight);
+    observer.observe(header);
+
+    return () => observer.disconnect();
+  }, []);
   useEffect(() => { setHasNewChangelog(hasUnreadChangelog()); }, []);
   const { unreadOrderUpdates, pendingOrdersCount } = useGlobalUnreadCount();
   useEffect(() => {
@@ -189,10 +189,11 @@ const AdminDashboard = () => {
   }
 
   return (
-    <div className="min-h-screen w-full flex flex-col bg-background overflow-x-hidden relative">
+    <div className="app-shell min-h-screen w-full flex flex-col bg-background overflow-x-hidden relative">
       <AuroraBackground />
       {/* Modern Top Navigation Bar */}
-      <header ref={headerRef} className="sticky top-0 z-50 bg-card/85 backdrop-blur-xl border-b-2 border-border shadow-soft w-full">
+      <header ref={headerRef} className="aleph-topbar sticky top-0 z-50 w-full border-b shadow-soft">
+        <div className="aleph-toolbar-watermark" aria-hidden />
         <div className="ribbon-bar" aria-hidden />
         <div className="w-full px-2 sm:px-3 py-2 sm:py-3">
           {/* Top row: Logo/Home, Search, Actions */}
@@ -272,7 +273,7 @@ const AdminDashboard = () => {
           </div>
 
           {/* Navigation Tabs - Hidden on mobile, shown on tablet+ */}
-          <nav className="hidden sm:flex items-center gap-0.5 sm:gap-1 mt-2 sm:mt-3 -mb-3 overflow-x-auto scrollbar-none pb-px" style={{ WebkitOverflowScrolling: 'touch' }}>
+          <nav className="hidden sm:flex flex-wrap items-center gap-0.5 sm:gap-1 mt-2 sm:mt-3 -mb-3 overflow-hidden pb-px">
             {navItems.map((item) => {
               const isActive = activeView === item.id;
               return (
@@ -307,13 +308,15 @@ const AdminDashboard = () => {
         </div>
       </header>
 
-      {/* Main content area with activity sidebar */}
-      <div className="flex-1 flex items-start">
-        {/* Main content - Add bottom padding on mobile for bottom nav */}
-        <main className="flex-1 min-w-0 overflow-x-hidden w-full pb-16 sm:pb-0">
+      {/* Main content area with activity sidebar.
+          Keep scrolling on the document itself. A nested overflow-y-auto here
+          creates a trapped scroll region and makes wheel hit-testing unreliable. */}
+      <div className="flex w-full items-start min-w-0 overflow-x-hidden">
+        {/* Main content uses natural document scrolling. */}
+        <main className="min-w-0 flex-1 overflow-x-hidden w-full pb-16 sm:pb-0">
           <div
             className={cn(
-              "w-full px-3 sm:px-5 lg:px-6 py-4 sm:py-6",
+              "app-page-stage w-full px-3 sm:px-5 lg:px-6 py-4 sm:py-6",
               activeView === "orders" || activeView === "history" ? "max-w-none" : "max-w-7xl mx-auto"
             )}
           >
@@ -339,11 +342,11 @@ const AdminDashboard = () => {
         </main>
 
         {/* Activity Feed Sidebar - desktop only */}
-        <ActivityFeedSidebar />
+        <ActivityFeedSidebar topOffset={headerHeight} />
       </div>
 
       {/* Mobile Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card/95 backdrop-blur-xl border-t border-border sm:hidden safe-area-bottom">
+      <nav className="aleph-mobile-nav fixed bottom-0 left-0 right-0 z-50 border-t sm:hidden safe-area-bottom">
         <div className="flex items-center justify-around px-1 py-1">
           {navItems.slice(0, 6).map((item) => {
             const isActive = activeView === item.id;

@@ -155,7 +155,9 @@ export default function OrderItemComments({ orderItemId, className }: OrderItemC
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-xs font-semibold text-foreground">Item comments</p>
-              <p className="text-[10px] text-muted-foreground">Shared with everyone who can access this order</p>
+              <p className="text-[10px] text-muted-foreground">
+                Shared with everyone who can access this order
+              </p>
             </div>
             {comments.length > 0 && (
               <span className="rounded-full bg-primary/10 px-2 py-1 text-[10px] font-semibold text-primary">
@@ -174,7 +176,9 @@ export default function OrderItemComments({ orderItemId, className }: OrderItemC
             <div className="rounded-xl bg-muted/40 px-3 py-5 text-center">
               <MessageCircle className="mx-auto mb-2 h-5 w-5 text-muted-foreground/50" />
               <p className="text-xs font-medium text-foreground">No comments yet</p>
-              <p className="mt-0.5 text-[10px] text-muted-foreground">Add a note for the team.</p>
+              <p className="mt-0.5 text-[10px] text-muted-foreground">
+                Add a note for the team.
+              </p>
             </div>
           ) : (
             comments.map((comment) => (
@@ -183,9 +187,13 @@ export default function OrderItemComments({ orderItemId, className }: OrderItemC
                   <span className="text-[10px] font-semibold text-foreground">
                     {comment.author?.full_name || (comment.user_id === user?.id ? "You" : "Team member")}
                   </span>
-                  <span className="text-[9px] text-muted-foreground">{formatCommentTime(comment.created_at)}</span>
+                  <span className="text-[9px] text-muted-foreground">
+                    {formatCommentTime(comment.created_at)}
+                  </span>
                 </div>
-                <p className="mt-1 whitespace-pre-wrap break-words text-xs text-foreground/90">{comment.body}</p>
+                <p className="mt-1 whitespace-pre-wrap break-words text-xs text-foreground/90">
+                  {comment.body}
+                </p>
               </div>
             ))
           )}

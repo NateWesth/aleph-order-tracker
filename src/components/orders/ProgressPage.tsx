@@ -874,7 +874,7 @@ export default function ProgressPage({
                     </div>
                   </div>
 
-                  {isExpanded && <div className="mt-4 border-t border-border pt-4 overflow-x-auto -mx-2 px-2">
+                  {isExpanded && <div className="mt-4 border-t border-border pt-4 overflow-x-hidden min-w-0 max-w-full -mx-2 px-2">
                       <Table className="min-w-0 w-full table-fixed sm:table-auto">
                         <TableHeader>
                           <TableRow>
