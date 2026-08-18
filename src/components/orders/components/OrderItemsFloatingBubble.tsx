@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Package, PackageCheck, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import OrderItemComments from "./OrderItemComments";
+import ItemCommentButton from "./ItemCommentButton";
 
 interface OrderItem {
   id: string;
@@ -127,7 +127,9 @@ export default function OrderItemsFloatingBubble({ order, onClose }: OrderItemsF
 
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">Order contents</p>
+              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
+                Order contents
+              </p>
 
               {visibleOrder.companyName && (
                 <span className="text-[10px] text-muted-foreground/60">· {visibleOrder.companyName}</span>
@@ -174,10 +176,7 @@ export default function OrderItemsFloatingBubble({ order, onClose }: OrderItemsF
           )}
         </div>
 
-        <div
-          key={`items-${visibleOrder.id}`}
-          className="mt-4 grid gap-2 sm:grid-cols-2 animate-order-floating-bubble-content"
-        >
+        <div key={`items-${visibleOrder.id}`} className="mt-4 grid gap-2 sm:grid-cols-2 animate-order-floating-bubble-content">
           {items.length === 0 ? (
             <div className="col-span-full rounded-2xl bg-muted/40 px-4 py-5 text-center text-xs text-muted-foreground">
               No items on this order.
@@ -203,27 +202,18 @@ export default function OrderItemsFloatingBubble({ order, onClose }: OrderItemsF
 
                     <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground">
                       {item.stock_status && (
-                        <span
-                          className={cn(
-                            "inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 font-semibold",
-                            stockStyle.chip,
-                          )}
-                        >
+                        <span className={cn("inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 font-semibold", stockStyle.chip)}>
                           <span className={cn("h-1.5 w-1.5 rounded-full", stockStyle.dot)} />
                           {stockStyle.label}
                         </span>
                       )}
-                      {isPartial && (
-                        <span>
-                          {item.quantity} of {total}
-                        </span>
-                      )}
+                      {isPartial && <span>{item.quantity} of {total}</span>}
                       {item.code && <span className="font-mono">[{item.code}]</span>}
                     </div>
                   </div>
 
-                  <OrderItemComments orderItemId={item.id} />
                   <PackageCheck className="h-4 w-4 shrink-0 text-muted-foreground/45" />
+                  <ItemCommentButton orderItemId={item.id} orderId={visibleOrder.id} itemName={item.name} />
                 </div>
               );
             })
