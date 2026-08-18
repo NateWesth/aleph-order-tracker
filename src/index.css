@@ -2220,8 +2220,7 @@ html.toolbar-glass .aleph-toolbar-search-input {
 .aleph-workspace-rail {
   position: fixed !important;
   left: 0;
-  overflow: hidden;
-  isolation: isolate;
+  overflow: visible;
 }
 
 .aleph-workspace-rail::after {
@@ -2579,7 +2578,7 @@ html.toolbar-glass .aleph-toolbar-search-input {
 .aleph-workspace-rail {
   width: 4.5rem;
   z-index: 45;
-  overflow-x: hidden !important;
+  overflow: visible !important;
   box-shadow: 16px 0 44px -38px hsl(var(--foreground) / .6);
   transition:
     width .52s cubic-bezier(.22, 1, .36, 1),
