@@ -88,15 +88,19 @@ export default function BuyingSheetPage() {
   const printRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetchDemandHistory();
-    fetchLastPurchaseDates();
-    fetchLeadTimes();
-    fetchSeasonalPatterns();
-    fetchSupplierReliability();
-    fetchWeeklyHistory();
-    fetchCostHistory();
     loadSnapshot();
-    fetchLocalData();
+    // These independent reports used to run as a burst of uncoordinated requests
+    // while the sheet calculated against empty maps. Load them concurrently, then
+    // build the sheet once so the first result is both faster and correct.
+    Promise.all([
+      fetchDemandHistory(),
+      fetchLastPurchaseDates(),
+      fetchLeadTimes(),
+      fetchSeasonalPatterns(),
+      fetchSupplierReliability(),
+      fetchWeeklyHistory(),
+      fetchCostHistory(),
+    ]).finally(() => fetchLocalData());
   }, []);
 
   // Live feed: re-pull local demand whenever orders / items / POs change
