@@ -474,7 +474,7 @@ const AdminDashboard = () => {
           <button
             type="button"
             onClick={() => setRailExpanded(prev => !prev)}
-            className="aleph-rail-ribbon-toggle group/toggle absolute top-1/2 -right-[22px] z-50 flex h-16 w-[22px] -translate-y-1/2 items-center justify-center text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+            className="aleph-rail-ribbon-toggle group/toggle absolute bottom-[58px] -right-[24px] z-50 flex h-[52px] w-[26px] items-center justify-center text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
             aria-expanded={railExpanded}
             aria-controls="aleph-workspace-navigation"
             title={`${railExpanded ? "Collapse" : "Expand"} control centre (Ctrl+\\)`}
