@@ -1567,7 +1567,7 @@ body {
   pointer-events: none;
   /* Every logo remains upright and undistorted; placement comes from the
      shared ToolbarWatermark component so all toolbar variants match. */
-  opacity: .045;
+  opacity: .065;
   transition: opacity .28s ease;
 }
 
@@ -1581,9 +1581,9 @@ body {
 }
 
 html.toolbar-dark .aleph-toolbar-watermark,
-html.toolbar-midnight .aleph-toolbar-watermark { opacity: .075; }
+html.toolbar-midnight .aleph-toolbar-watermark { opacity: .1; }
 
-html.toolbar-glass .aleph-toolbar-watermark { opacity: .055; }
+html.toolbar-glass .aleph-toolbar-watermark { opacity: .08; }
 
 html.toolbar-dark .aleph-topbar,
 html.toolbar-logo-wall .aleph-topbar {
@@ -1609,7 +1609,7 @@ html.toolbar-glass .aleph-topbar {
 }
 
 html.toolbar-logo-wall .aleph-toolbar-watermark {
-  opacity: .14;
+  opacity: .17;
 }
 
 html.toolbar-dark .aleph-topbar,
@@ -1800,10 +1800,10 @@ body:has(main.max-w-7xl) main.max-w-7xl > div > [class*="border"] {
 
 @media (max-width: 760px) {
   .aleph-toolbar-watermark {
-    opacity: .04;
+    opacity: .055;
   }
-  .aleph-toolbar-watermark img:nth-child(even) { display: none; }
-  html.toolbar-logo-wall .aleph-toolbar-watermark { opacity: .11; }
+  .aleph-toolbar-watermark img:nth-child(3n) { display: none; }
+  html.toolbar-logo-wall .aleph-toolbar-watermark { opacity: .14; }
   .app-page-stage { padding-left: .75rem; padding-right: .75rem; }
 }
 
@@ -1834,8 +1834,8 @@ body:has(main.max-w-7xl) main.max-w-7xl > div > [class*="border"] {
 
 .aleph-loading-orbit {
   position: relative;
-  width: 92px;
-  height: 92px;
+  width: 116px;
+  height: 116px;
   display: grid;
   place-items: center;
   border-radius: 999px;
@@ -1853,41 +1853,58 @@ body:has(main.max-w-7xl) main.max-w-7xl > div > [class*="border"] {
   animation: aleph-orbit-spin 4s linear infinite;
 }
 
-.aleph-loading-orbit img {
-  width: 54px;
-  height: 54px;
+.aleph-loading-core {
+  width: 44px;
+  height: 44px;
   object-fit: contain;
-  animation: aleph-logo-form 1.8s cubic-bezier(.22,1,.36,1) infinite alternate;
+  opacity: .24;
+  animation: aleph-logo-form 1.6s cubic-bezier(.22,1,.36,1) infinite alternate;
 }
 
-.aleph-loading-chaser {
+.aleph-loading-snake {
   position: absolute;
-  inset: -3px;
+  inset: 0;
   z-index: 2;
   border-radius: inherit;
-  animation: aleph-orbit-spin 1.35s linear infinite;
+  animation: aleph-orbit-spin 2.15s linear infinite;
 }
 
-.aleph-loading-chaser::after {
-  content: "";
+.aleph-loading-snake span {
   position: absolute;
   left: 50%;
-  top: 0;
-  width: 9px;
-  height: 9px;
-  border-radius: 999px;
-  background: hsl(var(--primary));
-  box-shadow: 0 0 18px hsl(var(--primary) / .8);
+  top: 50%;
+  width: 0;
+  height: 0;
 }
 
-.aleph-loading-chaser-two {
-  inset: 5px;
-  animation-duration: 1.9s;
-  animation-direction: reverse;
-  opacity: .55;
+.aleph-loading-snake span img {
+  position: absolute;
+  left: 0;
+  top: -50px;
+  object-fit: contain;
+  transform: translate(-50%, -50%);
+  filter: drop-shadow(0 0 7px hsl(var(--primary) / .28));
 }
 
-.aleph-loading-chaser-two::after { width: 6px; height: 6px; }
+.aleph-loading-snake span:nth-child(1) { transform: rotate(0deg); }
+.aleph-loading-snake span:nth-child(2) { transform: rotate(40deg); }
+.aleph-loading-snake span:nth-child(3) { transform: rotate(80deg); }
+.aleph-loading-snake span:nth-child(4) { transform: rotate(120deg); }
+.aleph-loading-snake span:nth-child(5) { transform: rotate(160deg); }
+.aleph-loading-snake span:nth-child(6) { transform: rotate(200deg); }
+.aleph-loading-snake span:nth-child(7) { transform: rotate(240deg); }
+.aleph-loading-snake span:nth-child(8) { transform: rotate(280deg); }
+.aleph-loading-snake span:nth-child(9) { transform: rotate(320deg); }
+
+.aleph-loading-snake span:nth-child(1) img { width: 27px; height: 27px; opacity: 1; filter: drop-shadow(0 0 11px hsl(var(--primary) / .55)); }
+.aleph-loading-snake span:nth-child(2) img { width: 23px; height: 23px; opacity: .92; }
+.aleph-loading-snake span:nth-child(3) img { width: 21px; height: 21px; opacity: .84; }
+.aleph-loading-snake span:nth-child(4) img { width: 19px; height: 19px; opacity: .75; }
+.aleph-loading-snake span:nth-child(5) img { width: 17px; height: 17px; opacity: .64; }
+.aleph-loading-snake span:nth-child(6) img { width: 15px; height: 15px; opacity: .52; }
+.aleph-loading-snake span:nth-child(7) img { width: 13px; height: 13px; opacity: .4; }
+.aleph-loading-snake span:nth-child(8) img { width: 11px; height: 11px; opacity: .28; }
+.aleph-loading-snake span:nth-child(9) img { width: 8px; height: 8px; opacity: .16; }
 
 @keyframes aleph-orbit-spin { to { transform: rotate(360deg); } }
 @keyframes aleph-logo-form {
@@ -2022,7 +2039,7 @@ html.canvas-aurora .aleph-aurora { opacity: .42; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .aleph-loading-chaser,
+  .aleph-loading-snake,
   .aleph-loading-orbit::before { animation-duration: 4s; }
   .aleph-loading-orbit img { animation: none; opacity: 1; }
 }

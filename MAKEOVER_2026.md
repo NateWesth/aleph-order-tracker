@@ -32,6 +32,12 @@
 - Duplicate supplier filter chips were removed; the supplier selector remains the single clear control.
 - Shared buttons, cards, tables, tabs, inputs, page widths, borders, mobile spacing, and toolbar navigation received a quieter app-wide refinement.
 
+## Brand art pass 4
+
+- Toolbar watermarks now use twenty larger company logos in a dense, irregular doodle-style composition instead of sparse rows.
+- All marks remain upright and preserve the original logo proportions.
+- The loading animation is now an Aleph-logo ouroboros: a bright large logo head continuously chases a progressively smaller fading tail around a circular path.
+
 ## Deployment
 
 1. Install dependencies and build the Vite app.
