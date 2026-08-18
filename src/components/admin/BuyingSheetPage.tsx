@@ -20,7 +20,7 @@ import {
   BarChart3, Filter, Maximize2, Minimize2, ClipboardCopy, Timer,
   ChevronUp, PieChart, Send, History, CheckSquare, Snowflake, Sun,
   Save, LayoutGrid, TableIcon, Zap, Pin, PinOff, AlignJustify, AlignCenter,
-  RotateCw, Eye, Star, Sparkles, Mail
+  RotateCw, Eye, Star, Sparkles
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
