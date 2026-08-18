@@ -49,17 +49,6 @@ export const useGlobalDocumentScroll = () => {
         return;
       }
 
-      // On desktop, the Orders Board owns its own vertical scrolling via
-      // independently scrollable columns. The document must not scroll
-      // when the pointer is over the orders workspace (header, stage flow,
-      // or any non-column surface).
-      const node = event.target instanceof HTMLElement ? event.target : null;
-      const inOrdersWorkspace = !!node?.closest(".aleph-orders-workspace");
-      if (inOrdersWorkspace && window.innerWidth >= 1024) {
-        event.preventDefault();
-        return;
-      }
-
       const maxScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
       if (maxScroll <= 0) return;
 

@@ -2391,6 +2391,188 @@ html.toolbar-glass .aleph-toolbar-search-input {
 }
 
 /* ============================================================
+   ALEPH WORKSPACE V9 — OPERATIONAL COCKPITS
+   ============================================================ */
+
+/* Orders is the only page with bounded, independently scrolling lanes. The
+   surrounding page remains a normal scroll canvas so users can reach the
+   actual bottom of the board. */
+.app-shell main.aleph-content-scroll:has(.aleph-orders-workspace) {
+  overflow-y: auto !important;
+}
+
+.aleph-orders-workspace {
+  height: auto !important;
+  min-height: 0;
+}
+
+.order-board-lane-frame {
+  height: max(470px, calc(100dvh - var(--aleph-header-height, 82px) - 2rem));
+  max-height: 900px;
+}
+
+.order-workflow-lane {
+  overflow: hidden;
+  border-radius: 1.65rem;
+  box-shadow: 0 30px 68px -50px hsl(var(--foreground) / .55);
+}
+
+.order-lane-header {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  box-shadow: inset 0 -1px 0 rgba(255,255,255,.12);
+}
+
+.order-lane-header::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: -5rem -3rem auto auto;
+  width: 10rem;
+  height: 10rem;
+  border: 1px solid rgba(255,255,255,.14);
+  border-radius: 999px;
+  box-shadow: 0 0 0 1.2rem rgba(255,255,255,.035), 0 0 0 2.5rem rgba(255,255,255,.025);
+}
+
+.order-lane-body {
+  background:
+    linear-gradient(180deg, hsl(var(--workspace-accent) / .045), transparent 9rem),
+    hsl(var(--muted) / .22);
+}
+
+.order-ticket {
+  position: relative;
+  border-radius: 1.25rem !important;
+  box-shadow: 0 18px 42px -34px hsl(var(--foreground) / .55);
+  transition: transform .2s cubic-bezier(.22,1,.36,1), border-color .2s ease, box-shadow .2s ease;
+}
+
+.order-ticket::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: linear-gradient(to bottom, hsl(var(--workspace-accent)), hsl(var(--workspace-accent) / .1));
+}
+
+.order-ticket:hover {
+  transform: translateY(-2px);
+  border-color: hsl(var(--workspace-accent) / .3);
+  box-shadow: 0 24px 50px -32px hsl(var(--workspace-accent) / .42);
+}
+
+.order-column-scroll {
+  padding-bottom: 1rem;
+}
+
+/* Buying Sheet becomes a procurement cockpit rather than a long strip of
+   tiny controls and identical KPI tiles. */
+.buying-mode-deck {
+  min-width: 0;
+}
+
+.buying-intelligence-grid {
+  align-items: stretch;
+}
+
+.buying-intelligence-grid > * {
+  min-width: 0;
+  height: 100%;
+}
+
+.buying-summary-mosaic {
+  height: 100%;
+}
+
+.buying-order-hero::after {
+  content: "";
+  position: absolute;
+  inset: -35% -15% auto auto;
+  width: 17rem;
+  height: 17rem;
+  border: 1px solid rgba(255,255,255,.16);
+  border-radius: 999px;
+  box-shadow: 0 0 0 2rem rgba(255,255,255,.04), 0 0 0 5rem rgba(255,255,255,.025);
+}
+
+.buying-metric-card {
+  min-height: 92px;
+  transition: transform .2s ease, box-shadow .2s ease;
+}
+
+.buying-metric-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 22px 45px -38px hsl(var(--foreground) / .5);
+}
+
+.aleph-buying-workspace .procurement-data-card {
+  border-radius: 1.75rem !important;
+  box-shadow: 0 30px 68px -52px hsl(var(--foreground) / .58);
+}
+
+/* Commission is now a two-column ledger cockpit on wide displays. */
+.commission-command-hero {
+  background:
+    radial-gradient(circle at 100% 0, hsl(var(--workspace-accent) / .15), transparent 25rem),
+    linear-gradient(120deg, hsl(var(--workspace-accent) / .075), transparent 42%),
+    hsl(var(--card) / .94);
+}
+
+.commission-command-hero::after {
+  content: "%";
+  position: absolute;
+  inset: -2.8rem 2rem auto auto;
+  color: hsl(var(--workspace-accent) / .045);
+  font-size: 13rem;
+  font-weight: 950;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.commission-ledger-grid > .commission-rep-card {
+  height: fit-content;
+  border-radius: 1.6rem !important;
+  background:
+    linear-gradient(145deg, hsl(var(--workspace-accent) / .055), transparent 42%),
+    hsl(var(--card) / .94);
+}
+
+.commission-ledger-grid > .commission-rep-card:hover {
+  transform: translateY(-2px);
+  border-color: hsl(var(--workspace-accent) / .25);
+}
+
+/* The already-card-based directories gain distinct spatial rhythm so they no
+   longer read as the same table with different labels. */
+.catalogue-card-grid { grid-auto-rows: 1fr; }
+.client-directory-grid > article:nth-child(3n + 1) { transform-origin: left center; }
+.supplier-directory-grid > article:nth-child(even) { background: linear-gradient(145deg, hsl(var(--workspace-accent) / .07), transparent 48%), hsl(var(--card) / .94); }
+.user-directory-grid > article:nth-child(3n + 2) { margin-top: 1rem; }
+
+@media (max-width: 1279px) {
+  .commission-ledger-grid { grid-template-columns: 1fr; }
+  .user-directory-grid > article:nth-child(3n + 2) { margin-top: 0; }
+}
+
+@media (max-width: 1023px) {
+  .order-board-lane-frame {
+    height: auto;
+    max-height: none;
+  }
+
+  .order-workflow-lane {
+    min-height: 420px;
+    max-height: min(72dvh, 680px);
+  }
+
+  .order-lane-body {
+    min-height: 0 !important;
+  }
+}
+
+/* ============================================================
    ALEPH WORKSPACE V7 — PURPOSE-BUILT PAGE LAYOUTS
    The global toolbar remains independent from these page styles.
    ============================================================ */
@@ -2678,10 +2860,6 @@ html.toolbar-glass .aleph-toolbar-search-input {
 }
 
 @media (min-width: 1024px) {
-  html:has(.aleph-orders-workspace) {
-    overflow-y: hidden !important;
-  }
-
   .app-shell main.aleph-content-scroll:has(.aleph-orders-workspace) {
     overflow-y: hidden !important;
   }
