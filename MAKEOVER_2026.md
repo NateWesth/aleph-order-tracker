@@ -93,6 +93,15 @@
 - Rebuilt Commission as a Revenue Operations control room with a hero workspace selector and a responsive two-column representative ledger.
 - Retained and strengthened the distinct catalogue cards, client directory, supplier directory, user approval lanes, supplier-focused PO workbench, History timeline, and Analytics insight canvas from the prior page architecture passes.
 
+## Compact board and workspace reinvention pass 10
+
+- Removed the Live Order Journey component from Orders completely.
+- Replaced the Orders heading area with a compact Operations Desk command bar and reduced desktop lane headers to a short single-row summary.
+- Reworked the visible Orders surface again with tighter borderless lane interiors, compact stage numbering, lightweight live totals, and a denser ticket hierarchy that gives order content more space than chrome.
+- Converted the desktop Control Centre into a 64px automatic hover rail. It expands over the workspace at the left edge and collapses again when the pointer returns to page work.
+- Discarded the Commission control-room hero and rebuilt the page as a statement workspace with a dark period/navigation sidebar and a separate ledger canvas.
+- Rebuilt Analytics as an executive Performance Studio with its period controls in the hero, a dominant selected-period score, asymmetric KPI bento, larger primary trend stage, and paired operational intelligence panels.
+
 ## Deployment
 
 1. Install dependencies and build the Vite app.

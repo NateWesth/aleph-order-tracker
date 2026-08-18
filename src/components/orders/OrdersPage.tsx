@@ -5,7 +5,7 @@ import { PullToRefresh } from "@/components/ui/PullToRefresh";
 import { useOrderCelebration, ConfettiOverlay } from "@/components/ui/OrderCelebration";
 import { playClick, playSuccess } from "@/utils/ambientSounds";
 import { Button } from "@/components/ui/button";
-import { Plus, Filter, Users, ArrowRight, PackageCheck } from "lucide-react";
+import { Plus, Filter, Users } from "lucide-react";
 import OrderTemplatesDialog from "./components/OrderTemplatesDialog";
 import OverdueAlerts from "./components/OverdueAlerts";
 import SavedFiltersBar, { type OrderFilter } from "./components/SavedFiltersBar";
@@ -986,21 +986,25 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
           />
         )}
 
-        <div className="flex shrink-0 flex-col gap-3 sm:gap-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div>
-              <h2 className="text-xl sm:text-2xl font-semibold text-foreground">Orders Board</h2>
+        <section className="orders-board-console shrink-0 overflow-hidden rounded-[24px] border border-border/65 bg-card/90 shadow-soft">
+          <div className="grid gap-3 p-3 lg:grid-cols-[minmax(190px,.55fr)_minmax(0,1.45fr)] lg:items-center lg:p-4">
+            <div className="flex items-center gap-3">
+              <span className="grid h-11 w-11 place-items-center rounded-2xl bg-foreground font-black text-background">OB</span>
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-[0.2em] text-primary">Operations desk</p>
+                <h2 className="text-lg font-black tracking-tight text-foreground">Orders Board</h2>
 
-              <p className="text-xs sm:text-sm text-muted-foreground">
+                <p className="text-[11px] text-muted-foreground">
                 {filteredOrders.length} order
                 {filteredOrders.length !== 1 ? "s" : ""}
                 {selectedCompanyId !== "all" && companies.find((c) => c.id === selectedCompanyId) && (
                   <span> for {companies.find((c) => c.id === selectedCompanyId)?.name}</span>
                 )}
-              </p>
+                </p>
+              </div>
             </div>
 
-            <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+            <div className="flex flex-wrap items-center justify-start gap-2 lg:justify-end">
               <OverdueAlerts />
 
               <SavedFiltersBar
@@ -1015,11 +1019,11 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
                 companies={companies}
               />
 
-              <div className="flex items-center gap-1.5 sm:gap-2 flex-1 sm:flex-none">
-                <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
+              <div className="flex flex-1 items-center gap-1.5 sm:flex-none">
+                <Filter className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
 
                 <Select value={selectedCompanyId} onValueChange={setSelectedCompanyId}>
-                  <SelectTrigger className="w-full sm:w-[200px] h-9 text-sm">
+                  <SelectTrigger className="h-9 w-full rounded-xl text-sm sm:w-[190px]">
                     <SelectValue placeholder="Filter by client" />
                   </SelectTrigger>
 
@@ -1083,46 +1087,6 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
                 </DialogContent>
               </Dialog>
             </div>
-          </div>
-        </div>
-
-        <section className="orders-stage-flow shrink-0 rounded-[28px] border border-border/65 bg-card/85 p-3 shadow-soft sm:p-4">
-          <div className="mb-3 flex items-center justify-between px-1">
-            <div className="flex items-center gap-2">
-              <PackageCheck className="h-4 w-4 text-primary" />
-              <span className="text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">Live order journey</span>
-            </div>
-            <span className="text-xs text-muted-foreground">Select a stage to jump to it</span>
-          </div>
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-            {STATUS_COLUMNS.map((column, index) => {
-              const stageOrders = ordersByStatus[column.key as keyof typeof ordersByStatus] || [];
-              return (
-                <div key={column.key} className="flex min-w-0 items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const stage = document.getElementById(`orders-stage-${column.key}`);
-                      stage?.querySelector<HTMLElement>("[data-order-column-scroll]")?.scrollTo({ top: 0, behavior: "smooth" });
-                      stage?.focus({ preventScroll: true });
-                    }}
-                    className="group flex min-w-0 flex-1 items-center gap-3 rounded-2xl border border-border/60 bg-background/75 p-3 text-left transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md"
-                  >
-                    <span
-                      className={cn("grid h-10 w-10 shrink-0 place-items-center rounded-xl font-bold shadow-sm", column.bgColor, column.color)}
-                      style={column.customColor ? { backgroundColor: column.customColor } : undefined}
-                    >
-                      {index + 1}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-semibold">{column.label}</span>
-                      <span className="text-xs text-muted-foreground">{stageOrders.length} orders</span>
-                    </span>
-                  </button>
-                  {index < STATUS_COLUMNS.length - 1 && <ArrowRight className="hidden h-4 w-4 shrink-0 text-muted-foreground/45 lg:block" />}
-                </div>
-              );
-            })}
           </div>
         </section>
 
