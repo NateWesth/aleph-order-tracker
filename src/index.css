@@ -2610,15 +2610,8 @@ html.toolbar-glass .aleph-toolbar-search-input {
 }
 
 
-.aleph-workspace-rail[data-expanded="false"] .aleph-rail-item:hover,
-.aleph-workspace-rail[data-expanded="false"] .aleph-rail-footer-action:hover {
-  transform: translateY(-1px) scale(1.05);
-}
 
-.aleph-workspace-rail[data-expanded="true"] .aleph-rail-item:hover,
-.aleph-workspace-rail[data-expanded="true"] .aleph-rail-footer-action:hover {
-  transform: translateX(3px);
-}
+
 
 .aleph-rail-toggle {
   transition:
