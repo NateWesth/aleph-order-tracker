@@ -95,7 +95,7 @@ const AdminDashboard = () => {
   const headerRef = useRef<HTMLElement | null>(null);
   const contentScrollRef = useRef<HTMLElement | null>(null);
   const workspaceScrollPositions = useRef<Record<string, number>>({});
-  const [headerHeight, setHeaderHeight] = useState(0);
+  const [headerHeight, setHeaderHeight] = useState(72);
 
   useEffect(() => {
     const header = headerRef.current;
