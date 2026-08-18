@@ -5,7 +5,7 @@ import { PullToRefresh } from "@/components/ui/PullToRefresh";
 import { useOrderCelebration, ConfettiOverlay } from "@/components/ui/OrderCelebration";
 import { playClick, playSuccess } from "@/utils/ambientSounds";
 import { Button } from "@/components/ui/button";
-import { Plus, Filter, Users, ArrowRight, PackageCheck } from "lucide-react";
+import { Plus, Filter, Users } from "lucide-react";
 import OrderTemplatesDialog from "./components/OrderTemplatesDialog";
 import OverdueAlerts from "./components/OverdueAlerts";
 import SavedFiltersBar, { type OrderFilter } from "./components/SavedFiltersBar";
