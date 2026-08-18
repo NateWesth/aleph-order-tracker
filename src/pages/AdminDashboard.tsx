@@ -420,12 +420,15 @@ const AdminDashboard = () => {
             <button
               type="button"
               onClick={() => setRailExpanded(prev => !prev)}
-              className="aleph-rail-toggle group/toggle flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-border/65 bg-background/70 text-muted-foreground shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/30 hover:bg-primary/10 hover:text-primary hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+              className="aleph-rail-toggle group/toggle flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-border/60 bg-background/80 text-muted-foreground shadow-sm transition-all duration-300 hover:scale-105 hover:border-primary/40 hover:bg-primary/10 hover:text-primary hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 active:scale-95"
               aria-expanded={railExpanded}
               aria-controls="aleph-workspace-navigation"
               title={`${railExpanded ? "Collapse" : "Expand"} control centre (Ctrl+\\)`}
             >
-              {railExpanded ? <PanelLeftClose className="h-[18px] w-[18px] transition-transform duration-300 group-hover/toggle:-translate-x-0.5" /> : <PanelLeftOpen className="h-[18px] w-[18px] transition-transform duration-300 group-hover/toggle:translate-x-0.5" />}
+              <span className="relative flex h-[18px] w-[18px] items-center justify-center">
+                <PanelLeftClose className={cn("h-[16px] w-[16px] transition-all duration-300", railExpanded ? "rotate-0 scale-100 opacity-100" : "-rotate-90 scale-50 opacity-0")} />
+                <PanelLeftOpen className={cn("absolute h-[16px] w-[16px] transition-all duration-300", railExpanded ? "rotate-90 scale-50 opacity-0" : "rotate-0 scale-100 opacity-100")} />
+              </span>
               <span className="sr-only">{railExpanded ? "Collapse" : "Expand"} control centre</span>
             </button>
           </div>
