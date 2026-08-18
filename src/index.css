@@ -2643,9 +2643,8 @@ html.toolbar-glass .aleph-toolbar-search-input {
   background: hsl(var(--card));
   border: 1px solid hsl(var(--border) / .7);
   border-left: none;
-  border-radius: 0 0.9rem 0.9rem 0;
-  box-shadow: 6px 0 22px -8px hsl(var(--foreground) / .4);
-  clip-path: polygon(0 0, 100% 16%, 100% 84%, 0 100%);
+  border-radius: 0 999px 999px 0;
+  box-shadow: 8px 0 24px -10px hsl(var(--foreground) / .45);
   transition:
     transform .35s cubic-bezier(.34, 1.56, .64, 1),
     background-color .2s ease,
@@ -2654,13 +2653,24 @@ html.toolbar-glass .aleph-toolbar-search-input {
     color .2s ease;
 }
 
+.aleph-rail-ribbon-toggle::before {
+  content: "";
+  position: absolute;
+  left: -4px;
+  top: 6px;
+  bottom: 6px;
+  width: 8px;
+  background: hsl(var(--card));
+}
+
 .aleph-rail-ribbon-toggle:hover {
-  transform: translateY(-50%) translateX(3px);
+  transform: translateX(3px);
   background: hsl(var(--card));
   border-color: hsl(var(--primary) / .5);
   color: hsl(var(--primary));
-  box-shadow: 8px 0 28px -8px hsl(var(--primary) / .35);
+  box-shadow: 10px 0 30px -10px hsl(var(--primary) / .4);
 }
+
 
 /* Hide scrollbars everywhere except the main page scroller on the right */
 *::-webkit-scrollbar { width: 0; height: 0; }
