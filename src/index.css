@@ -3075,17 +3075,7 @@ html.toolbar-glass .aleph-toolbar-search-input {
 
 @media (min-width: 1024px) {
   .app-shell main.aleph-content-scroll:has(.aleph-orders-workspace) {
-    overflow-y: hidden !important;
-  }
-
-  .aleph-orders-workspace {
-    height: 100%;
-    min-height: 0;
-  }
-
-  .aleph-orders-workspace > div:last-child,
-  .aleph-orders-workspace > div:last-child > div:last-child {
-    min-height: 0;
+    overflow-y: auto !important;
   }
 
   .order-column-scroll {
