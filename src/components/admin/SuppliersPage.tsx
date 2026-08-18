@@ -461,64 +461,38 @@ export default function SuppliersPage() {
           )}
         </div>
       ) : (
-        <div className="float-surface glass-card glow-border rounded-xl">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Vendor No.</TableHead>
-                <TableHead>Name</TableHead>
-                <TableHead>Contact Person</TableHead>
-                <TableHead>Phone</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead className="w-[100px]">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredSuppliers.length === 0 ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={6}
-                    className="text-center py-8 text-muted-foreground"
-                  >
-                    No suppliers found
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredSuppliers.map((supplier) => (
-                  <TableRow key={supplier.id}>
-                    <TableCell className="font-mono">{supplier.code}</TableCell>
-                    <TableCell className="font-medium">{supplier.name}</TableCell>
-                    <TableCell>{supplier.contact_person || "-"}</TableCell>
-                    <TableCell>{supplier.phone || "-"}</TableCell>
-                    <TableCell className="max-w-[200px] truncate">
-                      {supplier.email || "-"}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleOpenDialog(supplier)}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => {
-                            setSupplierToDelete(supplier);
-                            setDeleteDialogOpen(true);
-                          }}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+        <div className="supplier-directory-grid grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
+          {filteredSuppliers.length === 0 ? (
+            <div className="col-span-full rounded-[26px] border-2 border-dashed border-border bg-card/45 py-14 text-center text-muted-foreground">No suppliers found</div>
+          ) : filteredSuppliers.map((supplier) => (
+            <article key={supplier.id} className="group overflow-hidden rounded-[26px] border border-border/60 bg-card/90 shadow-[0_24px_50px_-42px_hsl(var(--foreground)/.5)] transition-all hover:-translate-y-1 hover:border-primary/25">
+              <div className="flex items-start gap-3 bg-gradient-to-r from-orange-500/10 to-transparent p-4">
+                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-orange-500/15 text-orange-600 dark:text-orange-300"><Truck className="h-5 w-5" /></span>
+                <div className="min-w-0 flex-1">
+                  <p className="font-mono text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Vendor {supplier.code}</p>
+                  <h3 className="mt-1 truncate font-display text-lg font-black text-foreground">{supplier.name}</h3>
+                </div>
+                <div className="flex gap-1">
+                  <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl" onClick={() => handleOpenDialog(supplier)} aria-label={`Edit ${supplier.name}`}><Pencil className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl" onClick={() => { setSupplierToDelete(supplier); setDeleteDialogOpen(true); }} aria-label={`Delete ${supplier.name}`}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-px bg-border/45">
+                <div className="bg-background/60 p-3">
+                  <p className="text-[9px] font-black uppercase tracking-wider text-muted-foreground">Contact</p>
+                  <p className="mt-1 truncate text-sm font-semibold text-foreground">{supplier.contact_person || "Not assigned"}</p>
+                </div>
+                <div className="bg-background/60 p-3">
+                  <p className="text-[9px] font-black uppercase tracking-wider text-muted-foreground">Phone</p>
+                  <p className="mt-1 truncate text-sm font-semibold text-foreground">{supplier.phone || "Not added"}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 px-4 py-3 text-xs text-muted-foreground">
+                <Mail className="h-3.5 w-3.5 shrink-0 text-orange-500" />
+                <span className="truncate">{supplier.email || "No supplier email"}</span>
+              </div>
+            </article>
+          ))}
         </div>
       )}
 

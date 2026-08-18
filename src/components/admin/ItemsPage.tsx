@@ -356,67 +356,50 @@ const ItemsPage = () => {
       />
 
 
-      {/* Table */}
-      <Card className="border-2 shadow-soft overflow-hidden">
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead className="w-[100px]">Code</TableHead>
-                <TableHead>Name</TableHead>
-                <TableHead className="w-[80px]">Unit</TableHead>
-                <TableHead className="hidden md:table-cell">Description</TableHead>
-                <TableHead className="w-[80px] text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {items.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                    <Package className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                    {searchTerm ? "No items found" : "No items yet. Add your first item."}
-                  </TableCell>
-                </TableRow>
-              ) : (
-                items.map((item) => (
-                  <TableRow key={item.id}>
-                    <TableCell className="font-mono text-xs font-medium">
-                      {item.code}
-                    </TableCell>
-                    <TableCell className="font-medium">{item.name}</TableCell>
-                    <TableCell className="text-muted-foreground text-sm">
-                      {item.unit || "pcs"}
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell text-muted-foreground text-sm truncate max-w-[200px]">
-                      {item.description || "—"}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7"
-                          onClick={() => openEditDialog(item)}
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-destructive hover:text-destructive"
-                          onClick={() => openDeleteDialog(item)}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      {/* Catalogue card workspace */}
+      {items.length === 0 ? (
+        <div className="rounded-[28px] border-2 border-dashed border-border bg-card/45 py-16 text-center text-muted-foreground">
+          <Package className="mx-auto mb-3 h-10 w-10 opacity-40" />
+          <p className="font-semibold text-foreground">{searchTerm ? "No matching items" : "Your catalogue is empty"}</p>
+          <p className="mt-1 text-sm">{searchTerm ? "Try a different name or item code." : "Add or import the first catalogue item."}</p>
+        </div>
+      ) : (
+        <div className="catalogue-card-grid grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+          {items.map((item, index) => (
+            <article key={item.id} className="group relative isolate overflow-hidden rounded-[24px] border border-border/60 bg-card/90 p-4 shadow-[0_22px_48px_-42px_hsl(var(--foreground)/.5)] transition-all duration-200 hover:-translate-y-1 hover:border-primary/25 hover:shadow-[0_28px_58px_-40px_hsl(var(--primary)/.35)]">
+              <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary via-primary/35 to-transparent" aria-hidden />
+              <div className="flex items-start gap-3">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 font-display text-sm font-black text-primary">
+                  {String((page - 1) * PAGE_SIZE + index + 1).padStart(2, "0")}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <span className="inline-flex max-w-full rounded-lg bg-muted px-2 py-1 font-mono text-[10px] font-bold text-muted-foreground">{item.code}</span>
+                  <h3 className="mt-2 line-clamp-2 font-display text-base font-black leading-tight text-foreground">{item.name}</h3>
+                </div>
+              </div>
+
+              <div className="mt-4 min-h-[52px] rounded-2xl bg-muted/35 px-3 py-2.5">
+                <p className="line-clamp-2 text-xs leading-relaxed text-muted-foreground">{item.description || "No description has been added yet."}</p>
+              </div>
+
+              <div className="mt-3 flex items-center justify-between gap-3 border-t border-border/45 pt-3">
+                <div>
+                  <p className="text-[9px] font-black uppercase tracking-[0.14em] text-muted-foreground">Stock unit</p>
+                  <p className="mt-0.5 text-sm font-bold text-foreground">{item.unit || "pcs"}</p>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl" onClick={() => openEditDialog(item)} aria-label={`Edit ${item.name}`}>
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-destructive hover:text-destructive" onClick={() => openDeleteDialog(item)} aria-label={`Delete ${item.name}`}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
 
       {totalPages > 1 && (
         <Pagination className="justify-end">

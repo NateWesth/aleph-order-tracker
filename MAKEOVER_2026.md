@@ -61,6 +61,16 @@
 - Preserved the Buying Sheet procurement table only in its optional Data view, where side-by-side quantities are required for editing; Queue and Suppliers remain the primary workflow views.
 - Reframed the Orders Board controls as a dedicated command surface while retaining its drag-and-drop workflow columns.
 
+## Operational page workspaces pass 7
+
+- Added a live order-journey navigator above the Orders Board. Each stage reports its current order count and jumps directly to the matching drag-and-drop lane.
+- Rebuilt PO Tracking as a focused supplier workbench: a persistent supplier queue controls one detailed PO workspace instead of rendering every supplier's full contents at once. This also reduces initial DOM work on large accounts.
+- Replaced the Items, Clients, Suppliers, and Users desktop spreadsheets with purpose-built catalogue, company, supplier, profile, and approval cards while preserving every edit, delete, approval, role, and access action.
+- Turned completed-order History into a visual monthly timeline with collapsible order groups.
+- Gave Analytics a composed insight canvas with a period switcher, KPI ribbon, primary chart stage, and ranking panels.
+- Strengthened the Buying Sheet and Commission internal work areas without altering the global toolbar, Control Centre, watermark, search, or Aleph AI placement.
+- Added responsive horizontal stage and supplier navigation for mobile while retaining the shared Capacitor codebase.
+
 ## Deployment
 
 1. Install dependencies and build the Vite app.

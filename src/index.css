@@ -2390,6 +2390,249 @@ html.toolbar-glass .aleph-toolbar-search-input {
   }
 }
 
+/* ============================================================
+   ALEPH WORKSPACE V7 — PURPOSE-BUILT PAGE LAYOUTS
+   The global toolbar remains independent from these page styles.
+   ============================================================ */
+
+.orders-stage-flow {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 0 0, hsl(var(--workspace-accent) / .12), transparent 24rem),
+    hsl(var(--card) / .88);
+}
+
+.orders-stage-flow::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: auto -4rem -6rem auto;
+  width: 15rem;
+  height: 15rem;
+  border-radius: 999px;
+  background: hsl(var(--workspace-accent) / .08);
+  filter: blur(28px);
+}
+
+.po-tracking-workbench {
+  align-items: start;
+}
+
+.po-supplier-navigator {
+  max-height: min(72vh, 760px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--workspace-accent) / .35) transparent;
+  background:
+    linear-gradient(180deg, hsl(var(--workspace-accent) / .085), transparent 8rem),
+    hsl(var(--card) / .92);
+}
+
+.po-supplier-navigator button {
+  position: relative;
+}
+
+.po-supplier-navigator button[aria-pressed="true"]::before {
+  content: "";
+  position: absolute;
+  inset: .65rem auto .65rem .35rem;
+  width: 3px;
+  border-radius: 999px;
+  background: hsl(var(--workspace-accent));
+}
+
+.catalogue-card-grid > article,
+.client-directory-grid > article,
+.supplier-directory-grid > article,
+.user-directory-grid > article {
+  position: relative;
+  isolation: isolate;
+}
+
+.catalogue-card-grid > article::after,
+.client-directory-grid > article::after,
+.supplier-directory-grid > article::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: auto -3rem -4rem auto;
+  width: 8rem;
+  height: 8rem;
+  border-radius: 999px;
+  background: hsl(var(--workspace-accent) / .07);
+  filter: blur(14px);
+  pointer-events: none;
+}
+
+.history-timeline {
+  position: relative;
+  padding-left: 1.15rem;
+}
+
+.history-timeline::before {
+  content: "";
+  position: absolute;
+  inset: .6rem auto .6rem .22rem;
+  width: 2px;
+  border-radius: 999px;
+  background: linear-gradient(to bottom, hsl(var(--workspace-accent)), hsl(var(--workspace-accent) / .08));
+}
+
+.history-month-block::before {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  top: 1.45rem;
+  left: -1.28rem;
+  width: .72rem;
+  height: .72rem;
+  border: 3px solid hsl(var(--background));
+  border-radius: 999px;
+  background: hsl(var(--workspace-accent));
+  box-shadow: 0 0 0 3px hsl(var(--workspace-accent) / .16);
+}
+
+.history-month-header {
+  background:
+    linear-gradient(100deg, hsl(var(--workspace-accent) / .075), transparent 40%),
+    hsl(var(--card) / .9);
+}
+
+.user-approval-lane {
+  background:
+    radial-gradient(circle at 100% 0, hsl(var(--warning) / .12), transparent 22rem),
+    hsl(var(--warning) / .055);
+}
+
+.user-directory-grid > article > div:first-child::after {
+  content: "";
+  position: absolute;
+  inset: auto 1.25rem 0 auto;
+  width: 4rem;
+  height: 2px;
+  background: linear-gradient(to left, hsl(var(--workspace-accent)), transparent);
+}
+
+.analytics-period-switcher {
+  width: fit-content;
+  max-width: 100%;
+  padding: .45rem;
+  border: 1px solid hsl(var(--workspace-accent) / .18);
+  border-radius: 1rem;
+  background: hsl(var(--card) / .8);
+  box-shadow: 0 18px 42px -36px hsl(var(--foreground) / .5);
+}
+
+.analytics-kpi-ribbon {
+  padding: .75rem;
+  border: 1px solid hsl(var(--workspace-accent) / .18);
+  border-radius: 1.75rem;
+  background:
+    linear-gradient(110deg, hsl(var(--workspace-accent) / .085), transparent 38%),
+    hsl(var(--card) / .72);
+}
+
+.analytics-kpi-ribbon > * {
+  border-width: 1px !important;
+  border-radius: 1.15rem !important;
+}
+
+.analytics-hero-grid > div,
+.analytics-ranking-grid > div {
+  overflow: hidden;
+  border-width: 1px !important;
+  border-radius: 1.6rem !important;
+  background:
+    radial-gradient(circle at 100% 0, hsl(var(--workspace-accent) / .07), transparent 16rem),
+    hsl(var(--card) / .92) !important;
+}
+
+.aleph-commission-workspace > [data-orientation="horizontal"] > [role="tablist"] {
+  position: relative;
+  width: fit-content;
+  padding: .35rem;
+  border: 1px solid hsl(var(--workspace-accent) / .18);
+  background: hsl(var(--card) / .88);
+  box-shadow: 0 20px 44px -38px hsl(var(--foreground) / .55);
+}
+
+.aleph-commission-workspace .commission-kpis {
+  padding: .75rem;
+  border: 1px solid hsl(var(--workspace-accent) / .18);
+  border-radius: 1.65rem;
+  background: linear-gradient(115deg, hsl(var(--workspace-accent) / .08), transparent 44%);
+}
+
+.aleph-buying-workspace > [data-orientation="horizontal"] {
+  overflow: hidden;
+  border: 1px solid hsl(var(--workspace-accent) / .16);
+  border-radius: 1.75rem;
+  padding: .75rem;
+  background: hsl(var(--card) / .72);
+}
+
+@media (min-width: 1280px) {
+  .po-tracking-workbench > section {
+    min-width: 0;
+  }
+
+  .orders-stage-flow > div:last-child > div:last-child {
+    padding-right: 0;
+  }
+}
+
+@media (max-width: 767px) {
+  .orders-stage-flow > div:last-child {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+  }
+
+  .orders-stage-flow > div:last-child::-webkit-scrollbar {
+    display: none;
+  }
+
+  .orders-stage-flow > div:last-child > div {
+    min-width: min(78vw, 17rem);
+    scroll-snap-align: start;
+  }
+
+  .po-supplier-navigator {
+    display: flex;
+    max-height: none;
+    gap: .5rem;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x mandatory;
+  }
+
+  .po-supplier-navigator > div:first-child,
+  .po-supplier-navigator > p {
+    display: none;
+  }
+
+  .po-supplier-navigator > div:last-child {
+    display: flex;
+    overflow-x: auto;
+  }
+
+  .po-supplier-navigator button {
+    min-width: min(76vw, 17rem);
+    scroll-snap-align: start;
+  }
+
+  .history-timeline {
+    padding-left: .8rem;
+  }
+
+  .history-month-block::before {
+    left: -.94rem;
+  }
+}
+
 .aleph-history-workspace [data-radix-collapsible-content] {
   background: hsl(var(--background) / .3);
 }

@@ -86,6 +86,7 @@ export default function POTrackingPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [openVendors, setOpenVendors] = useState<Set<string>>(new Set());
+  const [selectedVendor, setSelectedVendor] = useState<string | null>(null);
   const [openPOs, setOpenPOs] = useState<Set<string>>(new Set());
   const [selectedOrder, setSelectedOrder] = useState<OrderWithCompany | null>(null);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
@@ -229,6 +230,20 @@ export default function POTrackingPage() {
       .sort((a, b) => b.outstandingValue - a.outstandingValue);
   }, [pos, searchTerm, linkedOrders]);
 
+  useEffect(() => {
+    if (vendorGroups.length === 0) {
+      setSelectedVendor(null);
+      return;
+    }
+
+    const nextVendor = vendorGroups.some((group) => group.vendorName === selectedVendor)
+      ? selectedVendor!
+      : vendorGroups[0].vendorName;
+
+    setSelectedVendor(nextVendor);
+    setOpenVendors(new Set([nextVendor]));
+  }, [vendorGroups, selectedVendor]);
+
   const toggle = (set: Set<string>, key: string, setter: (s: Set<string>) => void) => {
     const next = new Set(set);
     next.has(key) ? next.delete(key) : next.add(key);
@@ -321,8 +336,53 @@ export default function POTrackingPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-3">
-          {vendorGroups.map((group) => (
+        <div className="po-tracking-workbench grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
+          <aside className="po-supplier-navigator rounded-[24px] border border-border/60 bg-card/80 p-2 shadow-sm xl:sticky xl:top-4 xl:self-start">
+            <div className="px-3 pb-2 pt-2">
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary">Supplier queue</p>
+              <p className="mt-1 text-xs text-muted-foreground">Select a supplier to focus its outstanding POs.</p>
+            </div>
+            <div className="flex gap-2 overflow-x-auto pb-1 xl:max-h-[calc(100dvh-19rem)] xl:flex-col xl:overflow-y-auto xl:overflow-x-hidden">
+              {vendorGroups.map((group) => {
+                const active = selectedVendor === group.vendorName;
+                return (
+                  <button
+                    key={group.vendorName}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => {
+                      setSelectedVendor(group.vendorName);
+                      setOpenVendors(new Set([group.vendorName]));
+                    }}
+                    className={cn(
+                      "min-w-[220px] rounded-2xl border p-3 text-left transition-all xl:min-w-0",
+                      active
+                        ? "border-primary/30 bg-primary/10 shadow-[0_16px_34px_-26px_hsl(var(--primary))]"
+                        : "border-transparent bg-muted/35 hover:border-primary/15 hover:bg-muted/65",
+                    )}
+                  >
+                    <div className="flex items-start gap-2.5">
+                      <span className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-xl", active ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground")}>
+                        <Truck className="h-4 w-4" />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-bold text-foreground">{group.vendorName}</span>
+                        <span className="mt-1 flex items-center gap-2 text-[10px] text-muted-foreground">
+                          <span>{group.pos.length} PO{group.pos.length !== 1 ? "s" : ""}</span>
+                          <span>·</span>
+                          <span>{group.outstandingUnits} units</span>
+                        </span>
+                        <span className="mt-1 block text-xs font-black text-primary">{money(group.outstandingValue)}</span>
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </aside>
+
+          <section className="min-w-0 space-y-3">
+          {vendorGroups.filter((group) => group.vendorName === selectedVendor).map((group) => (
             <Card key={group.vendorName} className="overflow-hidden border-2 hover:border-primary/25 transition-colors">
               <Collapsible
                 open={openVendors.has(group.vendorName)}
@@ -459,6 +519,7 @@ export default function POTrackingPage() {
               </Collapsible>
             </Card>
           ))}
+          </section>
         </div>
       )}
 

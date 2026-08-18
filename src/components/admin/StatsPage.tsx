@@ -259,7 +259,7 @@ export default function StatsPage() {
 
 
       {/* Date Range Selector */}
-      <div className="flex items-center gap-2 flex-wrap">
+      <div className="analytics-period-switcher flex items-center gap-2 flex-wrap">
         <div className="inline-flex items-center rounded-lg border border-border bg-card p-0.5 gap-0.5">
           {PRESETS.map(preset => (
             <button
@@ -303,7 +303,7 @@ export default function StatsPage() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+      <div className="analytics-kpi-ribbon grid grid-cols-2 lg:grid-cols-5 gap-3">
         <KPICard icon={<Package className="h-4 w-4" />} label="Total Orders" value={stats.totalOrders} />
         <KPICard icon={<ShoppingBag className="h-4 w-4" />} label="In Period" value={stats.ordersInRange} accent />
         <KPICard icon={<TrendingUp className="h-4 w-4" />} label="Active" value={stats.activeOrders} />
@@ -312,7 +312,7 @@ export default function StatsPage() {
       </div>
 
       {/* Main Charts Row */}
-      <div className="grid lg:grid-cols-3 gap-4">
+      <div className="analytics-hero-grid grid lg:grid-cols-3 gap-4">
         {/* Orders Trend */}
         <div className="lg:col-span-2 bg-card border-2 border-border rounded-2xl p-5 shadow-soft">
           <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
@@ -395,7 +395,7 @@ export default function StatsPage() {
       </div>
 
       {/* Most Popular Items & Top Clients */}
-      <div className="grid lg:grid-cols-2 gap-4">
+      <div className="analytics-ranking-grid grid lg:grid-cols-2 gap-4">
         {/* Most Popular Items */}
         <div className="bg-card border-2 border-border rounded-2xl p-5 shadow-soft">
           <div className="flex items-center justify-between mb-4">
