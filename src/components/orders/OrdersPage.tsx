@@ -986,15 +986,15 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
           />
         )}
 
-        <section className="orders-board-console shrink-0 overflow-hidden rounded-[24px] border border-border/65 bg-card/90 shadow-soft">
-          <div className="grid gap-3 p-3 lg:grid-cols-[minmax(190px,.55fr)_minmax(0,1.45fr)] lg:items-center lg:p-4">
-            <div className="flex items-center gap-3">
-              <span className="grid h-11 w-11 place-items-center rounded-2xl bg-foreground font-black text-background">OB</span>
+        <section className="orders-board-console shrink-0 overflow-hidden rounded-2xl border border-border/65 bg-card/90 shadow-soft">
+          <div className="grid gap-2 p-2 lg:grid-cols-[minmax(150px,.45fr)_minmax(0,1.55fr)] lg:items-center lg:p-2.5">
+            <div className="flex items-center gap-2">
+              <span className="grid h-8 w-8 place-items-center rounded-xl bg-foreground text-sm font-black text-background">OB</span>
               <div>
-                <p className="text-[9px] font-black uppercase tracking-[0.2em] text-primary">Operations desk</p>
-                <h2 className="text-lg font-black tracking-tight text-foreground">Orders Board</h2>
+                <p className="text-[8px] font-black uppercase tracking-[0.2em] text-primary">Operations desk</p>
+                <h2 className="text-sm font-black tracking-tight text-foreground">Orders Board</h2>
 
-                <p className="text-[11px] text-muted-foreground">
+                <p className="text-[10px] text-muted-foreground">
                 {filteredOrders.length} order
                 {filteredOrders.length !== 1 ? "s" : ""}
                 {selectedCompanyId !== "all" && companies.find((c) => c.id === selectedCompanyId) && (
@@ -1004,7 +1004,7 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center justify-start gap-2 lg:justify-end">
+            <div className="flex flex-wrap items-center justify-start gap-1.5 lg:justify-end">
               <OverdueAlerts />
 
               <SavedFiltersBar
@@ -1019,11 +1019,11 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
                 companies={companies}
               />
 
-              <div className="flex flex-1 items-center gap-1.5 sm:flex-none">
-                <Filter className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              <div className="flex flex-1 items-center gap-1 sm:flex-none">
+                <Filter className="h-3 w-3 shrink-0 text-muted-foreground" />
 
                 <Select value={selectedCompanyId} onValueChange={setSelectedCompanyId}>
-                  <SelectTrigger className="h-9 w-full rounded-xl text-sm sm:w-[190px]">
+                  <SelectTrigger className="h-7 w-full rounded-lg text-xs sm:w-[160px]">
                     <SelectValue placeholder="Filter by client" />
                   </SelectTrigger>
 
@@ -1042,10 +1042,10 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
               <Button
                 size="sm"
                 variant={groupByClient ? "default" : "outline"}
-                className="h-9 shrink-0 gap-1.5"
+                className="h-7 shrink-0 gap-1 px-2 text-xs"
                 onClick={() => setGroupByClient(!groupByClient)}
               >
-                <Users className="h-4 w-4" />
+                <Users className="h-3.5 w-3.5" />
 
                 <span className="hidden sm:inline">Group</span>
               </Button>
@@ -1069,8 +1069,8 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
                 }}
               >
                 <DialogTrigger asChild>
-                  <Button size="sm" className="h-9 shrink-0">
-                    <Plus className="h-4 w-4 sm:mr-2" />
+                  <Button size="sm" className="h-7 shrink-0 px-2 text-xs">
+                    <Plus className="h-3.5 w-3.5 sm:mr-1.5" />
 
                     <span className="hidden sm:inline">New Order</span>
                   </Button>
