@@ -5,14 +5,14 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 const buttonVariants = cva(
-  "ripple-container inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-5 [&_svg]:shrink-0 active:scale-95",
+  "ripple-container inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[11px] font-semibold transition-[transform,background-color,border-color,color,box-shadow] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-5 [&_svg]:shrink-0 active:scale-[0.97]",
   {
     variants: {
       variant: {
         default: "bg-primary text-primary-foreground shadow-button-base hover:bg-primary/90 hover:shadow-button-hover active:shadow-button-active",
         destructive: "bg-destructive text-destructive-foreground shadow-button-base hover:bg-destructive/90 hover:shadow-button-hover active:shadow-button-active",
-        outline: "border-2 border-primary bg-background text-primary shadow-none hover:bg-primary/5 hover:border-primary/80",
-        "outline-bold": "border-2 border-foreground bg-background text-foreground shadow-none hover:bg-foreground/5",
+        outline: "border border-border/80 bg-background/80 text-foreground shadow-xs hover:bg-muted/60 hover:border-primary/35 hover:text-primary",
+        "outline-bold": "border border-foreground/30 bg-background text-foreground shadow-xs hover:bg-foreground/5 hover:border-foreground/45",
         secondary: "bg-secondary text-secondary-foreground shadow-button-base hover:bg-secondary/80 hover:shadow-button-hover active:shadow-button-active",
         accent: "bg-brand-blue text-white shadow-button-base hover:bg-primary/85 hover:shadow-button-hover active:shadow-button-active",
         success: "bg-status-success text-white shadow-button-base hover:bg-status-success/90 hover:shadow-button-hover active:shadow-button-active",

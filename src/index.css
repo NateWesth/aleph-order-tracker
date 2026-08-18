@@ -52,7 +52,7 @@
     --input: 214 18% 89%;
     --ring: 205 90% 42%;
 
-    --radius: 0.75rem;
+    --radius: 0.9rem;
 
     /* Sidebar */
     --sidebar-background: 0 0% 100%;
@@ -1565,12 +1565,25 @@ body {
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  opacity: 0;
-  background-repeat: repeat;
-  background-size: 72px 72px;
-  background-position: 18px 10px;
+  /* Every logo remains upright and undistorted; placement comes from the
+     shared ToolbarWatermark component so all toolbar variants match. */
+  opacity: .045;
   transition: opacity .28s ease;
 }
+
+.aleph-toolbar-watermark img {
+  position: absolute;
+  display: block;
+  object-fit: contain;
+  transform: none !important;
+  filter: saturate(.9);
+  user-select: none;
+}
+
+html.toolbar-dark .aleph-toolbar-watermark,
+html.toolbar-midnight .aleph-toolbar-watermark { opacity: .075; }
+
+html.toolbar-glass .aleph-toolbar-watermark { opacity: .055; }
 
 html.toolbar-dark .aleph-topbar,
 html.toolbar-logo-wall .aleph-topbar {
@@ -1596,11 +1609,7 @@ html.toolbar-glass .aleph-topbar {
 }
 
 html.toolbar-logo-wall .aleph-toolbar-watermark {
-  opacity: .11;
-  background-image: url('/lovable-uploads/e1088147-889e-43f6-bdf0-271189b88913.png');
-  background-size: 62px 62px;
-  background-repeat: repeat;
-  transform: rotate(-4deg) scale(1.08);
+  opacity: .14;
 }
 
 html.toolbar-dark .aleph-topbar,
@@ -1777,8 +1786,10 @@ html.surface-contrast .app-shell [class*="rounded-2xl"][class*="border"] {
 /* In-page overflow wrappers must not create a page-wide horizontal scroller. */
 .app-shell .overflow-x-auto,
 .app-shell .overflow-x-scroll {
-  overflow-x: clip !important;
+  overflow-x: auto !important;
   max-width: 100% !important;
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--border)) transparent;
 }
 
 /* Settings gets the same makeover even though it lives outside app-shell. */
@@ -1788,8 +1799,11 @@ body:has(main.max-w-7xl) main.max-w-7xl > div > [class*="border"] {
 }
 
 @media (max-width: 760px) {
-  .aleph-toolbar-watermark { background-size: 48px 48px; }
-  html.toolbar-logo-wall .aleph-toolbar-watermark { opacity: .08; }
+  .aleph-toolbar-watermark {
+    opacity: .04;
+  }
+  .aleph-toolbar-watermark img:nth-child(even) { display: none; }
+  html.toolbar-logo-wall .aleph-toolbar-watermark { opacity: .11; }
   .app-page-stage { padding-left: .75rem; padding-right: .75rem; }
 }
 
@@ -1799,6 +1813,86 @@ body:has(main.max-w-7xl) main.max-w-7xl > div > [class*="border"] {
   background:
     radial-gradient(circle at 8% 0%, hsl(var(--primary) / .075), transparent 28rem),
     hsl(var(--background));
+}
+
+/* Brand-led loading state: the two orbiting points chase around the mark while
+   the mark resolves from soft to crisp. */
+.aleph-loading-mark {
+  display: grid;
+  justify-items: center;
+  gap: .9rem;
+  color: hsl(var(--muted-foreground));
+}
+
+.aleph-loading-mark p {
+  margin: 0;
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+.aleph-loading-orbit {
+  position: relative;
+  width: 92px;
+  height: 92px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: hsl(var(--card) / .86);
+  border: 1px solid hsl(var(--border) / .68);
+  box-shadow: 0 24px 55px -34px hsl(var(--primary) / .75);
+}
+
+.aleph-loading-orbit::before {
+  content: "";
+  position: absolute;
+  inset: 7px;
+  border-radius: inherit;
+  border: 1px dashed hsl(var(--primary) / .22);
+  animation: aleph-orbit-spin 4s linear infinite;
+}
+
+.aleph-loading-orbit img {
+  width: 54px;
+  height: 54px;
+  object-fit: contain;
+  animation: aleph-logo-form 1.8s cubic-bezier(.22,1,.36,1) infinite alternate;
+}
+
+.aleph-loading-chaser {
+  position: absolute;
+  inset: -3px;
+  z-index: 2;
+  border-radius: inherit;
+  animation: aleph-orbit-spin 1.35s linear infinite;
+}
+
+.aleph-loading-chaser::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: hsl(var(--primary));
+  box-shadow: 0 0 18px hsl(var(--primary) / .8);
+}
+
+.aleph-loading-chaser-two {
+  inset: 5px;
+  animation-duration: 1.9s;
+  animation-direction: reverse;
+  opacity: .55;
+}
+
+.aleph-loading-chaser-two::after { width: 6px; height: 6px; }
+
+@keyframes aleph-orbit-spin { to { transform: rotate(360deg); } }
+@keyframes aleph-logo-form {
+  from { opacity: .35; transform: scale(.82); filter: saturate(.45) blur(1.2px); }
+  to { opacity: 1; transform: scale(1); filter: saturate(1) blur(0); }
 }
 html.canvas-clean .settings-page { background: hsl(var(--background)); }
 html.canvas-mesh .settings-page {
@@ -1826,3 +1920,109 @@ html.canvas-mesh .aleph-aurora { opacity: .22 !important; }
 html.canvas-midnight .aleph-aurora { opacity: .18 !important; }
 html.canvas-aurora .aleph-aurora { opacity: .42; }
 .dark.canvas-aurora .aleph-aurora { opacity: .28; }
+
+/* ============================================================
+   GLOBAL LAYOUT REFINEMENT — quieter, cleaner, more consistent
+   ============================================================ */
+.app-shell {
+  font-size: .9375rem;
+}
+
+.app-page-stage {
+  padding-top: 1.15rem;
+  padding-bottom: 2rem;
+}
+
+.app-page-stage [data-ui="card"] {
+  isolation: isolate;
+}
+
+.app-page-stage [data-card-header] {
+  padding-bottom: 1rem;
+}
+
+.app-page-stage [role="tablist"] {
+  min-height: 2.4rem;
+  padding: 3px;
+  box-shadow: inset 0 1px 0 hsl(var(--foreground) / .025);
+}
+
+.app-page-stage [role="tab"] {
+  min-height: 2rem;
+  padding-inline: .85rem;
+  font-size: .78rem;
+  font-weight: 650;
+}
+
+.app-shell table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.app-shell th {
+  height: 2.75rem;
+  font-size: .68rem;
+  font-weight: 750;
+  letter-spacing: .045em;
+  text-transform: uppercase;
+  color: hsl(var(--muted-foreground));
+  background: hsl(var(--muted) / .3);
+  border-color: hsl(var(--border) / .5);
+}
+
+.app-shell td {
+  border-color: hsl(var(--border) / .45);
+}
+
+.app-shell tbody tr {
+  transition: background-color .16s ease;
+}
+
+.app-shell tbody tr:hover {
+  background: hsl(var(--primary) / .035);
+}
+
+.app-shell input,
+.app-shell textarea,
+.app-shell [role="combobox"] {
+  border-color: hsl(var(--border) / .7);
+  background-color: hsl(var(--background) / .74);
+  box-shadow: inset 0 1px 0 hsl(var(--foreground) / .018);
+}
+
+.app-shell input:focus,
+.app-shell textarea:focus,
+.app-shell [role="combobox"]:focus {
+  border-color: hsl(var(--primary) / .45);
+}
+
+.aleph-topbar nav {
+  flex-wrap: nowrap !important;
+  overflow-x: auto !important;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  mask-image: linear-gradient(to right, transparent 0, black 10px, black calc(100% - 10px), transparent 100%);
+}
+
+.aleph-topbar nav::-webkit-scrollbar,
+.aleph-mobile-nav > div::-webkit-scrollbar { display: none; }
+
+.aleph-topbar nav button {
+  flex: 0 0 auto;
+}
+
+@media (max-width: 640px) {
+  .app-page-stage {
+    padding-top: .8rem;
+    padding-bottom: 5.5rem;
+  }
+
+  .app-page-stage [data-card-header] { padding: 1rem; }
+  .app-shell th { height: 2.5rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aleph-loading-chaser,
+  .aleph-loading-orbit::before { animation-duration: 4s; }
+  .aleph-loading-orbit img { animation: none; opacity: 1; }
+}

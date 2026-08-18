@@ -19,6 +19,7 @@ import ActivityFeedSidebar from "@/components/admin/ActivityFeedSidebar";
 import OnlinePresenceIndicator from "@/components/admin/OnlinePresenceIndicator";
 import { Badge } from "@/components/ui/badge";
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
+import ToolbarWatermark from "@/components/ui/ToolbarWatermark";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useGlobalUnreadCount } from "@/hooks/useGlobalUnreadCount";
 import { cn } from "@/lib/utils";
@@ -197,7 +198,7 @@ const AdminDashboard = () => {
       <AuroraBackground />
       {/* Modern Top Navigation Bar */}
       <header ref={headerRef} className="aleph-topbar sticky top-0 z-50 w-full border-b shadow-soft">
-        <div className="aleph-toolbar-watermark" aria-hidden />
+        <ToolbarWatermark />
         <div className="ribbon-bar" aria-hidden />
         <div className="w-full px-2 sm:px-3 py-2 sm:py-3">
           {/* Top row: Logo/Home, Search, Actions */}
@@ -228,7 +229,7 @@ const AdminDashboard = () => {
             {/* Right side actions */}
             <div className="flex items-center gap-1">
               <OnlinePresenceIndicator currentView={activeView} />
-              <VoiceCommandButton onCommand={handleVoiceCommand} />
+              <VoiceCommandButton onCommand={handleVoiceCommand} className="hidden md:inline-flex" />
               <Button
                 variant="ghost"
                 size="icon"
@@ -253,7 +254,7 @@ const AdminDashboard = () => {
                 variant="ghost"
                 size="icon"
                 onClick={() => { setChangelogOpen(true); setHasNewChangelog(false); }}
-                className="relative rounded-xl text-muted-foreground hover:text-foreground"
+                className="relative hidden sm:inline-flex rounded-xl text-muted-foreground hover:text-foreground"
                 title="What's new"
               >
                 <Sparkles className="h-[18px] w-[18px]" />
@@ -332,7 +333,7 @@ const AdminDashboard = () => {
           <div
             className={cn(
               "app-page-stage w-full px-3 sm:px-5 lg:px-6 py-4 sm:py-6",
-              activeView === "orders" || activeView === "history" ? "max-w-none" : "max-w-7xl mx-auto"
+              activeView === "orders" || activeView === "history" ? "max-w-none" : "max-w-[1480px] mx-auto"
             )}
           >
             <Suspense fallback={<PageSkeleton variant="table" />}>

@@ -52,8 +52,17 @@ export const useGlobalDocumentScroll = () => {
       const maxScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
       if (maxScroll <= 0) return;
 
+      // Wheel events can report pixels, lines, or pages. Treating a three-line
+      // mouse wheel event as three pixels made desktop scrolling feel stuck.
+      const normalizedDelta = event.deltaMode === WheelEvent.DOM_DELTA_LINE
+        ? event.deltaY * 34
+        : event.deltaMode === WheelEvent.DOM_DELTA_PAGE
+          ? event.deltaY * window.innerHeight * 0.82
+          : event.deltaY * 1.65;
+      const acceleratedDelta = Math.sign(normalizedDelta) * Math.min(Math.abs(normalizedDelta), 560);
+
       event.preventDefault();
-      window.scrollBy({ top: event.deltaY, left: 0, behavior: "auto" });
+      window.scrollBy({ top: acceleratedDelta, left: 0, behavior: "auto" });
     };
 
     window.addEventListener("wheel", handleWheel, { passive: false, capture: true });

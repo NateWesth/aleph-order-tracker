@@ -20,6 +20,18 @@
 - Biometric login can be enabled directly in Settings, cleans up expired credentials, and keeps rotating Supabase refresh tokens synchronized in the secure device keystore.
 - Full TypeScript validation passes with no errors.
 
+## Visual and workflow pass 3
+
+- Every top-toolbar style now includes upright company-logo watermarks in a scattered composition; the Company Watermarks style increases their emphasis without skewing the logo.
+- Wheel input is normalized for pixel, line, and page devices and accelerated with a safe maximum distance.
+- Aleph AI is anchored to the viewport bottom-right with mobile safe-area offsets and a dynamic maximum panel height.
+- Loading screens keep their skeleton context but center an animated Aleph logo with two orbiting chasers.
+- Item notes are visible below item names and comment counts load independently before the realtime comment panel opens.
+- A migration restores the item-comments table, permissions, indexes, and realtime publication in environments where it was missing.
+- Buying Sheet fullscreen uses the browser Fullscreen API, stays above the app chrome, and falls back to app fullscreen on iOS/PWA browsers.
+- Duplicate supplier filter chips were removed; the supplier selector remains the single clear control.
+- Shared buttons, cards, tables, tabs, inputs, page widths, borders, mobile spacing, and toolbar navigation received a quieter app-wide refinement.
+
 ## Deployment
 
 1. Install dependencies and build the Vite app.

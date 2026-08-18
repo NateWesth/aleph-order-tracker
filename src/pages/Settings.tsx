@@ -25,6 +25,7 @@ import {
 import { Capacitor } from "@capacitor/core";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
+import ToolbarWatermark from "@/components/ui/ToolbarWatermark";
 
 type ColorTheme = keyof typeof colorThemes;
 type BoardSingleColor = keyof typeof boardSingleColors;
@@ -217,7 +218,7 @@ const Settings = () => {
     <div className="settings-page min-h-screen bg-background overflow-x-hidden">
       {/* Header */}
       <header className="aleph-topbar sticky top-0 z-30 border-b shadow-soft">
-        <div className="aleph-toolbar-watermark" aria-hidden />
+        <ToolbarWatermark />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-6">
             <div className="flex items-center">
