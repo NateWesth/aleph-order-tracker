@@ -18,7 +18,7 @@ import SmartSearch from "@/components/admin/SmartSearch";
 import ActivityFeedSidebar from "@/components/admin/ActivityFeedSidebar";
 import OnlinePresenceIndicator from "@/components/admin/OnlinePresenceIndicator";
 import { Badge } from "@/components/ui/badge";
-import { PageSkeleton } from "@/components/ui/PageSkeleton";
+import { AlephLoadingMark, PageSkeleton } from "@/components/ui/PageSkeleton";
 import ToolbarWatermark from "@/components/ui/ToolbarWatermark";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useGlobalUnreadCount } from "@/hooks/useGlobalUnreadCount";
@@ -185,10 +185,7 @@ const AdminDashboard = () => {
   if (loading) {
     return (
       <div className="min-h-screen w-full flex items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-3">
-          <div className="h-8 w-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-          <p className="text-muted-foreground text-sm font-medium">Loading...</p>
-        </div>
+        <AlephLoadingMark label="Opening Aleph" />
       </div>
     );
   }
@@ -208,7 +205,7 @@ const AdminDashboard = () => {
               variant={activeView === "home" ? "secondary" : "ghost"}
               size="icon"
               onClick={() => setActiveView("home")}
-              className="shrink-0 rounded-xl h-9 w-9 sm:h-10 sm:w-10 p-1.5"
+              className="aleph-home-button shrink-0 rounded-2xl h-12 w-12 sm:h-14 sm:w-14 p-1.5"
               data-tour="home"
               title="Home"
             >
@@ -223,6 +220,7 @@ const AdminDashboard = () => {
             <div className="flex-1 min-w-0" data-tour="search">
               <SmartSearch
                 onNavigate={(view) => setActiveView(view)}
+                className="aleph-smart-search"
               />
             </div>
 
@@ -289,7 +287,7 @@ const AdminDashboard = () => {
           </div>
 
           {/* Navigation Tabs - Hidden on mobile, shown on tablet+ */}
-          <nav className="hidden sm:flex flex-wrap items-center gap-0.5 sm:gap-1 mt-2 sm:mt-3 -mb-3 overflow-hidden pb-px">
+          <nav className="hidden sm:flex lg:hidden flex-wrap items-center gap-0.5 sm:gap-1 mt-2 sm:mt-3 -mb-3 overflow-hidden pb-px">
             {navItems.map((item) => {
               const isActive = activeView === item.id;
               return (
@@ -328,6 +326,44 @@ const AdminDashboard = () => {
           Keep scrolling on the document itself. A nested overflow-y-auto here
           creates a trapped scroll region and makes wheel hit-testing unreliable. */}
       <div className="flex w-full items-start min-w-0 overflow-x-hidden">
+        <aside className="aleph-workspace-rail sticky hidden w-[220px] shrink-0 flex-col border-r border-border/55 bg-card/55 px-3 py-5 backdrop-blur-xl lg:flex" style={{ top: headerHeight, height: `calc(100dvh - ${headerHeight}px)` }}>
+          <div className="mb-4 px-2">
+            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-primary">Control centre</p>
+            <p className="mt-1 text-xs text-muted-foreground">Move between live workspaces</p>
+          </div>
+          <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto py-1" aria-label="Workspace navigation">
+            {navItems.map((item) => {
+              const isActive = activeView === item.id;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => { playClick(); setActiveView(item.id); }}
+                  className={cn(
+                    "group relative flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left text-sm font-bold transition-all duration-200",
+                    isActive
+                      ? "bg-primary text-primary-foreground shadow-[0_14px_30px_-18px_hsl(var(--primary))]"
+                      : "text-muted-foreground hover:bg-primary/8 hover:text-foreground",
+                  )}
+                >
+                  <span className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-colors", isActive ? "bg-white/15" : "bg-muted/70 group-hover:bg-primary/10")}>
+                    <item.icon className="h-[18px] w-[18px]" />
+                  </span>
+                  <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                  {item.badge > 0 && (
+                    <span className={cn("min-w-5 rounded-full px-1.5 py-0.5 text-center text-[9px] font-black", isActive ? "bg-white/20 text-white" : "bg-primary/10 text-primary")}>
+                      {item.badge > 99 ? "99+" : item.badge}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </nav>
+          <button type="button" onClick={() => navigate('/settings')} className="mt-3 flex items-center gap-3 rounded-2xl border border-border/60 bg-background/55 px-3 py-2.5 text-sm font-bold text-muted-foreground transition-colors hover:border-primary/25 hover:text-foreground">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-muted/70"><Settings className="h-[18px] w-[18px]" /></span>
+            Preferences
+          </button>
+        </aside>
         {/* Main content uses natural document scrolling. */}
         <main className="min-w-0 flex-1 overflow-x-hidden w-full pb-16 sm:pb-0">
           <div

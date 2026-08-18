@@ -20,6 +20,7 @@ import ProcessingOrderFilesDialog from "./components/ProcessingOrderFilesDialog"
 import OrderExportActions from "./components/OrderExportActions";
 import { sendOrderNotification } from "@/utils/emailNotifications";
 import ItemProgressBoard from "./ItemProgressBoard";
+import OrderItemComments from "./components/OrderItemComments";
 
 // Define the order item interface
 interface OrderItem {
@@ -923,6 +924,7 @@ export default function ProgressPage({
                                   </TableCell>
                                   <TableCell>
                                     <div className="flex flex-wrap gap-1">
+                                      <OrderItemComments orderItemId={item.id} className="h-7 w-7 border border-blue-500/15 bg-blue-500/5" />
                                       <Button
                                         variant="outline"
                                         size="sm"

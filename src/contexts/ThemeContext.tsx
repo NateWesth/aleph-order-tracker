@@ -27,6 +27,7 @@ interface ThemeContextType {
   stockStatusColors: StockStatusColors;
   uiVariant: UiVariant;
   toolbarStyle: ToolbarStyle;
+  toolbarWatermark: boolean;
   surfaceStyle: SurfaceStyle;
   canvasStyle: CanvasStyle;
   setTheme: (theme: Theme) => void;
@@ -38,6 +39,7 @@ interface ThemeContextType {
   setStockStatusColors: (colors: StockStatusColors) => void;
   setUiVariant: (variant: UiVariant) => void;
   setToolbarStyle: (style: ToolbarStyle) => void;
+  setToolbarWatermark: (visible: boolean) => void;
   setSurfaceStyle: (style: SurfaceStyle) => void;
   setCanvasStyle: (style: CanvasStyle) => void;
   toggleTheme: () => void;
@@ -171,6 +173,7 @@ interface StoredThemePreferences {
   stockStatusColors: StockStatusColors;
   uiVariant: UiVariant;
   toolbarStyle: ToolbarStyle;
+  toolbarWatermark: boolean;
   surfaceStyle: SurfaceStyle;
   canvasStyle: CanvasStyle;
 }
@@ -185,6 +188,7 @@ const defaultPreferences: StoredThemePreferences = {
   stockStatusColors: defaultStockStatusColors,
   uiVariant: 'standard',
   toolbarStyle: 'classic',
+  toolbarWatermark: true,
   surfaceStyle: 'soft',
   canvasStyle: 'aurora',
 };
@@ -206,6 +210,7 @@ const readStoredPreferences = (): StoredThemePreferences => {
         stockStatusColors: parsed.stockStatusColors?.orderedColor && parsed.stockStatusColors?.receivedColor ? parsed.stockStatusColors : defaultPreferences.stockStatusColors,
         uiVariant: parsed.uiVariant === 'glass' ? 'glass' : 'standard',
         toolbarStyle: ['classic', 'dark', 'logo-wall', 'midnight', 'glass'].includes(parsed.toolbarStyle || '') ? parsed.toolbarStyle as ToolbarStyle : defaultPreferences.toolbarStyle,
+        toolbarWatermark: parsed.toolbarWatermark !== false,
         surfaceStyle: ['clean', 'soft', 'glass', 'contrast'].includes(parsed.surfaceStyle || '') ? parsed.surfaceStyle as SurfaceStyle : defaultPreferences.surfaceStyle,
         canvasStyle: ['aurora', 'clean', 'mesh', 'midnight'].includes(parsed.canvasStyle || '') ? parsed.canvasStyle as CanvasStyle : defaultPreferences.canvasStyle,
       };
@@ -258,6 +263,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
   const [stockStatusColors, setStockStatusColors] = useState<StockStatusColors>(initialPreferences.stockStatusColors);
   const [uiVariant, setUiVariant] = useState<UiVariant>(initialPreferences.uiVariant);
   const [toolbarStyle, setToolbarStyle] = useState<ToolbarStyle>(initialPreferences.toolbarStyle);
+  const [toolbarWatermark, setToolbarWatermark] = useState(initialPreferences.toolbarWatermark);
   const [surfaceStyle, setSurfaceStyle] = useState<SurfaceStyle>(initialPreferences.surfaceStyle);
   const [canvasStyle, setCanvasStyle] = useState<CanvasStyle>(initialPreferences.canvasStyle);
   const [systemTheme, setSystemTheme] = useState<ResolvedTheme>(() => {
@@ -296,6 +302,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     ['clean', 'soft', 'glass', 'contrast'].forEach(value => root.classList.remove(`surface-${value}`));
     ['aurora', 'clean', 'mesh', 'midnight'].forEach(value => root.classList.remove(`canvas-${value}`));
     root.classList.add(`toolbar-${toolbarStyle}`, `surface-${surfaceStyle}`, `canvas-${canvasStyle}`);
+    root.classList.toggle('toolbar-watermark-off', !toolbarWatermark);
     root.dataset.toolbarStyle = toolbarStyle;
     root.dataset.surfaceStyle = surfaceStyle;
     root.dataset.canvasStyle = canvasStyle;
@@ -311,7 +318,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
 
     const timeout = window.setTimeout(() => root.classList.remove('theme-transition'), 420);
     return () => window.clearTimeout(timeout);
-  }, [resolvedTheme, colorTheme, uiVariant, toolbarStyle, surfaceStyle, canvasStyle]);
+  }, [resolvedTheme, colorTheme, uiVariant, toolbarStyle, toolbarWatermark, surfaceStyle, canvasStyle]);
 
   useEffect(() => {
     const preferences: StoredThemePreferences = {
@@ -324,6 +331,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
       stockStatusColors,
       uiVariant,
       toolbarStyle,
+      toolbarWatermark,
       surfaceStyle,
       canvasStyle,
     };
@@ -340,12 +348,13 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
       localStorage.setItem('stockStatusColors', JSON.stringify(stockStatusColors));
       localStorage.setItem('uiVariant', uiVariant);
       localStorage.setItem('toolbarStyle', toolbarStyle);
+      localStorage.setItem('toolbarWatermark', String(toolbarWatermark));
       localStorage.setItem('surfaceStyle', surfaceStyle);
       localStorage.setItem('canvasStyle', canvasStyle);
     } catch (error) {
       console.warn('Failed to save theme preferences:', error);
     }
-  }, [theme, colorTheme, boardColorMode, boardSingleColor, colorfulPreset, customBoardColor, stockStatusColors, uiVariant, toolbarStyle, surfaceStyle, canvasStyle]);
+  }, [theme, colorTheme, boardColorMode, boardSingleColor, colorfulPreset, customBoardColor, stockStatusColors, uiVariant, toolbarStyle, toolbarWatermark, surfaceStyle, canvasStyle]);
 
   const toggleTheme = () => setTheme(prev => prev === 'light' ? 'dark' : 'light');
 
@@ -361,6 +370,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
       stockStatusColors,
       uiVariant,
       toolbarStyle,
+      toolbarWatermark,
       surfaceStyle,
       canvasStyle,
       setTheme,
@@ -372,6 +382,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
       setStockStatusColors,
       setUiVariant,
       setToolbarStyle,
+      setToolbarWatermark,
       setSurfaceStyle,
       setCanvasStyle,
       toggleTheme,

@@ -23,6 +23,8 @@ interface OrderItemComment {
 interface OrderItemCommentsProps {
   orderItemId: string;
   className?: string;
+  initialCount?: number;
+  onCountChange?: (count: number) => void;
 }
 
 function formatCommentTime(value: string) {
@@ -36,11 +38,11 @@ function formatCommentTime(value: string) {
   });
 }
 
-export default function OrderItemComments({ orderItemId, className }: OrderItemCommentsProps) {
+export default function OrderItemComments({ orderItemId, className, initialCount, onCountChange }: OrderItemCommentsProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const [comments, setComments] = useState<OrderItemComment[]>([]);
-  const [commentCount, setCommentCount] = useState(0);
+  const [commentCount, setCommentCount] = useState(initialCount || 0);
   const [open, setOpen] = useState(false);
   const [body, setBody] = useState("");
   const [loading, setLoading] = useState(false);
@@ -59,28 +61,37 @@ export default function OrderItemComments({ orderItemId, className }: OrderItemC
 
       if (error) throw error;
       setComments((data || []) as unknown as OrderItemComment[]);
-      setCommentCount(data?.length || 0);
+      const nextCount = data?.length || 0;
+      setCommentCount(nextCount);
+      onCountChange?.(nextCount);
     } catch (error) {
       console.error("Error loading item comments:", error);
       toast({ title: "Comments could not load", description: "Please check your connection and try again.", variant: "destructive" });
     } finally {
       setLoading(false);
     }
-  }, [orderItemId, toast]);
+  }, [orderItemId, onCountChange, toast]);
 
   // A lightweight count keeps the important note indicator visible before the
   // popover opens, without loading full messages or opening realtime sockets.
   useEffect(() => {
+    if (typeof initialCount === "number") {
+      setCommentCount(initialCount);
+      return;
+    }
     let active = true;
     void supabase
       .from("order_item_comments")
       .select("id", { count: "exact", head: true })
       .eq("order_item_id", orderItemId)
       .then(({ count, error }) => {
-        if (active && !error) setCommentCount(count || 0);
+        if (active && !error) {
+          setCommentCount(count || 0);
+          onCountChange?.(count || 0);
+        }
       });
     return () => { active = false; };
-  }, [orderItemId]);
+  }, [initialCount, onCountChange, orderItemId]);
 
   useEffect(() => {
     // Do not create a query and realtime socket for every row on the order board.
@@ -127,7 +138,11 @@ export default function OrderItemComments({ orderItemId, className }: OrderItemC
       author: { id: user.id, full_name: user.user_metadata?.full_name || null },
     };
     setComments(previous => [...previous, optimistic]);
-    setCommentCount(previous => previous + 1);
+    setCommentCount(previous => {
+      const nextCount = previous + 1;
+      onCountChange?.(nextCount);
+      return nextCount;
+    });
     setBody("");
     try {
       const { error } = await supabase.from("order_item_comments").insert({
@@ -142,7 +157,11 @@ export default function OrderItemComments({ orderItemId, className }: OrderItemC
     } catch (error) {
       console.error("Error adding item comment:", error);
       setComments(previous => previous.filter(comment => comment.id !== optimisticId));
-      setCommentCount(previous => Math.max(0, previous - 1));
+      setCommentCount(previous => {
+        const nextCount = Math.max(0, previous - 1);
+        onCountChange?.(nextCount);
+        return nextCount;
+      });
       setBody(trimmed);
       toast({ title: "Comment not sent", description: "Your message was restored. Check your connection and try again.", variant: "destructive" });
     } finally {

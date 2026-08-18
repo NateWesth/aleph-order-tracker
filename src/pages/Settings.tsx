@@ -36,7 +36,7 @@ const Settings = () => {
   const { toast } = useToast();
   const { user, session } = useAuth();
   const isMobile = useIsMobile();
-  const { theme, colorTheme, boardColorMode, boardSingleColor, colorfulPreset, customBoardColor, stockStatusColors, uiVariant, toolbarStyle, surfaceStyle, canvasStyle, setTheme, setColorTheme, setBoardColorMode, setBoardSingleColor, setColorfulPreset, setCustomBoardColor, setStockStatusColors, setUiVariant, setToolbarStyle, setSurfaceStyle, setCanvasStyle } = useTheme();
+  const { theme, colorTheme, boardColorMode, boardSingleColor, colorfulPreset, customBoardColor, stockStatusColors, uiVariant, toolbarStyle, toolbarWatermark, surfaceStyle, canvasStyle, setTheme, setColorTheme, setBoardColorMode, setBoardSingleColor, setColorfulPreset, setCustomBoardColor, setStockStatusColors, setUiVariant, setToolbarStyle, setToolbarWatermark, setSurfaceStyle, setCanvasStyle } = useTheme();
   const [userProfile, setUserProfile] = useState<any>(null);
   const [companyInfo, setCompanyInfo] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -181,6 +181,7 @@ const Settings = () => {
     setCustomBoardColor('#6366f1');
     setUiVariant('standard');
     setToolbarStyle('classic');
+    setToolbarWatermark(true);
     setSurfaceStyle('soft');
     setCanvasStyle('aurora');
     setStockStatusColors(defaultStockStatusColors);
@@ -577,11 +578,10 @@ const Settings = () => {
                   <p className="text-sm text-muted-foreground">
                     Change the top navigation without changing the Aleph logo colours.
                   </p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
                     {([
                       ['classic', 'Classic', 'Clean card toolbar'],
                       ['dark', 'Dark', 'Dark professional toolbar'],
-                      ['logo-wall', 'Company Watermarks', 'Repeating company logos across the toolbar'],
                       ['midnight', 'Midnight', 'Deep navy executive look'],
                       ['glass', 'Glass', 'Transparent frosted toolbar'],
                     ] as [ToolbarStyle, string, string][]).map(([value, label, description]) => (
@@ -596,13 +596,10 @@ const Settings = () => {
                             : "border-border bg-card hover:border-primary/35 hover:-translate-y-0.5"
                         )}
                       >
-                        <div
-                          style={value === 'logo-wall' ? { backgroundImage: "url('/lovable-uploads/e1088147-889e-43f6-bdf0-271189b88913.png')", backgroundSize: '26px 26px', backgroundRepeat: 'repeat' } : undefined}
-                          className={cn(
+                        <div className={cn(
                           "mb-2 h-7 rounded-lg border",
                           value === 'classic' && "bg-background",
                           value === 'dark' && "bg-slate-900",
-                          value === 'logo-wall' && "bg-slate-950 opacity-90",
                           value === 'midnight' && "bg-gradient-to-r from-slate-950 to-blue-950",
                           value === 'glass' && "bg-background/50 backdrop-blur-xl"
                         )} />
@@ -611,6 +608,13 @@ const Settings = () => {
                         {toolbarStyle === value && <Check className="absolute right-2 top-2 h-4 w-4 text-primary" />}
                       </button>
                     ))}
+                  </div>
+                  <div className="flex items-center justify-between gap-4 rounded-2xl border border-border/70 bg-muted/35 p-4">
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">Company logo watermark</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">Included automatically with every toolbar style. Turn it off here whenever you want a plain toolbar.</p>
+                    </div>
+                    <Switch checked={toolbarWatermark} onCheckedChange={setToolbarWatermark} aria-label="Show company watermark" />
                   </div>
                 </div>
 
