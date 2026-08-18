@@ -43,7 +43,7 @@ const ACTIVITY_CONFIG: Record<string, { icon: typeof Package; color: string; bg:
 
 const DEFAULT_CONFIG = { icon: Activity, color: "text-muted-foreground", bg: "bg-muted" };
 
-export default function ActivityFeedSidebar({ topOffset = 0 }: { topOffset?: number }) {
+export default function ActivityFeedSidebar() {
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [collapsed, setCollapsed] = useState(true);
@@ -129,9 +129,26 @@ export default function ActivityFeedSidebar({ topOffset = 0 }: { topOffset?: num
           fetchActivities();
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") void fetchActivities();
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          window.setTimeout(() => void fetchActivities(), 1000);
+        }
+      });
+
+    const refreshIfVisible = () => {
+      if (document.visibilityState === "visible") void fetchActivities();
+    };
+    const safetyPoll = window.setInterval(refreshIfVisible, 30_000);
+    document.addEventListener("visibilitychange", refreshIfVisible);
+    window.addEventListener("focus", refreshIfVisible);
+    window.addEventListener("online", refreshIfVisible);
 
     return () => {
+      window.clearInterval(safetyPoll);
+      document.removeEventListener("visibilitychange", refreshIfVisible);
+      window.removeEventListener("focus", refreshIfVisible);
+      window.removeEventListener("online", refreshIfVisible);
       supabase.removeChannel(channel);
     };
   }, []);
@@ -155,14 +172,10 @@ export default function ActivityFeedSidebar({ topOffset = 0 }: { topOffset?: num
   return (
     <div
       className={cn(
-        "hidden lg:flex flex-col transition-all duration-300 shrink-0 relative overflow-hidden self-start sticky",
+        "aleph-activity-rail hidden h-full min-h-0 lg:flex flex-col transition-all duration-300 shrink-0 relative overflow-hidden self-stretch",
         "border-l border-white/10 dark:border-white/[0.06]",
         collapsed ? "w-12" : "w-72 xl:w-80"
       )}
-      style={{
-        top: topOffset,
-        height: `calc(100vh - ${topOffset}px)`,
-      }}
     >
       {/* Background matches app background in every theme */}
       <div className="absolute inset-0 pointer-events-none bg-background" />

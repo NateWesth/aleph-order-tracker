@@ -179,11 +179,28 @@ export default function POTrackingPage() {
       setOpenVendors(new Set());
     } catch (error: any) {
       console.error("Error fetching PO tracking data:", error);
-      toast({
-        title: "Error",
-        description: error?.message || "Failed to load purchase orders from Zoho",
-        variant: "destructive",
-      });
+      // Keep the workspace useful during a transient Zoho/function outage.
+      const { data: cached } = await supabase
+        .from("po_tracking_cache")
+        .select("payload, fetched_at")
+        .eq("id", "00000000-0000-0000-0000-000000000003")
+        .maybeSingle();
+
+      if (cached?.payload) {
+        setPos(cached.payload as unknown as ZohoPO[]);
+        setFetchedAt(cached.fetched_at);
+        setIsCached(true);
+        toast({
+          title: "Showing the last synchronized purchase orders",
+          description: "Zoho is temporarily unavailable; the page will retry automatically.",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: error?.message || "Failed to load purchase orders from Zoho",
+          variant: "destructive",
+        });
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);

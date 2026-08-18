@@ -55,12 +55,22 @@ export default function OrderItemComments({ orderItemId, className, initialCount
     try {
       const { data, error } = await supabase
         .from("order_item_comments")
-        .select("*, author:profiles(id, full_name)")
+        .select("id, order_item_id, user_id, body, created_at")
         .eq("order_item_id", orderItemId)
         .order("created_at", { ascending: true });
 
       if (error) throw error;
-      setComments((data || []) as unknown as OrderItemComment[]);
+      const userIds = [...new Set((data || []).map((comment) => comment.user_id))];
+      const { data: profiles, error: profilesError } = userIds.length
+        ? await supabase.from("profiles").select("id, full_name").in("id", userIds)
+        : { data: [], error: null };
+      if (profilesError) console.warn("Comment authors could not load:", profilesError);
+      const authorMap = new Map((profiles || []).map((profile) => [profile.id, profile]));
+      const enriched = (data || []).map((comment) => ({
+        ...comment,
+        author: authorMap.get(comment.user_id) || null,
+      }));
+      setComments(enriched as OrderItemComment[]);
       const nextCount = data?.length || 0;
       setCommentCount(nextCount);
       onCountChange?.(nextCount);

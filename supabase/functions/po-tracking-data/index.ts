@@ -63,6 +63,25 @@ Deno.serve(async (req) => {
   const clientSecret = Deno.env.get('ZOHO_CLIENT_SECRET')
 
   if (!clientId || !clientSecret) {
+    const { data: cached } = await supabase
+      .from('po_tracking_cache')
+      .select('payload, fetched_at')
+      .eq('id', CACHE_ID)
+      .maybeSingle()
+
+    if (cached?.payload) {
+      const purchaseOrders = cached.payload as POEntry[]
+      return new Response(JSON.stringify({
+        success: true,
+        purchaseOrders,
+        count: purchaseOrders.length,
+        fetchedAt: cached.fetched_at,
+        cached: true,
+        stale: true,
+        warning: 'Zoho credentials are not configured; showing cached data',
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
+
     return new Response(JSON.stringify({ error: 'Zoho credentials not configured' }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -143,6 +162,25 @@ Deno.serve(async (req) => {
     })
   } catch (error) {
     console.error('PO tracking data error:', error)
+    const { data: cached } = await supabase
+      .from('po_tracking_cache')
+      .select('payload, fetched_at')
+      .eq('id', CACHE_ID)
+      .maybeSingle()
+
+    if (cached?.payload) {
+      const purchaseOrders = cached.payload as POEntry[]
+      return new Response(JSON.stringify({
+        success: true,
+        purchaseOrders,
+        count: purchaseOrders.length,
+        fetchedAt: cached.fetched_at,
+        cached: true,
+        stale: true,
+        warning: error instanceof Error ? error.message : 'Zoho refresh failed',
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
+
     return new Response(JSON.stringify({
       error: error instanceof Error ? error.message : 'Failed to fetch Zoho purchase orders',
     }), {

@@ -71,6 +71,18 @@
 - Strengthened the Buying Sheet and Commission internal work areas without altering the global toolbar, Control Centre, watermark, search, or Aleph AI placement.
 - Added responsive horizontal stage and supplier navigation for mobile while retaining the shared Capacitor codebase.
 
+## Fixed shell, board scrolling, and live sync pass 8
+
+- Locked the desktop application frame to the viewport. The company header, toolbar, Control Centre, and Activity rail no longer move with page content.
+- Made the active page canvas the only ordinary vertical scroller; the Orders Board uses four independent, height-constrained column scrollers instead.
+- Contained wheel and touch scrolling inside the Orders Board lane under the pointer, including at lane boundaries, so another lane or the page cannot move unexpectedly.
+- Corrected the missing Suppliers mail-icon import and formally typed optional custom board colours, resolving the reported production TypeScript failures.
+- Added an idempotent Realtime migration covering orders, items, POs, comments, files, activity, notifications, updates, and tags with full replica identities.
+- Added reconnect, focus, online, and short polling safety nets so authorized users recover any events missed during a websocket interruption.
+- Removed the fragile embedded-profile relationship from item-comment loading and enriches authors in a second indexed query, preventing schema-cache 400 errors.
+- Corrected the missing React list key on Order Board cards.
+- Added cached PO Tracking recovery in both the client and Edge Function so a temporary Zoho error does not blank the page.
+
 ## Deployment
 
 1. Install dependencies and build the Vite app.

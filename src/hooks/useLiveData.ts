@@ -20,7 +20,7 @@ export function useLiveData(
   const {
     enabled = true,
     debounceMs = 400,
-    fallbackIntervalMs = 5 * 60 * 1000,
+    fallbackIntervalMs = 30 * 1000,
     channelName,
   } = options ?? {};
 
@@ -51,13 +51,22 @@ export function useLiveData(
         fire
       );
     }
-    channel.subscribe();
+    channel.subscribe((status) => {
+      if (status === "SUBSCRIBED") {
+        fire();
+      } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+        // Supabase reconnects the socket internally. Refreshing here prevents
+        // a missed event from leaving another user's screen stale meanwhile.
+        window.setTimeout(fire, 1000);
+      }
+    });
 
     const onVisible = () => {
       if (document.visibilityState === "visible") fire();
     };
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("focus", onVisible);
+    window.addEventListener("online", onVisible);
 
     const interval =
       fallbackIntervalMs > 0
@@ -69,6 +78,7 @@ export function useLiveData(
       if (interval) window.clearInterval(interval);
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("focus", onVisible);
+      window.removeEventListener("online", onVisible);
       supabase.removeChannel(channel);
     };
   }, [enabled, key, debounceMs, fallbackIntervalMs, channelName]);
