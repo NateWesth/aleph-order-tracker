@@ -2582,7 +2582,7 @@ html.toolbar-glass .aleph-toolbar-search-input {
   backdrop-filter: none !important;
   background: hsl(var(--card)) !important;
   will-change: width;
-  contain: layout paint;
+  contain: layout;
   box-shadow: 16px 0 44px -38px hsl(var(--foreground) / .6);
   transition: width .28s cubic-bezier(.4, 0, .2, 1), padding .28s cubic-bezier(.4, 0, .2, 1);
 }
@@ -2644,6 +2644,7 @@ html.toolbar-glass .aleph-toolbar-search-input {
   border: 1px solid hsl(var(--border) / .7);
   border-left: none;
   border-radius: 0 5px 5px 0;
+  background: hsl(var(--card)) !important;
   box-shadow: 4px 0 12px -8px hsl(var(--foreground) / .45);
   transition: background-color .15s ease, border-color .15s ease, color .15s ease;
 }
