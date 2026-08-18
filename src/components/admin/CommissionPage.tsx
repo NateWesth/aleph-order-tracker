@@ -1171,16 +1171,25 @@ const CommissionPage = () => {
 
   return (
     <div className="commission-page aleph-page-workspace aleph-commission-workspace app-no-x-scroll min-w-0 w-full max-w-full space-y-5 overflow-x-hidden">
-      <PageHeader
-        title="Commission"
-        icon={Percent}
-        description="Monthly rep commission reports and rate management."
-      />
       <Tabs value={activeTab} onValueChange={setActiveTab} className="min-w-0">
-        <TabsList className="grid w-full max-w-md grid-cols-2 rounded-2xl bg-muted/60 p-1">
-          <TabsTrigger value="report"><FileText className="h-4 w-4 mr-1.5" />Commission Report</TabsTrigger>
-          <TabsTrigger value="reps"><Users className="h-4 w-4 mr-1.5" />Manage Reps</TabsTrigger>
-        </TabsList>
+        <section className="commission-command-hero relative overflow-hidden rounded-[30px] border border-border/65 bg-card p-5 shadow-soft sm:p-6">
+          <div className="relative z-10 grid gap-5 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-end">
+            <div className="flex items-start gap-4">
+              <span className="grid h-16 w-16 shrink-0 place-items-center rounded-[22px] bg-primary text-primary-foreground shadow-xl shadow-primary/25">
+                <Percent className="h-7 w-7" />
+              </span>
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-primary">Revenue operations</p>
+                <h1 className="mt-1 font-display text-3xl font-black tracking-[-0.04em]">Commission Control Room</h1>
+                <p className="mt-1 max-w-2xl text-sm text-muted-foreground">Calculate monthly earnings, resolve costs, lock paid invoices and manage every representative from one ledger.</p>
+              </div>
+            </div>
+            <TabsList className="grid h-auto w-full grid-cols-2 gap-2 rounded-[22px] border border-border/60 bg-background/60 p-2">
+              <TabsTrigger value="report" className="h-14 rounded-2xl gap-2 data-[state=active]:shadow-lg"><FileText className="h-4 w-4" /><span className="text-left"><strong className="block text-xs">Monthly Ledger</strong><span className="hidden text-[9px] font-normal opacity-65 sm:block">Earnings and payouts</span></span></TabsTrigger>
+              <TabsTrigger value="reps" className="h-14 rounded-2xl gap-2 data-[state=active]:shadow-lg"><Users className="h-4 w-4" /><span className="text-left"><strong className="block text-xs">Rep Directory</strong><span className="hidden text-[9px] font-normal opacity-65 sm:block">Rates and assignments</span></span></TabsTrigger>
+            </TabsList>
+          </div>
+        </section>
 
         {/* Commission Report Tab */}
         <TabsContent value="report" className="space-y-5 min-w-0">
@@ -1437,7 +1446,7 @@ const CommissionPage = () => {
               </div>
 
               {/* Missing Costs are shown via a small trigger in the action bar above; details open in a dialog. */}
-              <div className="space-y-3">
+              <div className="commission-ledger-grid grid gap-4 xl:grid-cols-2">
                 {commissionData.data.map((d) => (
                   <Card key={d.rep_id} className={cn("commission-rep-card rounded-[22px] border-border/60 shadow-sm overflow-hidden transition-all hover:shadow-md", d.is_locked && "opacity-70")}>
                     <CardHeader className="pb-2">

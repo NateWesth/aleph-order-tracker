@@ -83,6 +83,16 @@
 - Corrected the missing React list key on Order Board cards.
 - Added cached PO Tracking recovery in both the client and Edge Function so a temporary Zoho error does not blank the page.
 
+## Operational cockpit rebuild pass 9
+
+- Corrected the Orders scrolling model: the page canvas scrolls normally down to the physical bottom of the board, while each desktop lane is capped to the usable viewport height and owns its order-stack scrolling.
+- Kept lane scroll containment exclusive to the Orders page; Buying, Commission, History, directories, PO Tracking, and Analytics retain normal page scrolling.
+- Rebuilt every Orders lane with a large numbered workflow header, live order/unit/priority totals, a contained lane surface, and ticket-style order cards with clearer client, progress, item, comment, and movement hierarchy.
+- Replaced the Buying Sheet's small tab strip with three substantial operational workspaces: Order Queue, Supplier Rooms, and Data Console.
+- Replaced the Buying Sheet's ten equal KPI tiles with a procurement intelligence mosaic led by a large buying-requirement and demand-coverage command card.
+- Rebuilt Commission as a Revenue Operations control room with a hero workspace selector and a responsive two-column representative ledger.
+- Retained and strengthened the distinct catalogue cards, client directory, supplier directory, user approval lanes, supplier-focused PO workbench, History timeline, and Analytics insight canvas from the prior page architecture passes.
+
 ## Deployment
 
 1. Install dependencies and build the Vite app.

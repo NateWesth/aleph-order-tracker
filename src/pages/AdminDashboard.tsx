@@ -191,7 +191,10 @@ const AdminDashboard = () => {
   }
 
   return (
-    <div className="app-shell h-[100dvh] min-h-0 w-full flex flex-col bg-background overflow-hidden relative">
+    <div
+      className="app-shell h-[100dvh] min-h-0 w-full flex flex-col bg-background overflow-hidden relative"
+      style={{ "--aleph-header-height": `${headerHeight}px` } as any}
+    >
       <AuroraBackground />
       {/* Modern Top Navigation Bar */}
       <header ref={headerRef} className="aleph-topbar relative z-50 w-full shrink-0 border-b shadow-soft">
@@ -363,21 +366,15 @@ const AdminDashboard = () => {
             Preferences
           </button>
         </aside>
-        <main
-          className={cn(
-            "aleph-content-scroll h-full min-h-0 min-w-0 flex-1 w-full overflow-x-hidden pb-16 sm:pb-0 lg:ml-[220px]",
-            activeView === "orders" ? "overflow-y-auto lg:overflow-y-hidden" : "overflow-y-auto",
-          )}
-        >
+        <main className="aleph-content-scroll h-full min-h-0 min-w-0 flex-1 w-full overflow-x-hidden overflow-y-auto pb-16 sm:pb-0 lg:ml-[220px]">
           <div
             className={cn(
               "app-page-stage w-full px-3 sm:px-5 lg:px-6 py-4 sm:py-6",
-              activeView === "orders" && "lg:h-full lg:min-h-0",
               activeView === "orders" || activeView === "history" ? "max-w-none" : "max-w-[1480px] mx-auto"
             )}
           >
             <Suspense fallback={<PageSkeleton variant="table" />}>
-            <PageTransition viewKey={activeView} className={activeView === "orders" ? "lg:h-full lg:min-h-0" : undefined}>
+            <PageTransition viewKey={activeView}>
               {activeView === "home" && (
                 <CustomizableDashboard
                   userName={userProfile?.full_name}

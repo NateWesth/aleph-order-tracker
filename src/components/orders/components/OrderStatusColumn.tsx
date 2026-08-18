@@ -215,11 +215,15 @@ function OrderStatusColumn({
     };
   };
 
+  const stagePosition = Math.max(0, ["ordered", "in-progress", "in-stock", "ready"].indexOf(config.key)) + 1;
+  const totalUnits = orders.reduce((total, order) => total + (order.items || []).reduce((sum, item) => sum + (item.quantity || 0), 0), 0);
+  const urgentOrders = orders.filter((order) => order.urgency === "urgent" || order.urgency === "high").length;
+
   return (
     <>
       <div
         ref={setNodeRef}
-        className={cn("flex flex-col w-full min-w-0 lg:h-full lg:min-h-0", isOver && "ring-2 ring-primary/50 rounded-xl transition-all")}
+        className={cn("order-workflow-lane flex h-full min-h-0 w-full min-w-0 flex-col", isOver && "ring-2 ring-primary/50 rounded-[28px] transition-all")}
       >
         {isMobile ? (
           <button
@@ -257,36 +261,44 @@ function OrderStatusColumn({
         ) : (
           <div
             className={cn(
-              "px-3 sm:px-4 py-2.5 sm:py-3 rounded-t-xl w-full text-left",
+              "order-lane-header w-full rounded-t-[26px] px-4 py-4 text-left",
               !config.customColor && config.bgColor,
             )}
             style={config.customColor ? { backgroundColor: config.customColor } : undefined}
           >
-            <div className="flex items-center justify-between">
-              <h3 className={cn("font-semibold text-xs sm:text-sm uppercase tracking-wide truncate", config.color)}>
-                {config.label}
-              </h3>
-
-              <Badge
-                variant="secondary"
-                className="bg-white/20 text-white border-0 font-semibold text-xs shrink-0 ml-2"
-              >
-                {orders.length}
-              </Badge>
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-3">
+                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-white/16 text-lg font-black text-white ring-1 ring-white/20">
+                  {String(stagePosition).padStart(2, "0")}
+                </span>
+                <div className="min-w-0">
+                  <p className="text-[9px] font-black uppercase tracking-[0.2em] text-white/65">Workflow stage</p>
+                  <h3 className={cn("truncate text-sm font-black uppercase tracking-wide", config.color)}>{config.label}</h3>
+                </div>
+              </div>
+              <span className="rounded-2xl bg-black/12 px-3 py-2 text-center text-white ring-1 ring-white/15">
+                <strong className="block text-lg leading-none">{orders.length}</strong>
+                <span className="text-[8px] font-bold uppercase tracking-wider text-white/65">orders</span>
+              </span>
+            </div>
+            <div className="mt-3 flex items-center gap-2 text-[9px] font-bold uppercase tracking-wider text-white/70">
+              <span className="rounded-full bg-white/12 px-2 py-1">{totalUnits} units</span>
+              {urgentOrders > 0 && <span className="rounded-full bg-white/18 px-2 py-1 text-white">{urgentOrders} priority</span>}
+              <span className="ml-auto">Drag orders here</span>
             </div>
           </div>
         )}
 
         {effectiveIsExpanded && (
-          <div className="flex-1 bg-muted/30 dark:bg-muted/10 rounded-b-xl border border-t-0 border-border glass-card !rounded-t-none min-h-[200px] sm:min-h-[400px] lg:min-h-0 animate-fade-in lg:overflow-hidden">
+          <div className="order-lane-body min-h-0 flex-1 overflow-hidden rounded-b-[26px] border border-t-0 border-border bg-muted/30 dark:bg-muted/10 animate-fade-in">
             <div
-              className="order-column-scroll min-w-0 w-full lg:h-full lg:overflow-y-auto lg:overscroll-contain"
+              className="order-column-scroll h-full min-w-0 w-full overflow-y-auto overscroll-contain"
               data-order-column-scroll
               data-global-scroll-ignore="true"
               tabIndex={0}
               aria-label={`${config.label} orders, scrollable column`}
             >
-              <div className="p-2 space-y-2">
+              <div className="space-y-3 p-3">
                 {orders.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-12 sm:py-16 text-muted-foreground">
                     <Package className="h-8 w-8 sm:h-10 sm:w-10 mb-3 opacity-30" />
@@ -384,7 +396,7 @@ function OrderStatusColumn({
     const cardContent = (
       <Card
         className={cn(
-          "glass-card glow-border hover-lift interactive-scale overflow-hidden",
+          "order-ticket group/ticket overflow-hidden border-border/65 bg-card/95",
           "animate-fade-in",
           isSelected && "ring-2 ring-primary bg-primary/5",
           isBubbleOpen && "relative z-40",
@@ -393,8 +405,8 @@ function OrderStatusColumn({
           animationDelay: `${index * 30}ms`,
         }}
       >
-        <CardContent className="p-2.5 sm:p-3">
-          <div className="space-y-2 sm:space-y-2.5">
+        <CardContent className="p-0">
+          <div className="space-y-3 p-3.5">
             {/* Order Header */}
 
             <div className="flex items-start justify-between gap-2">
@@ -407,6 +419,10 @@ function OrderStatusColumn({
                 />
               )}
 
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary/10 text-xs font-black text-primary">
+                {(order.companyName || "?").charAt(0).toUpperCase()}
+              </span>
+
               <div className="flex-1 min-w-0">
                 <HoverCard openDelay={400} closeDelay={100}>
                   <HoverCardTrigger asChild>
@@ -418,7 +434,7 @@ function OrderStatusColumn({
                         setDetailsTab("pos");
                         setDetailsOrder(order);
                       }}
-                      className="font-semibold text-xs sm:text-sm text-primary hover:underline truncate cursor-pointer flex items-center gap-1 text-left"
+                      className="flex cursor-pointer items-center gap-1 truncate text-left text-sm font-black text-foreground hover:text-primary"
                     >
                       {order.order_number}
 
@@ -442,11 +458,11 @@ function OrderStatusColumn({
                   </HoverCardContent>
                 </HoverCard>
 
-                <span className="text-[10px] sm:text-xs text-muted-foreground truncate block mt-0.5">
+                <span className="mt-0.5 block truncate text-[11px] font-medium text-muted-foreground">
                   {order.companyName}
                 </span>
 
-                <span className="text-[10px] text-muted-foreground/60 font-light block mt-0.5">
+                <span className="mt-1 block text-[9px] font-bold uppercase tracking-wide text-muted-foreground/60">
                   {order.created_at
                     ? new Date(order.created_at).toLocaleDateString("en-US", {
                         month: "short",
@@ -486,7 +502,7 @@ function OrderStatusColumn({
               <button
                 type="button"
                 className={cn(
-                  "flex items-center justify-between w-full text-[10px] sm:text-xs bg-muted/50 hover:bg-muted px-2 sm:px-2.5 py-1.5 sm:py-2 rounded-lg transition-all duration-200",
+                  "flex w-full items-center justify-between rounded-2xl border border-border/50 bg-muted/45 px-3 py-2.5 text-[10px] transition-all duration-200 hover:border-primary/25 hover:bg-primary/5 sm:text-xs",
                   isBubbleOpen && "ring-2 ring-primary/40 bg-primary/10",
                 )}
                 onClick={(e) => {
@@ -521,7 +537,7 @@ function OrderStatusColumn({
 
             {/* Actions */}
 
-            <div className="flex items-center gap-1.5 sm:gap-2 pt-1">
+            <div className="flex items-center gap-1.5 border-t border-border/55 pt-3 sm:gap-2">
               {config.prevStatus && (
                 <Button
                   size="sm"

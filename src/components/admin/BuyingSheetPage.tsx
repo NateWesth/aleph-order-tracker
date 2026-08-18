@@ -1189,29 +1189,50 @@ export default function BuyingSheetPage() {
             </div>
 
 
-            {/* View mode tabs + filters row */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
-              <Tabs value={viewMode} onValueChange={v => setViewMode(v as ViewMode)} className="shrink-0">
-                <TabsList className="h-8 bg-muted/50">
-                  <TabsTrigger value="quick" className="text-xs gap-1 h-7 px-2.5"><Zap className="h-3 w-3" />Queue</TabsTrigger>
-                  <TabsTrigger value="suppliers" className="text-xs gap-1 h-7 px-2.5"><LayoutGrid className="h-3 w-3" />Suppliers</TabsTrigger>
-                  <TabsTrigger value="table" className="text-xs gap-1 h-7 px-2.5"><TableIcon className="h-3 w-3" />Data</TabsTrigger>
-                </TabsList>
-              </Tabs>
-              <div className="relative flex-1 min-w-0">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                <Input placeholder="Search SKU, item, order, customer..." value={search} onChange={e => setSearch(e.target.value)} className="pl-8 h-8 text-sm" />
+            {/* Procurement workspaces + filters */}
+            <div className="buying-mode-and-filter grid gap-3 xl:grid-cols-[minmax(420px,.9fr)_minmax(0,1.1fr)]">
+              <div className="buying-mode-deck grid grid-cols-3 gap-2" role="tablist" aria-label="Buying Sheet workspace">
+                {([
+                  { value: "quick", label: "Order Queue", hint: "Work by urgency", icon: Zap },
+                  { value: "suppliers", label: "Supplier Rooms", hint: "Prepare each PO", icon: LayoutGrid },
+                  { value: "table", label: "Data Console", hint: "Detailed controls", icon: TableIcon },
+                ] as const).map((mode) => {
+                  const Icon = mode.icon;
+                  const active = viewMode === mode.value;
+                  return (
+                    <button
+                      key={mode.value}
+                      type="button"
+                      role="tab"
+                      aria-selected={active}
+                      onClick={() => setViewMode(mode.value)}
+                      className={`flex min-w-0 items-center gap-2 rounded-2xl border p-2.5 text-left transition-all ${active ? "border-primary/30 bg-primary text-primary-foreground shadow-lg shadow-primary/20" : "border-border/60 bg-background/55 hover:border-primary/20 hover:bg-muted/60"}`}
+                    >
+                      <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${active ? "bg-white/16" : "bg-primary/10 text-primary"}`}><Icon className="h-4 w-4" /></span>
+                      <span className="min-w-0">
+                        <strong className="block truncate text-xs">{mode.label}</strong>
+                        <span className={`hidden truncate text-[9px] sm:block ${active ? "text-primary-foreground/65" : "text-muted-foreground"}`}>{mode.hint}</span>
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
-              <Select value={supplierFilter} onValueChange={setSupplierFilter}>
-                <SelectTrigger className="w-full sm:w-[200px] h-8 text-xs"><Package className="h-3.5 w-3.5 mr-1.5" /><SelectValue placeholder="All Suppliers" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Suppliers</SelectItem>
-                  {uniqueSuppliers.map(([id, info]) => <SelectItem key={id} value={id}>{info.name} ({info.totalToOrder})</SelectItem>)}
-                </SelectContent>
-              </Select>
-              <Button variant={showOnlyNeedOrder ? "default" : "outline"} size="sm" onClick={() => setShowOnlyNeedOrder(!showOnlyNeedOrder)} className="h-8 text-xs gap-1.5 whitespace-nowrap">
-                <AlertTriangle className="h-3.5 w-3.5" />{showOnlyNeedOrder ? "Needs Order" : "Show All"}
-              </Button>
+              <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_200px_auto] sm:items-center">
+                <div className="relative min-w-0">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input placeholder="Search SKU, item, order, customer..." value={search} onChange={e => setSearch(e.target.value)} className="h-11 rounded-2xl pl-9 text-sm" />
+                </div>
+                <Select value={supplierFilter} onValueChange={setSupplierFilter}>
+                  <SelectTrigger className="h-11 w-full rounded-2xl text-xs"><Package className="mr-1.5 h-3.5 w-3.5" /><SelectValue placeholder="All Suppliers" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Suppliers</SelectItem>
+                    {uniqueSuppliers.map(([id, info]) => <SelectItem key={id} value={id}>{info.name} ({info.totalToOrder})</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Button variant={showOnlyNeedOrder ? "default" : "outline"} size="sm" onClick={() => setShowOnlyNeedOrder(!showOnlyNeedOrder)} className="h-11 rounded-2xl gap-1.5 whitespace-nowrap">
+                  <AlertTriangle className="h-3.5 w-3.5" />{showOnlyNeedOrder ? "Needs Order" : "Show All"}
+                </Button>
+              </div>
             </div>
             </div>
           </div>
@@ -1262,25 +1283,25 @@ export default function BuyingSheetPage() {
           </Collapsible>
         )}
 
-        {/* Summary Cards */}
-        <BuyingSheetSummary totals={totals} avgDaysWaiting={avgDaysWaiting} supplierCount={uniqueSuppliers.length} />
+        <section className="buying-intelligence-grid grid gap-4 2xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,.65fr)]">
+          <BuyingSheetSummary totals={totals} avgDaysWaiting={avgDaysWaiting} supplierCount={uniqueSuppliers.length} />
 
-        {/* AI Procurement Suggestions */}
-        <ProcurementSuggestionsPanel
-          items={rows
-            .filter((r) => r.toOrder > 0)
-            .slice(0, 80)
-            .map((r) => ({
-              sku: r.sku,
-              name: r.itemName,
-              supplier: r.supplierName,
-              stock: r.stockOnHand,
-              toOrder: r.toOrder,
-              monthlyDemand: r.lastMonthQty,
-              daysToZero: r.stockoutRiskDays ?? undefined,
-              abcClass: r.abcClass,
-            }))}
-        />
+          <ProcurementSuggestionsPanel
+            items={rows
+              .filter((r) => r.toOrder > 0)
+              .slice(0, 80)
+              .map((r) => ({
+                sku: r.sku,
+                name: r.itemName,
+                supplier: r.supplierName,
+                stock: r.stockOnHand,
+                toOrder: r.toOrder,
+                monthlyDemand: r.lastMonthQty,
+                daysToZero: r.stockoutRiskDays ?? undefined,
+                abcClass: r.abcClass,
+              }))}
+          />
+        </section>
 
         {/* Priority Filter Tabs */}
         <Tabs value={priorityFilter} onValueChange={v => setPriorityFilter(v as PriorityFilter)}>
