@@ -7,22 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import {
-  Package,
-  History,
-  BarChart3,
-  Settings,
-  LogOut,
-  Building2,
-  Box,
-  Users,
-  Truck,
-  FileText,
-  Command,
-  ShoppingCart,
-  Percent,
-  Sparkles,
-} from "lucide-react";
+import { Package, History, BarChart3, Settings, LogOut, Building2, Box, Users, Truck, FileText, Command, ShoppingCart, Percent, Sparkles } from "lucide-react";
 import ChangelogDialog, { hasUnreadChangelog } from "@/components/admin/ChangelogDialog";
 import KeyboardShortcutsDialog from "@/components/admin/KeyboardShortcutsDialog";
 import { playClick, playWhoosh } from "@/utils/ambientSounds";
@@ -55,32 +40,30 @@ const AdminDashboard = () => {
   const { toast } = useToast();
   const { user, signOut } = useAuth();
   const [activeView, setActiveView] = useState("orders");
+  const headerRef = useRef<HTMLElement>(null);
+
+  // Measure the header's real (responsive) height so the activity sidebar can
+  // stick exactly below it once the page uses natural whole-page scrolling.
+  useEffect(() => {
+    const el = headerRef.current;
+    if (!el) return;
+    const setVar = () => {
+      document.documentElement.style.setProperty("--app-header-h", `${el.offsetHeight}px`);
+    };
+    setVar();
+    const observer = new ResizeObserver(setVar);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
   const [searchTerm] = useState("");
   const [userProfile, setUserProfile] = useState<any>(null);
-  const [userRole, setUserRole] = useState<"admin" | "user">("user");
+  const [userRole, setUserRole] = useState<'admin' | 'user'>('user');
   const [loading, setLoading] = useState(true);
   const [commandOpen, setCommandOpen] = useState(false);
   const [changelogOpen, setChangelogOpen] = useState(false);
   const [hasNewChangelog, setHasNewChangelog] = useState(false);
   const isMobile = useIsMobile();
-  const headerRef = useRef<HTMLElement | null>(null);
-  const [headerHeight, setHeaderHeight] = useState(0);
-
-  useEffect(() => {
-    const header = headerRef.current;
-    if (!header) return;
-
-    const updateHeaderHeight = () => setHeaderHeight(header.getBoundingClientRect().height);
-
-    updateHeaderHeight();
-    const observer = new ResizeObserver(updateHeaderHeight);
-    observer.observe(header);
-
-    return () => observer.disconnect();
-  }, []);
-  useEffect(() => {
-    setHasNewChangelog(hasUnreadChangelog());
-  }, []);
+  useEffect(() => { setHasNewChangelog(hasUnreadChangelog()); }, []);
   const { unreadOrderUpdates, pendingOrdersCount } = useGlobalUnreadCount();
   useEffect(() => {
     if (user) {
@@ -92,14 +75,18 @@ const AdminDashboard = () => {
   const fetchUserProfile = async () => {
     if (!user) return;
     try {
-      const { data, error } = await supabase.from("profiles").select("*").eq("id", user.id).maybeSingle();
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .maybeSingle();
       if (error) {
-        console.error("Error fetching profile:", error);
+        console.error('Error fetching profile:', error);
         return;
       }
       setUserProfile(data);
     } catch (error) {
-      console.error("Unexpected error fetching profile:", error);
+      console.error('Unexpected error fetching profile:', error);
     } finally {
       setLoading(false);
     }
@@ -108,18 +95,22 @@ const AdminDashboard = () => {
   const fetchUserRole = async () => {
     if (!user) return;
     try {
-      const { data, error } = await supabase.from("user_roles").select("role").eq("user_id", user.id).maybeSingle();
-
+      const { data, error } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      
       if (error) {
-        console.error("Error fetching user role:", error);
+        console.error('Error fetching user role:', error);
         return;
       }
-
+      
       if (data) {
         setUserRole(data.role);
       }
     } catch (error) {
-      console.error("Unexpected error fetching user role:", error);
+      console.error('Unexpected error fetching user role:', error);
     }
   };
 
@@ -127,7 +118,7 @@ const AdminDashboard = () => {
     await signOut();
     toast({
       title: "Logged out",
-      description: "You have been successfully logged out.",
+      description: "You have been successfully logged out."
     });
     navigate("/");
   };
@@ -137,46 +128,40 @@ const AdminDashboard = () => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault();
-        setCommandOpen((prev) => !prev);
+        setCommandOpen(prev => !prev);
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  const handleCommandAction = useCallback(
-    (action: string) => {
-      switch (action) {
-        case "create-order":
-          setActiveView("orders");
-          break;
-        case "settings":
-          navigate("/settings");
-          break;
-        case "logout":
-          handleLogout();
-          break;
-        case "toggle-voice":
-          // Voice toggle handled by the button itself
-          break;
-      }
-    },
-    [navigate],
-  );
+  const handleCommandAction = useCallback((action: string) => {
+    switch (action) {
+      case "create-order":
+        setActiveView("orders");
+        break;
+      case "settings":
+        navigate("/settings");
+        break;
+      case "logout":
+        handleLogout();
+        break;
+      case "toggle-voice":
+        // Voice toggle handled by the button itself
+        break;
+    }
+  }, [navigate]);
 
-  const handleVoiceCommand = useCallback(
-    (command: string) => {
-      const [type, target] = command.split(":");
-      if (type === "navigate") {
-        setActiveView(target);
-      } else if (type === "action") {
-        handleCommandAction(target);
-      }
-    },
-    [handleCommandAction],
-  );
+  const handleVoiceCommand = useCallback((command: string) => {
+    const [type, target] = command.split(":");
+    if (type === "navigate") {
+      setActiveView(target);
+    } else if (type === "action") {
+      handleCommandAction(target);
+    }
+  }, [handleCommandAction]);
 
-  const isAdmin = userRole === "admin";
+  const isAdmin = userRole === 'admin';
   const canEditCommission = isAdmin || !!userProfile?.can_edit_commission;
 
   const navItems = [
@@ -207,10 +192,7 @@ const AdminDashboard = () => {
     <div className="min-h-screen w-full flex flex-col bg-background overflow-x-hidden relative">
       <AuroraBackground />
       {/* Modern Top Navigation Bar */}
-      <header
-        ref={headerRef}
-        className="sticky top-0 z-50 bg-card/85 backdrop-blur-xl border-b-2 border-border shadow-soft w-full"
-      >
+      <header ref={headerRef} className="sticky top-0 z-50 bg-card/85 backdrop-blur-xl border-b-2 border-border shadow-soft w-full">
         <div className="ribbon-bar" aria-hidden />
         <div className="w-full px-2 sm:px-3 py-2 sm:py-3">
           {/* Top row: Logo/Home, Search, Actions */}
@@ -233,7 +215,9 @@ const AdminDashboard = () => {
 
             {/* Smart Search bar - grows to fill space */}
             <div className="flex-1 min-w-0" data-tour="search">
-              <SmartSearch onNavigate={(view) => setActiveView(view)} />
+              <SmartSearch
+                onNavigate={(view) => setActiveView(view)}
+              />
             </div>
 
             {/* Right side actions */}
@@ -252,10 +236,7 @@ const AdminDashboard = () => {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => {
-                  setChangelogOpen(true);
-                  setHasNewChangelog(false);
-                }}
+                onClick={() => { setChangelogOpen(true); setHasNewChangelog(false); }}
                 className="relative rounded-xl text-muted-foreground hover:text-foreground"
                 title="What's new"
               >
@@ -291,10 +272,7 @@ const AdminDashboard = () => {
           </div>
 
           {/* Navigation Tabs - Hidden on mobile, shown on tablet+ */}
-          <nav
-            className="hidden sm:flex items-center gap-0.5 sm:gap-1 mt-2 sm:mt-3 -mb-3 overflow-x-auto scrollbar-none pb-px"
-            style={{ WebkitOverflowScrolling: "touch" }}
-          >
+          <nav className="hidden sm:flex items-center gap-0.5 sm:gap-1 mt-2 sm:mt-3 -mb-3 overflow-x-auto scrollbar-none pb-px" style={{ WebkitOverflowScrolling: 'touch' }}>
             {navItems.map((item) => {
               const isActive = activeView === item.id;
               return (
@@ -310,14 +288,14 @@ const AdminDashboard = () => {
                     "border-b-[3px] -mb-[2px]",
                     isActive
                       ? "bg-primary/10 border-primary text-primary"
-                      : "border-transparent text-muted-foreground hover:text-foreground hover:bg-secondary/60",
+                      : "border-transparent text-muted-foreground hover:text-foreground hover:bg-secondary/60"
                   )}
                 >
                   <div className="relative">
                     <item.icon className="h-4 w-4" />
                     {item.badge > 0 && (
                       <span className="absolute -top-2 -right-2 min-w-[18px] h-[18px] flex items-center justify-center text-[10px] font-bold bg-primary text-primary-foreground rounded-full px-1">
-                        {item.badge > 99 ? "99+" : item.badge}
+                        {item.badge > 99 ? '99+' : item.badge}
                       </span>
                     )}
                   </div>
@@ -329,21 +307,22 @@ const AdminDashboard = () => {
         </div>
       </header>
 
-      {/* Main content area with activity sidebar.
-          Keep scrolling on the document itself. A nested overflow-y-auto here
-          creates a trapped scroll region and makes wheel hit-testing unreliable. */}
-      <div className="flex w-full items-start min-w-0 overflow-x-hidden">
-        {/* Main content uses natural document scrolling. */}
-        <main className="min-w-0 flex-1 overflow-x-hidden w-full pb-16 sm:pb-0">
+      {/* Main content area with activity sidebar */}
+      <div className="flex-1 flex items-start">
+        {/* Main content - Add bottom padding on mobile for bottom nav */}
+        <main className="flex-1 min-w-0 overflow-x-hidden w-full pb-16 sm:pb-0">
           <div
             className={cn(
               "w-full px-3 sm:px-5 lg:px-6 py-4 sm:py-6",
-              activeView === "orders" || activeView === "history" ? "max-w-none" : "max-w-7xl mx-auto",
+              activeView === "orders" || activeView === "history" ? "max-w-none" : "max-w-7xl mx-auto"
             )}
           >
             <PageTransition viewKey={activeView}>
               {activeView === "home" && (
-                <CustomizableDashboard userName={userProfile?.full_name} onNavigate={(view) => setActiveView(view)} />
+                <CustomizableDashboard
+                  userName={userProfile?.full_name}
+                  onNavigate={(view) => setActiveView(view)}
+                />
               )}
               {activeView === "orders" && <OrdersPage isAdmin={true} searchTerm={searchTerm} />}
               {activeView === "history" && <CompletedPage isAdmin={true} searchTerm={searchTerm} />}
@@ -360,7 +339,7 @@ const AdminDashboard = () => {
         </main>
 
         {/* Activity Feed Sidebar - desktop only */}
-        <ActivityFeedSidebar topOffset={headerHeight} />
+        <ActivityFeedSidebar />
       </div>
 
       {/* Mobile Bottom Navigation */}
@@ -372,24 +351,31 @@ const AdminDashboard = () => {
               <button
                 key={item.id}
                 onClick={() => {
-                  triggerHapticFeedback("light");
+                  triggerHapticFeedback('light');
                   playClick();
                   setActiveView(item.id);
                 }}
                 className={cn(
                   "flex flex-col items-center justify-center gap-0.5 py-2 px-3 rounded-xl transition-all duration-200 min-w-[56px]",
-                  isActive ? "text-primary bg-primary/10" : "text-muted-foreground active:bg-muted active:scale-95",
+                  isActive
+                    ? "text-primary bg-primary/10"
+                    : "text-muted-foreground active:bg-muted active:scale-95"
                 )}
               >
                 <div className="relative">
                   <item.icon className={cn("h-5 w-5", isActive && "stroke-[2.5]")} />
                   {item.badge > 0 && (
                     <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-[16px] flex items-center justify-center text-[9px] font-bold bg-primary text-primary-foreground rounded-full px-1">
-                      {item.badge > 99 ? "99+" : item.badge}
+                      {item.badge > 99 ? '99+' : item.badge}
                     </span>
                   )}
                 </div>
-                <span className={cn("text-[10px] font-medium", isActive && "font-semibold")}>{item.label}</span>
+                <span className={cn(
+                  "text-[10px] font-medium",
+                  isActive && "font-semibold"
+                )}>
+                  {item.label}
+                </span>
               </button>
             );
           })}
