@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Package, History, BarChart3, Settings, LogOut, Building2, Box, Users, Truck, FileText, Command, ShoppingCart, Percent, Sparkles, Bot } from "lucide-react";
+import { Package, History, BarChart3, Settings, LogOut, Building2, Box, Users, Truck, FileText, Command, ShoppingCart, Percent, Sparkles, Bot, PanelLeftClose, PanelLeftOpen, Search } from "lucide-react";
 import ChangelogDialog, { hasUnreadChangelog } from "@/components/admin/ChangelogDialog";
 import KeyboardShortcutsDialog from "@/components/admin/KeyboardShortcutsDialog";
 import { playClick, playWhoosh } from "@/utils/ambientSounds";
@@ -27,24 +27,58 @@ import { triggerHapticFeedback } from "@/utils/haptics";
 
 // Route-level splitting keeps the dashboard interactive while large workspaces
 // (buying, commission, analytics and AI) download only when opened.
-const OrdersPage = lazy(() => import("@/components/orders/OrdersPage"));
-const CompletedPage = lazy(() => import("@/components/orders/CompletedPage"));
-const ClientCompaniesPage = lazy(() => import("@/components/admin/ClientCompaniesPage"));
-const StatsPage = lazy(() => import("@/components/admin/StatsPage"));
-const ItemsPage = lazy(() => import("@/components/admin/ItemsPage"));
-const CustomizableDashboard = lazy(() => import("@/components/admin/CustomizableDashboard"));
-const UsersManagementPage = lazy(() => import("@/components/admin/UsersManagementPage"));
-const SuppliersPage = lazy(() => import("@/components/admin/SuppliersPage"));
-const POTrackingPage = lazy(() => import("@/components/admin/POTrackingPage"));
-const BuyingSheetPage = lazy(() => import("@/components/admin/BuyingSheetPage"));
-const CommissionPage = lazy(() => import("@/components/admin/CommissionPage"));
+const loadOrdersPage = () => import("@/components/orders/OrdersPage");
+const loadCompletedPage = () => import("@/components/orders/CompletedPage");
+const loadClientCompaniesPage = () => import("@/components/admin/ClientCompaniesPage");
+const loadStatsPage = () => import("@/components/admin/StatsPage");
+const loadItemsPage = () => import("@/components/admin/ItemsPage");
+const loadCustomizableDashboard = () => import("@/components/admin/CustomizableDashboard");
+const loadUsersManagementPage = () => import("@/components/admin/UsersManagementPage");
+const loadSuppliersPage = () => import("@/components/admin/SuppliersPage");
+const loadPOTrackingPage = () => import("@/components/admin/POTrackingPage");
+const loadBuyingSheetPage = () => import("@/components/admin/BuyingSheetPage");
+const loadCommissionPage = () => import("@/components/admin/CommissionPage");
+
+const OrdersPage = lazy(loadOrdersPage);
+const CompletedPage = lazy(loadCompletedPage);
+const ClientCompaniesPage = lazy(loadClientCompaniesPage);
+const StatsPage = lazy(loadStatsPage);
+const ItemsPage = lazy(loadItemsPage);
+const CustomizableDashboard = lazy(loadCustomizableDashboard);
+const UsersManagementPage = lazy(loadUsersManagementPage);
+const SuppliersPage = lazy(loadSuppliersPage);
+const POTrackingPage = lazy(loadPOTrackingPage);
+const BuyingSheetPage = lazy(loadBuyingSheetPage);
+const CommissionPage = lazy(loadCommissionPage);
 const FloatingAIChat = lazy(() => import("@/components/admin/FloatingAIChat"));
+
+const WORKSPACE_PREFETCHERS: Record<string, () => Promise<unknown>> = {
+  home: loadCustomizableDashboard,
+  orders: loadOrdersPage,
+  history: loadCompletedPage,
+  clients: loadClientCompaniesPage,
+  suppliers: loadSuppliersPage,
+  stats: loadStatsPage,
+  "po-tracking": loadPOTrackingPage,
+  "buying-sheet": loadBuyingSheetPage,
+  items: loadItemsPage,
+  commission: loadCommissionPage,
+  users: loadUsersManagementPage,
+};
+
+const RAIL_STORAGE_KEY = "aleph:workspace-rail-expanded";
+const WORKSPACE_STORAGE_KEY = "aleph:last-workspace";
+const RESTORABLE_WORKSPACES = new Set(["home", "orders", "history", "clients", "suppliers", "stats", "po-tracking", "buying-sheet", "items"]);
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user, signOut } = useAuth();
-  const [activeView, setActiveView] = useState("orders");
+  const [activeView, setActiveView] = useState(() => {
+    if (typeof window === "undefined") return "orders";
+    const savedView = window.localStorage.getItem(WORKSPACE_STORAGE_KEY);
+    return savedView && RESTORABLE_WORKSPACES.has(savedView) ? savedView : "orders";
+  });
   const [searchTerm] = useState("");
   const [userProfile, setUserProfile] = useState<any>(null);
   const [userRole, setUserRole] = useState<'admin' | 'user'>('user');
@@ -52,8 +86,15 @@ const AdminDashboard = () => {
   const [commandOpen, setCommandOpen] = useState(false);
   const [changelogOpen, setChangelogOpen] = useState(false);
   const [hasNewChangelog, setHasNewChangelog] = useState(false);
+  const [railExpanded, setRailExpanded] = useState(() => {
+    if (typeof window === "undefined") return true;
+    return window.localStorage.getItem(RAIL_STORAGE_KEY) !== "false";
+  });
+  const [railQuery, setRailQuery] = useState("");
   const isMobile = useIsMobile();
   const headerRef = useRef<HTMLElement | null>(null);
+  const contentScrollRef = useRef<HTMLElement | null>(null);
+  const workspaceScrollPositions = useRef<Record<string, number>>({});
   const [headerHeight, setHeaderHeight] = useState(0);
 
   useEffect(() => {
@@ -68,6 +109,26 @@ const AdminDashboard = () => {
 
     return () => observer.disconnect();
   }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem(RAIL_STORAGE_KEY, String(railExpanded));
+  }, [railExpanded]);
+
+  useEffect(() => {
+    window.localStorage.setItem(WORKSPACE_STORAGE_KEY, activeView);
+    const scroller = contentScrollRef.current;
+    if (!scroller) return;
+
+    const animationFrame = window.requestAnimationFrame(() => {
+      scroller.scrollTop = workspaceScrollPositions.current[activeView] ?? 0;
+    });
+
+    return () => {
+      window.cancelAnimationFrame(animationFrame);
+      workspaceScrollPositions.current[activeView] = scroller.scrollTop;
+    };
+  }, [activeView]);
+
   useEffect(() => { setHasNewChangelog(hasUnreadChangelog()); }, []);
   const { unreadOrderUpdates, pendingOrdersCount } = useGlobalUnreadCount();
   useEffect(() => {
@@ -128,12 +189,15 @@ const AdminDashboard = () => {
     navigate("/");
   };
 
-  // Keyboard shortcut for Cmd+K
+  // Keyboard shortcuts: Cmd/Ctrl+K opens actions and Cmd/Ctrl+\ toggles the rail.
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault();
         setCommandOpen(prev => !prev);
+      } else if ((e.metaKey || e.ctrlKey) && e.key === "\\") {
+        e.preventDefault();
+        setRailExpanded(prev => !prev);
       }
     };
     window.addEventListener("keydown", handleKeyDown);
@@ -166,6 +230,10 @@ const AdminDashboard = () => {
     }
   }, [handleCommandAction]);
 
+  const prefetchWorkspace = useCallback((view: string) => {
+    void WORKSPACE_PREFETCHERS[view]?.();
+  }, []);
+
   const isAdmin = userRole === 'admin';
   const canEditCommission = isAdmin || !!userProfile?.can_edit_commission;
 
@@ -181,6 +249,9 @@ const AdminDashboard = () => {
     ...(canEditCommission ? [{ id: "commission", label: "Commission", icon: Percent, badge: 0 }] : []),
     ...(isAdmin ? [{ id: "users", label: "Users", icon: Users, badge: 0 }] : []),
   ];
+  const filteredNavItems = railQuery.trim()
+    ? navItems.filter((item) => item.label.toLowerCase().includes(railQuery.trim().toLowerCase()))
+    : navItems;
 
   if (loading) {
     return (
@@ -208,6 +279,8 @@ const AdminDashboard = () => {
               variant={activeView === "home" ? "secondary" : "ghost"}
               size="icon"
               onClick={() => setActiveView("home")}
+              onPointerEnter={() => prefetchWorkspace("home")}
+              onFocus={() => prefetchWorkspace("home")}
               className="aleph-home-button shrink-0 rounded-2xl h-12 w-12 sm:h-14 sm:w-14 p-1.5"
               data-tour="home"
               title="Home"
@@ -300,6 +373,8 @@ const AdminDashboard = () => {
                     playClick();
                     setActiveView(item.id);
                   }}
+                  onPointerEnter={() => prefetchWorkspace(item.id)}
+                  onFocus={() => prefetchWorkspace(item.id)}
                   data-tour={`nav-${item.id}`}
                   className={cn(
                     "relative flex items-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold rounded-t-xl transition-all duration-200 whitespace-nowrap active:scale-[0.97]",
@@ -328,45 +403,98 @@ const AdminDashboard = () => {
       {/* The application frame is viewport-locked. Only the active page canvas
           (or an Orders Board column) owns vertical scrolling. */}
       <div className="aleph-shell-workspace flex min-h-0 w-full flex-1 items-stretch overflow-hidden">
-        <aside className="aleph-workspace-rail group fixed left-0 hidden w-[64px] shrink-0 flex-col overflow-hidden border-r border-border/55 bg-card/95 px-2 py-5 backdrop-blur-xl transition-[width,padding] duration-300 hover:w-[220px] hover:px-3 focus-within:w-[220px] focus-within:px-3 lg:flex" style={{ top: headerHeight, height: `calc(100dvh - ${headerHeight}px)` }}>
-          <div className="aleph-rail-copy mb-4 whitespace-nowrap px-2 opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-within:opacity-100">
-            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-primary">Control centre</p>
-            <p className="mt-1 text-xs text-muted-foreground">Move between live workspaces</p>
+        <aside
+          id="aleph-workspace-navigation"
+          data-expanded={railExpanded}
+          className={cn(
+            "aleph-workspace-rail fixed left-0 hidden shrink-0 flex-col overflow-hidden border-r border-border/55 bg-card/95 py-4 backdrop-blur-xl lg:flex",
+            railExpanded ? "w-[248px] px-3" : "w-[72px] px-2",
+          )}
+          style={{ top: headerHeight, height: `calc(100dvh - ${headerHeight}px)` }}
+        >
+          <div className={cn("aleph-rail-head mb-3 flex h-12 shrink-0 items-center", railExpanded ? "justify-between gap-2 px-1" : "justify-center")}>
+            <div className={cn("aleph-rail-copy min-w-0 whitespace-nowrap", railExpanded ? "translate-x-0 opacity-100" : "pointer-events-none absolute -translate-x-3 opacity-0")}>
+              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-primary">Control centre</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">Your live workspaces</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setRailExpanded(prev => !prev)}
+              className="aleph-rail-toggle group/toggle flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-border/65 bg-background/70 text-muted-foreground shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/30 hover:bg-primary/10 hover:text-primary hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+              aria-expanded={railExpanded}
+              aria-controls="aleph-workspace-navigation"
+              title={`${railExpanded ? "Collapse" : "Expand"} control centre (Ctrl+\\)`}
+            >
+              {railExpanded ? <PanelLeftClose className="h-[18px] w-[18px] transition-transform duration-300 group-hover/toggle:-translate-x-0.5" /> : <PanelLeftOpen className="h-[18px] w-[18px] transition-transform duration-300 group-hover/toggle:translate-x-0.5" />}
+              <span className="sr-only">{railExpanded ? "Collapse" : "Expand"} control centre</span>
+            </button>
           </div>
+
+          <div className={cn("aleph-rail-search relative shrink-0 overflow-hidden", railExpanded ? "mb-3 max-h-12 translate-y-0 opacity-100" : "mb-0 max-h-0 -translate-y-2 opacity-0")}>
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              value={railQuery}
+              onChange={(event) => setRailQuery(event.target.value)}
+              placeholder="Find workspace..."
+              className="h-10 w-full rounded-2xl border border-border/60 bg-background/60 pl-9 pr-3 text-xs font-semibold outline-none transition-all placeholder:text-muted-foreground/70 focus:border-primary/35 focus:bg-background focus:ring-4 focus:ring-primary/8"
+              tabIndex={railExpanded ? 0 : -1}
+              aria-label="Filter workspaces"
+            />
+          </div>
+
           <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto py-1" aria-label="Workspace navigation">
-            {navItems.map((item) => {
+            {filteredNavItems.map((item) => {
               const isActive = activeView === item.id;
               return (
                 <button
                   key={item.id}
                   type="button"
                   onClick={(event) => { playClick(); setActiveView(item.id); event.currentTarget.blur(); }}
+                  onPointerEnter={() => prefetchWorkspace(item.id)}
+                  onFocus={() => prefetchWorkspace(item.id)}
+                  title={railExpanded ? undefined : item.label}
+                  aria-current={isActive ? "page" : undefined}
                   className={cn(
-                    "relative flex w-full items-center gap-3 rounded-2xl px-1.5 py-2.5 text-left text-sm font-bold transition-all duration-200 group-hover:px-3 group-focus-within:px-3",
+                    "aleph-rail-item relative flex w-full items-center gap-3 overflow-hidden rounded-2xl py-2.5 text-left text-sm font-bold transition-all duration-300",
+                    railExpanded ? "px-3" : "justify-center px-1.5",
                     isActive
                       ? "bg-primary text-primary-foreground shadow-[0_14px_30px_-18px_hsl(var(--primary))]"
                       : "text-muted-foreground hover:bg-primary/8 hover:text-foreground",
                   )}
                 >
-                  <span className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-colors", isActive ? "bg-white/15" : "bg-muted/70 group-hover:bg-primary/10")}>
+                  <span className={cn("relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-all duration-300", isActive ? "bg-white/15" : "bg-muted/70 group-hover:bg-primary/10")}>
                     <item.icon className="h-[18px] w-[18px]" />
+                    {!railExpanded && item.badge > 0 && <span className="absolute -right-1.5 -top-1.5 h-2.5 w-2.5 rounded-full bg-amber-400 ring-2 ring-card" />}
                   </span>
-                  <span className="aleph-rail-label min-w-0 flex-1 truncate opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-within:opacity-100">{item.label}</span>
+                  <span className={cn("aleph-rail-label min-w-0 flex-1 truncate transition-all duration-300", railExpanded ? "translate-x-0 opacity-100" : "pointer-events-none absolute translate-x-3 opacity-0")}>{item.label}</span>
                   {item.badge > 0 && (
-                    <span className={cn("min-w-5 rounded-full px-1.5 py-0.5 text-center text-[9px] font-black opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100", isActive ? "bg-white/20 text-white" : "bg-primary/10 text-primary")}> 
+                    <span className={cn("min-w-5 rounded-full px-1.5 py-0.5 text-center text-[9px] font-black transition-all duration-300", railExpanded ? "translate-x-0 opacity-100" : "pointer-events-none absolute translate-x-3 opacity-0", isActive ? "bg-white/20 text-white" : "bg-primary/10 text-primary")}> 
                       {item.badge > 99 ? "99+" : item.badge}
                     </span>
                   )}
                 </button>
               );
             })}
+            {filteredNavItems.length === 0 && railExpanded && (
+              <div className="rounded-2xl border border-dashed border-border/70 px-3 py-5 text-center text-xs font-semibold text-muted-foreground">
+                No workspace matches “{railQuery}”
+              </div>
+            )}
           </nav>
-          <button type="button" onClick={() => navigate('/settings')} className="mt-3 flex items-center gap-3 rounded-2xl border border-border/60 bg-background/55 px-1.5 py-2.5 text-sm font-bold text-muted-foreground transition-all hover:border-primary/25 hover:px-3 hover:text-foreground group-focus-within:px-3">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-muted/70"><Settings className="h-[18px] w-[18px]" /></span>
-            <span className="aleph-rail-label opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-within:opacity-100">Preferences</span>
-          </button>
+
+          <div className="mt-3 shrink-0 space-y-1 border-t border-border/55 pt-3">
+            <button type="button" onClick={() => setCommandOpen(true)} title={railExpanded ? undefined : "Quick actions"} className={cn("aleph-rail-footer-action flex w-full items-center gap-3 rounded-2xl py-2 text-sm font-bold text-muted-foreground transition-all duration-300 hover:bg-primary/8 hover:text-foreground", railExpanded ? "px-3" : "justify-center px-1")}>
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-muted/70"><Command className="h-[18px] w-[18px]" /></span>
+              <span className={cn("aleph-rail-label min-w-0 flex-1 text-left transition-all duration-300", railExpanded ? "translate-x-0 opacity-100" : "pointer-events-none absolute translate-x-3 opacity-0")}>Quick actions</span>
+              <kbd className={cn("rounded-lg border border-border/60 bg-background/70 px-1.5 py-0.5 text-[9px] font-black text-muted-foreground transition-opacity", railExpanded ? "opacity-100" : "hidden opacity-0")}>⌘K</kbd>
+            </button>
+            <button type="button" onClick={() => navigate('/settings')} title={railExpanded ? undefined : "Preferences"} className={cn("aleph-rail-footer-action flex w-full items-center gap-3 rounded-2xl py-2 text-sm font-bold text-muted-foreground transition-all duration-300 hover:bg-primary/8 hover:text-foreground", railExpanded ? "px-3" : "justify-center px-1")}>
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-muted/70"><Settings className="h-[18px] w-[18px]" /></span>
+              <span className={cn("aleph-rail-label min-w-0 flex-1 text-left transition-all duration-300", railExpanded ? "translate-x-0 opacity-100" : "pointer-events-none absolute translate-x-3 opacity-0")}>Preferences</span>
+            </button>
+          </div>
         </aside>
-        <main className="aleph-content-scroll h-full min-h-0 min-w-0 flex-1 w-full overflow-x-hidden overflow-y-auto pb-16 sm:pb-0 lg:ml-[64px]">
+        <main ref={contentScrollRef} className={cn("aleph-content-scroll h-full min-h-0 min-w-0 flex-1 w-full overflow-x-hidden overflow-y-auto pb-16 transition-[margin-left] duration-500 ease-[cubic-bezier(.22,1,.36,1)] sm:pb-0", railExpanded ? "lg:ml-[248px]" : "lg:ml-[72px]")}>
           <div
             className={cn(
               "app-page-stage w-full px-3 sm:px-5 lg:px-6 py-4 sm:py-6",
@@ -413,6 +541,7 @@ const AdminDashboard = () => {
                   playClick();
                   setActiveView(item.id);
                 }}
+                onPointerDown={() => prefetchWorkspace(item.id)}
                 className={cn(
                   "flex flex-col items-center justify-center gap-0.5 py-2 px-3 rounded-xl transition-all duration-200 min-w-[64px] snap-start",
                   isActive
