@@ -4,11 +4,37 @@ import { Capacitor } from "@capacitor/core";
 import App from "./App.tsx";
 import "./index.css";
 
+// Preview / dev environments must NEVER be served by a cached service worker,
+// otherwise the Lovable preview keeps showing an old build.
+function isPreviewEnv() {
+  if (import.meta.env.DEV) return true;
+  const h = window.location.hostname;
+  return h === "localhost" || h.endsWith(".lovable.app") && h.includes("preview");
+}
+
+async function nukeServiceWorkersAndCaches() {
+  if ("serviceWorker" in navigator) {
+    try {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map((r) => r.unregister()));
+    } catch {
+      // ignore
+    }
+  }
+  try {
+    const keys = await caches.keys();
+    await Promise.all(keys.map((k) => caches.delete(k)));
+  } catch {
+    // ignore
+  }
+}
+
 async function disablePwaCachingInNative() {
   // When running inside a Capacitor WebView, a PWA service worker can cache
   // the remote app shell and prevent "instant" updates from showing.
   if (!Capacitor.isNativePlatform()) return;
   if (!("serviceWorker" in navigator)) return;
+
 
   try {
     const regs = await navigator.serviceWorker.getRegistrations();
@@ -35,6 +61,13 @@ async function disablePwaCachingInNative() {
 // instead of only finding out on the next full navigation.
 async function registerServiceWorkerWithForcedUpdates() {
   if (Capacitor.isNativePlatform()) return;
+  if (isPreviewEnv()) {
+    // Never let a stale worker serve the preview.
+    await nukeServiceWorkersAndCaches();
+    return;
+  }
+
+
 
   try {
     const { registerSW } = await import("virtual:pwa-register");

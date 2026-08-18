@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { useTheme, colorThemes, boardSingleColors, colorfulPresets, stockStatusColorOptions, defaultStockStatusColors } from "@/contexts/ThemeContext";
+import { useTheme, colorThemes, boardSingleColors, colorfulPresets, stockStatusColorOptions, defaultStockStatusColors, type ToolbarStyle, type SurfaceStyle, type CanvasStyle } from "@/contexts/ThemeContext";
 import { supabase } from "@/integrations/supabase/client";
 import { ArrowLeft, User, Building2, Moon, Sun, Palette, Check, LayoutGrid, RotateCcw, Package, Download, Smartphone, Share, Fingerprint, ScanFace, Trash2, Volume2 } from "lucide-react";
 import { isSoundEnabled, setSoundEnabled } from "@/utils/ambientSounds";
@@ -22,6 +22,7 @@ import {
 } from "@/utils/biometricAuth";
 import { Capacitor } from "@capacitor/core";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { cn } from "@/lib/utils";
 
 type ColorTheme = keyof typeof colorThemes;
 type BoardSingleColor = keyof typeof boardSingleColors;
@@ -32,7 +33,7 @@ const Settings = () => {
   const { toast } = useToast();
   const { user } = useAuth();
   const isMobile = useIsMobile();
-  const { theme, colorTheme, boardColorMode, boardSingleColor, colorfulPreset, customBoardColor, stockStatusColors, uiVariant, toggleTheme, setTheme, setColorTheme, setBoardColorMode, setBoardSingleColor, setColorfulPreset, setCustomBoardColor, setStockStatusColors, setUiVariant } = useTheme();
+  const { theme, colorTheme, boardColorMode, boardSingleColor, colorfulPreset, customBoardColor, stockStatusColors, uiVariant, toolbarStyle, surfaceStyle, canvasStyle, setTheme, setColorTheme, setBoardColorMode, setBoardSingleColor, setColorfulPreset, setCustomBoardColor, setStockStatusColors, setUiVariant, setToolbarStyle, setSurfaceStyle, setCanvasStyle } = useTheme();
   const [userProfile, setUserProfile] = useState<any>(null);
   const [companyInfo, setCompanyInfo] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -175,6 +176,10 @@ const Settings = () => {
     setBoardSingleColor('primary');
     setColorfulPreset('default');
     setCustomBoardColor('#6366f1');
+    setUiVariant('standard');
+    setToolbarStyle('classic');
+    setSurfaceStyle('soft');
+    setCanvasStyle('aurora');
     setStockStatusColors(defaultStockStatusColors);
     toast({
       title: "Settings Reset",
@@ -207,9 +212,10 @@ const Settings = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background overflow-x-hidden">
+    <div className="settings-page min-h-screen bg-background overflow-x-hidden">
       {/* Header */}
-      <header className="bg-card/80 backdrop-blur-xl border-b-2 border-border shadow-soft sticky top-0 z-30">
+      <header className="aleph-topbar sticky top-0 z-30 border-b shadow-soft">
+        <div className="aleph-toolbar-watermark" aria-hidden />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-6">
             <div className="flex items-center">
@@ -505,7 +511,7 @@ const Settings = () => {
                   <Switch
                     id="theme-toggle"
                     checked={theme === 'dark'}
-                    onCheckedChange={toggleTheme}
+                    onCheckedChange={(checked) => setTheme(checked ? 'dark' : 'light')}
                   />
                 </div>
 
@@ -525,6 +531,140 @@ const Settings = () => {
                     checked={uiVariant === 'glass'}
                     onCheckedChange={(checked) => setUiVariant(checked ? 'glass' : 'standard')}
                   />
+                </div>
+
+                {/* Theme Mode */}
+                <div className="space-y-3 pt-2 border-t border-border/70">
+                  <Label>Theme Mode</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Choose a fixed light/dark mode or follow the device automatically.
+                  </p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {([
+                      ['light', 'Light'],
+                      ['dark', 'Dark'],
+                      ['auto', 'Auto'],
+                    ] as const).map(([value, label]) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => setTheme(value)}
+                        className={cn(
+                          "rounded-xl border px-3 py-2.5 text-sm font-semibold transition-all",
+                          theme === value
+                            ? "border-primary bg-primary/10 text-primary shadow-sm"
+                            : "border-border bg-card hover:border-primary/40 hover:bg-muted/50"
+                        )}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Toolbar Theme */}
+                <div className="space-y-3 pt-2 border-t border-border/70">
+                  <Label>Top Toolbar Style</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Change the top navigation without changing the Aleph logo colours.
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
+                    {([
+                      ['classic', 'Classic', 'Clean card toolbar'],
+                      ['dark', 'Dark', 'Dark professional toolbar'],
+                      ['logo-wall', 'Logo Wall', 'Dark toolbar with Aleph watermarks'],
+                      ['midnight', 'Midnight', 'Deep navy executive look'],
+                      ['glass', 'Glass', 'Transparent frosted toolbar'],
+                    ] as [ToolbarStyle, string, string][]).map(([value, label, description]) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => setToolbarStyle(value)}
+                        className={cn(
+                          "relative overflow-hidden rounded-2xl border p-3 text-left transition-all min-h-[92px]",
+                          toolbarStyle === value
+                            ? "border-primary ring-2 ring-primary/15 bg-primary/5"
+                            : "border-border bg-card hover:border-primary/35 hover:-translate-y-0.5"
+                        )}
+                      >
+                        <div className={cn(
+                          "mb-2 h-7 rounded-lg border",
+                          value === 'classic' && "bg-background",
+                          value === 'dark' && "bg-slate-900",
+                          value === 'logo-wall' && "bg-slate-950 relative after:absolute after:inset-0 after:content-['ALEPH_ALEPH'] after:text-[7px] after:tracking-[0.28em] after:text-white/15 after:flex after:items-center after:justify-center",
+                          value === 'midnight' && "bg-gradient-to-r from-slate-950 to-blue-950",
+                          value === 'glass' && "bg-background/50 backdrop-blur-xl"
+                        )} />
+                        <div className="text-xs font-bold">{label}</div>
+                        <div className="mt-0.5 text-[10px] leading-snug text-muted-foreground">{description}</div>
+                        {toolbarStyle === value && <Check className="absolute right-2 top-2 h-4 w-4 text-primary" />}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Surface Style */}
+                <div className="space-y-3 pt-2 border-t border-border/70">
+                  <Label>Workspace Surface</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Control how cards, filters and panels feel across every page.
+                  </p>
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+                    {([
+                      ['clean', 'Clean'],
+                      ['soft', 'Soft Depth'],
+                      ['glass', 'Layered Glass'],
+                      ['contrast', 'High Contrast'],
+                    ] as [SurfaceStyle, string][]).map(([value, label]) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => setSurfaceStyle(value)}
+                        className={cn(
+                          "rounded-xl border px-3 py-3 text-sm font-semibold transition-all",
+                          surfaceStyle === value
+                            ? "border-primary bg-primary/10 text-primary shadow-sm"
+                            : "border-border bg-card hover:border-primary/40 hover:bg-muted/50"
+                        )}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Canvas Style */}
+                <div className="space-y-3 pt-2 border-t border-border/70">
+                  <Label>Page Background</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Choose the atmosphere behind your cards and dashboards.
+                  </p>
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+                    {([
+                      ['aurora', 'Aurora'],
+                      ['clean', 'Minimal'],
+                      ['mesh', 'Mesh'],
+                      ['midnight', 'Midnight'],
+                    ] as [CanvasStyle, string][]).map(([value, label]) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => setCanvasStyle(value)}
+                        className={cn(
+                          "relative overflow-hidden rounded-xl border px-3 py-6 text-sm font-semibold transition-all",
+                          canvasStyle === value
+                            ? "border-primary ring-2 ring-primary/15"
+                            : "border-border hover:border-primary/40",
+                          value === 'aurora' && "bg-gradient-to-br from-background via-primary/5 to-background",
+                          value === 'clean' && "bg-background",
+                          value === 'mesh' && "bg-[radial-gradient(circle_at_20%_20%,hsl(var(--primary)/.12),transparent_35%),radial-gradient(circle_at_80%_80%,hsl(var(--accent)/.18),transparent_35%)]",
+                          value === 'midnight' && "bg-slate-950 text-white"
+                        )}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 {/* Color Theme Selection */}

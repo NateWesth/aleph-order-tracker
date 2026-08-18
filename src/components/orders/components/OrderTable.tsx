@@ -54,7 +54,7 @@ export default function OrderTable({
   // Desktop table layout
   return (
     <div className="float-surface glass-card glow-border overflow-hidden">
-      <div className="overflow-x-auto">
+      <div className="overflow-x-hidden min-w-0 max-w-full">
         <Table>
           <TableHeader>
             <TableRow>

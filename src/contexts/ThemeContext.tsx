@@ -2,11 +2,14 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 
 type Theme = 'light' | 'dark' | 'auto';
 type ResolvedTheme = 'light' | 'dark';
-type ColorTheme = 'purple' | 'green' | 'blue' | 'rose' | 'orange' | 'teal' | 'red' | 'black';
+export type ColorTheme = 'purple' | 'green' | 'blue' | 'rose' | 'orange' | 'teal' | 'red' | 'black' | 'navy' | 'gold' | 'cyan' | 'magenta';
 type BoardColorMode = 'colorful' | 'single';
 type BoardSingleColor = 'amber' | 'sky' | 'violet' | 'emerald' | 'slate' | 'rose' | 'cyan' | 'lime' | 'orange' | 'indigo' | 'pink' | 'primary' | 'custom';
 type ColorfulPreset = 'default' | 'sunset' | 'ocean' | 'forest' | 'berry' | 'earth' | 'neon' | 'pastel' | 'mono' | 'candy';
-type UiVariant = 'standard' | 'glass';
+export type UiVariant = 'standard' | 'glass';
+export type ToolbarStyle = 'classic' | 'dark' | 'logo-wall' | 'midnight' | 'glass';
+export type SurfaceStyle = 'clean' | 'soft' | 'glass' | 'contrast';
+export type CanvasStyle = 'aurora' | 'clean' | 'mesh' | 'midnight';
 
 export interface StockStatusColors {
   orderedColor: string;
@@ -23,6 +26,9 @@ interface ThemeContextType {
   customBoardColor: string;
   stockStatusColors: StockStatusColors;
   uiVariant: UiVariant;
+  toolbarStyle: ToolbarStyle;
+  surfaceStyle: SurfaceStyle;
+  canvasStyle: CanvasStyle;
   setTheme: (theme: Theme) => void;
   setColorTheme: (colorTheme: ColorTheme) => void;
   setBoardColorMode: (mode: BoardColorMode) => void;
@@ -31,6 +37,9 @@ interface ThemeContextType {
   setCustomBoardColor: (color: string) => void;
   setStockStatusColors: (colors: StockStatusColors) => void;
   setUiVariant: (variant: UiVariant) => void;
+  setToolbarStyle: (style: ToolbarStyle) => void;
+  setSurfaceStyle: (style: SurfaceStyle) => void;
+  setCanvasStyle: (style: CanvasStyle) => void;
   toggleTheme: () => void;
 }
 
@@ -71,6 +80,10 @@ export const colorThemes: Record<ColorTheme, { name: string; hue: number; satura
   teal: { name: 'Teal', hue: 174, saturation: 72, lightness: 40, preview: 'hsl(174 72% 40%)' },
   red: { name: 'Crimson Red', hue: 0, saturation: 84, lightness: 50, preview: 'hsl(0 84% 50%)' },
   black: { name: 'Noir', hue: 0, saturation: 0, lightness: 20, preview: 'hsl(0 0% 20%)' },
+  navy: { name: 'Midnight Navy', hue: 222, saturation: 72, lightness: 42, preview: 'hsl(222 72% 42%)' },
+  gold: { name: 'Executive Gold', hue: 42, saturation: 88, lightness: 48, preview: 'hsl(42 88% 48%)' },
+  cyan: { name: 'Electric Cyan', hue: 190, saturation: 88, lightness: 44, preview: 'hsl(190 88% 44%)' },
+  magenta: { name: 'Magenta', hue: 316, saturation: 78, lightness: 50, preview: 'hsl(316 78% 50%)' },
 };
 
 export const colorfulPresets: Record<ColorfulPreset, { name: string; colors: [string, string, string, string]; textColors: [string, string, string, string] }> = {
@@ -146,80 +159,116 @@ interface ThemeProviderProps {
   children: React.ReactNode;
 }
 
+const STORAGE_KEY = 'alephThemePreferencesV2';
+
+interface StoredThemePreferences {
+  theme: Theme;
+  colorTheme: ColorTheme;
+  boardColorMode: BoardColorMode;
+  boardSingleColor: BoardSingleColor;
+  colorfulPreset: ColorfulPreset;
+  customBoardColor: string;
+  stockStatusColors: StockStatusColors;
+  uiVariant: UiVariant;
+  toolbarStyle: ToolbarStyle;
+  surfaceStyle: SurfaceStyle;
+  canvasStyle: CanvasStyle;
+}
+
+const defaultPreferences: StoredThemePreferences = {
+  theme: 'light',
+  colorTheme: 'black',
+  boardColorMode: 'colorful',
+  boardSingleColor: 'primary',
+  colorfulPreset: 'default',
+  customBoardColor: '#6366f1',
+  stockStatusColors: defaultStockStatusColors,
+  uiVariant: 'standard',
+  toolbarStyle: 'classic',
+  surfaceStyle: 'soft',
+  canvasStyle: 'aurora',
+};
+
+const readStoredPreferences = (): StoredThemePreferences => {
+  if (typeof window === 'undefined') return defaultPreferences;
+
+  try {
+    const consolidated = localStorage.getItem(STORAGE_KEY);
+    if (consolidated) {
+      const parsed = JSON.parse(consolidated) as Partial<StoredThemePreferences>;
+      return {
+        theme: parsed.theme === 'light' || parsed.theme === 'dark' || parsed.theme === 'auto' ? parsed.theme : defaultPreferences.theme,
+        colorTheme: parsed.colorTheme && colorThemes[parsed.colorTheme] ? parsed.colorTheme : defaultPreferences.colorTheme,
+        boardColorMode: parsed.boardColorMode === 'single' || parsed.boardColorMode === 'colorful' ? parsed.boardColorMode : defaultPreferences.boardColorMode,
+        boardSingleColor: parsed.boardSingleColor && boardSingleColors[parsed.boardSingleColor] ? parsed.boardSingleColor : defaultPreferences.boardSingleColor,
+        colorfulPreset: parsed.colorfulPreset && colorfulPresets[parsed.colorfulPreset] ? parsed.colorfulPreset : defaultPreferences.colorfulPreset,
+        customBoardColor: typeof parsed.customBoardColor === 'string' ? parsed.customBoardColor : defaultPreferences.customBoardColor,
+        stockStatusColors: parsed.stockStatusColors?.orderedColor && parsed.stockStatusColors?.receivedColor ? parsed.stockStatusColors : defaultPreferences.stockStatusColors,
+        uiVariant: parsed.uiVariant === 'glass' ? 'glass' : 'standard',
+        toolbarStyle: ['classic', 'dark', 'logo-wall', 'midnight', 'glass'].includes(parsed.toolbarStyle || '') ? parsed.toolbarStyle as ToolbarStyle : defaultPreferences.toolbarStyle,
+        surfaceStyle: ['clean', 'soft', 'glass', 'contrast'].includes(parsed.surfaceStyle || '') ? parsed.surfaceStyle as SurfaceStyle : defaultPreferences.surfaceStyle,
+        canvasStyle: ['aurora', 'clean', 'mesh', 'midnight'].includes(parsed.canvasStyle || '') ? parsed.canvasStyle as CanvasStyle : defaultPreferences.canvasStyle,
+      };
+    }
+
+    // Backward compatibility with the original individual localStorage keys.
+    const legacyStock = localStorage.getItem('stockStatusColors');
+    let stockStatusColors = defaultPreferences.stockStatusColors;
+    if (legacyStock) {
+      try {
+        const parsed = JSON.parse(legacyStock);
+        if (parsed?.orderedColor && parsed?.receivedColor) stockStatusColors = parsed;
+      } catch {}
+    }
+
+    const legacyTheme = localStorage.getItem('theme') as Theme | null;
+    const legacyColor = localStorage.getItem('colorTheme') as ColorTheme | null;
+    const legacyBoardMode = localStorage.getItem('boardColorMode') as BoardColorMode | null;
+    const legacyBoardColor = localStorage.getItem('boardSingleColor') as BoardSingleColor | null;
+    const legacyPreset = localStorage.getItem('colorfulPreset') as ColorfulPreset | null;
+    const legacyUi = localStorage.getItem('uiVariant') as UiVariant | null;
+
+    return {
+      ...defaultPreferences,
+      theme: legacyTheme === 'light' || legacyTheme === 'dark' || legacyTheme === 'auto' ? legacyTheme : defaultPreferences.theme,
+      colorTheme: legacyColor && colorThemes[legacyColor] ? legacyColor : defaultPreferences.colorTheme,
+      boardColorMode: legacyBoardMode === 'single' || legacyBoardMode === 'colorful' ? legacyBoardMode : defaultPreferences.boardColorMode,
+      boardSingleColor: legacyBoardColor && boardSingleColors[legacyBoardColor] ? legacyBoardColor : defaultPreferences.boardSingleColor,
+      colorfulPreset: legacyPreset && colorfulPresets[legacyPreset] ? legacyPreset : defaultPreferences.colorfulPreset,
+      customBoardColor: localStorage.getItem('customBoardColor') || defaultPreferences.customBoardColor,
+      stockStatusColors,
+      uiVariant: legacyUi === 'glass' ? 'glass' : 'standard',
+    };
+  } catch (error) {
+    console.warn('Failed to read saved theme preferences:', error);
+    return defaultPreferences;
+  }
+};
+
 export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
-  const [theme, setTheme] = useState<Theme>('light');
+  // Critical: preferences are loaded synchronously on the FIRST render.
+  // This prevents default values from being persisted before saved values are restored.
+  const [initialPreferences] = useState<StoredThemePreferences>(() => readStoredPreferences());
+  const [theme, setTheme] = useState<Theme>(initialPreferences.theme);
+  const [colorTheme, setColorTheme] = useState<ColorTheme>(initialPreferences.colorTheme);
+  const [boardColorMode, setBoardColorMode] = useState<BoardColorMode>(initialPreferences.boardColorMode);
+  const [boardSingleColor, setBoardSingleColor] = useState<BoardSingleColor>(initialPreferences.boardSingleColor);
+  const [colorfulPreset, setColorfulPreset] = useState<ColorfulPreset>(initialPreferences.colorfulPreset);
+  const [customBoardColor, setCustomBoardColor] = useState(initialPreferences.customBoardColor);
+  const [stockStatusColors, setStockStatusColors] = useState<StockStatusColors>(initialPreferences.stockStatusColors);
+  const [uiVariant, setUiVariant] = useState<UiVariant>(initialPreferences.uiVariant);
+  const [toolbarStyle, setToolbarStyle] = useState<ToolbarStyle>(initialPreferences.toolbarStyle);
+  const [surfaceStyle, setSurfaceStyle] = useState<SurfaceStyle>(initialPreferences.surfaceStyle);
+  const [canvasStyle, setCanvasStyle] = useState<CanvasStyle>(initialPreferences.canvasStyle);
   const [systemTheme, setSystemTheme] = useState<ResolvedTheme>(() => {
     if (typeof window === 'undefined') return 'light';
     return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   });
-  const [colorTheme, setColorTheme] = useState<ColorTheme>('black');
-  const [boardColorMode, setBoardColorMode] = useState<BoardColorMode>('colorful');
-  const [boardSingleColor, setBoardSingleColor] = useState<BoardSingleColor>('primary');
-  const [colorfulPreset, setColorfulPreset] = useState<ColorfulPreset>('default');
-  const [customBoardColor, setCustomBoardColor] = useState<string>('#6366f1');
-  const [stockStatusColors, setStockStatusColors] = useState<StockStatusColors>(defaultStockStatusColors);
-  const [uiVariant, setUiVariant] = useState<UiVariant>('standard');
 
-  // Apply / persist UI variant (e.g. glass)
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem('uiVariant') as UiVariant | null;
-      if (saved === 'glass' || saved === 'standard') setUiVariant(saved);
-    } catch {}
-  }, []);
-
-  useEffect(() => {
-    const root = window.document.documentElement;
-    root.classList.toggle('ui-glass', uiVariant === 'glass');
-    try { localStorage.setItem('uiVariant', uiVariant); } catch {}
-  }, [uiVariant]);
-
-  // Initialize theme from localStorage
-  useEffect(() => {
-    try {
-      const savedTheme = localStorage.getItem('theme') as Theme;
-      if (savedTheme && (savedTheme === 'light' || savedTheme === 'dark' || savedTheme === 'auto')) {
-        setTheme(savedTheme);
-      }
-      const savedColorTheme = localStorage.getItem('colorTheme') as ColorTheme;
-      if (savedColorTheme && colorThemes[savedColorTheme]) {
-        setColorTheme(savedColorTheme);
-      }
-      const savedBoardMode = localStorage.getItem('boardColorMode') as BoardColorMode;
-      if (savedBoardMode && (savedBoardMode === 'colorful' || savedBoardMode === 'single')) {
-        setBoardColorMode(savedBoardMode);
-      }
-      const savedBoardColor = localStorage.getItem('boardSingleColor') as BoardSingleColor;
-      if (savedBoardColor && boardSingleColors[savedBoardColor]) {
-        setBoardSingleColor(savedBoardColor);
-      }
-      const savedColorfulPreset = localStorage.getItem('colorfulPreset') as ColorfulPreset;
-      if (savedColorfulPreset && colorfulPresets[savedColorfulPreset]) {
-        setColorfulPreset(savedColorfulPreset);
-      }
-      const savedCustomColor = localStorage.getItem('customBoardColor');
-      if (savedCustomColor) {
-        setCustomBoardColor(savedCustomColor);
-      }
-      const savedStockStatusColors = localStorage.getItem('stockStatusColors');
-      if (savedStockStatusColors) {
-        try {
-          const parsed = JSON.parse(savedStockStatusColors);
-          setStockStatusColors(parsed);
-        } catch (e) {
-          // Invalid JSON, use defaults
-        }
-      }
-    } catch (error) {
-      console.warn('Failed to read theme from localStorage:', error);
-    }
-  }, []);
-
-  // Track system theme changes when in 'auto' mode
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const mq = window.matchMedia('(prefers-color-scheme: dark)');
-    const onChange = (e: MediaQueryListEvent) => setSystemTheme(e.matches ? 'dark' : 'light');
+    const onChange = (event: MediaQueryListEvent) => setSystemTheme(event.matches ? 'dark' : 'light');
     mq.addEventListener('change', onChange);
     return () => mq.removeEventListener('change', onChange);
   }, []);
@@ -227,49 +276,12 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
   const resolvedTheme: ResolvedTheme = theme === 'auto' ? systemTheme : theme;
 
   useEffect(() => {
-    const root = window.document.documentElement;
-
-    // Add transition class for smooth theme switching
+    const root = document.documentElement;
     root.classList.add('theme-transition');
-
     root.classList.remove('light', 'dark');
     root.classList.add(resolvedTheme);
 
-    // Remove transition class after animation completes to avoid interfering with other transitions
-    const timeout = setTimeout(() => {
-      root.classList.remove('theme-transition');
-    }, 500);
-
-    // Update theme-color meta tag to match status bar
-    const themeColor = resolvedTheme === 'dark' ? '#0e1117' : '#fafafa';
-    const themeColorMeta = document.querySelector('meta[name="theme-color"]:not([media])')
-      || document.querySelector('meta[name="theme-color"]');
-    if (themeColorMeta) {
-      themeColorMeta.setAttribute('content', themeColor);
-    }
-
-    // Update apple-mobile-web-app-status-bar-style
-    const appleStatusBarMeta = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
-    if (appleStatusBarMeta) {
-      appleStatusBarMeta.setAttribute('content', resolvedTheme === 'dark' ? 'black-translucent' : 'default');
-    }
-
-    // Save theme preference
-    try {
-      localStorage.setItem('theme', theme);
-    } catch (error) {
-      console.warn('Failed to save theme to localStorage:', error);
-    }
-
-    return () => clearTimeout(timeout);
-  }, [theme, resolvedTheme]);
-
-  useEffect(() => {
-    // Apply color theme CSS variables
-    const root = window.document.documentElement;
     const themeConfig = colorThemes[colorTheme];
-    
-    // Light mode colors
     root.style.setProperty('--primary', `${themeConfig.hue} ${themeConfig.saturation}% ${themeConfig.lightness}%`);
     root.style.setProperty('--ring', `${themeConfig.hue} ${themeConfig.saturation}% ${themeConfig.lightness}%`);
     root.style.setProperty('--accent', `${themeConfig.hue} ${themeConfig.saturation}% 95%`);
@@ -279,30 +291,63 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     root.style.setProperty('--sidebar-accent-foreground', `${themeConfig.hue} ${themeConfig.saturation}% 30%`);
     root.style.setProperty('--sidebar-ring', `${themeConfig.hue} ${themeConfig.saturation}% ${themeConfig.lightness}%`);
 
-    // Save color theme preference
-    try {
-      localStorage.setItem('colorTheme', colorTheme);
-    } catch (error) {
-      console.warn('Failed to save color theme to localStorage:', error);
-    }
-  }, [colorTheme]);
+    root.classList.toggle('ui-glass', uiVariant === 'glass');
+    ['classic', 'dark', 'logo-wall', 'midnight', 'glass'].forEach(value => root.classList.remove(`toolbar-${value}`));
+    ['clean', 'soft', 'glass', 'contrast'].forEach(value => root.classList.remove(`surface-${value}`));
+    ['aurora', 'clean', 'mesh', 'midnight'].forEach(value => root.classList.remove(`canvas-${value}`));
+    root.classList.add(`toolbar-${toolbarStyle}`, `surface-${surfaceStyle}`, `canvas-${canvasStyle}`);
+    root.dataset.toolbarStyle = toolbarStyle;
+    root.dataset.surfaceStyle = surfaceStyle;
+    root.dataset.canvasStyle = canvasStyle;
 
-  // Save board color preferences
+    const themeColor = toolbarStyle === 'dark' || toolbarStyle === 'logo-wall' || toolbarStyle === 'midnight'
+      ? '#0b1220'
+      : resolvedTheme === 'dark' ? '#0e1117' : '#fafafa';
+    const themeColorMeta = document.querySelector('meta[name="theme-color"]:not([media])') || document.querySelector('meta[name="theme-color"]');
+    themeColorMeta?.setAttribute('content', themeColor);
+
+    const appleStatusBarMeta = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
+    appleStatusBarMeta?.setAttribute('content', resolvedTheme === 'dark' || toolbarStyle !== 'classic' ? 'black-translucent' : 'default');
+
+    const timeout = window.setTimeout(() => root.classList.remove('theme-transition'), 420);
+    return () => window.clearTimeout(timeout);
+  }, [resolvedTheme, colorTheme, uiVariant, toolbarStyle, surfaceStyle, canvasStyle]);
+
   useEffect(() => {
+    const preferences: StoredThemePreferences = {
+      theme,
+      colorTheme,
+      boardColorMode,
+      boardSingleColor,
+      colorfulPreset,
+      customBoardColor,
+      stockStatusColors,
+      uiVariant,
+      toolbarStyle,
+      surfaceStyle,
+      canvasStyle,
+    };
+
     try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(preferences));
+      // Keep the original keys updated for older components/builds.
+      localStorage.setItem('theme', theme);
+      localStorage.setItem('colorTheme', colorTheme);
       localStorage.setItem('boardColorMode', boardColorMode);
       localStorage.setItem('boardSingleColor', boardSingleColor);
       localStorage.setItem('colorfulPreset', colorfulPreset);
       localStorage.setItem('customBoardColor', customBoardColor);
       localStorage.setItem('stockStatusColors', JSON.stringify(stockStatusColors));
+      localStorage.setItem('uiVariant', uiVariant);
+      localStorage.setItem('toolbarStyle', toolbarStyle);
+      localStorage.setItem('surfaceStyle', surfaceStyle);
+      localStorage.setItem('canvasStyle', canvasStyle);
     } catch (error) {
-      console.warn('Failed to save board color preferences:', error);
+      console.warn('Failed to save theme preferences:', error);
     }
-  }, [boardColorMode, boardSingleColor, colorfulPreset, customBoardColor, stockStatusColors]);
+  }, [theme, colorTheme, boardColorMode, boardSingleColor, colorfulPreset, customBoardColor, stockStatusColors, uiVariant, toolbarStyle, surfaceStyle, canvasStyle]);
 
-  const toggleTheme = () => {
-    setTheme(prev => prev === 'light' ? 'dark' : prev === 'dark' ? 'auto' : 'light');
-  };
+  const toggleTheme = () => setTheme(prev => prev === 'light' ? 'dark' : 'light');
 
   return (
     <ThemeContext.Provider value={{
@@ -315,6 +360,9 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
       customBoardColor,
       stockStatusColors,
       uiVariant,
+      toolbarStyle,
+      surfaceStyle,
+      canvasStyle,
       setTheme,
       setColorTheme,
       setBoardColorMode,
@@ -323,7 +371,10 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
       setCustomBoardColor,
       setStockStatusColors,
       setUiVariant,
-      toggleTheme
+      setToolbarStyle,
+      setSurfaceStyle,
+      setCanvasStyle,
+      toggleTheme,
     }}>
       {children}
     </ThemeContext.Provider>

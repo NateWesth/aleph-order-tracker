@@ -146,8 +146,8 @@ export default function OrderActivityHeatmap() {
         </div>
       </CardHeader>
       <CardContent>
-        <div className="overflow-x-auto">
-          <div className="min-w-[400px]">
+        <div className="overflow-x-hidden min-w-0 max-w-full">
+          <div className="min-w-0 w-full">
             {/* Hour labels */}
             <div className="flex items-center mb-1 pl-10">
               {HOURS.map(h => (

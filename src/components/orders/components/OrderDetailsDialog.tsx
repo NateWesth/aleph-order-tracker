@@ -25,7 +25,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Plus, Trash2, Edit2, X, Truck, Activity } from "lucide-react";
 import OrderActivityTimeline from "./OrderActivityTimeline";
 import PurchaseOrdersPanel from "./PurchaseOrdersPanel";
-import ItemCommentButton from "./ItemCommentButton";
+import OrderItemComments from "./OrderItemComments";
 
 interface Supplier {
   id: string;
@@ -664,7 +664,7 @@ export default function OrderDetailsDialog({
                       <tr>
                         <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Item</th>
                         <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground uppercase">Qty</th>
-                        <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground uppercase w-10"></th>
+                        <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground uppercase">Comments</th>
                         {isAwaitingStock && (
                           <>
                             <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground uppercase">Ordered</th>
@@ -679,7 +679,7 @@ export default function OrderDetailsDialog({
                           <td className="px-4 py-3 text-sm font-medium">{item.name}</td>
                           <td className="px-4 py-3 text-center text-sm text-muted-foreground">{item.quantity}</td>
                           <td className="px-4 py-3 text-center">
-                            <ItemCommentButton orderItemId={item.id} orderId={order.id} itemName={item.name} className="mx-auto" />
+                            {!item.id.startsWith("item-") && <OrderItemComments orderItemId={item.id} />}
                           </td>
                           {isAwaitingStock && (
                             <>
@@ -691,7 +691,7 @@ export default function OrderDetailsDialog({
                                     else if (!checked && isAdmin) updateStockStatus(item.id, 'awaiting');
                                   }}
                                   disabled={!isAdmin}
-                                  className="data-[state=checked]:bg-info data-[state=checked]:border-info"
+                                  className="data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-500"
                                 />
                               </td>
                               <td className="px-4 py-3 text-center">
@@ -702,7 +702,7 @@ export default function OrderDetailsDialog({
                                     else if (!checked && isAdmin) updateStockStatus(item.id, 'awaiting');
                                   }}
                                   disabled={!isAdmin}
-                                  className="data-[state=checked]:bg-success data-[state=checked]:border-success"
+                                  className="data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500"
                                 />
                               </td>
                             </>

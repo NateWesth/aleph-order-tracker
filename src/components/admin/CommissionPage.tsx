@@ -12,7 +12,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
-  Plus, Pencil, Trash2, Users, DollarSign, FileText, Download, ChevronDown, ChevronRight, Loader2, RefreshCw, Lock, Unlock, Settings2
+  Plus, Pencil, Trash2, Users, DollarSign, FileText, Download, ChevronDown, ChevronRight, Loader2, RefreshCw, AlertCircle, Lock, Unlock, Settings2
 } from "lucide-react";
 import { format, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import jsPDF from "jspdf";
@@ -280,7 +280,7 @@ const MissingCostsEditor = ({
             : "No items match the current filter."}
         </div>
       ) : (
-        <div className="rounded-md border overflow-x-auto max-h-[60vh]">
+        <div className="rounded-md border overflow-hidden max-h-[60vh]">
           <table className="w-full text-xs">
             <thead className="bg-muted/50 sticky top-0 z-10">
               <tr className="text-left">
@@ -1153,42 +1153,31 @@ const CommissionPage = () => {
   const isPreviousMonth = format(subMonths(new Date(), 1), "yyyy-MM") === selectedMonth;
 
   return (
-    <div className="space-y-4">
+    <div className="commission-page app-no-x-scroll min-w-0 w-full max-w-full space-y-5 overflow-x-hidden">
       <PageHeader
         title="Commission"
         icon={Percent}
         description="Monthly rep commission reports and rate management."
       />
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="min-w-0">
+        <TabsList className="grid w-full max-w-md grid-cols-2 rounded-2xl bg-muted/60 p-1">
           <TabsTrigger value="report"><FileText className="h-4 w-4 mr-1.5" />Commission Report</TabsTrigger>
           <TabsTrigger value="reps"><Users className="h-4 w-4 mr-1.5" />Manage Reps</TabsTrigger>
         </TabsList>
 
         {/* Commission Report Tab */}
-        <TabsContent value="report" className="space-y-4">
-          {/* Controls */}
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border-2 border-border bg-card shadow-soft p-3.5">
-            <div className="flex items-center gap-3">
-              <Input
-                type="month"
-                value={selectedMonth}
-                onChange={(e) => setSelectedMonth(e.target.value)}
-                className="w-44"
-              />
-              {loadingReport && (
-                <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin" />Calculating...
-                </span>
-              )}
+        <TabsContent value="report" className="space-y-5 min-w-0">
+          {/* Info banner */}
+          <div className="commission-info flex items-start gap-3 rounded-2xl border border-border/60 bg-card/70 p-4 text-sm text-muted-foreground shadow-sm">
+            <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+            <div>
+              <p className="font-medium text-foreground">Commission is calculated on amounts excluding VAT (sub-total)</p>
+              <p>This month's commission due = last month's sales. Default view shows previous month ({format(subMonths(new Date(), 1), "MMMM yyyy")}).</p>
             </div>
-            <p className="text-xs text-muted-foreground max-w-md text-right">
-              Commission due = last month's sales, ex-VAT. Default view: {format(subMonths(new Date(), 1), "MMMM yyyy")}.
-            </p>
           </div>
 
           {reportNotice && (
-            <div className="flex items-start gap-2.5 p-3.5 rounded-2xl border-2 border-warning/30 bg-warning/10 text-sm text-warning">
+            <div className="flex items-start gap-2 p-3 rounded-lg border-2 border-warning/30 bg-warning/10 text-sm text-warning">
               <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
               <p>{reportNotice}</p>
             </div>
@@ -1201,7 +1190,19 @@ const CommissionPage = () => {
             />
           )}
 
-          <div className="flex flex-wrap items-center gap-3">
+
+          <div className="commission-actions flex flex-wrap items-center gap-2 rounded-2xl border border-border/60 bg-card/75 p-3 shadow-sm">
+            <Input
+              type="month"
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              className="w-48"
+            />
+            {loadingReport && (
+              <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />Calculating...
+              </span>
+            )}
             {commissionData && (() => {
               type MissingRow = {
                 rep_name: string; invoice_number: string; customer_name: string;
@@ -1397,25 +1398,31 @@ const CommissionPage = () => {
           {/* Summary Cards */}
           {commissionData && (
             <div className="contents">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="rounded-2xl border-2 border-border bg-card shadow-soft p-4">
-                  <p className="text-xs font-medium text-muted-foreground">Total Invoiced (excl. VAT)</p>
-                  <p className="font-display text-2xl font-bold text-foreground mt-1">{formatCurrency(commissionData.summary.totalInvoiced)}</p>
-                </div>
-                <div className="rounded-2xl border-2 border-primary/20 bg-primary/5 shadow-soft p-4">
-                  <p className="text-xs font-medium text-muted-foreground">Total Commission Due</p>
-                  <p className="font-display text-2xl font-bold text-primary mt-1">{formatCurrency(commissionData.summary.totalCommission)}</p>
-                </div>
-                <div className="rounded-2xl border-2 border-success/20 bg-success/5 shadow-soft p-4">
-                  <p className="text-xs font-medium text-muted-foreground">Invoices Matched</p>
-                  <p className="font-display text-2xl font-bold text-success mt-1">{commissionData.summary.totalInvoices}</p>
-                </div>
+              <div className="commission-kpis grid grid-cols-1 md:grid-cols-3 gap-3">
+                <Card className="commission-kpi rounded-[22px] border-border/60 shadow-sm overflow-hidden">
+                  <CardContent className="pt-5 pb-4">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Total Invoiced (excl. VAT)</p>
+                    <p className="text-2xl font-bold text-foreground">{formatCurrency(commissionData.summary.totalInvoiced)}</p>
+                  </CardContent>
+                </Card>
+                <Card className="commission-kpi commission-kpi-primary rounded-[22px] border-primary/20 shadow-sm overflow-hidden">
+                  <CardContent className="pt-5 pb-4">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Total Commission Due</p>
+                    <p className="text-2xl font-bold text-primary">{formatCurrency(commissionData.summary.totalCommission)}</p>
+                  </CardContent>
+                </Card>
+                <Card className="commission-kpi rounded-[22px] border-border/60 shadow-sm overflow-hidden">
+                  <CardContent className="pt-5 pb-4">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Invoices Matched</p>
+                    <p className="text-2xl font-bold text-foreground">{commissionData.summary.totalInvoices}</p>
+                  </CardContent>
+                </Card>
               </div>
 
               {/* Missing Costs are shown via a small trigger in the action bar above; details open in a dialog. */}
               <div className="space-y-3">
                 {commissionData.data.map((d) => (
-                  <Card key={d.rep_id} className={cn("border-2 shadow-soft", d.is_locked && "opacity-70")}>
+                  <Card key={d.rep_id} className={cn("commission-rep-card rounded-[22px] border-border/60 shadow-sm overflow-hidden transition-all hover:shadow-md", d.is_locked && "opacity-70")}>
                     <CardHeader className="pb-2">
                       <div className="flex items-center justify-between gap-3 flex-wrap">
                         <div
@@ -1614,8 +1621,8 @@ const CommissionPage = () => {
                                                 Item commission total: {formatCurrency(itemCommissionTotal)}
                                               </Badge>
                                             </div>
-                                            <div className="overflow-x-auto">
-                                            <table className="min-w-[920px] w-full text-xs">
+                                            <div className="overflow-hidden">
+                                            <table className="commission-line-table w-full table-fixed text-xs">
                                               <thead className="text-muted-foreground">
                                                 <tr>
                                                   <th className="text-left py-1 font-medium">Item</th>
@@ -1787,7 +1794,7 @@ const CommissionPage = () => {
         </TabsContent>
 
         {/* Manage Reps Tab */}
-        <TabsContent value="reps" className="space-y-4">
+        <TabsContent value="reps" className="space-y-5 min-w-0">
           <div className="flex justify-between items-center flex-wrap gap-2">
             <h2 className="text-lg font-semibold">Sales Reps</h2>
             <div className="flex items-center gap-2 flex-wrap">

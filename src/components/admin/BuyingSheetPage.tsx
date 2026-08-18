@@ -73,7 +73,7 @@ export default function BuyingSheetPage() {
   const [showSnapshot, setShowSnapshot] = useState(false);
   const [snapshotData, setSnapshotData] = useState<{ date: string; rows: { sku: string; toOrder: number }[] } | null>(null);
   const [bulkOrdering, setBulkOrdering] = useState(false);
-  const [viewMode, setViewMode] = useState<ViewMode>("table");
+  const [viewMode, setViewMode] = useState<ViewMode>("quick");
   const [pinnedSkus, setPinnedSkus] = useState<string[]>(loadPinned);
   const [viewDensity, setViewDensity] = useState<ViewDensity>(loadDensity);
   const [recentlyOrdered, setRecentlyOrdered] = useState<RecentlyOrderedItem[]>(loadRecentlyOrdered);
@@ -924,7 +924,7 @@ export default function BuyingSheetPage() {
 
   const CoverageBar = ({ percent }: { percent: number }) => (
     <div className="flex items-center gap-2 min-w-[80px]">
-      <Progress value={percent} className={`h-1.5 flex-1 ${percent >= 100 ? "[&>div]:bg-success" : percent >= 50 ? "[&>div]:bg-warning" : "[&>div]:bg-destructive"}`} />
+      <Progress value={percent} className={`h-1.5 flex-1 ${percent >= 100 ? "[&>div]:bg-emerald-500" : percent >= 50 ? "[&>div]:bg-amber-500" : "[&>div]:bg-destructive"}`} />
       <span className="text-[10px] text-muted-foreground w-7 text-right">{percent}%</span>
     </div>
   );
@@ -933,7 +933,7 @@ export default function BuyingSheetPage() {
     <Tooltip>
       <TooltipTrigger asChild>
         <span className="inline-flex items-center">
-          {trend === "up" && <TrendingUp className="h-3.5 w-3.5 text-success" />}
+          {trend === "up" && <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />}
           {trend === "down" && <TrendingDown className="h-3.5 w-3.5 text-destructive" />}
           {trend === "stable" && <Minus className="h-3.5 w-3.5 text-muted-foreground" />}
           {trend === "new" && <BarChart3 className="h-3.5 w-3.5 text-primary" />}
@@ -981,7 +981,7 @@ export default function BuyingSheetPage() {
               <div className="flex justify-between"><span className="text-muted-foreground">Forecast Next:</span><span className="font-bold text-primary">{row.forecastNextMonth}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Daily Burn Rate:</span><span className="font-medium">{row.dailyBurnRate.toFixed(1)}/day</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Weekly Velocity:</span><span className="font-medium">{row.velocityScore}/wk {row.weeklyTrend !== 0 && <span className={row.weeklyTrend > 0 ? "text-emerald-600" : "text-destructive"}>({row.weeklyTrend > 0 ? "+" : ""}{row.weeklyTrend}%)</span>}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Demand Pattern:</span><span className={`font-medium ${row.demandVariability === "erratic" ? "text-destructive" : row.demandVariability === "moderate" ? "text-warning" : "text-success"}`}>{row.demandVariability}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Demand Pattern:</span><span className={`font-medium ${row.demandVariability === "erratic" ? "text-destructive" : row.demandVariability === "moderate" ? "text-orange-500" : "text-emerald-500"}`}>{row.demandVariability}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Reorder Point:</span><span className="font-medium">{row.reorderPoint}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Safety Stock:</span><span className="font-medium">{row.safetyStock > 0 ? `+${row.safetyStock} buffer` : "—"}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Recommended Qty:</span><span className="font-bold text-primary">{row.recommendedOrderQty}</span></div>
@@ -1059,7 +1059,7 @@ export default function BuyingSheetPage() {
           <TableCell className={`text-center ${densityPy}`} onClick={() => toggleExpand(row.sku)}><DemandTrendIcon trend={row.demandTrend} lastMonth={row.lastMonthQty} prevMonth={row.prevMonthQty} /></TableCell>
           <TableCell className={`text-center ${densityPy}`} onClick={() => toggleExpand(row.sku)}>
             <div className="flex items-center justify-center gap-1">
-              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${row.ageEscalation === "red" ? "bg-destructive" : row.ageEscalation === "orange" ? "bg-warning" : row.ageEscalation === "yellow" ? "bg-warning/60" : "bg-success"}`} />
+              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${row.ageEscalation === "red" ? "bg-destructive" : row.ageEscalation === "orange" ? "bg-orange-500" : row.ageEscalation === "yellow" ? "bg-amber-400" : "bg-emerald-500"}`} />
               <span className={`text-sm font-medium ${row.daysWaiting > 7 ? "text-destructive" : row.daysWaiting > 3 ? "text-orange-500" : "text-muted-foreground"}`}>{row.daysWaiting}d</span>
             </div>
           </TableCell>
@@ -1113,10 +1113,10 @@ export default function BuyingSheetPage() {
 
   return (
     <TooltipProvider>
-      <div className={`space-y-4 ${isFullscreen ? "fixed inset-0 z-50 bg-background p-4 overflow-auto" : ""}`} ref={printRef}>
+      <div className={`procurement-page app-no-x-scroll min-w-0 w-full max-w-full space-y-5 overflow-x-hidden ${isFullscreen ? "fixed inset-0 z-50 bg-background p-4 overflow-y-auto overflow-x-hidden" : ""}`} ref={printRef}>
         {/* ── Sticky Header ── */}
-        <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm pb-3 -mx-1 px-1 border-b border-transparent">
-          <div className="rounded-2xl border-2 border-border bg-card shadow-soft overflow-hidden mb-3">
+        <div className="sticky top-0 z-20 -mx-1 px-1 pb-3 bg-background/88 backdrop-blur-xl supports-[backdrop-filter]:bg-background/72">
+          <div className="procurement-command-center rounded-[24px] border border-border/60 bg-card/92 shadow-xl shadow-black/[0.04] overflow-hidden mb-3">
             <div className="ribbon-bar" aria-hidden />
             <div className="flex flex-col gap-3 p-4">
             {/* Title + actions row */}
@@ -1173,9 +1173,9 @@ export default function BuyingSheetPage() {
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
               <Tabs value={viewMode} onValueChange={v => setViewMode(v as ViewMode)} className="shrink-0">
                 <TabsList className="h-8 bg-muted/50">
-                  <TabsTrigger value="table" className="text-xs gap-1 h-7 px-2.5"><TableIcon className="h-3 w-3" />Table</TabsTrigger>
+                  <TabsTrigger value="quick" className="text-xs gap-1 h-7 px-2.5"><Zap className="h-3 w-3" />Queue</TabsTrigger>
                   <TabsTrigger value="suppliers" className="text-xs gap-1 h-7 px-2.5"><LayoutGrid className="h-3 w-3" />Suppliers</TabsTrigger>
-                  <TabsTrigger value="quick" className="text-xs gap-1 h-7 px-2.5"><Zap className="h-3 w-3" />Quick Order</TabsTrigger>
+                  <TabsTrigger value="table" className="text-xs gap-1 h-7 px-2.5"><TableIcon className="h-3 w-3" />Data</TabsTrigger>
                 </TabsList>
               </Tabs>
               <div className="relative flex-1 min-w-0">
@@ -1197,23 +1197,20 @@ export default function BuyingSheetPage() {
           </div>
         </div>
 
-        {/* Snapshot comparison + auto-refresh status */}
-        {((showSnapshot && snapshotData) || autoRefreshInterval > 0 || lastRefreshedAt) && (
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-3.5 py-2 rounded-xl bg-muted/40 border border-border/60 text-xs text-muted-foreground">
-            {showSnapshot && snapshotData && (
-              <span className="flex items-center gap-1.5">
-                <History className="h-3.5 w-3.5" />
-                Comparing to <strong className="text-foreground font-semibold">{new Date(snapshotData.date).toLocaleString()}</strong> ({snapshotData.rows.length} items)
-                <button onClick={() => setShowSnapshot(false)} className="ml-1 underline hover:text-foreground">Hide</button>
-              </span>
-            )}
+        {/* Snapshot comparison notice */}
+        {showSnapshot && snapshotData && (
+          <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/50 border border-border text-xs">
+            <History className="h-3.5 w-3.5 text-muted-foreground" />
+            <span className="text-muted-foreground">Comparing to <strong>{new Date(snapshotData.date).toLocaleString()}</strong> ({snapshotData.rows.length} items)</span>
+            <Button variant="ghost" size="sm" className="ml-auto h-6 text-xs" onClick={() => setShowSnapshot(false)}>Hide</Button>
+          </div>
+        )}
+
+        {/* Auto-refresh & last refreshed status */}
+        {(autoRefreshInterval > 0 || lastRefreshedAt) && (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
             {lastRefreshedAt && <span>Last refreshed: {lastRefreshedAt.toLocaleTimeString()}</span>}
-            {autoRefreshInterval > 0 && (
-              <span className="flex items-center gap-1">
-                <RotateCw className="h-3 w-3 animate-spin" style={{ animationDuration: "3s" }} />
-                Next in {Math.floor(autoRefreshCountdown / 60)}:{String(autoRefreshCountdown % 60).padStart(2, "0")}
-              </span>
-            )}
+            {autoRefreshInterval > 0 && <span className="flex items-center gap-1"><RotateCw className="h-3 w-3 animate-spin" style={{ animationDuration: "3s" }} />Next in {Math.floor(autoRefreshCountdown / 60)}:{String(autoRefreshCountdown % 60).padStart(2, "0")}</span>}
           </div>
         )}
 
@@ -1233,10 +1230,10 @@ export default function BuyingSheetPage() {
         {/* Recently Ordered Today */}
         {todayOrdered.length > 0 && (
           <Collapsible open={showRecentlyOrdered} onOpenChange={setShowRecentlyOrdered}>
-            <Card className="border-dashed border-success/30 bg-success/5">
+            <Card className="border-dashed border-emerald-500/30 bg-emerald-500/5">
               <CollapsibleTrigger asChild>
-                <button className="w-full flex items-center justify-between p-3 hover:bg-success/10 transition-colors rounded-t-2xl">
-                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-success" /><span className="font-semibold text-sm text-foreground">Ordered Today</span><Badge className="text-xs bg-success/15 text-success border-success/30">{todayOrdered.length}</Badge></div>
+                <button className="w-full flex items-center justify-between p-3 hover:bg-emerald-500/10 transition-colors rounded-t-lg">
+                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-emerald-500" /><span className="font-semibold text-sm text-foreground">Ordered Today</span><Badge className="text-xs bg-emerald-500/20 text-emerald-700 border-emerald-500/30">{todayOrdered.length}</Badge></div>
                   {showRecentlyOrdered ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
                 </button>
               </CollapsibleTrigger>
@@ -1324,7 +1321,7 @@ export default function BuyingSheetPage() {
                 </button>
               </CollapsibleTrigger>
               <CollapsibleContent>
-                <CardContent className="p-0"><div className="overflow-x-auto"><Table><TableHeader><TableRow>
+                <CardContent className="p-0"><div className="overflow-hidden"><Table className="w-full table-fixed"><TableHeader><TableRow>
                   <TableHead>SKU</TableHead><TableHead>Item Name</TableHead><TableHead className="text-right">Avg Qty/mo</TableHead><TableHead className="text-right">Months</TableHead><TableHead className="text-right">Orders</TableHead><TableHead>Last Ordered</TableHead>
                 </TableRow></TableHeader><TableBody>
                   {suggestedRows.map(row => (
@@ -1376,8 +1373,8 @@ export default function BuyingSheetPage() {
         {viewMode === "table" && (
           <>
             {/* Table toolbar */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
+            <div className="procurement-table-toolbar flex flex-col xl:flex-row xl:items-center xl:justify-between gap-2 rounded-2xl border border-border/60 bg-card/70 p-2.5">
+              <div className="flex items-center gap-2 flex-wrap">
                 <Button variant={groupBySupplier ? "default" : "outline"} size="sm" onClick={() => setGroupBySupplier(!groupBySupplier)} className="h-7 text-xs gap-1.5"><Layers className="h-3 w-3" />{groupBySupplier ? "Grouped" : "Group"}</Button>
                 <Button variant={showSupplierChart ? "default" : "outline"} size="sm" onClick={() => setShowSupplierChart(!showSupplierChart)} className="h-7 text-xs gap-1.5"><PieChart className="h-3 w-3" />Chart</Button>
                 <Button variant="outline" size="sm" onClick={handleCopySupplierEmails} className="h-7 text-xs gap-1.5"><Mail className="h-3 w-3" />Emails</Button>
@@ -1394,7 +1391,7 @@ export default function BuyingSheetPage() {
                   </TooltipTrigger><TooltipContent><p className="text-xs">Recommended: {totalRecommendedQty} total (incl. {totalSafetyBuffer} safety stock buffer)</p></TooltipContent></Tooltip>
                 )}
               </div>
-              <div className="flex items-center gap-2 text-[10px] text-muted-foreground/50">
+              <div className="hidden 2xl:flex items-center gap-2 text-[10px] text-muted-foreground/50">
                 <span><kbd className="px-1 py-0.5 rounded bg-muted text-[10px]">Ctrl+F</kbd> Search</span>
                 <span><kbd className="px-1 py-0.5 rounded bg-muted text-[10px]">G</kbd> Group</span>
                 <span><kbd className="px-1 py-0.5 rounded bg-muted text-[10px]">P</kbd> Density</span>
@@ -1404,10 +1401,10 @@ export default function BuyingSheetPage() {
               </div>
             </div>
 
-            <Card>
-              <CardContent className="p-0">
-                <div className="overflow-x-auto">
-                  <Table>
+            <Card className="procurement-data-card overflow-hidden rounded-[22px] border-border/60 shadow-sm">
+              <CardContent className="p-0 min-w-0">
+                <div className="overflow-hidden min-w-0 max-w-full">
+                  <Table className="procurement-data-table table-fixed w-full">
                     <TableHeader>
                       <TableRow>
                         <TableHead className="w-8"><Checkbox checked={selectedSkus.size === sortedRows.length && sortedRows.length > 0} onCheckedChange={toggleSelectAll} /></TableHead>

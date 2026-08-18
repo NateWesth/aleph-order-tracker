@@ -7,7 +7,7 @@ import { memo } from "react";
 const AuroraBackground = memo(function AuroraBackground() {
   return (
     <div
-      className="pointer-events-none fixed inset-0 z-0 overflow-hidden opacity-40 dark:opacity-25"
+      className="aleph-aurora pointer-events-none fixed inset-0 z-0 overflow-hidden opacity-40 dark:opacity-25"
       aria-hidden="true"
     >
       {/* Blob 1 — primary color, top-left drift */}

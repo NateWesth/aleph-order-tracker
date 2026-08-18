@@ -11,6 +11,7 @@ import { PWAInstallPrompt } from './components/PWAInstallPrompt';
 import { PWAUpdatePrompt } from './components/PWAUpdatePrompt';
 import { NetworkStatusIndicator } from './components/ui/NetworkStatusIndicator';
 import AdminDashboard from './pages/AdminDashboard';
+import { useGlobalDocumentScroll } from './hooks/useGlobalDocumentScroll';
 
 // Lazy load heavy components for better Speed Index
 const Auth = lazy(() => import('./pages/Auth'));
@@ -54,7 +55,8 @@ const PageFallback = () => (
 );
 
 function App() {
-  
+  useGlobalDocumentScroll();
+
   // Capture reset password parameters before router processes them
   if (window.location.pathname === '/reset-password' && window.location.hash) {
     const hashParams = window.location.hash.substring(1);

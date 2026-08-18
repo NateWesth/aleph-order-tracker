@@ -18,7 +18,6 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 
 import { cn } from "@/lib/utils";
@@ -278,7 +277,7 @@ function OrderStatusColumn({
 
         {effectiveIsExpanded && (
           <div className="flex-1 bg-muted/30 dark:bg-muted/10 rounded-b-xl border border-t-0 border-border glass-card !rounded-t-none min-h-[200px] sm:min-h-[400px] animate-fade-in">
-            <ScrollArea className={cn("sm:h-[calc(100vh-320px)]", isMobile ? "h-[calc(100vh-280px)]" : "")}>
+            <div className="min-w-0 w-full">
               <div className="p-2 space-y-2">
                 {orders.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-12 sm:py-16 text-muted-foreground">
@@ -343,7 +342,7 @@ function OrderStatusColumn({
                   orders.map((order, index) => renderOrderCard(order, index))
                 )}
               </div>
-            </ScrollArea>
+            </div>
           </div>
         )}
       </div>

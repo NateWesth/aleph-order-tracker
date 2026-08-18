@@ -480,7 +480,7 @@ export default function ProcessingPage({
               </div>
             ) : (
               /* Desktop table view */
-              <div className="overflow-x-auto">
+              <div className="overflow-x-hidden min-w-0 max-w-full">
                 <Table>
                   <TableHeader>
                     <TableRow>

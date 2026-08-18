@@ -1118,3 +1118,711 @@ main .empty-state {
 .animate-item-pop {
   animation: item-pop 280ms ease-out both;
 }
+
+/* App-wide horizontal overflow guard */
+html, body, #root {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* ============================================
+   2026 RESPONSIVE WORKSPACE MAKEOVER
+   ============================================ */
+html, body, #root {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden !important;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+.app-no-x-scroll {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: clip;
+}
+
+.app-no-x-scroll > *,
+.app-no-x-scroll main,
+.app-no-x-scroll section,
+.app-no-x-scroll article,
+.app-no-x-scroll [class*="grid"],
+.app-no-x-scroll [class*="flex"] {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.app-no-x-scroll input,
+.app-no-x-scroll textarea,
+.app-no-x-scroll select,
+.app-no-x-scroll button {
+  max-width: 100%;
+}
+
+/* Procurement cockpit */
+.procurement-page {
+  --workspace-radius: 1.4rem;
+}
+.procurement-command-center {
+  position: relative;
+  isolation: isolate;
+}
+.procurement-command-center::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at 8% 0%, hsl(var(--primary) / .09), transparent 30%);
+  z-index: -1;
+}
+.procurement-page [data-radix-collection-item] { max-width: 100%; }
+.procurement-data-card { max-width: 100%; }
+.procurement-data-table { width: 100% !important; max-width: 100%; }
+.procurement-data-table th,
+.procurement-data-table td {
+  min-width: 0 !important;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  padding-left: .45rem;
+  padding-right: .45rem;
+}
+.procurement-data-table input { min-width: 0 !important; width: 100% !important; }
+
+@media (max-width: 1399px) {
+  /* Secondary analytics columns disappear before they can force width. */
+  .procurement-data-table th:nth-child(8), .procurement-data-table td:nth-child(8),
+  .procurement-data-table th:nth-child(10), .procurement-data-table td:nth-child(10),
+  .procurement-data-table th:nth-child(11), .procurement-data-table td:nth-child(11),
+  .procurement-data-table th:nth-child(12), .procurement-data-table td:nth-child(12),
+  .procurement-data-table th:nth-child(14), .procurement-data-table td:nth-child(14),
+  .procurement-data-table th:nth-child(15), .procurement-data-table td:nth-child(15) {
+    display: none;
+  }
+}
+@media (max-width: 1099px) {
+  .procurement-data-table th:nth-child(6), .procurement-data-table td:nth-child(6),
+  .procurement-data-table th:nth-child(7), .procurement-data-table td:nth-child(7),
+  .procurement-data-table th:nth-child(13), .procurement-data-table td:nth-child(13) {
+    display: none;
+  }
+}
+@media (max-width: 719px) {
+  .procurement-data-table th:nth-child(2), .procurement-data-table td:nth-child(2),
+  .procurement-data-table th:nth-child(5), .procurement-data-table td:nth-child(5) {
+    display: none;
+  }
+  .procurement-data-table th, .procurement-data-table td { font-size: .7rem; padding: .5rem .3rem; }
+}
+
+/* Commission cockpit */
+.commission-page .commission-info,
+.commission-page .commission-actions,
+.commission-page .commission-kpi,
+.commission-page .commission-rep-card {
+  backdrop-filter: blur(14px);
+}
+.commission-kpi {
+  position: relative;
+  isolation: isolate;
+  transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+}
+.commission-kpi:hover { transform: translateY(-2px); box-shadow: 0 16px 38px -24px rgb(0 0 0 / .35); }
+.commission-kpi::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at 100% 0%, hsl(var(--primary) / .08), transparent 42%);
+  z-index: -1;
+}
+.commission-kpi-primary::before {
+  background: radial-gradient(circle at 100% 0%, hsl(var(--primary) / .16), transparent 50%);
+}
+.commission-rep-card > * { min-width: 0; max-width: 100%; }
+.commission-line-table { width: 100% !important; max-width: 100%; table-layout: fixed; }
+.commission-line-table th,
+.commission-line-table td {
+  min-width: 0 !important;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  padding-left: .35rem;
+  padding-right: .35rem;
+}
+.commission-line-table input {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+}
+@media (max-width: 1099px) {
+  .commission-line-table th:nth-child(5), .commission-line-table td:nth-child(5),
+  .commission-line-table th:nth-child(6), .commission-line-table td:nth-child(6) { display: none; }
+}
+@media (max-width: 719px) {
+  .commission-line-table th:nth-child(2), .commission-line-table td:nth-child(2),
+  .commission-line-table th:nth-child(3), .commission-line-table td:nth-child(3),
+  .commission-line-table th:nth-child(4), .commission-line-table td:nth-child(4),
+  .commission-line-table th:nth-child(7), .commission-line-table td:nth-child(7) { display: none; }
+  .commission-line-table th, .commission-line-table td { font-size: .7rem; }
+}
+
+/* Shared micro-interactions */
+.procurement-page button,
+.commission-page button {
+  transition: transform .18s ease, box-shadow .18s ease, background-color .18s ease, border-color .18s ease, color .18s ease;
+}
+.procurement-page button:active,
+.commission-page button:active { transform: scale(.975); }
+
+@media (prefers-reduced-motion: reduce) {
+  .procurement-page *, .commission-page * {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}
+
+/* ============================================================
+   ALEPH APP-WIDE UI POLISH + SCROLL ARCHITECTURE
+   Keeps the existing brand/logo colours; this only changes layout,
+   depth, spacing, surfaces, motion, and responsive containment.
+   ============================================================ */
+
+html {
+  min-height: 100%;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  overscroll-behavior-y: auto;
+  scroll-behavior: smooth;
+}
+
+body,
+#root {
+  min-height: 100%;
+  height: auto !important;
+  overflow-y: visible !important;
+  overflow-x: hidden !important;
+  max-width: 100%;
+}
+
+body {
+  position: static !important;
+  touch-action: pan-y;
+}
+
+.app-shell {
+  min-height: 100vh;
+  height: auto !important;
+  overflow-y: visible !important;
+  overflow-x: hidden !important;
+  isolation: isolate;
+  background:
+    radial-gradient(circle at 8% 0%, hsl(var(--primary) / 0.07), transparent 28rem),
+    radial-gradient(circle at 92% 18%, hsl(var(--accent) / 0.05), transparent 26rem),
+    hsl(var(--background));
+}
+
+.app-shell main {
+  height: auto !important;
+  max-height: none !important;
+  overflow-y: visible !important;
+  overflow-x: hidden !important;
+  min-width: 0;
+}
+
+.app-shell main > div,
+.app-shell main section,
+.app-shell main article,
+.app-shell main form,
+.app-shell main [class*="grid"],
+.app-shell main [class*="flex"] {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Absolutely no page-level horizontal scrolling. Wide content must adapt. */
+.app-shell .overflow-x-auto,
+.app-shell .overflow-auto {
+  overflow-x: clip !important;
+}
+
+.app-shell table {
+  width: 100% !important;
+  max-width: 100% !important;
+  table-layout: fixed;
+}
+
+.app-shell th,
+.app-shell td {
+  min-width: 0 !important;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.app-shell img,
+.app-shell svg,
+.app-shell canvas,
+.app-shell video {
+  max-width: 100%;
+}
+
+/* Premium page canvas */
+.app-shell main > div {
+  animation: aleph-page-enter 320ms cubic-bezier(.22,1,.36,1) both;
+}
+
+@keyframes aleph-page-enter {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Card makeover – more separation with less visual clutter. */
+.app-shell [class*="rounded-xl"][class*="border"],
+.app-shell [class*="rounded-2xl"][class*="border"],
+.app-shell .glass-card {
+  border-color: hsl(var(--border) / 0.72);
+}
+
+.app-shell .glass-card,
+.app-shell [data-ui="card"] {
+  box-shadow:
+    0 1px 1px hsl(var(--foreground) / 0.025),
+    0 12px 32px -24px hsl(var(--foreground) / 0.28);
+}
+
+/* Buttons feel tactile without changing brand colours. */
+.app-shell button:not([role="tab"]),
+.app-shell [role="button"] {
+  transition:
+    transform 160ms cubic-bezier(.22,1,.36,1),
+    box-shadow 180ms ease,
+    background-color 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease,
+    opacity 180ms ease;
+}
+
+.app-shell button:not(:disabled):active,
+.app-shell [role="button"]:not([aria-disabled="true"]):active {
+  transform: scale(0.975);
+}
+
+.app-shell button:not(:disabled):focus-visible,
+.app-shell input:focus-visible,
+.app-shell textarea:focus-visible,
+.app-shell select:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px hsl(var(--primary) / 0.16);
+}
+
+/* Inputs / search / filters become calmer and more consistent. */
+.app-shell input,
+.app-shell textarea,
+.app-shell select {
+  max-width: 100%;
+  min-width: 0;
+  transition: border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
+}
+
+.app-shell input:hover,
+.app-shell textarea:hover,
+.app-shell select:hover {
+  border-color: hsl(var(--primary) / 0.28);
+}
+
+/* Tables: lighter, cleaner, more scan-friendly. */
+.app-shell thead tr {
+  background: hsl(var(--muted) / 0.48);
+}
+
+.app-shell tbody tr {
+  transition: background-color 140ms ease, transform 140ms ease;
+}
+
+.app-shell tbody tr:hover {
+  background: hsl(var(--primary) / 0.035);
+}
+
+.app-shell th {
+  font-size: 0.68rem;
+  letter-spacing: 0.045em;
+  text-transform: uppercase;
+  color: hsl(var(--muted-foreground));
+}
+
+/* Desktop navigation wraps instead of horizontally scrolling. */
+.app-shell header nav {
+  max-width: 100%;
+}
+
+/* Mobile: force data-heavy screens to become readable summaries rather than wide tables. */
+@media (max-width: 899px) {
+  .app-shell table th,
+  .app-shell table td {
+    padding-left: .45rem;
+    padding-right: .45rem;
+    font-size: .75rem;
+  }
+
+  .app-shell main {
+    padding-inline: 0;
+  }
+}
+
+@media (max-width: 639px) {
+  html { scroll-behavior: auto; }
+
+  .app-shell {
+    background:
+      radial-gradient(circle at 15% 0%, hsl(var(--primary) / 0.055), transparent 20rem),
+      hsl(var(--background));
+  }
+
+  .app-shell table th,
+  .app-shell table td {
+    font-size: .7rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto !important; }
+  .app-shell main > div { animation: none !important; }
+}
+
+/* ============================================================
+   ALEPH THEME SYSTEM V2 — GLOBAL MAKEOVER
+   These selectors are driven by ThemeContext root classes.
+   The original Aleph logo asset and its colours are never modified.
+   ============================================================ */
+
+/* A single, explicit document scroll owner. */
+html,
+body {
+  width: 100%;
+  max-width: 100%;
+  min-height: 100%;
+  overflow-x: hidden !important;
+}
+
+html {
+  height: auto !important;
+  overflow-y: scroll !important;
+  scrollbar-gutter: stable;
+}
+
+body,
+#root,
+#root > div {
+  height: auto !important;
+  max-height: none !important;
+  overflow-y: visible !important;
+  overscroll-behavior-y: auto !important;
+}
+
+body {
+  touch-action: pan-y pinch-zoom !important;
+}
+
+/* Never let the app shell itself become the vertical scroll owner. */
+.app-shell,
+.app-shell > div,
+.app-shell main,
+.app-page-stage {
+  height: auto !important;
+  max-height: none !important;
+  overflow-y: visible !important;
+}
+
+.app-page-stage {
+  position: relative;
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* ------------------------------
+   TOP TOOLBAR THEMES
+   ------------------------------ */
+.aleph-topbar {
+  position: sticky;
+  overflow: hidden;
+  background: hsl(var(--card) / .92);
+  border-color: hsl(var(--border) / .78);
+  backdrop-filter: blur(22px) saturate(1.18);
+  -webkit-backdrop-filter: blur(22px) saturate(1.18);
+  transition: background-color .28s ease, border-color .28s ease, box-shadow .28s ease;
+}
+
+.aleph-topbar > *:not(.aleph-toolbar-watermark) {
+  position: relative;
+  z-index: 2;
+}
+
+.aleph-toolbar-watermark {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0;
+  background-repeat: repeat;
+  background-size: 72px 72px;
+  background-position: 18px 10px;
+  transition: opacity .28s ease;
+}
+
+html.toolbar-dark .aleph-topbar,
+html.toolbar-logo-wall .aleph-topbar {
+  background: linear-gradient(135deg, rgba(6, 12, 24, .97), rgba(15, 23, 42, .97));
+  border-color: rgba(148, 163, 184, .18);
+  box-shadow: 0 12px 38px -24px rgba(2, 6, 23, .78);
+}
+
+html.toolbar-midnight .aleph-topbar {
+  background:
+    radial-gradient(circle at 18% -30%, hsl(var(--primary) / .24), transparent 36%),
+    linear-gradient(115deg, rgba(2, 6, 23, .98), rgba(9, 20, 46, .98) 48%, rgba(12, 20, 38, .98));
+  border-color: rgba(148, 163, 184, .2);
+  box-shadow: 0 16px 46px -28px rgba(2, 6, 23, .9);
+}
+
+html.toolbar-glass .aleph-topbar {
+  background: hsl(var(--background) / .62);
+  border-color: hsl(var(--primary) / .16);
+  box-shadow: 0 18px 48px -34px hsl(var(--foreground) / .38);
+  backdrop-filter: blur(30px) saturate(1.35);
+  -webkit-backdrop-filter: blur(30px) saturate(1.35);
+}
+
+html.toolbar-logo-wall .aleph-toolbar-watermark {
+  opacity: .11;
+  background-image: url('/lovable-uploads/e1088147-889e-43f6-bdf0-271189b88913.png');
+  background-size: 62px 62px;
+  background-repeat: repeat;
+  transform: rotate(-4deg) scale(1.08);
+}
+
+html.toolbar-dark .aleph-topbar,
+html.toolbar-logo-wall .aleph-topbar,
+html.toolbar-midnight .aleph-topbar {
+  color: rgba(248, 250, 252, .96);
+  --foreground: 210 40% 98%;
+  --muted-foreground: 215 20% 72%;
+  --border: 215 24% 25%;
+  --card: 222 34% 11%;
+  --secondary: 217 28% 16%;
+  --secondary-foreground: 210 40% 96%;
+  --muted: 217 28% 16%;
+}
+
+html.toolbar-dark .aleph-topbar button,
+html.toolbar-logo-wall .aleph-topbar button,
+html.toolbar-midnight .aleph-topbar button {
+  color: inherit;
+}
+
+html.toolbar-dark .aleph-topbar button:hover,
+html.toolbar-logo-wall .aleph-topbar button:hover,
+html.toolbar-midnight .aleph-topbar button:hover {
+  background: rgba(255,255,255,.08);
+}
+
+html.toolbar-dark .aleph-topbar nav button[class*="bg-primary"],
+html.toolbar-logo-wall .aleph-topbar nav button[class*="bg-primary"],
+html.toolbar-midnight .aleph-topbar nav button[class*="bg-primary"] {
+  background: hsl(var(--primary) / .2);
+}
+
+.aleph-mobile-nav {
+  background: hsl(var(--card) / .94);
+  border-color: hsl(var(--border) / .78);
+  backdrop-filter: blur(24px) saturate(1.2);
+}
+
+html.toolbar-dark .aleph-mobile-nav,
+html.toolbar-logo-wall .aleph-mobile-nav,
+html.toolbar-midnight .aleph-mobile-nav {
+  background: rgba(7, 13, 25, .96);
+  border-color: rgba(148,163,184,.18);
+  color: rgba(248,250,252,.94);
+}
+
+/* ------------------------------
+   WORKSPACE CANVAS THEMES
+   ------------------------------ */
+html.canvas-clean .app-shell {
+  background: hsl(var(--background));
+}
+
+html.canvas-aurora .app-shell {
+  background:
+    radial-gradient(circle at 5% 0%, hsl(var(--primary) / .105), transparent 32rem),
+    radial-gradient(circle at 96% 22%, hsl(var(--primary) / .055), transparent 30rem),
+    linear-gradient(180deg, hsl(var(--background)), hsl(var(--muted) / .18));
+}
+
+html.canvas-mesh .app-shell {
+  background:
+    radial-gradient(circle at 8% 6%, hsl(var(--primary) / .12), transparent 28rem),
+    radial-gradient(circle at 84% 8%, hsl(var(--accent) / .24), transparent 25rem),
+    radial-gradient(circle at 65% 78%, hsl(var(--primary) / .055), transparent 30rem),
+    hsl(var(--background));
+}
+
+html.canvas-midnight .app-shell {
+  background:
+    radial-gradient(circle at 12% 0%, hsl(var(--primary) / .14), transparent 30rem),
+    linear-gradient(145deg, hsl(var(--background)) 0%, hsl(222 42% 11% / .12) 55%, hsl(var(--background)) 100%);
+}
+
+/* ------------------------------
+   SURFACE THEMES — APP-WIDE
+   ------------------------------ */
+html.surface-clean .app-shell .glass-card,
+html.surface-clean .app-shell [class*="rounded-xl"][class*="border"],
+html.surface-clean .app-shell [class*="rounded-2xl"][class*="border"] {
+  box-shadow: none;
+  border-color: hsl(var(--border) / .76);
+}
+
+html.surface-soft .app-shell .glass-card,
+html.surface-soft .app-shell [class*="rounded-xl"][class*="border"],
+html.surface-soft .app-shell [class*="rounded-2xl"][class*="border"] {
+  border-color: hsl(var(--border) / .66);
+  box-shadow:
+    0 1px 1px hsl(var(--foreground) / .025),
+    0 10px 25px -22px hsl(var(--foreground) / .26),
+    0 22px 50px -42px hsl(var(--primary) / .18);
+}
+
+html.surface-glass .app-shell .glass-card,
+html.surface-glass .app-shell [class*="rounded-xl"][class*="border"],
+html.surface-glass .app-shell [class*="rounded-2xl"][class*="border"] {
+  background-color: hsl(var(--card) / .72);
+  border-color: hsl(var(--border) / .62);
+  box-shadow: 0 18px 50px -38px hsl(var(--foreground) / .42);
+  backdrop-filter: blur(18px) saturate(1.16);
+  -webkit-backdrop-filter: blur(18px) saturate(1.16);
+}
+
+html.surface-contrast .app-shell .glass-card,
+html.surface-contrast .app-shell [class*="rounded-xl"][class*="border"],
+html.surface-contrast .app-shell [class*="rounded-2xl"][class*="border"] {
+  border-width: 1.5px;
+  border-color: hsl(var(--foreground) / .16);
+  box-shadow: 0 10px 30px -24px hsl(var(--foreground) / .4);
+}
+
+/* Drastic shared page polish: page content feels intentional without
+   touching any page-specific business logic. */
+.app-page-stage > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.app-page-stage h1,
+.app-page-stage h2 {
+  letter-spacing: -.035em;
+  text-wrap: balance;
+}
+
+.app-page-stage > div > [class*="space-y"] {
+  max-width: 100%;
+}
+
+.app-shell [class*="CardHeader"],
+.app-shell [data-card-header] {
+  position: relative;
+}
+
+.app-shell [role="tablist"] {
+  border-radius: 14px;
+  padding: 3px;
+  background: hsl(var(--muted) / .46);
+  border: 1px solid hsl(var(--border) / .58);
+}
+
+.app-shell [role="tab"] {
+  border-radius: 10px;
+}
+
+/* More modern dashboard/page headers. */
+.app-page-stage > div > div:first-child h1,
+.app-page-stage > div > div:first-child h2 {
+  background: linear-gradient(92deg, hsl(var(--foreground)), hsl(var(--foreground) / .76));
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+/* Data-heavy pages stay within the viewport. */
+.app-shell table,
+.app-shell [role="table"] {
+  max-width: 100%;
+}
+
+.app-shell td,
+.app-shell th {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.app-shell input,
+.app-shell textarea,
+.app-shell button,
+.app-shell [role="combobox"] {
+  max-width: 100%;
+}
+
+/* In-page overflow wrappers must not create a page-wide horizontal scroller. */
+.app-shell .overflow-x-auto,
+.app-shell .overflow-x-scroll {
+  overflow-x: clip !important;
+  max-width: 100% !important;
+}
+
+/* Settings gets the same makeover even though it lives outside app-shell. */
+body:has(main.max-w-7xl) main.max-w-7xl > div > [class*="border"] {
+  border-color: hsl(var(--border) / .68);
+  box-shadow: 0 20px 55px -45px hsl(var(--foreground) / .34);
+}
+
+@media (max-width: 760px) {
+  .aleph-toolbar-watermark { background-size: 48px 48px; }
+  html.toolbar-logo-wall .aleph-toolbar-watermark { opacity: .08; }
+  .app-page-stage { padding-left: .75rem; padding-right: .75rem; }
+}
+
+/* Settings and standalone protected pages follow the selected canvas/surfaces too. */
+.settings-page {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 8% 0%, hsl(var(--primary) / .075), transparent 28rem),
+    hsl(var(--background));
+}
+html.canvas-clean .settings-page { background: hsl(var(--background)); }
+html.canvas-mesh .settings-page {
+  background:
+    radial-gradient(circle at 8% 6%, hsl(var(--primary) / .11), transparent 28rem),
+    radial-gradient(circle at 88% 18%, hsl(var(--accent) / .20), transparent 24rem),
+    hsl(var(--background));
+}
+html.canvas-midnight .settings-page {
+  background:
+    radial-gradient(circle at 12% 0%, hsl(var(--primary) / .12), transparent 30rem),
+    linear-gradient(145deg, hsl(var(--background)), hsl(222 42% 11% / .10));
+}
+
+.settings-page main > div > [data-ui="card"] {
+  transition: transform .22s cubic-bezier(.22,1,.36,1), box-shadow .25s ease, border-color .22s ease;
+}
+.settings-page main > div > [data-ui="card"]:hover {
+  transform: translateY(-2px);
+  border-color: hsl(var(--primary) / .2);
+}
+
+html.canvas-clean .aleph-aurora { opacity: 0 !important; }
+html.canvas-mesh .aleph-aurora { opacity: .22 !important; }
+html.canvas-midnight .aleph-aurora { opacity: .18 !important; }
+html.canvas-aurora .aleph-aurora { opacity: .42; }
+.dark.canvas-aurora .aleph-aurora { opacity: .28; }
