@@ -420,17 +420,8 @@ const AdminDashboard = () => {
               </div>
             </div>
 
-          <div className={cn("aleph-rail-search relative shrink-0 overflow-hidden", railExpanded ? "mb-3 max-h-12 translate-y-0 opacity-100" : "mb-0 max-h-0 -translate-y-2 opacity-0")}>
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <input
-              value={railQuery}
-              onChange={(event) => setRailQuery(event.target.value)}
-              placeholder="Find workspace..."
-              className="h-10 w-full rounded-2xl border border-border/60 bg-background/60 pl-9 pr-3 text-xs font-semibold outline-none transition-all placeholder:text-muted-foreground/70 focus:border-primary/35 focus:bg-background focus:ring-4 focus:ring-primary/8"
-              tabIndex={railExpanded ? 0 : -1}
-              aria-label="Filter workspaces"
-            />
-          </div>
+
+
 
           <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto py-1" aria-label="Workspace navigation">
             {filteredNavItems.map((item) => {
