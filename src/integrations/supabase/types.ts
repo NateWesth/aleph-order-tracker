@@ -679,45 +679,6 @@ export type Database = {
           },
         ]
       }
-      order_item_comments: {
-        Row: {
-          id: string
-          order_item_id: string
-          user_id: string
-          body: string
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          order_item_id: string
-          user_id: string
-          body: string
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          order_item_id?: string
-          user_id?: string
-          body?: string
-          created_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "order_item_comments_order_item_id_fkey"
-            columns: ["order_item_id"]
-            isOneToOne: false
-            referencedRelation: "order_items"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "order_item_comments_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       order_items: {
         Row: {
           code: string | null
