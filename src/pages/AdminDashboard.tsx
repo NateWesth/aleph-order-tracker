@@ -410,7 +410,7 @@ const AdminDashboard = () => {
             "aleph-workspace-rail fixed left-0 z-40 hidden shrink-0 flex-col overflow-visible border-r border-border/55 bg-card/95 py-4 backdrop-blur-xl lg:flex",
             railExpanded ? "w-[248px] px-3" : "w-[56px] px-1.5",
           )}
-          style={{ top: headerHeight, height: `calc(100dvh - ${headerHeight}px)` }}
+          style={{ top: headerHeight, height: `calc(100dvh - ${headerHeight}px - 8px)` }}
         >
           <div className="relative flex h-full w-full flex-col overflow-hidden">
             <div className={cn("aleph-rail-head mb-3 flex h-12 shrink-0 items-center", railExpanded ? "justify-between gap-2 px-1" : "justify-center")}>
