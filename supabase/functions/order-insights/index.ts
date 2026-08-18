@@ -34,10 +34,11 @@ serve(async (req) => {
 
     const userId = claimsData.claims.sub;
 
-    // Require admin role
-    const { data: userRole } = await supabaseAuth.from("user_roles").select("role").eq("user_id", userId).single();
-    if (userRole?.role !== "admin") {
-      return new Response(JSON.stringify({ error: "Forbidden - Admin access required" }), {
+    // AI is an internal team feature. Require an approved profile, rather than
+    // silently hiding it from every non-admin team member.
+    const { data: profile } = await supabaseAuth.from("profiles").select("approved").eq("id", userId).single();
+    if (!profile?.approved) {
+      return new Response(JSON.stringify({ error: "Forbidden - approved account required" }), {
         status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }

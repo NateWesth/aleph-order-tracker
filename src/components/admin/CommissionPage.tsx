@@ -817,7 +817,13 @@ const CommissionPage = () => {
     const { data: { user } } = await supabase.auth.getUser();
 
     if (existing) {
-      const updated: Record<string, any> = { [field]: value };
+      const updated = { [field]: value } as {
+        sell_rate?: number | null;
+        cost?: number | null;
+        sub_total?: number | null;
+        commission_rate?: number | null;
+        commission?: number | null;
+      };
       // If clearing every override field, delete the row.
       const remaining = { ...existing, ...updated } as Record<string, any>;
       const allNull = ["sell_rate","cost","sub_total","commission_rate","commission"].every(k => remaining[k] == null);
@@ -830,10 +836,21 @@ const CommissionPage = () => {
       }
     } else {
       if (value === null) return; // nothing to insert
-      const { error } = await supabase.from("commission_line_overrides").insert({
+      const insertRow = {
         rep_id: repId, invoice_id: invoiceId, line_index: lineIndex,
         [field]: value, created_by: user?.id ?? null,
-      });
+      } as {
+        rep_id: string;
+        invoice_id: string;
+        line_index: number;
+        created_by: string | null;
+        sell_rate?: number | null;
+        cost?: number | null;
+        sub_total?: number | null;
+        commission_rate?: number | null;
+        commission?: number | null;
+      };
+      const { error } = await supabase.from("commission_line_overrides").insert(insertRow);
       if (error) { toast({ title: "Save failed", description: error.message, variant: "destructive" }); return; }
     }
     toast({ title: "Updated" });

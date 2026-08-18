@@ -8,6 +8,18 @@
 - Mobile navigation exposes every permitted workspace, including Buying, Items, Commission, and Users.
 - The responsive theme, realtime presence, notifications, order messages, threaded replies, and activity feed work from the same web/Capacitor codebase.
 
+## Performance and experience pass 2
+
+- Major dashboard workspaces and Aleph AI now load on demand instead of blocking startup.
+- Item comments query and subscribe only while opened, avoiding a database request and realtime channel for every visible item.
+- Comments send optimistically and restore the draft if delivery fails.
+- Notifications include All/Unread filters and apply realtime updates without refetching the whole feed.
+- The toolbar now has a clearly labelled Company Watermarks style using the real company logo.
+- Aleph AI is available from both the top toolbar and floating assistant, uses the signed-in user's token, and has a timeout/error recovery path.
+- Approved internal users can use the AI assistant; deploy the updated `order-insights` function and ensure `LOVABLE_API_KEY` is configured.
+- Biometric login can be enabled directly in Settings, cleans up expired credentials, and keeps rotating Supabase refresh tokens synchronized in the secure device keystore.
+- Full TypeScript validation passes with no errors.
+
 ## Deployment
 
 1. Install dependencies and build the Vite app.

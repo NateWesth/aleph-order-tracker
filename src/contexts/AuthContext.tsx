@@ -31,6 +31,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
+
+      // Supabase rotates refresh tokens. Keep the device-keystore copy current or
+      // biometric login works once and later appears to "stop working".
+      if ((event === 'TOKEN_REFRESHED' || event === 'SIGNED_IN') && session?.refresh_token) {
+        void import('@/utils/biometricAuth').then(async ({ hasStoredCredentials, saveRefreshToken }) => {
+          if (await hasStoredCredentials()) await saveRefreshToken(session.refresh_token);
+        });
+      }
     });
 
     // THEN check for existing session and clear any corrupted data

@@ -18,6 +18,8 @@ import {
   getBiometricTypeName, 
   hasStoredCredentials, 
   deleteCredentials,
+  saveRefreshToken,
+  authenticateWithBiometric,
   BiometryType 
 } from "@/utils/biometricAuth";
 import { Capacitor } from "@capacitor/core";
@@ -31,7 +33,7 @@ type ColorfulPreset = keyof typeof colorfulPresets;
 const Settings = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const isMobile = useIsMobile();
   const { theme, colorTheme, boardColorMode, boardSingleColor, colorfulPreset, customBoardColor, stockStatusColors, uiVariant, toolbarStyle, surfaceStyle, canvasStyle, setTheme, setColorTheme, setBoardColorMode, setBoardSingleColor, setColorfulPreset, setCustomBoardColor, setStockStatusColors, setUiVariant, setToolbarStyle, setSurfaceStyle, setCanvasStyle } = useTheme();
   const [userProfile, setUserProfile] = useState<any>(null);
@@ -333,7 +335,7 @@ const Settings = () => {
                         <p className="text-sm text-muted-foreground">
                           {hasSavedCredentials 
                             ? "Quick sign-in using biometric authentication" 
-                            : "Log out and sign in to enable biometric login"
+                            : "Turn this on to securely enable biometric login"
                           }
                         </p>
                       </div>
@@ -345,14 +347,22 @@ const Settings = () => {
                             // Disable biometric - clear credentials
                             await handleClearBiometricCredentials();
                           } else if (checked && !hasSavedCredentials) {
-                            // Can't enable without credentials - inform user
-                            toast({
-                              title: "Setup Required",
-                              description: `Log out and sign in with your email and password to set up ${getBiometricTypeName(biometricType)} login.`,
-                            });
+                            if (!session?.refresh_token) {
+                              toast({ title: "Sign in required", description: "Please sign in again before enabling biometric login." });
+                              return;
+                            }
+                            setClearingCredentials(true);
+                            const verified = await authenticateWithBiometric(`Enable ${getBiometricTypeName(biometricType)} for Aleph Orders`);
+                            const saved = verified && await saveRefreshToken(session.refresh_token);
+                            setClearingCredentials(false);
+                            if (saved) {
+                              setHasSavedCredentials(true);
+                              setBiometricEnabled(true);
+                              toast({ title: `${getBiometricTypeName(biometricType)} enabled`, description: "You can use biometrics the next time you sign in." });
+                            }
                           }
                         }}
-                        disabled={clearingCredentials || (!hasSavedCredentials && !biometricEnabled)}
+                        disabled={clearingCredentials}
                       />
                     </div>
 
@@ -380,11 +390,9 @@ const Settings = () => {
                           <Fingerprint className="h-8 w-8 text-muted-foreground shrink-0" />
                         )}
                         <div>
-                          <p className="text-sm font-medium">How to Enable</p>
+                          <p className="text-sm font-medium">Ready to enable</p>
                           <p className="text-xs text-muted-foreground">
-                            1. Log out of the app<br />
-                            2. Sign in with your email and password<br />
-                            3. When prompted, allow {getBiometricTypeName(biometricType)} access
+                            Turn on the switch above and confirm with {getBiometricTypeName(biometricType)}. Your password is never stored.
                           </p>
                         </div>
                       </div>
@@ -572,7 +580,7 @@ const Settings = () => {
                     {([
                       ['classic', 'Classic', 'Clean card toolbar'],
                       ['dark', 'Dark', 'Dark professional toolbar'],
-                      ['logo-wall', 'Logo Wall', 'Dark toolbar with Aleph watermarks'],
+                      ['logo-wall', 'Company Watermarks', 'Repeating company logos across the toolbar'],
                       ['midnight', 'Midnight', 'Deep navy executive look'],
                       ['glass', 'Glass', 'Transparent frosted toolbar'],
                     ] as [ToolbarStyle, string, string][]).map(([value, label, description]) => (
@@ -587,11 +595,13 @@ const Settings = () => {
                             : "border-border bg-card hover:border-primary/35 hover:-translate-y-0.5"
                         )}
                       >
-                        <div className={cn(
+                        <div
+                          style={value === 'logo-wall' ? { backgroundImage: "url('/lovable-uploads/e1088147-889e-43f6-bdf0-271189b88913.png')", backgroundSize: '26px 26px', backgroundRepeat: 'repeat' } : undefined}
+                          className={cn(
                           "mb-2 h-7 rounded-lg border",
                           value === 'classic' && "bg-background",
                           value === 'dark' && "bg-slate-900",
-                          value === 'logo-wall' && "bg-slate-950 relative after:absolute after:inset-0 after:content-['ALEPH_ALEPH'] after:text-[7px] after:tracking-[0.28em] after:text-white/15 after:flex after:items-center after:justify-center",
+                          value === 'logo-wall' && "bg-slate-950 opacity-90",
                           value === 'midnight' && "bg-gradient-to-r from-slate-950 to-blue-950",
                           value === 'glass' && "bg-background/50 backdrop-blur-xl"
                         )} />

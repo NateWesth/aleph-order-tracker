@@ -5,6 +5,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Bot, Send, Sparkles, Loader2, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Message {
   role: "user" | "assistant";
@@ -44,17 +45,26 @@ export default function AIInsightsPanel() {
     let assistantContent = "";
 
     try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (!accessToken) throw new Error("Please sign in again to use Aleph AI.");
+
+      const controller = new AbortController();
+      const timeout = window.setTimeout(() => controller.abort(), 45_000);
       const resp = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/order-insights`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+            Authorization: `Bearer ${accessToken}`,
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
           },
           body: JSON.stringify({ question }),
+          signal: controller.signal,
         }
       );
+      window.clearTimeout(timeout);
 
       if (!resp.ok) {
         const err = await resp.json().catch(() => ({ error: "Request failed" }));
@@ -122,9 +132,10 @@ export default function AIInsightsPanel() {
       }
     } catch (e: any) {
       console.error("AI insights error:", e);
+      const message = e?.name === "AbortError" ? "Aleph AI took too long to respond. Please try again." : e.message;
       toast({
         title: "AI Insights Error",
-        description: e.message || "Failed to get insights",
+        description: message || "Failed to get insights",
         variant: "destructive",
       });
       // Remove the user message if no response
