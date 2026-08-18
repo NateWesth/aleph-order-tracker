@@ -2579,11 +2579,17 @@ html.toolbar-glass .aleph-toolbar-search-input {
 .aleph-workspace-rail {
   width: 4.5rem;
   z-index: 45;
+  overflow-x: hidden !important;
   box-shadow: 16px 0 44px -38px hsl(var(--foreground) / .6);
   transition:
     width .52s cubic-bezier(.22, 1, .36, 1),
     padding .52s cubic-bezier(.22, 1, .36, 1),
     box-shadow .35s ease;
+}
+
+.aleph-workspace-rail nav {
+  overflow-x: hidden !important;
+  scrollbar-gutter: stable;
 }
 
 .aleph-workspace-rail[data-expanded="true"] {
@@ -2605,14 +2611,32 @@ html.toolbar-glass .aleph-toolbar-search-input {
     margin .42s cubic-bezier(.22, 1, .36, 1);
 }
 
+.aleph-rail-item,
+.aleph-rail-footer-action {
+  transition:
+    transform .3s cubic-bezier(.22, 1, .36, 1),
+    background-color .2s ease,
+    color .2s ease,
+    box-shadow .3s ease,
+    padding .42s cubic-bezier(.22, 1, .36, 1);
+}
+
 .aleph-workspace-rail[data-expanded="false"] .aleph-rail-item:hover,
 .aleph-workspace-rail[data-expanded="false"] .aleph-rail-footer-action:hover {
-  transform: translateY(-1px) scale(1.035);
+  transform: translateY(-1px) scale(1.05);
 }
 
 .aleph-workspace-rail[data-expanded="true"] .aleph-rail-item:hover,
 .aleph-workspace-rail[data-expanded="true"] .aleph-rail-footer-action:hover {
   transform: translateX(3px);
+}
+
+.aleph-rail-toggle {
+  transition:
+    transform .35s cubic-bezier(.34, 1.56, .64, 1),
+    background-color .2s ease,
+    border-color .2s ease,
+    box-shadow .25s ease;
 }
 
 .aleph-workspace-rail[data-expanded="true"] .aleph-rail-toggle {
