@@ -478,7 +478,7 @@ const AdminDashboard = () => {
           </div>
           </div>
         </aside>
-        <main ref={contentScrollRef} className="aleph-content-scroll h-full min-h-0 min-w-0 flex-1 w-full overflow-x-hidden overflow-y-auto pb-16 sm:pb-0" style={{ marginLeft: isDesktop ? (railExpanded ? 248 : 56) : undefined }}>
+        <main ref={contentScrollRef} className={cn("aleph-content-scroll h-full min-h-0 min-w-0 flex-1 w-full overflow-x-hidden overflow-y-auto pb-16 sm:pb-0", railExpanded ? "lg:ml-[248px]" : "lg:ml-[56px]")}>
 
 
           <div
