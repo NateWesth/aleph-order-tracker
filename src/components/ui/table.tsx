@@ -5,22 +5,51 @@ import { cn } from "@/lib/utils"
 const Table = React.forwardRef<
   HTMLTableElement,
   React.HTMLAttributes<HTMLTableElement>
->(({ className, ...props }, ref) => (
-  <div className="relative w-full overflow-auto">
-    <table
-      ref={ref}
-      className={cn("w-full caption-bottom text-sm", className)}
-      {...props}
-    />
-  </div>
-))
+>(({ className, children, ...props }, forwardedRef) => {
+  const tableRef = React.useRef<HTMLTableElement | null>(null)
+
+  const setRef = React.useCallback((node: HTMLTableElement | null) => {
+    tableRef.current = node
+    if (typeof forwardedRef === "function") forwardedRef(node)
+    else if (forwardedRef) forwardedRef.current = node
+  }, [forwardedRef])
+
+  React.useLayoutEffect(() => {
+    const table = tableRef.current
+    if (!table) return
+
+    const labels = Array.from(table.querySelectorAll("thead th")).map((cell) =>
+      (cell.textContent || "Details").trim() || "Details"
+    )
+
+    table.querySelectorAll("tbody tr").forEach((row) => {
+      Array.from(row.children).forEach((cell, index) => {
+        if (!(cell instanceof HTMLTableCellElement)) return
+        cell.dataset.label = labels[index] || "Details"
+        if (cell.colSpan > 1) cell.dataset.span = "full"
+      })
+    })
+  }, [children])
+
+  return (
+    <div className="aleph-data-deck relative w-full overflow-auto">
+      <table
+        ref={setRef}
+        className={cn("w-full caption-bottom text-sm", className)}
+        {...props}
+      >
+        {children}
+      </table>
+    </div>
+  )
+})
 Table.displayName = "Table"
 
 const TableHeader = React.forwardRef<
   HTMLTableSectionElement,
   React.HTMLAttributes<HTMLTableSectionElement>
 >(({ className, ...props }, ref) => (
-  <thead ref={ref} className={cn("[&_tr]:border-b-2 [&_tr]:border-border", className)} {...props} />
+  <thead ref={ref} className={cn("aleph-data-deck-header", className)} {...props} />
 ))
 TableHeader.displayName = "TableHeader"
 
@@ -30,7 +59,7 @@ const TableBody = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <tbody
     ref={ref}
-    className={cn("[&_tr:last-child]:border-0", className)}
+    className={cn("aleph-data-deck-body", className)}
     {...props}
   />
 ))
@@ -58,7 +87,7 @@ const TableRow = React.forwardRef<
   <tr
     ref={ref}
     className={cn(
-      "border-b transition-colors hover:bg-primary/5 data-[state=selected]:bg-primary/10",
+      "aleph-data-deck-row transition-colors data-[state=selected]:bg-primary/10",
       className
     )}
     {...props}
@@ -73,7 +102,7 @@ const TableHead = React.forwardRef<
   <th
     ref={ref}
     className={cn(
-      "h-12 px-4 text-left align-middle font-semibold text-xs uppercase tracking-wide text-muted-foreground [&:has([role=checkbox])]:pr-0",
+      "h-11 px-4 text-left align-middle font-bold text-[10px] uppercase tracking-[0.12em] text-muted-foreground [&:has([role=checkbox])]:pr-0",
       className
     )}
     {...props}
@@ -87,7 +116,7 @@ const TableCell = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <td
     ref={ref}
-    className={cn("p-4 align-middle [&:has([role=checkbox])]:pr-0", className)}
+    className={cn("p-3.5 align-middle [&:has([role=checkbox])]:pr-0", className)}
     {...props}
   />
 ))

@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Trash2, ArrowRight, Package, PackageCheck, ChevronDown, Undo2 } from "lucide-react";
+import { Trash2, ArrowRight, Package, PackageCheck, ChevronDown, Undo2, MessageCircle } from "lucide-react";
 
 import {
   AlertDialog,
@@ -51,6 +51,8 @@ interface Order {
   items?: OrderItem[];
   reference?: string | null;
   boardStage?: string;
+  commentCount?: number;
+  latestCommentAt?: string;
 }
 
 interface StatusConfig {
@@ -493,10 +495,19 @@ function OrderStatusColumn({
                 </span>
 
                 {stockSummary && (
-                  <span className="flex items-center gap-1 font-medium text-muted-foreground">
-                    <PackageCheck className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
-                    {stockSummary.units} unit
-                    {stockSummary.units !== 1 ? "s" : ""}
+                  <span className="flex items-center gap-2">
+                    {(order.commentCount || 0) > 0 && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/12 px-2 py-1 font-black text-blue-600 shadow-[0_0_18px_rgba(59,130,246,.18)] dark:text-blue-300">
+                        <MessageCircle className="h-3 w-3 fill-current/10" />
+                        {order.commentCount}
+                        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-blue-500" />
+                      </span>
+                    )}
+                    <span className="flex items-center gap-1 font-medium text-muted-foreground">
+                      <PackageCheck className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                      {stockSummary.units} unit
+                      {stockSummary.units !== 1 ? "s" : ""}
+                    </span>
                   </span>
                 )}
               </button>

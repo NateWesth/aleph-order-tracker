@@ -15,6 +15,7 @@ const typeConfig: Record<string, { icon: typeof Package; color: string }> = {
   order_created: { icon: Package, color: 'text-emerald-500' },
   order_status_changed: { icon: ArrowRightLeft, color: 'text-blue-500' },
   order_update_message: { icon: MessageCircle, color: 'text-amber-500' },
+  item_comment: { icon: MessageCircle, color: 'text-blue-500' },
 };
 
 function NotificationItem({
@@ -40,7 +41,8 @@ function NotificationItem({
       className={cn(
         "w-full flex items-start gap-3 p-3 text-left transition-colors rounded-lg",
         "hover:bg-muted/60",
-        !notification.read && "bg-primary/5"
+        !notification.read && "bg-primary/5",
+        notification.type === 'item_comment' && !notification.read && "border border-blue-500/15 bg-blue-500/[0.07] shadow-[0_10px_28px_-24px_rgba(59,130,246,.75)]"
       )}
     >
       <div className={cn("mt-0.5 shrink-0", config.color)}>

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Package, PackageCheck, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import OrderItemComments from "./OrderItemComments";
 
 interface OrderItem {
   id: string;
@@ -9,6 +10,8 @@ interface OrderItem {
   quantity: number;
   stock_status: string;
   totalQuantity?: number;
+  commentCount?: number;
+  latestCommentAt?: string;
 }
 
 interface Order {
@@ -25,6 +28,8 @@ interface Order {
   items?: OrderItem[];
   reference?: string | null;
   boardStage?: string;
+  commentCount?: number;
+  latestCommentAt?: string;
 }
 
 interface OrderItemsFloatingBubbleProps {
@@ -156,7 +161,7 @@ export default function OrderItemsFloatingBubble({ order, onClose }: OrderItemsF
           </button>
         </div>
 
-        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
+        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
           <div className="rounded-2xl bg-primary/5 px-3 py-2.5">
             <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Items</p>
             <p className="mt-0.5 font-display text-xl font-bold text-primary">{items.length}</p>
@@ -167,8 +172,13 @@ export default function OrderItemsFloatingBubble({ order, onClose }: OrderItemsF
             <p className="mt-0.5 font-display text-xl font-bold text-[hsl(var(--ribbon-4))]">{units}</p>
           </div>
 
+          <div className="rounded-2xl bg-blue-500/10 px-3 py-2.5">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Team notes</p>
+            <p className="mt-0.5 font-display text-xl font-bold text-blue-500">{visibleOrder.commentCount || 0}</p>
+          </div>
+
           {visibleOrder.reference && (
-            <div className="col-span-2 rounded-2xl bg-muted/45 px-3 py-2.5 sm:col-span-1">
+            <div className="rounded-2xl bg-muted/45 px-3 py-2.5">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Reference</p>
               <p className="mt-0.5 truncate text-sm font-semibold text-foreground">{visibleOrder.reference}</p>
             </div>
@@ -211,7 +221,7 @@ export default function OrderItemsFloatingBubble({ order, onClose }: OrderItemsF
                     </div>
                   </div>
 
-                  <PackageCheck className="h-4 w-4 shrink-0 text-muted-foreground/45" />
+                  <OrderItemComments orderItemId={item.id} initialCount={item.commentCount || 0} className="h-9 w-9 border border-blue-500/15 bg-blue-500/5" />
                 </div>
               );
             })

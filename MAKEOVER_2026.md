@@ -38,6 +38,20 @@
 - All marks remain upright and preserve the original logo proportions.
 - The loading animation is now an Aleph-logo ouroboros: a bright large logo head continuously chases a progressively smaller fading tail around a circular path.
 
+## Workspace architecture pass 5
+
+- Replaced the crowded desktop toolbar tabs with a persistent left workspace rail. Tablet retains a compact switcher and mobile retains bottom navigation.
+- Rebuilt shared page headers as command centres with larger identity icons, stronger hierarchy, stat tiles, and a dedicated action/filter dock.
+- Reworked every shared table into a separated data deck. Desktop rows read as individual records; mobile rows automatically become labelled responsive cards.
+- Increased wheel scrolling to a 3.25x pixel multiplier, 68px line steps, near-full-page paging, and a 1200px safety cap.
+- Watermarks are now included with every toolbar theme. The old watermark-only theme choice was replaced with one persistent show/hide control.
+- Tightened the toolbar watermark composition to 31 overlapping, irregularly placed logos for a compressed doodle effect.
+- Enlarged the home logo control and themed global search to match each toolbar with a lighter surface and readable theme-aware text.
+- Replaced the orbit loader with a single-logo progressive reveal: no ring, dots, duplicated logos, or surrounding decoration.
+- Made item comments visible directly in the Orders item bubble, Progress item table, and Item Progress Board on desktop and mobile.
+- Batched order/item comment counts into the Orders query and added glowing comment activity badges to parent order cards.
+- Added database-backed item-comment broadcasts that create parent-order activity and realtime notifications for other approved users.
+
 ## Deployment
 
 1. Install dependencies and build the Vite app.
@@ -46,4 +60,4 @@
 
 ## Verification note
 
-The changed files pass TypeScript parsing. A full project type-check still reports pre-existing strict Supabase typing errors in CommissionPage, OrdersPage, and useOrderUpdates; these are unrelated to this update.
+The full application TypeScript check and Tailwind CSS compilation pass without errors.

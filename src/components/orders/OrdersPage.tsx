@@ -55,6 +55,8 @@ interface OrderItem {
   qty_invoiced?: number;
   qty_completed?: number;
   totalQuantity?: number;
+  commentCount?: number;
+  latestCommentAt?: string;
 }
 
 interface PurchaseOrderInfo {
@@ -78,6 +80,8 @@ interface Order {
   items?: OrderItem[];
   purchaseOrders?: PurchaseOrderInfo[];
   boardStage?: ItemStage;
+  commentCount?: number;
+  latestCommentAt?: string;
 }
 
 type ItemStage = "awaiting-stock" | "ordered" | "in-stock" | "ready-for-delivery" | "completed";
@@ -337,6 +341,27 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
           .in("order_id", orderIds);
 
         if (itemsData) {
+          const itemIds = itemsData.map((item: any) => item.id);
+          const commentCountMap = new Map<string, number>();
+          const latestCommentMap = new Map<string, string>();
+
+          if (itemIds.length > 0) {
+            const { data: commentsData, error: commentsError } = await supabase
+              .from("order_item_comments")
+              .select("order_item_id, created_at")
+              .in("order_item_id", itemIds);
+
+            if (commentsError) {
+              console.error("Item comment counts could not load:", commentsError);
+            } else {
+              (commentsData || []).forEach((comment) => {
+                commentCountMap.set(comment.order_item_id, (commentCountMap.get(comment.order_item_id) || 0) + 1);
+                const previous = latestCommentMap.get(comment.order_item_id);
+                if (!previous || comment.created_at > previous) latestCommentMap.set(comment.order_item_id, comment.created_at);
+              });
+            }
+          }
+
           itemsData.forEach((item: any) => {
             const existing = orderItemsMap.get(item.order_id) || [];
 
@@ -351,6 +376,8 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
               qty_received: item.qty_received ?? 0,
               qty_invoiced: item.qty_invoiced ?? 0,
               qty_completed: item.qty_completed ?? 0,
+              commentCount: commentCountMap.get(item.id) || 0,
+              latestCommentAt: latestCommentMap.get(item.id),
             });
 
             orderItemsMap.set(item.order_id, existing);
@@ -404,6 +431,12 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
         creatorName: order.user_id ? userMap.get(order.user_id) || undefined : undefined,
         items: orderItemsMap.get(order.id) || [],
         purchaseOrders: orderPOsMap.get(order.id) || [],
+        commentCount: (orderItemsMap.get(order.id) || []).reduce((total, item) => total + (item.commentCount || 0), 0),
+        latestCommentAt: (orderItemsMap.get(order.id) || [])
+          .map((item) => item.latestCommentAt)
+          .filter((value): value is string => Boolean(value))
+          .sort()
+          .at(-1),
       }));
 
       setOrders(ordersWithData);
@@ -432,7 +465,7 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
     }
   }, [toast, itemsBubble]);
 
-  useLiveData(["orders", "order_items", "order_purchase_orders", "order_files"], () => fetchOrders());
+  useLiveData(["orders", "order_items", "order_item_comments", "order_purchase_orders", "order_files"], () => fetchOrders());
 
   useEffect(() => {
     fetchOrders();

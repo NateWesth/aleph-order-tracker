@@ -281,7 +281,7 @@ export default function SmartSearch({ onNavigate, onSelectResult, className }: S
           }}
           onFocus={() => setIsOpen(true)}
           onKeyDown={handleKeyDown}
-          className="pl-8 sm:pl-10 pr-8 h-9 sm:h-10 bg-secondary/50 border-0 focus-visible:ring-1 focus-visible:ring-primary/50 rounded-xl text-sm"
+          className="aleph-toolbar-search-input pl-9 sm:pl-11 pr-8 h-11 sm:h-12 border-0 focus-visible:ring-2 focus-visible:ring-primary/35 rounded-2xl text-sm font-medium"
         />
         {query && (
           <button

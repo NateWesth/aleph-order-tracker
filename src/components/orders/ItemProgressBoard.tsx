@@ -13,6 +13,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useUserData } from "@/hooks/useUserData";
 import { useOptimizedRealtime } from "@/hooks/useOptimizedRealtime";
 import { useIsMobile } from "@/hooks/use-mobile";
+import OrderItemComments from "./components/OrderItemComments";
 import {
   DndContext,
   DragOverlay,
@@ -169,9 +170,12 @@ function DraggableItem({
           <GripVertical className="h-4 w-4 text-muted-foreground shrink-0" />
           <span className="font-medium truncate">{item.name}</span>
         </div>
-        <Badge variant="secondary" className="text-[10px] shrink-0">
-          {qty} of {item.quantity}
-        </Badge>
+        <div className="flex shrink-0 items-center gap-1">
+          <OrderItemComments orderItemId={item.id} className="h-7 w-7 border border-blue-500/15 bg-blue-500/5" />
+          <Badge variant="secondary" className="text-[10px] shrink-0">
+            {qty} of {item.quantity}
+          </Badge>
+        </div>
       </div>
       {item.code && (
         <p className="text-muted-foreground text-[10px] pl-5 font-mono">{item.code}</p>
@@ -679,9 +683,12 @@ export default function ItemProgressBoard({ isAdmin }: ItemProgressBoardProps) {
                                   <div key={card.item.id} className="p-3 bg-muted/50 rounded space-y-2">
                                     <div className="flex items-start justify-between gap-2">
                                       <span className="font-medium text-sm">{card.item.name}</span>
-                                      <Badge variant="secondary" className="text-xs shrink-0">
-                                        {card.qty} of {card.item.quantity}
-                                      </Badge>
+                                      <div className="flex shrink-0 items-center gap-1">
+                                        <OrderItemComments orderItemId={card.item.id} className="h-8 w-8 border border-blue-500/15 bg-blue-500/5" />
+                                        <Badge variant="secondary" className="text-xs shrink-0">
+                                          {card.qty} of {card.item.quantity}
+                                        </Badge>
+                                      </div>
                                     </div>
                                     {card.qty > 1 && (
                                       <div className="flex items-center gap-2">
