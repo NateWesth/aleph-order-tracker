@@ -2622,26 +2622,48 @@ html.toolbar-glass .aleph-toolbar-search-input {
 
 
 
-/* Hide scrollbars everywhere except the main page scroller on the right */
-*::-webkit-scrollbar { width: 0; height: 0; }
-* { scrollbar-width: none; }
+/* Hide every scrollbar app-wide (scrolling still works) */
+*::-webkit-scrollbar,
+html::-webkit-scrollbar,
+body::-webkit-scrollbar { width: 0 !important; height: 0 !important; display: none; }
+*, html, body { scrollbar-width: none !important; -ms-overflow-style: none; }
 
-.app-shell main.aleph-content-scroll,
-html {
-  scrollbar-width: thin;
+/* Rail items scale with viewport height so the rail never scrolls */
+.aleph-workspace-rail {
+  --rail-item-h: clamp(30px, 4.5vh, 44px);
 }
 
-.app-shell main.aleph-content-scroll::-webkit-scrollbar,
-html::-webkit-scrollbar {
-  width: 10px;
-  height: 0;
+.aleph-workspace-rail nav {
+  overflow-y: hidden !important;
+  gap: clamp(2px, 0.5vh, 6px);
 }
 
-.app-shell main.aleph-content-scroll::-webkit-scrollbar-thumb,
-html::-webkit-scrollbar-thumb {
-  background: hsl(var(--muted-foreground) / .35);
-  border-radius: 999px;
+.aleph-rail-item,
+.aleph-rail-footer-action {
+  height: var(--rail-item-h);
+  min-height: var(--rail-item-h);
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  font-size: clamp(11px, 1.6vh, 14px);
 }
+
+.aleph-rail-item > span:first-child,
+.aleph-rail-footer-action > span:first-child {
+  height: calc(var(--rail-item-h) - 6px);
+  width: calc(var(--rail-item-h) - 6px);
+}
+
+.aleph-rail-item svg,
+.aleph-rail-footer-action svg {
+  height: clamp(14px, 2vh, 18px);
+  width: clamp(14px, 2vh, 18px);
+}
+
+.aleph-workspace-rail .aleph-rail-head {
+  height: clamp(34px, 5vh, 48px);
+  margin-bottom: clamp(4px, 1vh, 12px);
+}
+
 
 
 
