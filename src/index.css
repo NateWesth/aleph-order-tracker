@@ -2622,11 +2622,14 @@ html.toolbar-glass .aleph-toolbar-search-input {
 
 
 
-/* Hide every scrollbar app-wide (scrolling still works) */
-*::-webkit-scrollbar,
+/* Hide scrollbars on nested containers; keep the page scrollbar visible */
+*::-webkit-scrollbar { width: 0 !important; height: 0 !important; display: none; }
+* { scrollbar-width: none !important; -ms-overflow-style: none; }
+
+/* Restore the main page scrollbar */
 html::-webkit-scrollbar,
-body::-webkit-scrollbar { width: 0 !important; height: 0 !important; display: none; }
-*, html, body { scrollbar-width: none !important; -ms-overflow-style: none; }
+body::-webkit-scrollbar { width: 8px !important; height: 8px !important; display: block; }
+html, body { scrollbar-width: thin !important; }
 
 /* Rail items scale with viewport height so the rail never scrolls */
 .aleph-workspace-rail {
