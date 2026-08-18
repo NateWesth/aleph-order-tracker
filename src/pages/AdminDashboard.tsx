@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Package, History, BarChart3, Settings, LogOut, Building2, Box, Users, Truck, FileText, Command, ShoppingCart, Percent, Sparkles, Bot, PanelLeftClose, PanelLeftOpen, Search } from "lucide-react";
+import { Package, History, BarChart3, Settings, LogOut, Building2, Box, Users, Truck, FileText, Command, ShoppingCart, Percent, Sparkles, Bot, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import ChangelogDialog, { hasUnreadChangelog } from "@/components/admin/ChangelogDialog";
 import KeyboardShortcutsDialog from "@/components/admin/KeyboardShortcutsDialog";
 import { playClick, playWhoosh } from "@/utils/ambientSounds";
@@ -420,17 +420,8 @@ const AdminDashboard = () => {
               </div>
             </div>
 
-          <div className={cn("aleph-rail-search relative shrink-0 overflow-hidden", railExpanded ? "mb-3 max-h-12 translate-y-0 opacity-100" : "mb-0 max-h-0 -translate-y-2 opacity-0")}>
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <input
-              value={railQuery}
-              onChange={(event) => setRailQuery(event.target.value)}
-              placeholder="Find workspace..."
-              className="h-10 w-full rounded-2xl border border-border/60 bg-background/60 pl-9 pr-3 text-xs font-semibold outline-none transition-all placeholder:text-muted-foreground/70 focus:border-primary/35 focus:bg-background focus:ring-4 focus:ring-primary/8"
-              tabIndex={railExpanded ? 0 : -1}
-              aria-label="Filter workspaces"
-            />
-          </div>
+
+
 
           <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto py-1" aria-label="Workspace navigation">
             {filteredNavItems.map((item) => {
@@ -483,17 +474,18 @@ const AdminDashboard = () => {
           <button
             type="button"
             onClick={() => setRailExpanded(prev => !prev)}
-            className="aleph-rail-ribbon-toggle group/toggle absolute -right-3.5 top-24 z-50 flex items-start justify-center text-muted-foreground transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+            className="aleph-rail-ribbon-toggle group/toggle absolute top-1/2 -right-[22px] z-50 flex h-16 w-[22px] -translate-y-1/2 items-center justify-center text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
             aria-expanded={railExpanded}
             aria-controls="aleph-workspace-navigation"
             title={`${railExpanded ? "Collapse" : "Expand"} control centre (Ctrl+\\)`}
           >
-            <span className="relative flex h-4 w-4 items-center justify-center pt-2.5">
+            <span className="relative flex h-4 w-4 items-center justify-center">
               <PanelLeftClose className={cn("h-3.5 w-3.5 transition-all duration-300", railExpanded ? "rotate-0 scale-100 opacity-100" : "-rotate-90 scale-50 opacity-0")} />
               <PanelLeftOpen className={cn("absolute h-3.5 w-3.5 transition-all duration-300", railExpanded ? "rotate-90 scale-50 opacity-0" : "rotate-0 scale-100 opacity-100")} />
             </span>
             <span className="sr-only">{railExpanded ? "Collapse" : "Expand"} control centre</span>
           </button>
+
         </aside>
         <main ref={contentScrollRef} className={cn("aleph-content-scroll h-full min-h-0 min-w-0 flex-1 w-full overflow-x-hidden overflow-y-auto pb-16 transition-[margin-left] duration-500 ease-[cubic-bezier(.22,1,.36,1)] sm:pb-0", railExpanded ? "lg:ml-[248px]" : "lg:ml-[72px]")}>
           <div
