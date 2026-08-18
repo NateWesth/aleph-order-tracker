@@ -1145,7 +1145,7 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
             <div
               className={cn(
                 "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4 w-full overflow-visible",
-                "items-start lg:min-h-0 lg:flex-1 lg:items-stretch lg:overflow-hidden",
+                "items-start lg:min-h-0 lg:flex-1 lg:items-stretch lg:overflow-hidden lg:grid-rows-[1fr]",
               )}
             >
               {STATUS_COLUMNS.map((column) => {
