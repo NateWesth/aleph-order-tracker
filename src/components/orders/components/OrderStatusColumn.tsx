@@ -219,7 +219,7 @@ function OrderStatusColumn({
     <>
       <div
         ref={setNodeRef}
-        className={cn("flex flex-col w-full min-w-0", isOver && "ring-2 ring-primary/50 rounded-xl transition-all")}
+        className={cn("flex flex-col w-full min-w-0 lg:h-full lg:min-h-0", isOver && "ring-2 ring-primary/50 rounded-xl transition-all")}
       >
         {isMobile ? (
           <button
@@ -278,8 +278,14 @@ function OrderStatusColumn({
         )}
 
         {effectiveIsExpanded && (
-          <div className="flex-1 bg-muted/30 dark:bg-muted/10 rounded-b-xl border border-t-0 border-border glass-card !rounded-t-none min-h-[200px] sm:min-h-[400px] animate-fade-in">
-            <div className="min-w-0 w-full">
+          <div className="flex-1 bg-muted/30 dark:bg-muted/10 rounded-b-xl border border-t-0 border-border glass-card !rounded-t-none min-h-[200px] sm:min-h-[400px] lg:min-h-0 animate-fade-in lg:overflow-hidden">
+            <div
+              className="order-column-scroll min-w-0 w-full lg:h-full lg:overflow-y-auto lg:overscroll-contain"
+              data-order-column-scroll
+              data-global-scroll-ignore="true"
+              tabIndex={0}
+              aria-label={`${config.label} orders, scrollable column`}
+            >
               <div className="p-2 space-y-2">
                 {orders.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-12 sm:py-16 text-muted-foreground">
@@ -583,10 +589,9 @@ function OrderStatusColumn({
      * ================================================================ */
 
     return (
-      <div className="space-y-2">
+      <div key={`${order.id}-${config.key}`} className="space-y-2">
         {isMobile ? (
           <SwipeableCard
-            key={`${order.id}-${config.key}`}
             onSwipeLeft={() => onDeleteOrder(order)}
             onSwipeRight={config.nextStatus ? () => onMoveOrder(order, config.nextStatus!) : undefined}
             leftLabel="Delete"
@@ -596,7 +601,7 @@ function OrderStatusColumn({
             {cardContent}
           </SwipeableCard>
         ) : (
-          <DraggableCard key={`${order.id}-${config.key}`} id={`${order.id}::${order.boardStage || config.key}`}>
+          <DraggableCard id={`${order.id}::${order.boardStage || config.key}`}>
             {cardContent}
           </DraggableCard>
         )}

@@ -191,10 +191,10 @@ const AdminDashboard = () => {
   }
 
   return (
-    <div className="app-shell min-h-screen w-full flex flex-col bg-background overflow-x-hidden relative">
+    <div className="app-shell h-[100dvh] min-h-0 w-full flex flex-col bg-background overflow-hidden relative">
       <AuroraBackground />
       {/* Modern Top Navigation Bar */}
-      <header ref={headerRef} className="aleph-topbar sticky top-0 z-50 w-full border-b shadow-soft">
+      <header ref={headerRef} className="aleph-topbar relative z-50 w-full shrink-0 border-b shadow-soft">
         <ToolbarWatermark />
         <div className="ribbon-bar" aria-hidden />
         <div className="w-full px-2 sm:px-3 py-2 sm:py-3">
@@ -322,10 +322,9 @@ const AdminDashboard = () => {
         </div>
       </header>
 
-      {/* Main content area with activity sidebar.
-          Keep scrolling on the document itself. A nested overflow-y-auto here
-          creates a trapped scroll region and makes wheel hit-testing unreliable. */}
-      <div className="flex w-full items-start min-w-0 overflow-x-hidden">
+      {/* The application frame is viewport-locked. Only the active page canvas
+          (or an Orders Board column) owns vertical scrolling. */}
+      <div className="aleph-shell-workspace flex min-h-0 w-full flex-1 items-stretch overflow-hidden">
         <aside className="aleph-workspace-rail fixed left-0 hidden w-[220px] shrink-0 flex-col border-r border-border/55 bg-card/95 px-3 py-5 backdrop-blur-xl lg:flex" style={{ top: headerHeight, height: `calc(100dvh - ${headerHeight}px)` }}>
           <div className="mb-4 px-2">
             <p className="text-[10px] font-black uppercase tracking-[0.22em] text-primary">Control centre</p>
@@ -364,16 +363,21 @@ const AdminDashboard = () => {
             Preferences
           </button>
         </aside>
-        {/* Main content uses natural document scrolling. */}
-        <main className="min-w-0 flex-1 overflow-x-hidden w-full pb-16 sm:pb-0 lg:ml-[220px]">
+        <main
+          className={cn(
+            "aleph-content-scroll h-full min-h-0 min-w-0 flex-1 w-full overflow-x-hidden pb-16 sm:pb-0 lg:ml-[220px]",
+            activeView === "orders" ? "overflow-y-auto lg:overflow-y-hidden" : "overflow-y-auto",
+          )}
+        >
           <div
             className={cn(
               "app-page-stage w-full px-3 sm:px-5 lg:px-6 py-4 sm:py-6",
+              activeView === "orders" && "lg:h-full lg:min-h-0",
               activeView === "orders" || activeView === "history" ? "max-w-none" : "max-w-[1480px] mx-auto"
             )}
           >
             <Suspense fallback={<PageSkeleton variant="table" />}>
-            <PageTransition viewKey={activeView}>
+            <PageTransition viewKey={activeView} className={activeView === "orders" ? "lg:h-full lg:min-h-0" : undefined}>
               {activeView === "home" && (
                 <CustomizableDashboard
                   userName={userProfile?.full_name}
@@ -396,7 +400,7 @@ const AdminDashboard = () => {
         </main>
 
         {/* Activity Feed Sidebar - desktop only */}
-        <ActivityFeedSidebar topOffset={headerHeight} />
+        <ActivityFeedSidebar />
       </div>
 
       {/* Mobile Bottom Navigation */}

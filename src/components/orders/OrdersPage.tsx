@@ -86,6 +86,18 @@ interface Order {
 
 type ItemStage = "awaiting-stock" | "ordered" | "in-stock" | "ready-for-delivery" | "completed";
 
+interface StatusColumnConfig {
+  key: string;
+  label: string;
+  color: string;
+  bgColor: string;
+  customColor?: string;
+  nextStatus?: string;
+  nextLabel?: string;
+  prevStatus?: string;
+  prevLabel?: string;
+}
+
 const STAGE_ORDER: ItemStage[] = ["awaiting-stock", "ordered", "in-stock", "ready-for-delivery", "completed"];
 
 const COLUMN_STAGE: Record<string, ItemStage> = {
@@ -141,7 +153,7 @@ const countersAfterMove = (item: OrderItem, from: ItemStage, to: ItemStage, qty:
   };
 };
 
-const DEFAULT_STATUS_COLUMNS = [
+const DEFAULT_STATUS_COLUMNS: StatusColumnConfig[] = [
   {
     key: "ordered",
     label: "Awaiting Stock",
@@ -187,7 +199,7 @@ const getStatusColumns = (
   boardSingleColor: string,
   colorfulPreset: string,
   customBoardColor: string,
-) => {
+): StatusColumnConfig[] => {
   if (boardColorMode === "colorful") {
     const preset = colorfulPresets[colorfulPreset as keyof typeof colorfulPresets] || colorfulPresets.default;
 
@@ -465,7 +477,11 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
     }
   }, [toast, itemsBubble]);
 
-  useLiveData(["orders", "order_items", "order_item_comments", "order_purchase_orders", "order_files"], () => fetchOrders());
+  useLiveData(["orders", "order_items", "order_item_comments", "order_purchase_orders", "order_files"], () => fetchOrders(), {
+    channelName: "orders-board-live-data",
+    fallbackIntervalMs: 15_000,
+    debounceMs: 250,
+  });
 
   useEffect(() => {
     fetchOrders();
@@ -961,7 +977,7 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
         }
       `}</style>
 
-      <PullToRefresh onRefresh={fetchOrders} className="aleph-page-workspace aleph-orders-workspace space-y-3 sm:space-y-4 w-full overflow-x-hidden">
+      <PullToRefresh onRefresh={fetchOrders} className="aleph-page-workspace aleph-orders-workspace w-full overflow-x-hidden lg:!overflow-hidden lg:flex lg:h-full lg:min-h-0 lg:flex-col lg:gap-4">
         {selectedOrders.length > 0 && (
           <BulkActionsBar
             selectedOrders={selectedOrders}
@@ -970,7 +986,7 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
           />
         )}
 
-        <div className="flex flex-col gap-3 sm:gap-4">
+        <div className="flex shrink-0 flex-col gap-3 sm:gap-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
               <h2 className="text-xl sm:text-2xl font-semibold text-foreground">Orders Board</h2>
@@ -1070,7 +1086,7 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
           </div>
         </div>
 
-        <section className="orders-stage-flow mb-5 rounded-[28px] border border-border/65 bg-card/85 p-3 shadow-soft sm:p-4">
+        <section className="orders-stage-flow shrink-0 rounded-[28px] border border-border/65 bg-card/85 p-3 shadow-soft sm:p-4">
           <div className="mb-3 flex items-center justify-between px-1">
             <div className="flex items-center gap-2">
               <PackageCheck className="h-4 w-4 text-primary" />
@@ -1085,7 +1101,11 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
                 <div key={column.key} className="flex min-w-0 items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => document.getElementById(`orders-stage-${column.key}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                    onClick={() => {
+                      const stage = document.getElementById(`orders-stage-${column.key}`);
+                      stage?.querySelector<HTMLElement>("[data-order-column-scroll]")?.scrollTo({ top: 0, behavior: "smooth" });
+                      stage?.focus({ preventScroll: true });
+                    }}
                     className="group flex min-w-0 flex-1 items-center gap-3 rounded-2xl border border-border/60 bg-background/75 p-3 text-left transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md"
                   >
                     <span
@@ -1112,7 +1132,7 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
         >
-          <div className="relative w-full overflow-visible">
+          <div className="relative w-full lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:overflow-hidden">
             {itemsBubble && (
               <div className="relative z-50 mb-4 flex w-full justify-center px-1 sm:px-2 lg:mb-5">
                 <OrderItemsFloatingBubble
@@ -1125,12 +1145,17 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
             <div
               className={cn(
                 "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4 w-full overflow-visible",
-                "items-start",
+                "items-start lg:min-h-0 lg:flex-1 lg:items-stretch lg:overflow-hidden",
               )}
             >
               {STATUS_COLUMNS.map((column) => {
                 return (
-                  <div id={`orders-stage-${column.key}`} key={column.key} className="min-w-0 w-full scroll-mt-36 relative">
+                  <div
+                    id={`orders-stage-${column.key}`}
+                    key={column.key}
+                    tabIndex={-1}
+                    className="relative min-w-0 w-full scroll-mt-36 outline-none lg:h-full lg:min-h-0"
+                  >
                     <OrderStatusColumn
                       config={column}
                       orders={ordersByStatus[column.key as keyof typeof ordersByStatus] || []}

@@ -2633,6 +2633,72 @@ html.toolbar-glass .aleph-toolbar-search-input {
   }
 }
 
+/* ============================================================
+   ALEPH WORKSPACE V8 — VIEWPORT SHELL + INDEPENDENT BOARD LANES
+   ============================================================ */
+
+.app-shell {
+  height: 100dvh !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+.aleph-shell-workspace {
+  height: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.app-shell main.aleph-content-scroll {
+  height: 100% !important;
+  min-height: 0 !important;
+  max-height: 100% !important;
+  overflow-y: auto !important;
+  overscroll-behavior-y: contain;
+  scrollbar-gutter: stable;
+}
+
+.aleph-activity-rail {
+  position: relative !important;
+  top: auto !important;
+  height: 100% !important;
+  max-height: 100% !important;
+}
+
+.order-column-scroll {
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--workspace-accent) / .42) transparent;
+}
+
+.order-column-scroll:focus-visible {
+  outline: 2px solid hsl(var(--workspace-accent) / .32);
+  outline-offset: -2px;
+  border-radius: 0 0 1rem 1rem;
+}
+
+@media (min-width: 1024px) {
+  .app-shell main.aleph-content-scroll:has(.aleph-orders-workspace) {
+    overflow-y: hidden !important;
+  }
+
+  .aleph-orders-workspace {
+    height: 100%;
+    min-height: 0;
+  }
+
+  .aleph-orders-workspace > div:last-child,
+  .aleph-orders-workspace > div:last-child > div:last-child {
+    min-height: 0;
+  }
+
+  .order-column-scroll {
+    scroll-behavior: auto;
+    overscroll-behavior: contain;
+    touch-action: pan-y;
+  }
+}
+
 .aleph-history-workspace [data-radix-collapsible-content] {
   background: hsl(var(--background) / .3);
 }
