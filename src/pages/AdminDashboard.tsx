@@ -483,11 +483,6 @@ const AdminDashboard = () => {
           </nav>
 
           <div className="mt-3 shrink-0 space-y-1 border-t border-border/55 pt-3">
-            <button type="button" onClick={() => setCommandOpen(true)} title={railExpanded ? undefined : "Quick actions"} className={cn("aleph-rail-footer-action flex w-full items-center gap-3 rounded-2xl py-2 text-sm font-bold text-muted-foreground transition-all duration-300 hover:bg-primary/8 hover:text-foreground", railExpanded ? "px-3" : "justify-center px-1")}>
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-muted/70"><Command className="h-[18px] w-[18px]" /></span>
-              <span className={cn("aleph-rail-label min-w-0 flex-1 text-left transition-all duration-300", railExpanded ? "translate-x-0 opacity-100" : "pointer-events-none absolute translate-x-3 opacity-0")}>Quick actions</span>
-              <kbd className={cn("rounded-lg border border-border/60 bg-background/70 px-1.5 py-0.5 text-[9px] font-black text-muted-foreground transition-opacity", railExpanded ? "opacity-100" : "hidden opacity-0")}>⌘K</kbd>
-            </button>
             <button type="button" onClick={() => navigate('/settings')} title={railExpanded ? undefined : "Preferences"} className={cn("aleph-rail-footer-action flex w-full items-center gap-3 rounded-2xl py-2 text-sm font-bold text-muted-foreground transition-all duration-300 hover:bg-primary/8 hover:text-foreground", railExpanded ? "px-3" : "justify-center px-1")}>
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-muted/70"><Settings className="h-[18px] w-[18px]" /></span>
               <span className={cn("aleph-rail-label min-w-0 flex-1 text-left transition-all duration-300", railExpanded ? "translate-x-0 opacity-100" : "pointer-events-none absolute translate-x-3 opacity-0")}>Preferences</span>
