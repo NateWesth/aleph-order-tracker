@@ -2700,8 +2700,8 @@ html::-webkit-scrollbar-thumb {
 }
 
 @keyframes aleph-rail-ribbon-arrive {
-  from { transform: translateY(-50%) translateX(-6px); opacity: .55; }
-  to { transform: translateY(-50%) translateX(0); opacity: 1; }
+  from { transform: translateX(-8px); opacity: .55; }
+  to { transform: translateX(0); opacity: 1; }
 }
 
 .aleph-workspace-rail[data-expanded="true"] .aleph-rail-toggle {
