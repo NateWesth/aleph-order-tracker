@@ -2576,14 +2576,13 @@ html.toolbar-glass .aleph-toolbar-search-input {
    ============================================================ */
 
 .aleph-workspace-rail {
-  width: 4.5rem;
+  width: 3.5rem;
   z-index: 45;
   overflow: visible !important;
   box-shadow: 16px 0 44px -38px hsl(var(--foreground) / .6);
   transition:
-    width .52s cubic-bezier(.22, 1, .36, 1),
-    padding .52s cubic-bezier(.22, 1, .36, 1),
-    box-shadow .35s ease;
+    width .2s ease-out,
+    padding .2s ease-out;
 }
 
 .aleph-workspace-rail nav {
@@ -2642,14 +2641,9 @@ html.toolbar-glass .aleph-toolbar-search-input {
   background: hsl(var(--card));
   border: 1px solid hsl(var(--border) / .7);
   border-left: none;
-  border-radius: 0 999px 999px 0;
-  box-shadow: 8px 0 24px -10px hsl(var(--foreground) / .45);
-  transition:
-    transform .35s cubic-bezier(.34, 1.56, .64, 1),
-    background-color .2s ease,
-    border-color .2s ease,
-    box-shadow .25s ease,
-    color .2s ease;
+  border-radius: 0 5px 5px 0;
+  box-shadow: 4px 0 12px -8px hsl(var(--foreground) / .45);
+  transition: background-color .15s ease, border-color .15s ease, color .15s ease;
 }
 
 .aleph-rail-ribbon-toggle::before {
@@ -2663,11 +2657,10 @@ html.toolbar-glass .aleph-toolbar-search-input {
 }
 
 .aleph-rail-ribbon-toggle:hover {
-  transform: translateX(3px);
   background: hsl(var(--card));
   border-color: hsl(var(--primary) / .5);
   color: hsl(var(--primary));
-  box-shadow: 10px 0 30px -10px hsl(var(--primary) / .4);
+  box-shadow: 5px 0 14px -8px hsl(var(--primary) / .4);
 }
 
 
@@ -2695,7 +2688,7 @@ html::-webkit-scrollbar-thumb {
 
 .aleph-workspace-rail[data-expanded="true"] .aleph-rail-ribbon-toggle,
 .aleph-workspace-rail[data-expanded="false"] .aleph-rail-ribbon-toggle {
-  animation: aleph-rail-ribbon-arrive .5s cubic-bezier(.22, 1, .36, 1);
+  animation: none;
 }
 
 @keyframes aleph-rail-ribbon-arrive {
