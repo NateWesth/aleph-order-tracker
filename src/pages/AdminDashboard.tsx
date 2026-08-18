@@ -478,6 +478,22 @@ const AdminDashboard = () => {
               <span className={cn("aleph-rail-label min-w-0 flex-1 text-left transition-all duration-300", railExpanded ? "translate-x-0 opacity-100" : "pointer-events-none absolute translate-x-3 opacity-0")}>Preferences</span>
             </button>
           </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setRailExpanded(prev => !prev)}
+            className="aleph-rail-ribbon-toggle group/toggle absolute -right-3.5 top-24 z-50 flex items-start justify-center text-muted-foreground transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+            aria-expanded={railExpanded}
+            aria-controls="aleph-workspace-navigation"
+            title={`${railExpanded ? "Collapse" : "Expand"} control centre (Ctrl+\\)`}
+          >
+            <span className="relative flex h-4 w-4 items-center justify-center pt-2.5">
+              <PanelLeftClose className={cn("h-3.5 w-3.5 transition-all duration-300", railExpanded ? "rotate-0 scale-100 opacity-100" : "-rotate-90 scale-50 opacity-0")} />
+              <PanelLeftOpen className={cn("absolute h-3.5 w-3.5 transition-all duration-300", railExpanded ? "rotate-90 scale-50 opacity-0" : "rotate-0 scale-100 opacity-100")} />
+            </span>
+            <span className="sr-only">{railExpanded ? "Collapse" : "Expand"} control centre</span>
+          </button>
         </aside>
         <main ref={contentScrollRef} className={cn("aleph-content-scroll h-full min-h-0 min-w-0 flex-1 w-full overflow-x-hidden overflow-y-auto pb-16 transition-[margin-left] duration-500 ease-[cubic-bezier(.22,1,.36,1)] sm:pb-0", railExpanded ? "lg:ml-[248px]" : "lg:ml-[72px]")}>
           <div
