@@ -2,14 +2,6 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { 
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { User, Shield, Search, Check, X, Clock, UserCog, Percent } from "lucide-react";
@@ -214,197 +206,117 @@ export default function UsersManagementPage() {
 
       {/* Pending Approval Section */}
       {pendingUsers.length > 0 && (
-        <div className="bg-warning/10 rounded-2xl p-4 border-2 border-warning/20">
-          <div className="flex items-center gap-2 mb-4">
-            <Clock className="h-5 w-5 text-warning" />
-            <h2 className="font-display text-lg font-semibold text-warning">
-              Pending Approval ({pendingUsers.length})
-            </h2>
+        <section className="user-approval-lane rounded-[28px] border border-warning/25 bg-warning/10 p-4 sm:p-5">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <span className="grid h-11 w-11 place-items-center rounded-2xl bg-warning/15">
+                <Clock className="h-5 w-5 text-warning" />
+              </span>
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-warning">Access queue</p>
+                <h2 className="font-display text-lg font-semibold">Pending approval</h2>
+              </div>
+            </div>
+            <Badge variant="outline" className="rounded-full border-warning/30 bg-background/70 px-3 py-1">
+              {pendingUsers.length} waiting
+            </Badge>
           </div>
-          <div className="bg-card rounded-xl shadow-soft">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>User</TableHead>
-                  <TableHead>Contact</TableHead>
-                  <TableHead>Requested</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {pendingUsers.map((user) => (
-                  <TableRow key={user.id}>
-                    <TableCell>
-                      <div className="flex items-center space-x-3">
-                        <div className="bg-yellow-100 dark:bg-yellow-900/50 p-2 rounded-full">
-                          <User className="h-4 w-4 text-yellow-600" />
-                        </div>
-                        <div>
-                          <div className="font-medium">{user.full_name || 'N/A'}</div>
-                          <div className="text-sm text-muted-foreground">{user.position || 'No position'}</div>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-sm">{user.email}</div>
-                      <div className="text-sm text-muted-foreground">{user.phone || 'No phone'}</div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-sm">
-                        {new Date(user.created_at).toLocaleDateString()}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          onClick={() => approveUser(user.id, true)}
-                          className="bg-green-600 hover:bg-green-700"
-                        >
-                          <Check className="h-4 w-4 mr-1" />
-                          Approve
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          onClick={() => approveUser(user.id, false)}
-                        >
-                          <X className="h-4 w-4 mr-1" />
-                          Reject
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+          <div className="grid gap-3 lg:grid-cols-2">
+            {pendingUsers.map((user) => (
+              <article key={user.id} className="rounded-2xl border border-warning/20 bg-card/95 p-4 shadow-soft">
+                <div className="flex items-start gap-3">
+                  <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-warning/12 text-warning">
+                    <User className="h-5 w-5" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="truncate font-semibold">{user.full_name || 'N/A'}</h3>
+                    <p className="text-sm text-muted-foreground">{user.position || 'No position supplied'}</p>
+                  </div>
+                  <span className="text-xs text-muted-foreground">{new Date(user.created_at).toLocaleDateString()}</span>
+                </div>
+                <div className="my-4 grid gap-2 rounded-2xl bg-muted/45 p-3 text-sm sm:grid-cols-2">
+                  <span className="truncate">{user.email}</span>
+                  <span className="truncate text-muted-foreground sm:text-right">{user.phone || 'No phone'}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button size="sm" onClick={() => approveUser(user.id, true)} className="bg-green-600 hover:bg-green-700">
+                    <Check className="mr-1 h-4 w-4" /> Approve
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => approveUser(user.id, false)} className="border-destructive/35 text-destructive hover:bg-destructive/10">
+                    <X className="mr-1 h-4 w-4" /> Reject
+                  </Button>
+                </div>
+              </article>
+            ))}
           </div>
-        </div>
+        </section>
       )}
 
       {/* Active Users Section */}
-      <div>
-        <h2 className="text-lg font-semibold mb-4">Active Users ({approvedUsers.length})</h2>
-        <div className="bg-card rounded-lg shadow">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>User</TableHead>
-                <TableHead>Contact</TableHead>
-                <TableHead>Company</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead>Joined</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {approvedUsers.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8">
-                    No active users found.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                approvedUsers.map((user) => (
-                  <TableRow key={user.id}>
-                    <TableCell>
-                      <div className="flex items-center space-x-3">
-                        <div className="bg-primary/10 p-2 rounded-full">
-                          <User className="h-4 w-4 text-primary" />
-                        </div>
-                        <div>
-                          <div className="font-medium">{user.full_name || 'N/A'}</div>
-                          <div className="text-sm text-muted-foreground">{user.position || 'No position'}</div>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-sm">{user.email}</div>
-                      <div className="text-sm text-muted-foreground">{user.phone || 'No phone'}</div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{user.company_name}</Badge>
-                      {user.company_code && (
-                        <div className="text-xs text-muted-foreground mt-1">Code: {user.company_code}</div>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-col gap-1 items-start">
-                        {user.role === 'admin' ? (
-                          <Badge className="bg-primary">
-                            <Shield className="h-3 w-3 mr-1" />
-                            Admin
-                          </Badge>
-                        ) : (
-                          <Badge variant="secondary">
-                            <User className="h-3 w-3 mr-1" />
-                            User
-                          </Badge>
-                        )}
-                        {user.can_edit_commission && (
-                          <Badge variant="outline" className="border-green-600 text-green-700 dark:text-green-400">
-                            <Percent className="h-3 w-3 mr-1" />
-                            Commission Editor
-                          </Badge>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-sm">
-                        {new Date(user.created_at).toLocaleDateString()}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-2 flex-wrap">
-                        {user.role === 'admin' ? (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => updateUserRole(user.id, 'user')}
-                            className="text-orange-600 border-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/20"
-                          >
-                            <UserCog className="h-4 w-4 mr-1" />
-                            Make User
-                          </Button>
-                        ) : (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => updateUserRole(user.id, 'admin')}
-                            className="text-primary border-primary hover:bg-primary/10"
-                          >
-                            <Shield className="h-4 w-4 mr-1" />
-                            Make Admin
-                          </Button>
-                        )}
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => toggleCommissionAccess(user.id, !user.can_edit_commission)}
-                          className={user.can_edit_commission
-                            ? "text-green-700 border-green-600 hover:bg-green-50 dark:hover:bg-green-900/20"
-                            : "text-muted-foreground border-muted-foreground/40 hover:bg-accent"}
-                        >
-                          <Percent className="h-4 w-4 mr-1" />
-                          {user.can_edit_commission ? 'Revoke Commission' : 'Allow Commission'}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => approveUser(user.id, false)}
-                          className="text-destructive border-destructive hover:bg-destructive/10"
-                        >
-                          Revoke Access
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+      <section className="user-directory-space">
+        <div className="mb-4 flex items-end justify-between gap-3">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">Team directory</p>
+            <h2 className="text-xl font-semibold">Active people</h2>
+          </div>
+          <Badge variant="secondary" className="rounded-full px-3 py-1">{approvedUsers.length} members</Badge>
         </div>
-      </div>
+        {approvedUsers.length === 0 ? (
+          <div className="rounded-[28px] border border-dashed border-border bg-card/60 py-16 text-center text-muted-foreground">No active users found.</div>
+        ) : (
+          <div className="user-directory-grid grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
+            {approvedUsers.map((user) => (
+              <article key={user.id} className="group flex min-h-[300px] flex-col overflow-hidden rounded-[26px] border border-border/70 bg-card shadow-soft transition-all hover:-translate-y-1 hover:shadow-elevated">
+                <div className="relative border-b border-border/60 bg-gradient-to-br from-primary/12 via-primary/5 to-transparent p-5">
+                  <div className="flex items-start gap-3">
+                    <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/20">
+                      <User className="h-6 w-6" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="truncate text-lg font-semibold">{user.full_name || 'N/A'}</h3>
+                      <p className="truncate text-sm text-muted-foreground">{user.position || 'Team member'}</p>
+                    </div>
+                    {user.role === 'admin' ? (
+                      <Badge className="rounded-full bg-primary"><Shield className="mr-1 h-3 w-3" />Admin</Badge>
+                    ) : (
+                      <Badge variant="secondary" className="rounded-full">User</Badge>
+                    )}
+                  </div>
+                </div>
+                <div className="grid flex-1 gap-3 p-5">
+                  <div className="rounded-2xl bg-muted/45 p-3">
+                    <p className="truncate text-sm font-medium">{user.email}</p>
+                    <p className="truncate text-xs text-muted-foreground">{user.phone || 'No phone number'}</p>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs uppercase tracking-wider text-muted-foreground">Company</p>
+                      <p className="font-medium">{user.company_name}</p>
+                    </div>
+                    {user.company_code && <Badge variant="outline" className="rounded-full">{user.company_code}</Badge>}
+                  </div>
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span>Joined {new Date(user.created_at).toLocaleDateString()}</span>
+                    {user.can_edit_commission && <Badge variant="outline" className="border-green-600/50 text-green-700 dark:text-green-400"><Percent className="mr-1 h-3 w-3" />Commission</Badge>}
+                  </div>
+                </div>
+                <div className="grid gap-2 border-t border-border/60 bg-muted/20 p-4 sm:grid-cols-2">
+                  <Button size="sm" variant="outline" onClick={() => updateUserRole(user.id, user.role === 'admin' ? 'user' : 'admin')}>
+                    {user.role === 'admin' ? <UserCog className="mr-1 h-4 w-4" /> : <Shield className="mr-1 h-4 w-4" />}
+                    {user.role === 'admin' ? 'Make User' : 'Make Admin'}
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => toggleCommissionAccess(user.id, !user.can_edit_commission)}>
+                    <Percent className="mr-1 h-4 w-4" /> {user.can_edit_commission ? 'Remove Commission' : 'Allow Commission'}
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => approveUser(user.id, false)} className="text-destructive hover:bg-destructive/10 hover:text-destructive sm:col-span-2">
+                    Revoke access
+                  </Button>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
 
       <div className="text-sm text-muted-foreground">
         Total users: {filteredUsers.length}

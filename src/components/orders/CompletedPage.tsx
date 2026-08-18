@@ -299,16 +299,16 @@ export default function CompletedPage({
           <p className="text-sm mt-1 text-muted-foreground">Completed orders will appear here grouped by month</p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="history-timeline space-y-4">
           {monthGroups.map(group => (
             <Collapsible 
               key={group.monthKey} 
               open={group.isOpen}
               onOpenChange={() => toggleMonth(group.monthKey)}
-              className="rounded-2xl border-2 border-border bg-card shadow-soft overflow-hidden"
+              className="history-month-block relative overflow-hidden rounded-[26px] border border-border/70 bg-card shadow-soft"
             >
-              <CollapsibleTrigger className="w-full">
-                <div className="flex items-center justify-between px-4 py-3.5 hover:bg-muted/50 transition-colors cursor-pointer">
+              <CollapsibleTrigger className="history-month-header w-full">
+                <div className="flex cursor-pointer items-center justify-between px-4 py-4 transition-colors hover:bg-muted/50 sm:px-5">
                   <div className="flex items-center gap-3">
                     <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-success/10 text-success">
                       <CheckCircle2 className="h-4 w-4" />
