@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/hooks/use-toast";
 
 interface OrderItemComment {
   id: string;
@@ -37,6 +38,7 @@ function formatCommentTime(value: string) {
 
 export default function OrderItemComments({ orderItemId, className }: OrderItemCommentsProps) {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [comments, setComments] = useState<OrderItemComment[]>([]);
   const [open, setOpen] = useState(false);
   const [body, setBody] = useState("");
@@ -64,6 +66,9 @@ export default function OrderItemComments({ orderItemId, className }: OrderItemC
   }, [orderItemId]);
 
   useEffect(() => {
+    // Do not create a query and realtime socket for every row on the order board.
+    // Comments become live only while their popover is open.
+    if (!open || !orderItemId) return;
     fetchComments();
 
     const channel = supabase
@@ -83,7 +88,7 @@ export default function OrderItemComments({ orderItemId, className }: OrderItemC
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [orderItemId, fetchComments]);
+  }, [open, orderItemId, fetchComments]);
 
   const commentCountLabel = useMemo(
     () => `${comments.length} comment${comments.length === 1 ? "" : "s"}`,
@@ -95,6 +100,17 @@ export default function OrderItemComments({ orderItemId, className }: OrderItemC
     if (!trimmed || !user?.id || sending) return;
 
     setSending(true);
+    const optimisticId = `optimistic-${Date.now()}`;
+    const optimistic: OrderItemComment = {
+      id: optimisticId,
+      order_item_id: orderItemId,
+      user_id: user.id,
+      body: trimmed,
+      created_at: new Date().toISOString(),
+      author: { id: user.id, full_name: user.user_metadata?.full_name || null },
+    };
+    setComments(previous => [...previous, optimistic]);
+    setBody("");
     try {
       const { error } = await supabase.from("order_item_comments").insert({
         order_item_id: orderItemId,
@@ -103,11 +119,13 @@ export default function OrderItemComments({ orderItemId, className }: OrderItemC
       });
 
       if (error) throw error;
-      setBody("");
       setOpen(true);
       await fetchComments();
     } catch (error) {
       console.error("Error adding item comment:", error);
+      setComments(previous => previous.filter(comment => comment.id !== optimisticId));
+      setBody(trimmed);
+      toast({ title: "Comment not sent", description: "Your message was restored. Check your connection and try again.", variant: "destructive" });
     } finally {
       setSending(false);
     }

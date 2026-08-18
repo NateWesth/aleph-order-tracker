@@ -10,11 +10,11 @@ import { FloatingUploadButton } from './components/FloatingUploadButton';
 import { PWAInstallPrompt } from './components/PWAInstallPrompt';
 import { PWAUpdatePrompt } from './components/PWAUpdatePrompt';
 import { NetworkStatusIndicator } from './components/ui/NetworkStatusIndicator';
-import AdminDashboard from './pages/AdminDashboard';
 import { useGlobalDocumentScroll } from './hooks/useGlobalDocumentScroll';
 
 // Lazy load heavy components for better Speed Index
 const Auth = lazy(() => import('./pages/Auth'));
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 const Settings = lazy(() => import('./pages/Settings'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 const ResetPassword = lazy(() => import('./pages/ResetPassword'));

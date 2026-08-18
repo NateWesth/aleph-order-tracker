@@ -556,7 +556,7 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
   const handleSetItemStockStatus = useCallback(
     async (itemId: string, newStatus: string) => {
       try {
-        const updateData: Record<string, string> = {
+        const updateData: { stock_status: string; progress_stage?: string } = {
           stock_status: newStatus,
         };
 

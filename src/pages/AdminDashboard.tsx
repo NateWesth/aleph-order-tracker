@@ -2,38 +2,42 @@ import { useNavigate } from "react-router-dom";
 import { PageTransition } from "@/components/ui/PageTransition";
 import AuroraBackground from "@/components/ui/AuroraBackground";
 import OnboardingTour from "@/components/ui/OnboardingTour";
-import { useState, useEffect, useCallback, useRef } from "react";
+import { lazy, Suspense, useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Package, History, BarChart3, Settings, LogOut, Building2, Box, Users, Truck, FileText, Command, ShoppingCart, Percent, Sparkles } from "lucide-react";
+import { Package, History, BarChart3, Settings, LogOut, Building2, Box, Users, Truck, FileText, Command, ShoppingCart, Percent, Sparkles, Bot } from "lucide-react";
 import ChangelogDialog, { hasUnreadChangelog } from "@/components/admin/ChangelogDialog";
 import KeyboardShortcutsDialog from "@/components/admin/KeyboardShortcutsDialog";
 import { playClick, playWhoosh } from "@/utils/ambientSounds";
 import NotificationCenter from "@/components/NotificationCenter";
-import FloatingAIChat from "@/components/admin/FloatingAIChat";
 import CommandPalette from "@/components/admin/CommandPalette";
 import VoiceCommandButton from "@/components/admin/VoiceCommandButton";
 import SmartSearch from "@/components/admin/SmartSearch";
 import ActivityFeedSidebar from "@/components/admin/ActivityFeedSidebar";
 import OnlinePresenceIndicator from "@/components/admin/OnlinePresenceIndicator";
 import { Badge } from "@/components/ui/badge";
-import OrdersPage from "@/components/orders/OrdersPage";
-import CompletedPage from "@/components/orders/CompletedPage";
-import ClientCompaniesPage from "@/components/admin/ClientCompaniesPage";
-import StatsPage from "@/components/admin/StatsPage";
-import ItemsPage from "@/components/admin/ItemsPage";
-import CustomizableDashboard from "@/components/admin/CustomizableDashboard";
-import UsersManagementPage from "@/components/admin/UsersManagementPage";
-import SuppliersPage from "@/components/admin/SuppliersPage";
-import POTrackingPage from "@/components/admin/POTrackingPage";
-import BuyingSheetPage from "@/components/admin/BuyingSheetPage";
-import CommissionPage from "@/components/admin/CommissionPage";
+import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useGlobalUnreadCount } from "@/hooks/useGlobalUnreadCount";
 import { cn } from "@/lib/utils";
 import { triggerHapticFeedback } from "@/utils/haptics";
+
+// Route-level splitting keeps the dashboard interactive while large workspaces
+// (buying, commission, analytics and AI) download only when opened.
+const OrdersPage = lazy(() => import("@/components/orders/OrdersPage"));
+const CompletedPage = lazy(() => import("@/components/orders/CompletedPage"));
+const ClientCompaniesPage = lazy(() => import("@/components/admin/ClientCompaniesPage"));
+const StatsPage = lazy(() => import("@/components/admin/StatsPage"));
+const ItemsPage = lazy(() => import("@/components/admin/ItemsPage"));
+const CustomizableDashboard = lazy(() => import("@/components/admin/CustomizableDashboard"));
+const UsersManagementPage = lazy(() => import("@/components/admin/UsersManagementPage"));
+const SuppliersPage = lazy(() => import("@/components/admin/SuppliersPage"));
+const POTrackingPage = lazy(() => import("@/components/admin/POTrackingPage"));
+const BuyingSheetPage = lazy(() => import("@/components/admin/BuyingSheetPage"));
+const CommissionPage = lazy(() => import("@/components/admin/CommissionPage"));
+const FloatingAIChat = lazy(() => import("@/components/admin/FloatingAIChat"));
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -228,6 +232,17 @@ const AdminDashboard = () => {
               <Button
                 variant="ghost"
                 size="icon"
+                onClick={() => window.dispatchEvent(new CustomEvent("aleph:toggle-ai"))}
+                className="relative rounded-xl text-primary hover:bg-primary/10"
+                title="Open Aleph AI"
+                aria-label="Open Aleph AI assistant"
+              >
+                <Bot className="h-[19px] w-[19px]" />
+                <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-emerald-500 ring-2 ring-background" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
                 onClick={() => setCommandOpen(true)}
                 className="hidden sm:flex rounded-xl text-muted-foreground hover:text-foreground"
                 title="Command Palette (⌘K)"
@@ -320,6 +335,7 @@ const AdminDashboard = () => {
               activeView === "orders" || activeView === "history" ? "max-w-none" : "max-w-7xl mx-auto"
             )}
           >
+            <Suspense fallback={<PageSkeleton variant="table" />}>
             <PageTransition viewKey={activeView}>
               {activeView === "home" && (
                 <CustomizableDashboard
@@ -338,6 +354,7 @@ const AdminDashboard = () => {
               {activeView === "users" && isAdmin && <UsersManagementPage />}
               {activeView === "stats" && <StatsPage />}
             </PageTransition>
+            </Suspense>
           </div>
         </main>
 
@@ -395,7 +412,7 @@ const AdminDashboard = () => {
       />
 
       {/* Floating AI Chat */}
-      <FloatingAIChat />
+      <Suspense fallback={null}><FloatingAIChat /></Suspense>
 
       {/* Changelog */}
       <ChangelogDialog open={changelogOpen} onOpenChange={setChangelogOpen} />

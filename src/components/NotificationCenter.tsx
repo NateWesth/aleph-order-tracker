@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Bell, Check, CheckCheck, Trash2, Package, ArrowRightLeft, MessageCircle, X } from 'lucide-react';
+import { Bell, CheckCheck, Trash2, Package, ArrowRightLeft, MessageCircle, X, Inbox } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -65,7 +65,9 @@ function NotificationItem({
 export default function NotificationCenter({ onNavigateToOrder }: NotificationCenterProps) {
   const { notifications, unreadCount, loading, markAsRead, markAllAsRead, clearAll } = useNotifications();
   const [isOpen, setIsOpen] = useState(false);
+  const [filter, setFilter] = useState<'all' | 'unread'>('all');
   const panelRef = useRef<HTMLDivElement>(null);
+  const visibleNotifications = filter === 'unread' ? notifications.filter(item => !item.read) : notifications;
 
   // Close on outside click
   useEffect(() => {
@@ -143,20 +145,36 @@ export default function NotificationCenter({ onNavigateToOrder }: NotificationCe
             </div>
           </div>
 
+          <div className="flex items-center gap-1 border-b border-border px-3 py-2">
+            {(['all', 'unread'] as const).map(value => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setFilter(value)}
+                className={cn(
+                  "rounded-full px-3 py-1 text-xs font-semibold transition-colors",
+                  filter === value ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
+                )}
+              >
+                {value === 'all' ? `All ${notifications.length}` : `Unread ${unreadCount}`}
+              </button>
+            ))}
+          </div>
+
           {/* Notification List */}
           <ScrollArea className="max-h-[400px]">
             {loading ? (
               <div className="flex items-center justify-center py-8">
                 <div className="h-5 w-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
               </div>
-            ) : notifications.length === 0 ? (
+            ) : visibleNotifications.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-10 text-muted-foreground">
-                <Bell className="h-8 w-8 mb-2 opacity-30" />
-                <p className="text-sm">No notifications yet</p>
+                <Inbox className="h-8 w-8 mb-2 opacity-30" />
+                <p className="text-sm">{filter === 'unread' ? 'You’re all caught up' : 'No notifications yet'}</p>
               </div>
             ) : (
               <div className="py-1 px-1">
-                {notifications.map((notification) => (
+                {visibleNotifications.map((notification) => (
                   <NotificationItem
                     key={notification.id}
                     notification={notification}

@@ -8,9 +8,11 @@ export function useOrderUpdates() {
 
   const updateOrder = async (orderId: string, updates: Partial<Omit<Order, 'items'>>) => {
     try {
+      // companyName is a UI-only projection and is not an orders table column.
+      const { companyName: _companyName, ...databaseUpdates } = updates;
       const { error } = await supabase
         .from('orders')
-        .update(updates)
+        .update(databaseUpdates)
         .eq('id', orderId);
 
       if (error) throw error;

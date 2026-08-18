@@ -116,7 +116,14 @@ export function useNotifications() {
           table: 'notifications',
           filter: `user_id=eq.${user.id}`,
         },
-        () => fetchNotifications()
+        (payload) => {
+          const updated = payload.new as Notification;
+          setNotifications(previous => previous.map(item => item.id === updated.id ? updated : item));
+          setUnreadCount(previous => {
+            const wasUnread = !(payload.old as Partial<Notification>)?.read;
+            return wasUnread && updated.read ? Math.max(0, previous - 1) : previous;
+          });
+        }
       )
       .subscribe();
 

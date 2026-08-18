@@ -15,6 +15,7 @@ import {
   getRefreshToken, 
   saveRefreshToken,
   hasStoredCredentials,
+  deleteCredentials,
   BiometryType
 } from "@/utils/biometricAuth";
 
@@ -94,9 +95,12 @@ const LoginForm = () => {
       }
 
       // Save refresh token for biometric login if available and requested
-      if (saveForBiometric && biometricAvailable && data.session?.refresh_token) {
+      const biometricStatus = saveForBiometric ? await isBiometricAvailable() : null;
+      if (saveForBiometric && biometricStatus?.isAvailable && data.session?.refresh_token) {
         const saved = await saveRefreshToken(data.session.refresh_token);
         if (saved) {
+          setBiometricAvailable(true);
+          setBiometricType(biometricStatus.biometryType);
           setHasSavedCredentials(true);
         }
       }
@@ -195,6 +199,7 @@ const LoginForm = () => {
       const { data, error } = await supabase.auth.refreshSession({ refresh_token: refreshToken });
       
       if (error || !data.session) {
+        await deleteCredentials();
         toast({
           title: "Session Expired",
           description: "Your saved session has expired. Please log in with your email and password.",
