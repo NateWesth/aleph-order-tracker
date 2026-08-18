@@ -468,23 +468,23 @@ const AdminDashboard = () => {
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-muted/70"><Settings className="h-[18px] w-[18px]" /></span>
               <span className={cn("aleph-rail-label min-w-0 flex-1 text-left transition-opacity duration-200", railExpanded ? "translate-x-0 opacity-100" : "pointer-events-none absolute translate-x-3 opacity-0")}>Preferences</span>
             </button>
-          </div>
+            <button
+              type="button"
+              onClick={() => setRailExpanded(prev => !prev)}
+              aria-expanded={railExpanded}
+              aria-controls="aleph-workspace-navigation"
+              title={`${railExpanded ? "Collapse" : "Expand"} control centre (Ctrl+\\)`}
+              className={cn("aleph-rail-footer-action flex w-full items-center gap-3 rounded-2xl py-2 text-sm font-bold text-muted-foreground transition-opacity duration-200 hover:bg-primary/8 hover:text-foreground", railExpanded ? "px-3" : "justify-center px-1")}
+            >
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-muted/70">
+                {railExpanded ? <PanelLeftClose className="h-[18px] w-[18px]" /> : <PanelLeftOpen className="h-[18px] w-[18px]" />}
+              </span>
+              <span className={cn("aleph-rail-label min-w-0 flex-1 text-left transition-opacity duration-200", railExpanded ? "translate-x-0 opacity-100" : "pointer-events-none absolute translate-x-3 opacity-0")}>Collapse</span>
+            </button>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setRailExpanded(prev => !prev)}
-            className="aleph-rail-ribbon-toggle group/toggle absolute bottom-[58px] -right-[16px] z-50 flex h-[34px] w-[17px] items-center justify-center text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-            aria-expanded={railExpanded}
-            aria-controls="aleph-workspace-navigation"
-            title={`${railExpanded ? "Collapse" : "Expand"} control centre (Ctrl+\\)`}
-          >
-            <span className="relative flex h-4 w-4 items-center justify-center">
-              <PanelLeftClose className={cn("h-3 w-3 transition-all duration-150", railExpanded ? "rotate-0 scale-100 opacity-100" : "-rotate-90 scale-50 opacity-0")} />
-              <PanelLeftOpen className={cn("absolute h-3 w-3 transition-all duration-150", railExpanded ? "rotate-90 scale-50 opacity-0" : "rotate-0 scale-100 opacity-100")} />
-            </span>
-            <span className="sr-only">{railExpanded ? "Collapse" : "Expand"} control centre</span>
-          </button>
+          </div>
+
 
         </aside>
         <main ref={contentScrollRef} className={cn("aleph-content-scroll h-full min-h-0 min-w-0 flex-1 w-full overflow-x-hidden overflow-y-auto pb-16 transition-[margin-left] duration-[280ms] ease-[cubic-bezier(.4,0,.2,1)] sm:pb-0", railExpanded ? "lg:ml-[248px]" : "lg:ml-[56px]")}>
