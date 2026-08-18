@@ -347,8 +347,8 @@ const AdminDashboard = () => {
 
       {/* Mobile Bottom Navigation */}
       <nav className="aleph-mobile-nav fixed bottom-0 left-0 right-0 z-50 border-t sm:hidden safe-area-bottom">
-        <div className="flex items-center justify-around px-1 py-1">
-          {navItems.slice(0, 6).map((item) => {
+        <div className="flex items-center justify-start gap-1 overflow-x-auto px-2 py-1 scrollbar-none snap-x">
+          {navItems.map((item) => {
             const isActive = activeView === item.id;
             return (
               <button
@@ -359,7 +359,7 @@ const AdminDashboard = () => {
                   setActiveView(item.id);
                 }}
                 className={cn(
-                  "flex flex-col items-center justify-center gap-0.5 py-2 px-3 rounded-xl transition-all duration-200 min-w-[56px]",
+                  "flex flex-col items-center justify-center gap-0.5 py-2 px-3 rounded-xl transition-all duration-200 min-w-[64px] snap-start",
                   isActive
                     ? "text-primary bg-primary/10"
                     : "text-muted-foreground active:bg-muted active:scale-95"

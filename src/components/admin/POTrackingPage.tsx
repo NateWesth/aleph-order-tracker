@@ -106,9 +106,11 @@ export default function POTrackingPage() {
 
 
   const fetchLinkedOrders = async () => {
-    const { data: links } = await supabase
+    const { data: links, error: linksError } = await supabase
       .from("order_purchase_orders")
       .select("order_id, purchase_order_number");
+
+    if (linksError) throw linksError;
 
     if (!links?.length) {
       setLinkedOrders({});
@@ -116,21 +118,25 @@ export default function POTrackingPage() {
     }
 
     const orderIds = [...new Set(links.map((l) => l.order_id))];
-    const { data: ordersData } = await supabase
+    const { data: ordersData, error: ordersError } = await supabase
       .from("orders")
       .select("id, order_number, status, urgency, created_at, company_id, description")
       .in("id", orderIds);
+    if (ordersError) throw ordersError;
 
     const companyIds = [...new Set((ordersData || []).map((o) => o.company_id).filter(Boolean))] as string[];
     let companyMap = new Map<string, string>();
     if (companyIds.length) {
-      const { data: companies } = await supabase.from("companies").select("id, name").in("id", companyIds);
+      const { data: companies, error: companiesError } = await supabase.from("companies").select("id, name").in("id", companyIds);
+      if (companiesError) throw companiesError;
       companyMap = new Map((companies || []).map((c) => [c.id, c.name]));
     }
 
+    // Index once rather than scanning the complete order list for every PO link.
+    const orderMap = new Map((ordersData || []).map((order) => [order.id, order]));
     const map: Record<string, LinkedOrderRef[]> = {};
     links.forEach((link) => {
-      const order = ordersData?.find((o) => o.id === link.order_id);
+      const order = orderMap.get(link.order_id);
       if (!order) return;
       const key = (link.purchase_order_number || "").trim().toUpperCase();
       if (!key) return;
@@ -167,7 +173,9 @@ export default function POTrackingPage() {
       setPos(purchaseOrders);
       setFetchedAt(data?.fetchedAt || null);
       setIsCached(Boolean(data?.cached));
-      setOpenVendors(new Set(purchaseOrders.map((p) => p.vendorName)));
+      // Large accounts previously mounted every vendor, PO and line on first paint.
+      // Expanding on demand keeps the initial web and mobile render fast.
+      setOpenVendors(new Set());
     } catch (error: any) {
       console.error("Error fetching PO tracking data:", error);
       toast({
