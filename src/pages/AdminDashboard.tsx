@@ -418,7 +418,22 @@ const AdminDashboard = () => {
                 <p className="text-[10px] font-black uppercase tracking-[0.22em] text-primary">Control centre</p>
                 <p className="mt-0.5 text-xs text-muted-foreground">Your live workspaces</p>
               </div>
+              <button
+                type="button"
+                onClick={() => setRailExpanded(prev => !prev)}
+                className="aleph-rail-toggle flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-border/60 bg-muted/50 text-muted-foreground hover:border-primary/40 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                aria-expanded={railExpanded}
+                aria-controls="aleph-workspace-navigation"
+                title={`${railExpanded ? "Collapse" : "Expand"} control centre (Ctrl+\\)`}
+              >
+                <span className="relative flex h-4 w-4 items-center justify-center">
+                  <PanelLeftClose className={cn("h-4 w-4 transition-all duration-300", railExpanded ? "rotate-0 scale-100 opacity-100" : "-rotate-90 scale-50 opacity-0")} />
+                  <PanelLeftOpen className={cn("absolute h-4 w-4 transition-all duration-300", railExpanded ? "rotate-90 scale-50 opacity-0" : "rotate-0 scale-100 opacity-100")} />
+                </span>
+                <span className="sr-only">{railExpanded ? "Collapse" : "Expand"} control centre</span>
+              </button>
             </div>
+
 
 
 
