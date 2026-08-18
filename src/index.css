@@ -2626,10 +2626,11 @@ html.toolbar-glass .aleph-toolbar-search-input {
 *::-webkit-scrollbar { width: 0 !important; height: 0 !important; display: none; }
 * { scrollbar-width: none !important; -ms-overflow-style: none; }
 
-/* Restore the main page scrollbar */
+/* Restore the main page/content scrollbar */
 html::-webkit-scrollbar,
-body::-webkit-scrollbar { width: 8px !important; height: 8px !important; display: block; }
-html, body { scrollbar-width: thin !important; }
+body::-webkit-scrollbar,
+.aleph-content-scroll::-webkit-scrollbar { width: 8px !important; height: 8px !important; display: block; }
+html, body, .aleph-content-scroll { scrollbar-width: thin !important; }
 
 /* Rail items scale with viewport height so the rail never scrolls */
 .aleph-workspace-rail {
