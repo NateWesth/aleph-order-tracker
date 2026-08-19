@@ -25,15 +25,12 @@ import {
   Truck,
   Package,
   FileText,
-  Loader2,
-  RefreshCw,
   Mail,
 } from "lucide-react";
 import { format } from "date-fns";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import { OrderWithCompany } from "@/components/orders/types/orderTypes";
-import { useLiveData } from "@/hooks/useLiveData";
 import OrderDetailsDialog from "@/components/orders/components/OrderDetailsDialog";
 import PageHeader from "@/components/ui/PageHeader";
 import { cn } from "@/lib/utils";
@@ -83,7 +80,6 @@ export default function POTrackingPage() {
   const [pos, setPos] = useState<ZohoPO[]>([]);
   const [linkedOrders, setLinkedOrders] = useState<Record<string, LinkedOrderRef[]>>({});
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [openVendors, setOpenVendors] = useState<Set<string>>(new Set());
   const [selectedVendor, setSelectedVendor] = useState<string | null>(null);
@@ -91,7 +87,6 @@ export default function POTrackingPage() {
   const [selectedOrder, setSelectedOrder] = useState<OrderWithCompany | null>(null);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
   const [fetchedAt, setFetchedAt] = useState<string | null>(null);
-  const [isCached, setIsCached] = useState(false);
   const { toast } = useToast();
   const isMobile = useIsMobile();
 
@@ -99,11 +94,37 @@ export default function POTrackingPage() {
     fetchData();
   }, []);
 
-  // Auto-refresh from Zoho every 10 minutes and whenever the tab regains focus
-  useLiveData(["order_purchase_orders", "order_items"], () => fetchData(true), {
-    fallbackIntervalMs: 5 * 60 * 1000,
-    debounceMs: 1500,
-  });
+  // Zoho webhooks update the shared cache once; Realtime delivers that same
+  // snapshot to every open app without any browser polling or repeated API read.
+  useEffect(() => {
+    let localRefreshTimer: number | undefined;
+    const channel = supabase
+      .channel("po-tracking-event-cache")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "po_tracking_cache", filter: "id=eq.00000000-0000-0000-0000-000000000003" },
+        (change) => {
+          const next = change.new as { payload?: unknown; fetched_at?: string };
+          if (!next?.payload) return;
+          setPos(next.payload as ZohoPO[]);
+          setFetchedAt(next.fetched_at || new Date().toISOString());
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "order_purchase_orders" },
+        () => {
+          window.clearTimeout(localRefreshTimer);
+          localRefreshTimer = window.setTimeout(() => void fetchLinkedOrders(), 500);
+        },
+      )
+      .subscribe();
+
+    return () => {
+      window.clearTimeout(localRefreshTimer);
+      void supabase.removeChannel(channel);
+    };
+  }, []);
 
 
   const fetchLinkedOrders = async () => {
@@ -157,53 +178,45 @@ export default function POTrackingPage() {
     setLinkedOrders(map);
   };
 
-  const fetchData = async (isRefresh = false) => {
-    isRefresh ? setRefreshing(true) : setLoading(true);
+  const fetchData = async () => {
+    setLoading(true);
     try {
-      const [{ data, error }] = await Promise.all([
-        supabase.functions.invoke("po-tracking-data", {
-          body: { force: isRefresh },
-        }),
+      const [{ data: cached, error: cacheError }] = await Promise.all([
+        supabase
+          .from("po_tracking_cache")
+          .select("payload, fetched_at")
+          .eq("id", "00000000-0000-0000-0000-000000000003")
+          .maybeSingle(),
         fetchLinkedOrders(),
       ]);
 
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+      if (cacheError) throw cacheError;
 
-      const purchaseOrders: ZohoPO[] = data?.purchaseOrders || [];
+      // Only a brand-new installation with no snapshot performs one bootstrap
+      // request. Subsequent loads are database-only and webhook-driven.
+      let payload = cached;
+      if (!payload?.payload) {
+        const { data, error } = await supabase.functions.invoke("po-tracking-data", { body: { force: false } });
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+        payload = { payload: data?.purchaseOrders || [], fetched_at: data?.fetchedAt || new Date().toISOString() } as typeof cached;
+      }
+
+      const purchaseOrders = (payload?.payload || []) as unknown as ZohoPO[];
       setPos(purchaseOrders);
-      setFetchedAt(data?.fetchedAt || null);
-      setIsCached(Boolean(data?.cached));
+      setFetchedAt(payload?.fetched_at || null);
       // Large accounts previously mounted every vendor, PO and line on first paint.
       // Expanding on demand keeps the initial web and mobile render fast.
       setOpenVendors(new Set());
     } catch (error: any) {
       console.error("Error fetching PO tracking data:", error);
-      // Keep the workspace useful during a transient Zoho/function outage.
-      const { data: cached } = await supabase
-        .from("po_tracking_cache")
-        .select("payload, fetched_at")
-        .eq("id", "00000000-0000-0000-0000-000000000003")
-        .maybeSingle();
-
-      if (cached?.payload) {
-        setPos(cached.payload as unknown as ZohoPO[]);
-        setFetchedAt(cached.fetched_at);
-        setIsCached(true);
-        toast({
-          title: "Showing the last synchronized purchase orders",
-          description: "Zoho is temporarily unavailable; the page will retry automatically.",
-        });
-      } else {
-        toast({
-          title: "Error",
-          description: error?.message || "Failed to load purchase orders from Zoho",
-          variant: "destructive",
-        });
-      }
+      toast({
+        title: "Error",
+        description: error?.message || "Failed to load the shared purchase-order snapshot",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
   };
 
@@ -307,27 +320,14 @@ export default function POTrackingPage() {
         icon={FileText}
         description={
           fetchedAt
-            ? `${isCached ? "Cached" : "Live from Zoho"} · updated ${format(new Date(fetchedAt), "dd MMM yyyy HH:mm")} · auto-updates every 5 minutes · POs disappear once a vendor bill is raised`
-            : "Live from Zoho · POs disappear once a vendor bill is raised"
+            ? `Live webhook cache · updated ${format(new Date(fetchedAt), "dd MMM yyyy HH:mm")} · POs disappear once a vendor bill is raised`
+            : "Live webhook cache · POs appear when Zoho sends a document event"
         }
         stats={[
           { label: "suppliers", value: vendorGroups.length, icon: Truck },
           { label: "POs", value: pos.length, icon: FileText },
           { label: `units · ${money(totalOutstandingValue)}`, value: totalOutstandingUnits, icon: Package },
-          ...(refreshing ? [{ label: "Updating", value: "", icon: Loader2 }] : []),
         ]}
-        actions={
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => fetchData(true)}
-            disabled={refreshing}
-            className="gap-1.5"
-          >
-            <RefreshCw className={cn("h-3.5 w-3.5", refreshing && "animate-spin")} />
-            Refresh
-          </Button>
-        }
         toolbar={
           <div className="relative w-full">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -546,7 +546,7 @@ export default function POTrackingPage() {
           onOpenChange={setDetailsDialogOpen}
           order={selectedOrder}
           isAdmin={true}
-          onSave={() => fetchData(true)}
+          onSave={() => fetchData()}
         />
       )}
     </div>

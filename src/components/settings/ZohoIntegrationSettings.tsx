@@ -143,7 +143,7 @@ export default function ZohoIntegrationSettings() {
           </Badge>
         </div>
         <CardDescription className="text-xs sm:text-sm">
-          Sync items, contacts, and purchase orders from Zoho Books
+          Event-driven sync for invoices, orders, bills, vendors, items, and purchase orders
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -164,14 +164,14 @@ export default function ZohoIntegrationSettings() {
               </div>
             )}
 
-            {/* Manual sync button */}
+            {/* Explicit disaster-recovery path; routine updates are webhook-driven. */}
             <Button onClick={handleSync} disabled={syncing} variant="outline" className="w-full sm:w-auto">
               {syncing ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               ) : (
                 <RefreshCw className="h-4 w-4 mr-2" />
               )}
-              {syncing ? "Syncing..." : "Sync Now"}
+              {syncing ? "Running recovery..." : "Run recovery sync"}
             </Button>
 
             {/* Sync history */}
@@ -201,7 +201,7 @@ export default function ZohoIntegrationSettings() {
             )}
 
             <p className="text-xs text-muted-foreground">
-              Auto-sync runs every hour. Data synced: Items, Contacts → Companies, Purchase Orders → Orders.
+              Routine updates arrive immediately through secured Zoho webhooks and are read once per changed document. Use the recovery sync only after reconnecting Zoho or repairing missing historical data.
             </p>
           </>
         )}

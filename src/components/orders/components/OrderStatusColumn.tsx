@@ -229,7 +229,7 @@ function OrderStatusColumn({
           <button
             onClick={onToggleExpand}
             className={cn(
-              "px-3 sm:px-4 py-2.5 sm:py-3 rounded-t-xl w-full text-left transition-all duration-200 hover:opacity-90 active:scale-[0.99]",
+              "order-lane-header px-3 sm:px-4 py-2.5 sm:py-3 rounded-t-xl w-full text-left transition-all duration-200 hover:opacity-90 active:scale-[0.99]",
               !effectiveIsExpanded && "rounded-b-xl",
               !config.customColor && config.bgColor,
             )}

@@ -30,7 +30,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Plus, Pencil, Trash2, Truck, Search, Loader2, RefreshCw, Mail } from "lucide-react";
+import { Plus, Pencil, Trash2, Truck, Search, Loader2, Mail } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -80,35 +80,18 @@ export default function SuppliersPage() {
   const [supplierToDelete, setSupplierToDelete] = useState<Supplier | null>(null);
   const [formData, setFormData] = useState<SupplierFormData>(emptyFormData);
   const [saving, setSaving] = useState(false);
-  const [syncing, setSyncing] = useState(false);
   const { toast } = useToast();
   const isMobile = useIsMobile();
 
-  const handleSyncZohoVendors = async () => {
-    setSyncing(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("zoho-sync-vendors");
-      if (error) throw error;
-      if ((data as any)?.error) throw new Error((data as any).error);
-      toast({
-        title: "Vendors synced",
-        description: `${(data as any)?.total_vendors ?? 0} Zoho vendors processed — ${(data as any)?.created ?? 0} added, ${(data as any)?.updated ?? 0} updated.`,
-      });
-      fetchSuppliers();
-    } catch (error: any) {
-      console.error("Vendor sync failed:", error);
-      toast({
-        title: "Sync failed",
-        description: error.message || "Could not sync vendors from Zoho",
-        variant: "destructive",
-      });
-    } finally {
-      setSyncing(false);
-    }
-  };
-
   useEffect(() => {
     fetchSuppliers();
+    const channel = supabase
+      .channel("suppliers-live-cache")
+      .on("postgres_changes", { event: "*", schema: "public", table: "suppliers" }, () => void fetchSuppliers())
+      .subscribe();
+    return () => {
+      void supabase.removeChannel(channel);
+    };
   }, []);
 
   const fetchSuppliers = async () => {
@@ -250,7 +233,7 @@ export default function SuppliersPage() {
       <PageHeader
         title="Suppliers"
         icon={Truck}
-        description="Vendors synced from Zoho Books plus any you add manually."
+        description="Vendors arrive automatically from Zoho document events, plus any you add manually."
         stats={[{ label: "suppliers", value: filteredSuppliers.length, icon: Truck }]}
         toolbar={
           <div className="flex flex-1 flex-col sm:flex-row sm:items-center gap-2">
@@ -263,14 +246,6 @@ export default function SuppliersPage() {
               className="pl-9"
             />
           </div>
-          <Button variant="outline" onClick={handleSyncZohoVendors} disabled={syncing}>
-            {syncing ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <RefreshCw className="h-4 w-4 mr-2" />
-            )}
-            Sync Zoho Vendors
-          </Button>
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
               <Button onClick={() => handleOpenDialog()}>

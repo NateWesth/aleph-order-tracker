@@ -55,6 +55,8 @@ Deno.serve(async (req) => {
 
   const clientId = Deno.env.get('ZOHO_CLIENT_ID')
   const clientSecret = Deno.env.get('ZOHO_CLIENT_SECRET')
+  const recoveryLockKey = 'zoho-full-recovery'
+  let recoveryLockAcquired = false
 
   if (!clientId || !clientSecret) {
     return new Response(JSON.stringify({ error: 'Zoho credentials not configured' }), {
@@ -63,6 +65,18 @@ Deno.serve(async (req) => {
   }
 
   try {
+    const { data: acquired } = await supabase.rpc('try_acquire_zoho_sync_lock', {
+      requested_key: recoveryLockKey,
+      lease_seconds: 900,
+    })
+    recoveryLockAcquired = acquired === true
+    if (!recoveryLockAcquired) {
+      return new Response(JSON.stringify({ error: 'A Zoho recovery sync is already running' }), {
+        status: 409,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
     // Parse sync type from request body or default to full
     let syncType = 'full'
     if (req.method === 'POST') {
@@ -157,6 +171,10 @@ Deno.serve(async (req) => {
     }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
+  } finally {
+    if (recoveryLockAcquired) {
+      await supabase.rpc('release_zoho_sync_lock', { requested_key: recoveryLockKey })
+    }
   }
 })
 

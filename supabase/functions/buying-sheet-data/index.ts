@@ -43,7 +43,7 @@ type VendorCandidate = VendorSummary & {
 }
 
 const CACHE_ID = 'buying-sheet'
-const CACHE_TTL_MS = 15 * 60 * 1000
+const SYNC_LOCK_KEY = 'buying-sheet-bootstrap'
 
 async function readCache(supabase: any) {
   const { data } = await supabase
@@ -67,6 +67,7 @@ Deno.serve(async (req) => {
 
   const clientId = Deno.env.get('ZOHO_CLIENT_ID')
   const clientSecret = Deno.env.get('ZOHO_CLIENT_SECRET')
+  let recoveryLockAcquired = false
 
   if (!clientId || !clientSecret) {
     return new Response(JSON.stringify({ error: 'Zoho credentials not configured' }), {
@@ -97,7 +98,9 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Serve fresh cache first — Zoho enforces a hard daily API call quota
+    // Normal reads are cache-only. The Zoho webhook updates this shared row and
+    // Supabase Realtime pushes the change to every open app. The expensive scan
+    // below is now only an explicit admin recovery/bootstrap path.
     let force = false
     if (req.method === 'POST') {
       try {
@@ -106,20 +109,53 @@ Deno.serve(async (req) => {
       } catch (_e) { /* no body */ }
     }
 
-    if (!force) {
-      const cached = await readCache(supabase)
-      if (cached?.payload && cached.fetched_at) {
-        const age = Date.now() - new Date(cached.fetched_at).getTime()
-        if (age < CACHE_TTL_MS) {
-          return new Response(JSON.stringify({
-            success: true,
-            data: cached.payload,
-            itemCount: Object.keys(cached.payload || {}).length,
-            fetchedAt: cached.fetched_at,
-            cached: true,
-          }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
-        }
+    const cached = await readCache(supabase)
+    if (!force && cached?.payload) {
+      return new Response(JSON.stringify({
+        success: true,
+        data: cached.payload,
+        itemCount: Object.keys(cached.payload || {}).length,
+        fetchedAt: cached.fetched_at,
+        cached: true,
+        eventDriven: true,
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
+
+    if (force) {
+      const { data: role } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .maybeSingle()
+      if (role?.role !== 'admin') {
+        return new Response(JSON.stringify({ error: 'Only administrators can run a full Zoho recovery sync' }), {
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
       }
+    }
+
+    const { data: acquired } = await supabase.rpc('try_acquire_zoho_sync_lock', {
+      requested_key: SYNC_LOCK_KEY,
+      lease_seconds: 600,
+    })
+    recoveryLockAcquired = acquired === true
+    if (!recoveryLockAcquired) {
+      if (cached?.payload) {
+        return new Response(JSON.stringify({
+          success: true,
+          data: cached.payload,
+          itemCount: Object.keys(cached.payload || {}).length,
+          fetchedAt: cached.fetched_at,
+          cached: true,
+          syncInProgress: true,
+          eventDriven: true,
+        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+      return new Response(JSON.stringify({ error: 'Zoho bootstrap sync is already running' }), {
+        status: 409,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
     }
 
 
@@ -198,6 +234,7 @@ Deno.serve(async (req) => {
       itemCount: activeSkus.size,
       fetchedAt,
       cached: false,
+      eventDriven: true,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
@@ -228,6 +265,10 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
 
+  } finally {
+    if (recoveryLockAcquired) {
+      await supabase.rpc('release_zoho_sync_lock', { requested_key: SYNC_LOCK_KEY })
+    }
   }
 })
 
