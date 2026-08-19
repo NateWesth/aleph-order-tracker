@@ -3,6 +3,12 @@ export interface BuyingSheetRow {
   itemName: string;
   totalNeeded: number;
   stockOnHand: number;
+  /** Quantity allocated by PO webhooks to the exact awaiting order lines in this row. */
+  allocatedOnPurchaseOrder: number;
+  /** Open quantity reported by the shared Zoho purchase-order cache for this SKU. */
+  zohoOnPurchaseOrder: number;
+  /** Absolute difference between demand-linked allocations and Zoho's open PO total. */
+  poVariance: number;
   onPurchaseOrder: number;
   toOrder: number;
   orders: { orderNumber: string; customerName: string; quantity: number; urgency?: string }[];
@@ -10,6 +16,7 @@ export interface BuyingSheetRow {
   supplierId: string | null;
   supplierEmail?: string;
   daysWaiting: number;
+  waitingSince: string;
   priorityScore: number;
   coveragePercent: number;
   hasUrgent: boolean;

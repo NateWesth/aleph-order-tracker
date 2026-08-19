@@ -1148,6 +1148,30 @@ async function handleBillWebhook(
   const result = await applyBillReceipt(supabase, data.bill)
   await updateCachesFromBill(supabase, data.bill)
 
+  // A bill changes the outstanding quantity on its linked PO. Refresh that
+  // single document now (and only now) so Buying Sheet and PO Tracking receive
+  // the exact same quantity without a full Zoho scan or browser polling.
+  const linkedPurchaseOrderId = String(data.bill.purchaseorder_id || data.bill.purchase_order_id || '')
+  if (linkedPurchaseOrderId) {
+    try {
+      const poResp = await fetch(
+        `${ZOHO_API_URL}/books/v3/purchaseorders/${linkedPurchaseOrderId}?organization_id=${orgId}`,
+        { headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` } }
+      )
+      const poData = await poResp.json()
+      if (poData.code === 0 && poData.purchaseorder) {
+        const poCached = await cacheZohoDocument(supabase, orgId, 'purchase_order', linkedPurchaseOrderId, poData.purchaseorder)
+        if (!poCached.unchanged) {
+          await updateCachesFromPurchaseOrder(supabase, poCached.previous, poData.purchaseorder)
+        }
+      }
+    } catch (poRefreshError) {
+      // The receipt allocation and bill cost update remain valid. A later PO
+      // webhook safely retries this cache reconciliation.
+      console.error('Failed to refresh linked PO after bill:', poRefreshError)
+    }
+  }
+
   await supabase.from('zoho_sync_log').insert({
     sync_type: 'bill_webhook',
     status: 'completed',
