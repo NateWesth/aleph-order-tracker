@@ -1378,6 +1378,54 @@ export type Database = {
         }
         Relationships: []
       }
+      zoho_document_cache: {
+        Row: {
+          document_id: string
+          document_type: string
+          organization_id: string
+          payload: Json
+          payload_hash: string
+          source_modified_at: string | null
+          synced_at: string
+        }
+        Insert: {
+          document_id: string
+          document_type: string
+          organization_id: string
+          payload: Json
+          payload_hash: string
+          source_modified_at?: string | null
+          synced_at?: string
+        }
+        Update: {
+          document_id?: string
+          document_type?: string
+          organization_id?: string
+          payload?: Json
+          payload_hash?: string
+          source_modified_at?: string | null
+          synced_at?: string
+        }
+        Relationships: []
+      }
+      zoho_sync_locks: {
+        Row: {
+          lock_key: string
+          locked_until: string
+          updated_at: string
+        }
+        Insert: {
+          lock_key: string
+          locked_until: string
+          updated_at?: string
+        }
+        Update: {
+          lock_key?: string
+          locked_until?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       zoho_sync_log: {
         Row: {
           completed_at: string | null
@@ -1447,6 +1495,48 @@ export type Database = {
         }
         Relationships: []
       }
+      zoho_webhook_events: {
+        Row: {
+          dedupe_key: string
+          document_id: string
+          document_type: string
+          error_message: string | null
+          event_type: string | null
+          id: string
+          operation: string | null
+          payload: Json
+          processed_at: string | null
+          received_at: string
+          status: string
+        }
+        Insert: {
+          dedupe_key: string
+          document_id: string
+          document_type: string
+          error_message?: string | null
+          event_type?: string | null
+          id?: string
+          operation?: string | null
+          payload?: Json
+          processed_at?: string | null
+          received_at?: string
+          status?: string
+        }
+        Update: {
+          dedupe_key?: string
+          document_id?: string
+          document_type?: string
+          error_message?: string | null
+          event_type?: string | null
+          id?: string
+          operation?: string | null
+          payload?: Json
+          processed_at?: string | null
+          received_at?: string
+          status?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -1498,6 +1588,10 @@ export type Database = {
         Args: { update_id: string; user_uuid: string }
         Returns: undefined
       }
+      release_zoho_sync_lock: {
+        Args: { requested_key: string }
+        Returns: undefined
+      }
       resolve_rep_for_company_as_of: {
         Args: { _as_of: string; _company_id: string }
         Returns: {
@@ -1511,6 +1605,10 @@ export type Database = {
           commission_method: string
           commission_rate: number
         }[]
+      }
+      try_acquire_zoho_sync_lock: {
+        Args: { lease_seconds?: number; requested_key: string }
+        Returns: boolean
       }
       validate_company_code: {
         Args: { company_code: string }
