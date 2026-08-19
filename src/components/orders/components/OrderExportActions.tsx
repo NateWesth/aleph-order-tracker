@@ -8,9 +8,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Download, Printer, FileText, Sheet, Loader2 } from "lucide-react";
 import ExportProgress from "@/components/ui/ExportProgress";
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
-import * as XLSX from 'xlsx';
 import { supabase } from "@/integrations/supabase/client";
 import { OrderWithCompany } from "../types/orderTypes";
 
@@ -347,6 +344,10 @@ export default function OrderExportActions({
   const handleExportSingleOrderPDF = async (orderToExport: OrderWithCompany) => {
     setLoading(true);
     try {
+      const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
+        import('jspdf'),
+        import('jspdf-autotable'),
+      ]);
       const doc = new jsPDF();
       
       // Fetch company details if company_id exists
@@ -618,6 +619,10 @@ export default function OrderExportActions({
     
     setLoading(true);
     try {
+      const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
+        import('jspdf'),
+        import('jspdf-autotable'),
+      ]);
       const doc = new jsPDF();
       
       // Add title
@@ -714,6 +719,7 @@ export default function OrderExportActions({
     
     setLoading(true);
     try {
+      const XLSX = await import('xlsx');
       // Prepare data for Excel
       const excelData = orders.map(order => ({
         'Order Number': order.order_number,

@@ -11,7 +11,6 @@ import { format } from "date-fns";
 import { Trash2, Eye, CheckCircle, MoreHorizontal } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { useGlobalRealtimeOrders } from "./hooks/useGlobalRealtimeOrders";
 import ProcessingOrderFilesDialog from "./components/ProcessingOrderFilesDialog";
 import OrderExportActions from "./components/OrderExportActions";
 import { sendOrderNotification } from "@/utils/emailNotifications";
@@ -213,17 +212,12 @@ export default function ProcessingPage({
     }
   };
 
-  // Set up real-time subscriptions
-  useGlobalRealtimeOrders({
-    onOrdersChange: () => {
-      fetchProcessingOrders();
-    },
-    isAdmin,
-    pageType: 'processing'
+  // One coalesced Realtime feed replaces the previous duplicate subscriptions.
+  useLiveData(["orders", "order_items", "order_purchase_orders", "order_files"], () => fetchProcessingOrders(), {
+    channelName: "processing-orders-live-data",
+    debounceMs: 400,
+    fallbackIntervalMs: 0,
   });
-
-  // Load user info first, then orders
-  useLiveData(["orders", "order_items", "order_purchase_orders", "order_files"], () => fetchProcessingOrders());
 
   useEffect(() => {
     if (user?.id) {

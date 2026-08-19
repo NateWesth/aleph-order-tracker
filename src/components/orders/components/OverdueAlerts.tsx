@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AlertTriangle, Clock } from "lucide-react";
 import { differenceInDays, format } from "date-fns";
+import { useLiveData } from "@/hooks/useLiveData";
 
 interface OverdueOrder {
   id: string;
@@ -29,8 +30,7 @@ export default function OverdueAlerts() {
   const [overdueOrders, setOverdueOrders] = useState<OverdueOrder[]>([]);
   const [open, setOpen] = useState(false);
 
-  useEffect(() => {
-    const fetchOverdue = async () => {
+  const fetchOverdue = async () => {
       const { data: orders } = await supabase
         .from("orders")
         .select("id, order_number, status, urgency, created_at, companies(name)")
@@ -59,12 +59,17 @@ export default function OverdueAlerts() {
         .sort((a, b) => b.daysOpen - a.daysOpen);
 
       setOverdueOrders(overdue);
-    };
+  };
 
+  useEffect(() => {
     fetchOverdue();
-    const interval = setInterval(fetchOverdue, 5 * 60 * 1000); // refresh every 5min
-    return () => clearInterval(interval);
   }, []);
+
+  useLiveData(["orders"], fetchOverdue, {
+    channelName: "overdue-orders-live-data",
+    debounceMs: 500,
+    fallbackIntervalMs: 0,
+  });
 
   if (overdueOrders.length === 0) return null;
 

@@ -14,20 +14,23 @@ export function NetworkStatusIndicator() {
   const [showRestored, setShowRestored] = useState(false);
 
   useEffect(() => {
+    let restoredTimer: number | undefined;
     const handleOffline = () => {
+      if (restoredTimer) window.clearTimeout(restoredTimer);
       setIsOnline(false);
       setShowRestored(false);
     };
     const handleOnline = () => {
       setIsOnline(true);
       setShowRestored(true);
-      const t = setTimeout(() => setShowRestored(false), 2500);
-      return () => clearTimeout(t);
+      if (restoredTimer) window.clearTimeout(restoredTimer);
+      restoredTimer = window.setTimeout(() => setShowRestored(false), 2500);
     };
 
     window.addEventListener("offline", handleOffline);
     window.addEventListener("online", handleOnline);
     return () => {
+      if (restoredTimer) window.clearTimeout(restoredTimer);
       window.removeEventListener("offline", handleOffline);
       window.removeEventListener("online", handleOnline);
     };
@@ -60,7 +63,7 @@ export function NetworkStatusIndicator() {
         ) : (
           <>
             <WifiOff className="h-4 w-4" />
-            You're offline — changes will retry when reconnected
+            You're offline — reconnect before saving changes
           </>
         )}
       </div>

@@ -6,7 +6,7 @@ import { format } from "date-fns";
 import { File, Download, Printer, Search, Plus, FileText, Eye } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { useGlobalRealtimeOrders } from "./hooks/useGlobalRealtimeOrders";
+import { useLiveData } from "@/hooks/useLiveData";
 import {
   Collapsible,
   CollapsibleContent,
@@ -125,13 +125,10 @@ export default function FilesPage({ isAdmin }: FilesPageProps) {
     }
   };
 
-  // Set up real-time subscriptions for order changes
-  useGlobalRealtimeOrders({
-    onOrdersChange: () => {
-      fetchCompletedOrderFiles();
-    },
-    isAdmin,
-    pageType: 'files'
+  useLiveData(["orders", "order_files"], fetchCompletedOrderFiles, {
+    channelName: "completed-files-live-data",
+    debounceMs: 500,
+    fallbackIntervalMs: 0,
   });
 
   useEffect(() => {
