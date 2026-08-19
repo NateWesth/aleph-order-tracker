@@ -1,10 +1,21 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { allocatePurchaseOrder, applyBillReceipt, applyInvoiceQuantities, isExcludedSku } from './quantity-flow.ts'
+import {
+  cacheZohoDocument,
+  completeWebhookEvent,
+  failWebhookEvent,
+  reserveWebhookEvent,
+  updateCacheFromItem,
+  updateCachesFromBill,
+  updateCachesFromPurchaseOrder,
+  upsertVendorFromContact,
+  type ZohoDocumentType,
+} from './event-cache.ts'
 
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-zoho-webhook-secret, x-webhook-secret',
 }
 
 const ZOHO_AUTH_URL = 'https://accounts.zoho.com/oauth/v2'
@@ -22,10 +33,28 @@ Deno.serve(async (req) => {
 
   const clientId = Deno.env.get('ZOHO_CLIENT_ID')
   const clientSecret = Deno.env.get('ZOHO_CLIENT_SECRET')
+  const webhookSecret = Deno.env.get('ZOHO_WEBHOOK_SECRET')
+  let webhookReceiptId: string | undefined
 
   if (!clientId || !clientSecret) {
     return new Response(JSON.stringify({ error: 'Zoho credentials not configured' }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
+  }
+
+  // Refuse to run unsecured: otherwise anyone who discovers this public URL
+  // could submit document ids and deliberately consume the Zoho API quota.
+  if (!webhookSecret) {
+    return new Response(JSON.stringify({ error: 'ZOHO_WEBHOOK_SECRET is not configured' }), {
+      status: 503,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  }
+  const suppliedSecret = req.headers.get('x-zoho-webhook-secret') || req.headers.get('x-webhook-secret')
+  if (suppliedSecret !== webhookSecret) {
+    return new Response(JSON.stringify({ error: 'Invalid webhook secret' }), {
+      status: 401,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }
 
@@ -82,38 +111,62 @@ Deno.serve(async (req) => {
       return await handleReconcileQuantities(supabase, clientId, clientSecret, Number(payload.since_days) || 90)
     }
 
-    // Detect event type - invoice, purchase order, vendor bill or sales order
-    const invoiceId = payload.invoice_id || payload.data?.invoice_id || payload.invoice?.invoice_id
+    const moduleHint = String(
+      payload.module || payload.entity || payload.resource_type || payload.event_type || payload.event || payload.data?.module || ''
+    ).toLowerCase()
+    const resourceId = payload.resource_id || payload.data?.resource_id || payload.id
+    const invoiceId = payload.invoice_id || payload.data?.invoice_id || payload.invoice?.invoice_id ||
+      (moduleHint.includes('invoice') ? resourceId : null)
     const purchaseOrderId = payload.purchaseorder_id || payload.purchaseorder?.purchaseorder_id ||
-      payload.data?.purchaseorder?.purchaseorder_id || payload.data?.purchaseorder_id
-    const billId = payload.bill_id || payload.bill?.bill_id || payload.data?.bill?.bill_id || payload.data?.bill_id
-    const salesOrderId = payload.salesorder_id || payload.resource_id || payload.id || 
-      payload.salesorder?.salesorder_id || payload.data?.salesorder_id
+      payload.data?.purchaseorder?.purchaseorder_id || payload.data?.purchaseorder_id ||
+      (moduleHint.includes('purchaseorder') || moduleHint.includes('purchase_order') ? resourceId : null)
+    const billId = payload.bill_id || payload.bill?.bill_id || payload.data?.bill?.bill_id || payload.data?.bill_id ||
+      (moduleHint.includes('bill') ? resourceId : null)
+    const vendorId = payload.vendor_id || payload.contact_id || payload.contact?.contact_id || payload.data?.contact_id ||
+      (moduleHint.includes('vendor') || moduleHint.includes('contact') ? resourceId : null)
+    const itemId = payload.item_id || payload.item?.item_id || payload.data?.item_id ||
+      (moduleHint.includes('item') ? resourceId : null)
+    const salesOrderId = payload.salesorder_id || payload.salesorder?.salesorder_id || payload.data?.salesorder_id ||
+      (moduleHint.includes('salesorder') || moduleHint.includes('sales_order') ? resourceId : null)
 
-    if (invoiceId) {
-      return await handleInvoiceWebhook(supabase, payload, invoiceId, clientId, clientSecret)
+    let documentType: ZohoDocumentType | null = null
+    let documentId = ''
+    if (invoiceId) { documentType = 'invoice'; documentId = String(invoiceId) }
+    else if (purchaseOrderId) { documentType = 'purchase_order'; documentId = String(purchaseOrderId) }
+    else if (billId) { documentType = 'bill'; documentId = String(billId) }
+    else if (vendorId) { documentType = 'vendor'; documentId = String(vendorId) }
+    else if (itemId) { documentType = 'item'; documentId = String(itemId) }
+    else if (salesOrderId) { documentType = 'sales_order'; documentId = String(salesOrderId) }
+
+    if (!documentType || !documentId) {
+      console.log('No recognized ID in webhook payload. Full payload:', JSON.stringify(payload))
+      return new Response(JSON.stringify({ received: true, warning: 'No recognized event ID found' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
     }
 
-    if (purchaseOrderId) {
-      return await handlePurchaseOrderWebhook(supabase, purchaseOrderId, clientId, clientSecret)
+    const receipt = await reserveWebhookEvent(supabase, payload, documentType, documentId)
+    if (!receipt.accepted) {
+      return new Response(JSON.stringify({ received: true, duplicate: true, documentType, documentId }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
     }
+    webhookReceiptId = receipt.id
 
-    if (billId) {
-      return await handleBillWebhook(supabase, billId, clientId, clientSecret)
-    }
+    let response: Response
+    if (documentType === 'invoice') response = await handleInvoiceWebhook(supabase, payload, documentId, clientId, clientSecret)
+    else if (documentType === 'purchase_order') response = await handlePurchaseOrderWebhook(supabase, documentId, clientId, clientSecret)
+    else if (documentType === 'bill') response = await handleBillWebhook(supabase, documentId, clientId, clientSecret)
+    else if (documentType === 'vendor') response = await handleVendorWebhook(supabase, documentId, clientId, clientSecret)
+    else if (documentType === 'item') response = await handleItemWebhook(supabase, documentId, clientId, clientSecret)
+    else response = await handleSalesOrderWebhook(supabase, payload, documentId, clientId, clientSecret)
 
-
-    if (salesOrderId) {
-      return await handleSalesOrderWebhook(supabase, payload, salesOrderId, clientId, clientSecret)
-    }
-
-    console.log('No recognized ID in webhook payload. Full payload:', JSON.stringify(payload))
-    return new Response(JSON.stringify({ received: true, warning: 'No recognized event ID found' }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    })
+    await completeWebhookEvent(supabase, webhookReceiptId)
+    return response
 
   } catch (error) {
     console.error('Zoho webhook error:', error)
+    await failWebhookEvent(supabase, webhookReceiptId, error)
 
     await supabase.from('zoho_sync_log').insert({
       sync_type: 'webhook',
@@ -268,6 +321,12 @@ async function handleInvoiceWebhook(
   }
 
   const invoice = invData.invoice
+  const invoiceCache = await cacheZohoDocument(supabase, orgId, 'invoice', String(invoiceId), invoice)
+  if (invoiceCache.unchanged) {
+    return new Response(JSON.stringify({ success: true, unchanged: true, invoice_id: invoiceId }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
+  }
   console.log('Invoice number:', invoice.invoice_number)
   console.log('Invoice reference_number:', invoice.reference_number)
   console.log('Invoice salesorder_ids:', JSON.stringify(invoice.salesorders || []))
@@ -287,18 +346,33 @@ async function handleInvoiceWebhook(
       if (so.reference_number) possibleMatches.push(so.reference_number)
       if (so.salesorder_number) linkedSoNumbers.push(so.salesorder_number)
       if (so.salesorder_id) {
-        // Fetch SO details to get its reference_number (our order_number)
+        // Reuse the document cache before spending another API call. If this SO
+        // has never been seen, fetch it once and cache it for future invoices.
         try {
-          const soResp = await fetch(
-            `${ZOHO_API_URL}/books/v3/salesorders/${so.salesorder_id}?organization_id=${orgId}`,
-            { headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` } }
-          )
-          const soData = await soResp.json()
-          if (soData.salesorder?.reference_number) {
-            possibleMatches.push(soData.salesorder.reference_number)
+          const { data: cachedSo } = await supabase
+            .from('zoho_document_cache')
+            .select('payload')
+            .eq('organization_id', orgId)
+            .eq('document_type', 'sales_order')
+            .eq('document_id', String(so.salesorder_id))
+            .maybeSingle()
+          let linkedSalesOrder = cachedSo?.payload
+          if (!linkedSalesOrder) {
+            const soResp = await fetch(
+              `${ZOHO_API_URL}/books/v3/salesorders/${so.salesorder_id}?organization_id=${orgId}`,
+              { headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` } }
+            )
+            const soData = await soResp.json()
+            linkedSalesOrder = soData.salesorder
+            if (linkedSalesOrder) {
+              await cacheZohoDocument(supabase, orgId, 'sales_order', String(so.salesorder_id), linkedSalesOrder)
+            }
           }
-          if (soData.salesorder?.salesorder_number) {
-            linkedSoNumbers.push(soData.salesorder.salesorder_number)
+          if (linkedSalesOrder?.reference_number) {
+            possibleMatches.push(linkedSalesOrder.reference_number)
+          }
+          if (linkedSalesOrder?.salesorder_number) {
+            linkedSoNumbers.push(linkedSalesOrder.salesorder_number)
           }
         } catch (e) {
           console.error('Failed to fetch linked SO:', e)
@@ -637,6 +711,12 @@ async function handleSalesOrderWebhook(
   }
 
   const salesOrder = soData.salesorder
+  const salesOrderCache = await cacheZohoDocument(supabase, orgId, 'sales_order', String(salesOrderId), salesOrder)
+  if (salesOrderCache.unchanged) {
+    return new Response(JSON.stringify({ success: true, unchanged: true, salesorder_id: salesOrderId }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
+  }
   
   // Also extract inline line_items from webhook payload as fallback
   const inlineLineItems = payload.salesorder?.line_items || payload.line_items || []
@@ -1015,7 +1095,15 @@ async function handlePurchaseOrderWebhook(
     throw new Error(`Failed to fetch purchase order: ${data.message || 'Unknown error'}`)
   }
 
+  const cached = await cacheZohoDocument(supabase, orgId, 'purchase_order', String(purchaseOrderId), data.purchaseorder)
+  if (cached.unchanged) {
+    return new Response(JSON.stringify({ success: true, unchanged: true, purchaseorder_id: purchaseOrderId }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
+  }
+
   const result = await allocatePurchaseOrder(supabase, data.purchaseorder)
+  await updateCachesFromPurchaseOrder(supabase, cached.previous, data.purchaseorder)
 
   await supabase.from('zoho_sync_log').insert({
     sync_type: 'purchase_order_webhook',
@@ -1050,7 +1138,15 @@ async function handleBillWebhook(
     throw new Error(`Failed to fetch bill: ${data.message || 'Unknown error'}`)
   }
 
+  const cached = await cacheZohoDocument(supabase, orgId, 'bill', String(billId), data.bill)
+  if (cached.unchanged) {
+    return new Response(JSON.stringify({ success: true, unchanged: true, bill_id: billId }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
+  }
+
   const result = await applyBillReceipt(supabase, data.bill)
+  await updateCachesFromBill(supabase, data.bill)
 
   await supabase.from('zoho_sync_log').insert({
     sync_type: 'bill_webhook',
@@ -1062,6 +1158,70 @@ async function handleBillWebhook(
   console.log(`=== BILL WEBHOOK COMPLETE: ${result.received} units received ===`)
 
   return new Response(JSON.stringify({ success: true, ...result }), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+  })
+}
+
+// ─── VENDOR WEBHOOK (one contact read, then local supplier upsert) ─────────────
+
+async function handleVendorWebhook(
+  supabase: any, contactId: string,
+  clientId: string, clientSecret: string
+) {
+  const accessToken = await getValidAccessToken(supabase, clientId, clientSecret)
+  const orgId = await getOrgId(supabase)
+  const resp = await fetch(
+    `${ZOHO_API_URL}/books/v3/contacts/${contactId}?organization_id=${orgId}`,
+    { headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` } }
+  )
+  const data = await resp.json()
+  if (data.code !== 0 || !data.contact) {
+    throw new Error(`Failed to fetch Zoho contact: ${data.message || 'Unknown error'}`)
+  }
+
+  const cached = await cacheZohoDocument(supabase, orgId, 'vendor', String(contactId), data.contact)
+  if (!cached.unchanged) await upsertVendorFromContact(supabase, data.contact)
+
+  await supabase.from('zoho_sync_log').insert({
+    sync_type: 'vendor_webhook',
+    status: 'completed',
+    items_synced: cached.unchanged ? 0 : 1,
+    completed_at: new Date().toISOString(),
+  })
+
+  return new Response(JSON.stringify({ success: true, unchanged: cached.unchanged, contact_id: contactId }), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+  })
+}
+
+// ─── ITEM WEBHOOK (one item read, then buying-cache patch) ────────────────────
+
+async function handleItemWebhook(
+  supabase: any, itemId: string,
+  clientId: string, clientSecret: string
+) {
+  const accessToken = await getValidAccessToken(supabase, clientId, clientSecret)
+  const orgId = await getOrgId(supabase)
+  const resp = await fetch(
+    `${ZOHO_API_URL}/books/v3/items/${itemId}?organization_id=${orgId}`,
+    { headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` } }
+  )
+  const data = await resp.json()
+  if (data.code !== 0 || !data.item) {
+    throw new Error(`Failed to fetch Zoho item: ${data.message || 'Unknown error'}`)
+  }
+
+  const cached = await cacheZohoDocument(supabase, orgId, 'item', String(itemId), data.item)
+  if (!cached.unchanged) await updateCacheFromItem(supabase, data.item)
+
+  await supabase.from('zoho_sync_log').insert({
+    sync_type: 'item_webhook',
+    status: 'completed',
+    items_synced: cached.unchanged ? 0 : 1,
+    completed_at: new Date().toISOString(),
+  })
+
+  return new Response(JSON.stringify({ success: true, unchanged: cached.unchanged, item_id: itemId }), {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' }
   })
 }

@@ -13,14 +13,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { MoreHorizontal } from "lucide-react";
 import {
-  Search, Download, ShoppingCart, Package, RefreshCw, Loader2,
+  Search, Download, ShoppingCart, Package, Loader2,
   AlertTriangle, TrendingUp, TrendingDown, Minus, ChevronDown, ChevronRight,
   ArrowUpDown, ArrowUp, ArrowDown, Layers, Clock, Flame, CheckCircle2,
   FileSpreadsheet, Users, Printer, Mail, StickyNote, Copy, X,
   BarChart3, Filter, Maximize2, Minimize2, ClipboardCopy, Timer,
   ChevronUp, PieChart, Send, History, CheckSquare, Snowflake, Sun,
   Save, LayoutGrid, TableIcon, Zap, Pin, PinOff, AlignJustify, AlignCenter,
-  RotateCw, Eye, Star, Sparkles
+  Eye, Star, Sparkles
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -77,9 +77,7 @@ export default function BuyingSheetPage() {
   const [pinnedSkus, setPinnedSkus] = useState<string[]>(loadPinned);
   const [viewDensity, setViewDensity] = useState<ViewDensity>(loadDensity);
   const [recentlyOrdered, setRecentlyOrdered] = useState<RecentlyOrderedItem[]>(loadRecentlyOrdered);
-  const [autoRefreshInterval, setAutoRefreshInterval] = useState<number>(5);
   const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(null);
-  const [autoRefreshCountdown, setAutoRefreshCountdown] = useState(0);
   const [showRecentlyOrdered, setShowRecentlyOrdered] = useState(false);
   const [adjustedQtys, setAdjustedQtys] = useState<Record<string, number>>({});
   const [supplierReliabilityMap, setSupplierReliabilityMap] = useState<Map<string, number>>(new Map());
@@ -108,6 +106,29 @@ export default function BuyingSheetPage() {
     fetchLocalData();
     fetchLastPurchaseDates();
   }, { fallbackIntervalMs: 0, debounceMs: 1500 });
+
+  // Zoho document webhooks update one shared cache row. Realtime broadcasts
+  // that single change to every app, so no browser needs to poll Zoho.
+  useEffect(() => {
+    const channel = supabase
+      .channel("buying-sheet-event-cache")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "buying_sheet_cache", filter: "id=eq.buying-sheet" },
+        (change) => {
+          const next = change.new as { payload?: ZohoStockData; fetched_at?: string };
+          if (!next?.payload) return;
+          setZohoData(next.payload);
+          setLastRefreshedAt(next.fetched_at ? new Date(next.fetched_at) : new Date());
+          void fetchLocalData();
+        },
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, []);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -149,28 +170,7 @@ export default function BuyingSheetPage() {
     }
   }, []);
 
-  // Auto-refresh timer
-  useEffect(() => {
-    if (autoRefreshInterval <= 0) return;
-    const totalSeconds = autoRefreshInterval * 60;
-    setAutoRefreshCountdown(totalSeconds);
-    const countdown = setInterval(() => {
-      setAutoRefreshCountdown(prev => {
-        if (prev <= 1) {
-          handleRefreshZoho();
-          return totalSeconds;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => clearInterval(countdown);
-  }, [autoRefreshInterval]);
-
   // ── Data Fetching ──────────────────────────────────────────────────────
-  const getAuthHeaders = async () => {
-    const { data: sessionData } = await supabase.auth.getSession();
-    return { 'Authorization': `Bearer ${sessionData?.session?.access_token}`, 'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY };
-  };
 
   const fetchDemandHistory = async () => {
     try {
@@ -252,15 +252,29 @@ export default function BuyingSheetPage() {
   const fetchZohoData = async (): Promise<ZohoStockData | null> => {
     setZohoLoading(true);
     try {
-      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
-      const headers = await getAuthHeaders();
-      const response = await fetch(`https://${projectId}.supabase.co/functions/v1/buying-sheet-data`, { headers });
-      const result = await response.json();
-      if (response.ok && result.success && result.data) { setZohoData(result.data); setLastRefreshedAt(new Date()); return result.data; }
-      toast({ title: "Zoho Data", description: result.error || result.message || "Could not fetch supplier and stock data from Zoho", variant: "destructive" });
-      return null;
+      const { data: cached, error: cacheError } = await supabase
+        .from("buying_sheet_cache")
+        .select("payload, fetched_at")
+        .eq("id", "buying-sheet")
+        .maybeSingle();
+      if (cacheError) throw cacheError;
+
+      let payload = cached;
+      if (!payload?.payload) {
+        // One-time bootstrap for a new environment. Once this row exists,
+        // normal page loads never call Zoho again.
+        const { data, error } = await supabase.functions.invoke("buying-sheet-data", { body: { force: false } });
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+        payload = { payload: data?.data || {}, fetched_at: data?.fetchedAt || new Date().toISOString() } as typeof cached;
+      }
+
+      const next = (payload?.payload || {}) as unknown as ZohoStockData;
+      setZohoData(next);
+      setLastRefreshedAt(payload?.fetched_at ? new Date(payload.fetched_at) : new Date());
+      return next;
     } catch (error) {
-      toast({ title: "Error", description: "Failed to connect to Zoho Books", variant: "destructive" });
+      toast({ title: "Error", description: "Failed to load the shared Zoho snapshot", variant: "destructive" });
       return null;
     } finally { setZohoLoading(false); }
   };
@@ -592,36 +606,9 @@ export default function BuyingSheetPage() {
           const analytical = computeAnalyticalFields(row.sku, toOrder, row.daysWaiting, row.avgLeadTimeDays, row.orders, recommendedOrderQty, z.unitCost ?? null, z.costSource ?? null);
           return { ...row, supplierName, supplierEmail, stockOnHand: z.stockOnHand, onPurchaseOrder: z.onPurchaseOrder, toOrder, coveragePercent, priorityScore, stockoutRiskDays, safetyStock, recommendedOrderQty, lastPurchasedDate: z.lastPurchasedDate || row.lastPurchasedDate, ...analytical };
         }));
-        toast({ title: "Updated", description: "Zoho stock, PO & vendor-bill cost data loaded" });
+        toast({ title: "Live data ready", description: "Stock, PO and vendor-bill data loaded from the shared event cache" });
       }
     });
-  };
-
-  const handleRefreshZoho = async () => {
-    const zoho = await fetchZohoData();
-    if (zoho) {
-      setRows(prev => prev.map(row => {
-        const z = zoho[row.sku] || { stockOnHand: 0, onPurchaseOrder: 0, vendorName: '', vendorEmail: '' };
-        const toOrder = Math.max(0, row.totalNeeded - z.stockOnHand - z.onPurchaseOrder);
-        const supplierName = z.vendorName || row.supplierName;
-        const covered = z.stockOnHand + z.onPurchaseOrder;
-        const coveragePercent = row.totalNeeded > 0 ? Math.min(100, Math.round((covered / row.totalNeeded) * 100)) : 100;
-        const stockoutRiskDays = getStockoutRiskDays(row.sku, z.stockOnHand, z.onPurchaseOrder);
-        let priorityScore = 0;
-        if (toOrder > 0) priorityScore += 30; if (row.hasUrgent) priorityScore += 40;
-        if (row.daysWaiting > 7) priorityScore += 15; if (row.daysWaiting > 3) priorityScore += 10;
-        if (coveragePercent < 25) priorityScore += 15; else if (coveragePercent < 50) priorityScore += 10;
-        priorityScore += Math.min(20, row.orders.length * 5);
-        if (stockoutRiskDays !== null && stockoutRiskDays <= 7) priorityScore += 15;
-        if (row.distinctCustomers >= 3) priorityScore += 10;
-        if (row.avgLeadTimeDays !== null && row.daysWaiting > row.avgLeadTimeDays) priorityScore += 10;
-        const safetyStock = getSafetyStock(row.sku, row.avgLeadTimeDays);
-        const recommendedOrderQty = toOrder > 0 ? toOrder + safetyStock : 0;
-        const analytical = computeAnalyticalFields(row.sku, toOrder, row.daysWaiting, row.avgLeadTimeDays, row.orders, recommendedOrderQty, z.unitCost ?? null, z.costSource ?? null);
-        return { ...row, supplierName, supplierEmail: z.vendorEmail || row.supplierEmail, stockOnHand: z.stockOnHand, onPurchaseOrder: z.onPurchaseOrder, toOrder, coveragePercent, priorityScore, stockoutRiskDays, safetyStock, recommendedOrderQty, lastPurchasedDate: z.lastPurchasedDate || row.lastPurchasedDate, ...analytical };
-      }));
-      toast({ title: "Updated", description: "Stock, POs & vendor-bill costs refreshed from Zoho Books" });
-    }
   };
 
   // ── Actions ──────────────────────────────────────────────────────────
@@ -1149,7 +1136,7 @@ export default function BuyingSheetPage() {
                   <h1 className="font-display text-xl font-bold tracking-tight leading-tight">Buying Sheet</h1>
                   <p className="text-xs text-muted-foreground">
                     {filteredRows.length} SKUs to review
-                    {zohoLoading && " · syncing Zoho..."}
+                    {zohoLoading && " · loading live snapshot..."}
                   </p>
                 </div>
               </div>
@@ -1247,11 +1234,10 @@ export default function BuyingSheetPage() {
           </div>
         )}
 
-        {/* Auto-refresh & last refreshed status */}
-        {(autoRefreshInterval > 0 || lastRefreshedAt) && (
+        {/* Event-driven sync status */}
+        {lastRefreshedAt && (
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            {lastRefreshedAt && <span>Last refreshed: {lastRefreshedAt.toLocaleTimeString()}</span>}
-            {autoRefreshInterval > 0 && <span className="flex items-center gap-1"><RotateCw className="h-3 w-3 animate-spin" style={{ animationDuration: "3s" }} />Next in {Math.floor(autoRefreshCountdown / 60)}:{String(autoRefreshCountdown % 60).padStart(2, "0")}</span>}
+            <span className="flex items-center gap-1.5"><Zap className="h-3.5 w-3.5 text-emerald-500" />Live webhook cache · last document event {lastRefreshedAt.toLocaleTimeString()}</span>
           </div>
         )}
 

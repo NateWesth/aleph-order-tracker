@@ -14,8 +14,8 @@ const EXCLUDED_PO_STATUSES = ['cancelled', 'closed', 'rejected', 'draft', 'void'
 const MAX_PO_AGE_DAYS = 180
 const MAX_PO_DETAILS = 250
 const DETAIL_CONCURRENCY = 8
-const CACHE_TTL_MS = 15 * 60 * 1000
 const CACHE_ID = '00000000-0000-0000-0000-000000000003'
+const SYNC_LOCK_KEY = 'po-tracking-bootstrap'
 
 type POLine = {
   sku: string
@@ -61,6 +61,7 @@ Deno.serve(async (req) => {
 
   const clientId = Deno.env.get('ZOHO_CLIENT_ID')
   const clientSecret = Deno.env.get('ZOHO_CLIENT_SECRET')
+  let recoveryLockAcquired = false
 
   if (!clientId || !clientSecret) {
     const { data: cached } = await supabase
@@ -114,27 +115,62 @@ Deno.serve(async (req) => {
       } catch (_e) { /* no body */ }
     }
 
-    // Serve from cache when fresh — Zoho round trips are the slow part
-    if (!force) {
-      const { data: cached } = await supabase
-        .from('po_tracking_cache')
-        .select('payload, fetched_at')
-        .eq('id', CACHE_ID)
-        .maybeSingle()
+    const { data: cached } = await supabase
+      .from('po_tracking_cache')
+      .select('payload, fetched_at')
+      .eq('id', CACHE_ID)
+      .maybeSingle()
 
-      if (cached?.payload && cached.fetched_at) {
-        const age = Date.now() - new Date(cached.fetched_at).getTime()
-        if (age < CACHE_TTL_MS) {
-          const purchaseOrders = cached.payload as POEntry[]
-          return new Response(JSON.stringify({
-            success: true,
-            purchaseOrders,
-            count: purchaseOrders.length,
-            fetchedAt: cached.fetched_at,
-            cached: true,
-          }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
-        }
+    // Event-driven mode: normal page loads never contact Zoho. A webhook reads
+    // the changed PO once, updates this cache row, and Realtime fans it out.
+    if (!force && cached?.payload) {
+      const purchaseOrders = cached.payload as POEntry[]
+      return new Response(JSON.stringify({
+        success: true,
+        purchaseOrders,
+        count: purchaseOrders.length,
+        fetchedAt: cached.fetched_at,
+        cached: true,
+        eventDriven: true,
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
+
+    if (force) {
+      const { data: role } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .maybeSingle()
+      if (role?.role !== 'admin') {
+        return new Response(JSON.stringify({ error: 'Only administrators can run a full Zoho recovery sync' }), {
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
       }
+    }
+
+    const { data: acquired } = await supabase.rpc('try_acquire_zoho_sync_lock', {
+      requested_key: SYNC_LOCK_KEY,
+      lease_seconds: 600,
+    })
+    recoveryLockAcquired = acquired === true
+    if (!recoveryLockAcquired) {
+      if (cached?.payload) {
+        const purchaseOrders = cached.payload as POEntry[]
+        return new Response(JSON.stringify({
+          success: true,
+          purchaseOrders,
+          count: purchaseOrders.length,
+          fetchedAt: cached.fetched_at,
+          cached: true,
+          syncInProgress: true,
+          eventDriven: true,
+        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+      return new Response(JSON.stringify({ error: 'PO tracking bootstrap sync is already running' }), {
+        status: 409,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
     }
 
     const [accessToken, orgId] = await Promise.all([
@@ -157,6 +193,7 @@ Deno.serve(async (req) => {
       count: purchaseOrders.length,
       fetchedAt,
       cached: false,
+      eventDriven: true,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
@@ -187,6 +224,10 @@ Deno.serve(async (req) => {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
+  } finally {
+    if (recoveryLockAcquired) {
+      await supabase.rpc('release_zoho_sync_lock', { requested_key: SYNC_LOCK_KEY })
+    }
   }
 })
 

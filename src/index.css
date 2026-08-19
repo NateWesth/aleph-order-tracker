@@ -2420,19 +2420,12 @@ html.toolbar-glass .aleph-toolbar-search-input {
   position: relative;
   overflow: hidden;
   isolation: isolate;
+  background-image: none !important;
   box-shadow: inset 0 -1px 0 rgba(255,255,255,.12);
 }
 
 .order-lane-header::after {
-  content: "";
-  position: absolute;
-  z-index: -1;
-  inset: -5rem -3rem auto auto;
-  width: 10rem;
-  height: 10rem;
-  border: 1px solid rgba(255,255,255,.14);
-  border-radius: 999px;
-  box-shadow: 0 0 0 1.2rem rgba(255,255,255,.035), 0 0 0 2.5rem rgba(255,255,255,.025);
+  content: none;
 }
 
 .order-lane-body {
