@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Package, History, BarChart3, Settings, LogOut, Building2, Box, Users, Truck, FileText, Command, ShoppingCart, Percent, Sparkles, Bot, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { Package, History, BarChart3, Settings, LogOut, Building2, Box, Users, Truck, FileText, Command, ShoppingCart, Percent, Sparkles, Bot, PanelLeftClose, PanelLeftOpen, Radar } from "lucide-react";
 import ChangelogDialog, { hasUnreadChangelog } from "@/components/admin/ChangelogDialog";
 import KeyboardShortcutsDialog from "@/components/admin/KeyboardShortcutsDialog";
 import { playClick, playWhoosh } from "@/utils/ambientSounds";
@@ -38,6 +38,7 @@ const loadSuppliersPage = () => import("@/components/admin/SuppliersPage");
 const loadPOTrackingPage = () => import("@/components/admin/POTrackingPage");
 const loadBuyingSheetPage = () => import("@/components/admin/BuyingSheetPage");
 const loadCommissionPage = () => import("@/components/admin/CommissionPage");
+const loadControlTower = () => import("@/components/admin/OperationsControlTower");
 
 const OrdersPage = lazy(loadOrdersPage);
 const CompletedPage = lazy(loadCompletedPage);
@@ -50,6 +51,7 @@ const SuppliersPage = lazy(loadSuppliersPage);
 const POTrackingPage = lazy(loadPOTrackingPage);
 const BuyingSheetPage = lazy(loadBuyingSheetPage);
 const CommissionPage = lazy(loadCommissionPage);
+const OperationsControlTower = lazy(loadControlTower);
 const FloatingAIChat = lazy(() => import("@/components/admin/FloatingAIChat"));
 
 const WORKSPACE_PREFETCHERS: Record<string, () => Promise<unknown>> = {
@@ -64,11 +66,12 @@ const WORKSPACE_PREFETCHERS: Record<string, () => Promise<unknown>> = {
   items: loadItemsPage,
   commission: loadCommissionPage,
   users: loadUsersManagementPage,
+  "control-tower": loadControlTower,
 };
 
 const RAIL_STORAGE_KEY = "aleph:workspace-rail-expanded";
 const WORKSPACE_STORAGE_KEY = "aleph:last-workspace";
-const RESTORABLE_WORKSPACES = new Set(["home", "orders", "history", "clients", "suppliers", "stats", "po-tracking", "buying-sheet", "items"]);
+const RESTORABLE_WORKSPACES = new Set(["home", "orders", "history", "clients", "suppliers", "stats", "po-tracking", "buying-sheet", "items", "control-tower"]);
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -243,6 +246,7 @@ const AdminDashboard = () => {
     { id: "clients", label: "Clients", icon: Building2, badge: 0 },
     { id: "suppliers", label: "Suppliers", icon: Truck, badge: 0 },
     { id: "stats", label: "Stats", icon: BarChart3, badge: 0 },
+    { id: "control-tower", label: "Control Tower", icon: Radar, badge: 0 },
     { id: "po-tracking", label: "PO Tracking", icon: FileText, badge: 0 },
     { id: "buying-sheet", label: "Buying", icon: ShoppingCart, badge: 0 },
     { id: "items", label: "Items", icon: Box, badge: 0 },
@@ -505,6 +509,7 @@ const AdminDashboard = () => {
               {activeView === "commission" && <CommissionPage />}
               {activeView === "users" && isAdmin && <UsersManagementPage />}
               {activeView === "stats" && <StatsPage />}
+              {activeView === "control-tower" && <OperationsControlTower />}
             </PageTransition>
             </Suspense>
           </div>

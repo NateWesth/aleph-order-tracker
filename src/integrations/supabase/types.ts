@@ -1357,6 +1357,69 @@ export type Database = {
         }
         Relationships: []
       }
+      team_action_items: {
+        Row: {
+          assigned_to: string | null
+          completed_at: string | null
+          created_at: string
+          created_by: string
+          description: string | null
+          due_at: string | null
+          entity_id: string | null
+          id: string
+          priority: string
+          status: string
+          title: string
+          updated_at: string
+          workspace: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          completed_at?: string | null
+          created_at?: string
+          created_by: string
+          description?: string | null
+          due_at?: string | null
+          entity_id?: string | null
+          id?: string
+          priority?: string
+          status?: string
+          title: string
+          updated_at?: string
+          workspace?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          due_at?: string | null
+          entity_id?: string | null
+          id?: string
+          priority?: string
+          status?: string
+          title?: string
+          updated_at?: string
+          workspace?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_action_items_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "team_action_items_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string | null
