@@ -37,6 +37,23 @@ import { SupplierCardsView } from "./buying-sheet/SupplierCardsView";
 import { QuickOrderView } from "./buying-sheet/QuickOrderView";
 import ProcurementSuggestionsPanel from "./buying-sheet/ProcurementSuggestionsPanel";
 
+const MS_PER_DAY = 86_400_000;
+
+/** Calendar-day age, independent of time-of-day, DST and browser timezone offsets. */
+const calendarDaysSince = (isoDate: string) => {
+  const start = new Date(isoDate);
+  if (Number.isNaN(start.getTime())) return 0;
+  const today = new Date();
+  const startDay = Date.UTC(start.getFullYear(), start.getMonth(), start.getDate());
+  const todayDay = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
+  return Math.max(0, Math.round((todayDay - startDay) / MS_PER_DAY));
+};
+
+const earliestTimestamp = (...dates: Array<string | null | undefined>) => {
+  const valid = dates.filter((date): date is string => Boolean(date) && !Number.isNaN(new Date(date as string).getTime()));
+  return valid.sort((a, b) => new Date(a).getTime() - new Date(b).getTime())[0] || new Date().toISOString();
+};
+
 export default function BuyingSheetPage() {
   const { toast } = useToast();
   const [rows, setRows] = useState<BuyingSheetRow[]>([]);
@@ -48,6 +65,7 @@ export default function BuyingSheetPage() {
   const [search, setSearch] = useState("");
   const [supplierFilter, setSupplierFilter] = useState<string>("all");
   const [showOnlyNeedOrder, setShowOnlyNeedOrder] = useState(true);
+  const [showOnlyPOMismatches, setShowOnlyPOMismatches] = useState(false);
   const [sortField, setSortField] = useState<SortField>("priorityScore");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [groupBySupplier, setGroupBySupplier] = useState(false);
@@ -474,7 +492,7 @@ export default function BuyingSheetPage() {
 
       const orderIds = [...new Set(orderItems.map(i => i.order_id))];
       const [ordersResult, poResult] = await Promise.all([
-        supabase.from("orders").select("id, order_number, company_id, supplier_id, urgency").in("id", orderIds),
+        supabase.from("orders").select("id, order_number, company_id, supplier_id, urgency, created_at").in("id", orderIds),
         supabase.from("order_purchase_orders").select("order_id, supplier_id").in("order_id", orderIds),
       ]);
       if (ordersResult.error) throw ordersResult.error;
@@ -497,13 +515,14 @@ export default function BuyingSheetPage() {
         orderSupplierMap.set(po.order_id, { name: supplier?.name || "Unknown", id: po.supplier_id, email: supplier?.email || undefined });
       });
 
-      const skuMap = new Map<string, { sku: string; itemName: string; totalNeeded: number; orders: { orderNumber: string; customerName: string; quantity: number; urgency?: string }[]; supplierName: string; supplierId: string | null; supplierEmail?: string; oldestCreatedAt: string; hasUrgent: boolean }>();
+      const skuMap = new Map<string, { sku: string; itemName: string; totalNeeded: number; allocatedOnPurchaseOrder: number; orders: { orderNumber: string; customerName: string; quantity: number; urgency?: string }[]; supplierName: string; supplierId: string | null; supplierEmail?: string; oldestCreatedAt: string; hasUrgent: boolean }>();
       for (const item of orderItems) {
-        // Only the quantity that is NOT already on a purchase order still needs buying
-        const outstanding = Math.max(0, (item.quantity || 0) - (item.qty_on_po || 0));
-        if (outstanding <= 0) continue;
+        const requested = Math.max(0, item.quantity || 0);
+        const allocatedOnPO = Math.min(requested, Math.max(0, item.qty_on_po || 0));
+        if (requested <= 0) continue;
         const sku = (item.code || "NO-SKU").toUpperCase(); activeSkus.add(sku);
         const order = ordersMap.get(item.order_id);
+        const waitingSince = earliestTimestamp(order?.created_at, item.created_at);
         const customerName = order?.company_id ? companiesMap.get(order.company_id) || "Unknown" : "Unknown";
         const urgency = order?.urgency || "normal";
         let supplierName = "No Supplier", supplierId: string | null = null, supplierEmail: string | undefined;
@@ -512,27 +531,34 @@ export default function BuyingSheetPage() {
         else if (order?.supplier_id) { const s = suppliersMap.get(order.supplier_id); supplierName = s?.name || "Unknown"; supplierId = order.supplier_id; supplierEmail = s?.email || undefined; }
         const existing = skuMap.get(sku);
         if (existing) {
-          existing.totalNeeded += outstanding; existing.orders.push({ orderNumber: order?.order_number || "—", customerName, quantity: outstanding, urgency });
-          if (item.created_at < existing.oldestCreatedAt) existing.oldestCreatedAt = item.created_at;
+          existing.totalNeeded += requested;
+          existing.allocatedOnPurchaseOrder += allocatedOnPO;
+          existing.orders.push({ orderNumber: order?.order_number || "—", customerName, quantity: requested, urgency });
+          existing.oldestCreatedAt = earliestTimestamp(existing.oldestCreatedAt, waitingSince);
           if (urgency === "urgent" || urgency === "critical") existing.hasUrgent = true;
         } else {
-          skuMap.set(sku, { sku, itemName: item.name, totalNeeded: outstanding, orders: [{ orderNumber: order?.order_number || "—", customerName, quantity: outstanding, urgency }], supplierName, supplierId, supplierEmail, oldestCreatedAt: item.created_at, hasUrgent: urgency === "urgent" || urgency === "critical" });
+          skuMap.set(sku, { sku, itemName: item.name, totalNeeded: requested, allocatedOnPurchaseOrder: allocatedOnPO, orders: [{ orderNumber: order?.order_number || "—", customerName, quantity: requested, urgency }], supplierName, supplierId, supplierEmail, oldestCreatedAt: waitingSince, hasUrgent: urgency === "urgent" || urgency === "critical" });
         }
       }
 
       const zohoStock = zohoData || {};
-      const now = Date.now();
       const buyingRows: BuyingSheetRow[] = Array.from(skuMap.values()).map(entry => {
         const z = zohoStock[entry.sku] || { stockOnHand: 0, onPurchaseOrder: 0, vendorName: '', vendorEmail: '' };
-        const toOrder = Math.max(0, entry.totalNeeded - z.stockOnHand - z.onPurchaseOrder);
+        // Only demand-linked PO allocations reduce this buying requirement.
+        // Zoho's SKU total can include POs belonging to other customer orders,
+        // so it is shown for reconciliation but never silently double-counted.
+        const zohoOnPurchaseOrder = Math.max(0, z.onPurchaseOrder || 0);
+        const onPurchaseOrder = entry.allocatedOnPurchaseOrder;
+        const poVariance = Math.abs(zohoOnPurchaseOrder - onPurchaseOrder);
+        const toOrder = Math.max(0, entry.totalNeeded - z.stockOnHand - onPurchaseOrder);
         // Zoho vendor (from historical POs) takes priority as the suggested supplier
         const supplierName = z.vendorName || entry.supplierName;
         const supplierEmail = z.vendorEmail || entry.supplierEmail || undefined;
-        const daysWaiting = Math.floor((now - new Date(entry.oldestCreatedAt).getTime()) / (1000 * 60 * 60 * 24));
-        const covered = z.stockOnHand + z.onPurchaseOrder;
+        const daysWaiting = calendarDaysSince(entry.oldestCreatedAt);
+        const covered = z.stockOnHand + onPurchaseOrder;
         const coveragePercent = entry.totalNeeded > 0 ? Math.min(100, Math.round((covered / entry.totalNeeded) * 100)) : 100;
         const { trend, lastMonth, prevMonth } = getDemandTrend(entry.sku);
-        const stockoutRiskDays = getStockoutRiskDays(entry.sku, z.stockOnHand, z.onPurchaseOrder);
+        const stockoutRiskDays = getStockoutRiskDays(entry.sku, z.stockOnHand, onPurchaseOrder);
         const lastPurchasedDate = z.lastPurchasedDate || lastPurchaseMap.get(entry.sku) || null;
         const seasonalPattern = seasonalMap.get(entry.sku) || null;
         const avgLeadTimeDays = leadTimeMap.get(entry.sku) ?? null;
@@ -561,7 +587,7 @@ export default function BuyingSheetPage() {
         const dailyBurn = getDailyBurnRate(entry.sku);
         const recommendedOrderQty = toOrder > 0 ? toOrder + safetyStock : 0;
         const analytical = computeAnalyticalFields(entry.sku, toOrder, daysWaiting, avgLeadTimeDays, entry.orders, recommendedOrderQty, z.unitCost ?? null, z.costSource ?? null);
-        return { ...entry, supplierName, supplierEmail, stockOnHand: z.stockOnHand, onPurchaseOrder: z.onPurchaseOrder, toOrder, daysWaiting, priorityScore, coveragePercent, demandTrend: trend, lastMonthQty: lastMonth, prevMonthQty: prevMonth, stockoutRiskDays, lastPurchasedDate, seasonalPattern, avgLeadTimeDays, safetyStock, dailyBurnRate: dailyBurn, demandVariability: demandVar, distinctCustomers, recommendedOrderQty, ...analytical };
+        return { ...entry, supplierName, supplierEmail, stockOnHand: z.stockOnHand, onPurchaseOrder, zohoOnPurchaseOrder, poVariance, waitingSince: entry.oldestCreatedAt, toOrder, daysWaiting, priorityScore, coveragePercent, demandTrend: trend, lastMonthQty: lastMonth, prevMonthQty: prevMonth, stockoutRiskDays, lastPurchasedDate, seasonalPattern, avgLeadTimeDays, safetyStock, dailyBurnRate: dailyBurn, demandVariability: demandVar, distinctCustomers, recommendedOrderQty, ...analytical };
       });
       buyingRows.sort((a, b) => b.priorityScore - a.priorityScore);
       // ABC classification: top 80% of total demand = A, next 15% = B, rest = C
@@ -581,13 +607,16 @@ export default function BuyingSheetPage() {
       if (zoho) {
         setRows(prev => prev.map(row => {
           const z = zoho[row.sku] || { stockOnHand: 0, onPurchaseOrder: 0, vendorName: '', vendorEmail: '' };
-          const toOrder = Math.max(0, row.totalNeeded - z.stockOnHand - z.onPurchaseOrder);
+          const zohoOnPurchaseOrder = Math.max(0, z.onPurchaseOrder || 0);
+          const onPurchaseOrder = row.allocatedOnPurchaseOrder;
+          const poVariance = Math.abs(zohoOnPurchaseOrder - onPurchaseOrder);
+          const toOrder = Math.max(0, row.totalNeeded - z.stockOnHand - onPurchaseOrder);
           // Zoho vendor (from historical POs) takes priority as the suggested supplier
           const supplierName = z.vendorName || row.supplierName;
           const supplierEmail = z.vendorEmail || row.supplierEmail || undefined;
-          const covered = z.stockOnHand + z.onPurchaseOrder;
+          const covered = z.stockOnHand + onPurchaseOrder;
           const coveragePercent = row.totalNeeded > 0 ? Math.min(100, Math.round((covered / row.totalNeeded) * 100)) : 100;
-          const stockoutRiskDays = getStockoutRiskDays(row.sku, z.stockOnHand, z.onPurchaseOrder);
+          const stockoutRiskDays = getStockoutRiskDays(row.sku, z.stockOnHand, onPurchaseOrder);
           let priorityScore = 0;
           if (toOrder > 0) priorityScore += 30; if (row.hasUrgent) priorityScore += 40;
           if (row.daysWaiting > 7) priorityScore += 15; if (row.daysWaiting > 3) priorityScore += 10;
@@ -601,7 +630,7 @@ export default function BuyingSheetPage() {
           const safetyStock = getSafetyStock(row.sku, row.avgLeadTimeDays);
           const recommendedOrderQty = toOrder > 0 ? toOrder + safetyStock : 0;
           const analytical = computeAnalyticalFields(row.sku, toOrder, row.daysWaiting, row.avgLeadTimeDays, row.orders, recommendedOrderQty, z.unitCost ?? null, z.costSource ?? null);
-          return { ...row, supplierName, supplierEmail, stockOnHand: z.stockOnHand, onPurchaseOrder: z.onPurchaseOrder, toOrder, coveragePercent, priorityScore, stockoutRiskDays, safetyStock, recommendedOrderQty, lastPurchasedDate: z.lastPurchasedDate || row.lastPurchasedDate, ...analytical };
+          return { ...row, supplierName, supplierEmail, stockOnHand: z.stockOnHand, onPurchaseOrder, zohoOnPurchaseOrder, poVariance, toOrder, coveragePercent, priorityScore, stockoutRiskDays, safetyStock, recommendedOrderQty, lastPurchasedDate: z.lastPurchasedDate || row.lastPurchasedDate, ...analytical };
         }));
         toast({ title: "Live data ready", description: "Stock, PO and vendor-bill data loaded from the shared event cache" });
       }
@@ -728,9 +757,9 @@ export default function BuyingSheetPage() {
     let html = `<!DOCTYPE html><html><head><title>Buying Sheet - ${date}</title><style>body{font-family:Arial,sans-serif;font-size:11px;padding:20px;color:#333}h1{font-size:18px}h2{font-size:14px;margin:20px 0 8px;padding:5px 8px;background:#f0f0f0;border-radius:4px}.summary{display:flex;gap:20px;margin-bottom:15px;padding:10px;background:#f8f8f8;border-radius:6px}.summary-item{text-align:center}.summary-label{font-size:10px;color:#666;text-transform:uppercase}.summary-value{font-size:16px;font-weight:bold}table{width:100%;border-collapse:collapse;margin-bottom:15px}th{text-align:left;padding:6px 8px;border-bottom:2px solid #333;font-size:10px;text-transform:uppercase;color:#666}td{padding:5px 8px;border-bottom:1px solid #ddd}.text-right{text-align:right}.urgent{color:#dc2626;font-weight:bold}.total-row{border-top:2px solid #333;font-weight:bold;background:#f8f8f8}@media print{body{padding:0}}</style></head><body><h1>📋 Buying Sheet</h1><p style="color:#666;font-size:12px">Generated: ${date} | ${target.length} SKUs | To Order: ${totals.toOrder.toLocaleString()} units</p><div class="summary"><div class="summary-item"><div class="summary-label">Total Needed</div><div class="summary-value">${totals.needed.toLocaleString()}</div></div><div class="summary-item"><div class="summary-label">In Stock</div><div class="summary-value">${totals.inStock.toLocaleString()}</div></div><div class="summary-item"><div class="summary-label">On PO</div><div class="summary-value">${totals.onPO.toLocaleString()}</div></div><div class="summary-item"><div class="summary-label">To Order</div><div class="summary-value" style="color:#2563eb">${totals.toOrder.toLocaleString()}</div></div></div>`;
     for (const [supplier, items] of groups.entries()) {
       const st = items.reduce((s, r) => s + r.toOrder, 0);
-      html += `<h2>${supplier}</h2><table><thead><tr><th>SKU</th><th>Item</th><th class="text-right">Needed</th><th class="text-right">Stock</th><th class="text-right">On PO</th><th class="text-right">To Order</th><th>Orders</th><th>Notes</th></tr></thead><tbody>`;
-      for (const item of items) html += `<tr><td style="font-family:monospace;font-size:10px">${item.sku}</td><td>${item.itemName}</td><td class="text-right">${item.totalNeeded}</td><td class="text-right">${item.stockOnHand}</td><td class="text-right">${item.onPurchaseOrder}</td><td class="text-right ${item.toOrder > 0 ? "urgent" : ""}">${item.toOrder}</td><td style="font-size:10px">${item.orders.map(o => `${o.orderNumber} (${o.customerName})`).join(", ")}</td><td style="font-style:italic;color:#666;font-size:10px">${notes[item.sku] || ""}</td></tr>`;
-      html += `<tr class="total-row"><td colspan="5">Total for ${supplier}</td><td class="text-right">${st}</td><td colspan="2"></td></tr></tbody></table>`;
+      html += `<h2>${supplier}</h2><table><thead><tr><th>SKU</th><th>Item</th><th class="text-right">Needed</th><th class="text-right">Stock</th><th class="text-right">Allocated PO</th><th class="text-right">Zoho Open PO</th><th class="text-right">To Order</th><th>Orders</th><th>Notes</th></tr></thead><tbody>`;
+      for (const item of items) html += `<tr><td style="font-family:monospace;font-size:10px">${item.sku}</td><td>${item.itemName}</td><td class="text-right">${item.totalNeeded}</td><td class="text-right">${item.stockOnHand}</td><td class="text-right">${item.onPurchaseOrder}</td><td class="text-right ${item.poVariance > 0.01 ? "urgent" : ""}">${item.zohoOnPurchaseOrder}</td><td class="text-right ${item.toOrder > 0 ? "urgent" : ""}">${item.toOrder}</td><td style="font-size:10px">${item.orders.map(o => `${o.orderNumber} (${o.customerName})`).join(", ")}</td><td style="font-style:italic;color:#666;font-size:10px">${notes[item.sku] || ""}</td></tr>`;
+      html += `<tr class="total-row"><td colspan="6">Total for ${supplier}</td><td class="text-right">${st}</td><td colspan="2"></td></tr></tbody></table>`;
     }
     html += `</body></html>`;
     printWindow.document.write(html); printWindow.document.close(); printWindow.print();
@@ -738,8 +767,8 @@ export default function BuyingSheetPage() {
 
   const handleExportCSV = () => {
     const target = selectedSkus.size > 0 ? sortedRows.filter(r => selectedSkus.has(r.sku)) : sortedRows;
-    const headers = ["SKU","Item Name","Total Needed","In Stock","On PO","To Order","Safety Stock","Recommended Qty","Coverage %","Days Waiting","Stockout Risk Days","Daily Burn Rate","Demand Variability","Distinct Customers","Priority","Supplier","Lead Time","Trend","Season","Notes","Orders"];
-    const csvRows = target.map(r => [r.sku, r.itemName, r.totalNeeded, r.stockOnHand, r.onPurchaseOrder, r.toOrder, r.safetyStock, r.recommendedOrderQty, r.coveragePercent, r.daysWaiting, r.stockoutRiskDays ?? "N/A", r.dailyBurnRate.toFixed(1), r.demandVariability, r.distinctCustomers, r.priorityScore, r.supplierName, r.avgLeadTimeDays ?? "N/A", r.demandTrend, r.seasonalPattern || "N/A", notes[r.sku] || "", r.orders.map(o => `${o.orderNumber}(${o.customerName}:${o.quantity})`).join("; ")]);
+    const headers = ["SKU","Item Name","Total Needed","In Stock","Allocated On PO","Zoho Open PO","PO Variance","To Order","Safety Stock","Recommended Qty","Coverage %","Waiting Since","Calendar Days Waiting","Stockout Risk Days","Daily Burn Rate","Demand Variability","Distinct Customers","Priority","Supplier","Lead Time","Trend","Season","Notes","Orders"];
+    const csvRows = target.map(r => [r.sku, r.itemName, r.totalNeeded, r.stockOnHand, r.onPurchaseOrder, r.zohoOnPurchaseOrder, r.poVariance, r.toOrder, r.safetyStock, r.recommendedOrderQty, r.coveragePercent, r.waitingSince, r.daysWaiting, r.stockoutRiskDays ?? "N/A", r.dailyBurnRate.toFixed(1), r.demandVariability, r.distinctCustomers, r.priorityScore, r.supplierName, r.avgLeadTimeDays ?? "N/A", r.demandTrend, r.seasonalPattern || "N/A", notes[r.sku] || "", r.orders.map(o => `${o.orderNumber}(${o.customerName}:${o.quantity})`).join("; ")]);
     const csv = [headers, ...csvRows].map(r => r.map(c => `"${c}"`).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" }); const url = URL.createObjectURL(blob);
     const a = document.createElement("a"); a.href = url; a.download = `buying-sheet-${new Date().toISOString().split("T")[0]}.csv`; a.click(); URL.revokeObjectURL(url);
@@ -751,9 +780,9 @@ export default function BuyingSheetPage() {
     for (const row of target) { const key = row.supplierName || "No Supplier"; groups.set(key, [...(groups.get(key) || []), row]); }
     let csv = "";
     for (const [supplier, items] of groups.entries()) {
-      csv += `\n"SUPPLIER: ${supplier}"\n"SKU","Item Name","Qty to Order","In Stock","On PO","Notes"\n`;
-      for (const item of items) csv += `"${item.sku}","${item.itemName}","${item.toOrder}","${item.stockOnHand}","${item.onPurchaseOrder}","${notes[item.sku] || ""}"\n`;
-      csv += `"","TOTAL","${items.reduce((s, r) => s + r.toOrder, 0)}","","",""\n`;
+      csv += `\n"SUPPLIER: ${supplier}"\n"SKU","Item Name","Qty to Order","In Stock","Allocated On PO","Zoho Open PO","PO Variance","Notes"\n`;
+      for (const item of items) csv += `"${item.sku}","${item.itemName}","${item.toOrder}","${item.stockOnHand}","${item.onPurchaseOrder}","${item.zohoOnPurchaseOrder}","${item.poVariance}","${notes[item.sku] || ""}"\n`;
+      csv += `"","TOTAL","${items.reduce((s, r) => s + r.toOrder, 0)}","","","","",""\n`;
     }
     const blob = new Blob([csv], { type: "text/csv" }); const url = URL.createObjectURL(blob);
     const a = document.createElement("a"); a.href = url; a.download = `buying-sheet-by-supplier-${new Date().toISOString().split("T")[0]}.csv`; a.click(); URL.revokeObjectURL(url);
@@ -786,10 +815,16 @@ export default function BuyingSheetPage() {
     return rows.filter(r => r.toOrder > 0 && (r.supplierName === "No Supplier" || !r.supplierName));
   }, [rows]);
 
+  const poIntegrity = useMemo(() => ({
+    mismatches: rows.filter(row => row.poVariance > 0.01),
+    unallocated: rows.filter(row => row.zohoOnPurchaseOrder > row.allocatedOnPurchaseOrder + 0.01).length,
+    overAllocated: rows.filter(row => row.allocatedOnPurchaseOrder > row.zohoOnPurchaseOrder + 0.01).length,
+  }), [rows]);
+
   const filteredRows = useMemo(() => rows.filter(row => {
     const matchesSearch = !search || row.itemName.toLowerCase().includes(search.toLowerCase()) || row.sku.toLowerCase().includes(search.toLowerCase()) || row.supplierName.toLowerCase().includes(search.toLowerCase()) || row.orders.some(o => o.orderNumber.toLowerCase().includes(search.toLowerCase()) || o.customerName.toLowerCase().includes(search.toLowerCase()));
-    return matchesSearch && (supplierFilter === "all" || row.supplierId === supplierFilter) && (!showOnlyNeedOrder || row.toOrder > 0) && (priorityFilter === "all" || getPriorityLevel(row.priorityScore) === priorityFilter);
-  }), [rows, search, supplierFilter, showOnlyNeedOrder, priorityFilter]);
+    return matchesSearch && (supplierFilter === "all" || row.supplierId === supplierFilter) && (!showOnlyNeedOrder || row.toOrder > 0) && (!showOnlyPOMismatches || row.poVariance > 0.01) && (priorityFilter === "all" || getPriorityLevel(row.priorityScore) === priorityFilter);
+  }), [rows, search, supplierFilter, showOnlyNeedOrder, showOnlyPOMismatches, priorityFilter]);
 
   const sortedRows = useMemo(() => {
     const sorted = [...filteredRows];
@@ -919,7 +954,7 @@ export default function BuyingSheetPage() {
 
   const SortableHeader = ({ field, children, className = "" }: { field: SortField; children: React.ReactNode; className?: string }) => (
     <TableHead className={`cursor-pointer select-none hover:bg-muted/50 transition-colors ${className}`} onClick={() => handleSort(field)}>
-      <div className="flex items-center gap-1">{children}{sortField === field ? (sortDirection === "asc" ? <ArrowUp className="h-3 w-3 text-primary" /> : <ArrowDown className="h-3 w-3 text-primary" />) : <ArrowUpDown className="h-3 w-3 text-muted-foreground/40" />}</div>
+      <div className={`flex items-center gap-1 ${className.includes("text-right") ? "justify-end" : className.includes("text-center") ? "justify-center" : "justify-start"}`}>{children}{sortField === field ? (sortDirection === "asc" ? <ArrowUp className="h-3 w-3 text-primary" /> : <ArrowDown className="h-3 w-3 text-primary" />) : <ArrowUpDown className="h-3 w-3 text-muted-foreground/40" />}</div>
     </TableHead>
   );
 
@@ -993,6 +1028,9 @@ export default function BuyingSheetPage() {
               <div className="flex justify-between"><span className="text-muted-foreground">Reorder Point:</span><span className="font-medium">{row.reorderPoint}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Safety Stock:</span><span className="font-medium">{row.safetyStock > 0 ? `+${row.safetyStock} buffer` : "—"}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Recommended Qty:</span><span className="font-bold text-primary">{row.recommendedOrderQty}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Demand-linked PO:</span><span className="font-medium">{row.allocatedOnPurchaseOrder}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Zoho open PO:</span><span className={`font-medium ${row.poVariance > 0.01 ? "text-amber-600" : "text-emerald-600"}`}>{row.zohoOnPurchaseOrder}{row.poVariance > 0.01 ? ` (Δ ${row.poVariance})` : " ✓"}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Waiting Since:</span><span className="font-medium">{new Date(row.waitingSince).toLocaleDateString()} ({row.daysWaiting} calendar days)</span></div>
               {row.unitCost !== null && <div className="flex justify-between"><span className="text-muted-foreground">Unit Cost:</span><span className="font-medium">R{row.unitCost.toFixed(2)} <span className="text-[10px] text-muted-foreground">({row.costSource === "bill" ? "vendor bill" : "estimated"})</span></span></div>}
               {row.estimatedCost !== null && <div className="flex justify-between"><span className="text-muted-foreground">Est. Cost:</span><span className="font-bold">R{row.estimatedCost.toLocaleString()}</span></div>}
 
@@ -1055,7 +1093,22 @@ export default function BuyingSheetPage() {
           </TableCell>
           <TableCell className={`text-right font-semibold ${densityPy}`} onClick={() => toggleExpand(row.sku)}>{row.totalNeeded}</TableCell>
           <TableCell className={`text-right font-medium ${densityPy}`} onClick={() => toggleExpand(row.sku)}>{row.stockOnHand}</TableCell>
-          <TableCell className={`text-right font-medium ${densityPy}`} onClick={() => toggleExpand(row.sku)}>{row.onPurchaseOrder}</TableCell>
+          <TableCell className={`text-right font-medium ${densityPy}`} onClick={() => toggleExpand(row.sku)}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="flex items-center justify-end gap-1.5">
+                  <span>{row.onPurchaseOrder}</span>
+                  {row.poVariance > 0.01 && <span className="h-2 w-2 rounded-full bg-amber-500 ring-2 ring-amber-500/20" aria-label="PO quantity needs reconciliation" />}
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-72">
+                <p className="text-xs font-semibold">PO quantity reconciliation</p>
+                <p className="text-xs">Allocated to these orders: {row.allocatedOnPurchaseOrder}</p>
+                <p className="text-xs">Open in Zoho for this SKU: {row.zohoOnPurchaseOrder}</p>
+                {row.poVariance > 0.01 && <p className="mt-1 text-xs text-amber-600">Difference: {row.poVariance}. Review PO links before ordering.</p>}
+              </TooltipContent>
+            </Tooltip>
+          </TableCell>
           <TableCell className={densityPy} onClick={() => toggleExpand(row.sku)}><CoverageBar percent={row.coveragePercent} /></TableCell>
           <TableCell className={`text-right ${densityPy}`} onClick={() => toggleExpand(row.sku)}>
             <div className="flex items-center justify-end gap-1">
@@ -1068,7 +1121,7 @@ export default function BuyingSheetPage() {
           <TableCell className={`text-center ${densityPy}`} onClick={() => toggleExpand(row.sku)}>
             <div className="flex items-center justify-center gap-1">
               <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${row.ageEscalation === "red" ? "bg-destructive" : row.ageEscalation === "orange" ? "bg-orange-500" : row.ageEscalation === "yellow" ? "bg-amber-400" : "bg-emerald-500"}`} />
-              <span className={`text-sm font-medium ${row.daysWaiting > 7 ? "text-destructive" : row.daysWaiting > 3 ? "text-orange-500" : "text-muted-foreground"}`}>{row.daysWaiting}d</span>
+              <Tooltip><TooltipTrigger asChild><span className={`text-sm font-medium ${row.daysWaiting > 7 ? "text-destructive" : row.daysWaiting > 3 ? "text-orange-500" : "text-muted-foreground"}`}>{row.daysWaiting}d</span></TooltipTrigger><TooltipContent><p className="text-xs">Calendar days since {new Date(row.waitingSince).toLocaleDateString()}</p></TooltipContent></Tooltip>
             </div>
           </TableCell>
           <TableCell className={`text-sm ${densityPy}`} onClick={() => toggleExpand(row.sku)}>
@@ -1205,7 +1258,7 @@ export default function BuyingSheetPage() {
                   );
                 })}
               </div>
-              <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_200px_auto] sm:items-center">
+              <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_190px_auto_auto] xl:items-center">
                 <div className="relative min-w-0">
                   <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input placeholder="Search SKU, item, order, customer..." value={search} onChange={e => setSearch(e.target.value)} className="h-11 rounded-2xl pl-9 text-sm" />
@@ -1219,6 +1272,9 @@ export default function BuyingSheetPage() {
                 </Select>
                 <Button variant={showOnlyNeedOrder ? "default" : "outline"} size="sm" onClick={() => setShowOnlyNeedOrder(!showOnlyNeedOrder)} className="h-11 rounded-2xl gap-1.5 whitespace-nowrap">
                   <AlertTriangle className="h-3.5 w-3.5" />{showOnlyNeedOrder ? "Needs Order" : "Show All"}
+                </Button>
+                <Button variant={showOnlyPOMismatches ? "default" : "outline"} size="sm" onClick={() => { const next = !showOnlyPOMismatches; setShowOnlyPOMismatches(next); if (next) setShowOnlyNeedOrder(false); }} className={`h-11 rounded-2xl gap-1.5 whitespace-nowrap ${!showOnlyPOMismatches && poIntegrity.mismatches.length > 0 ? "border-amber-500/50 text-amber-700 dark:text-amber-300" : ""}`}>
+                  <Eye className="h-3.5 w-3.5" />PO Audit {poIntegrity.mismatches.length > 0 && <Badge variant="secondary" className="ml-0.5 h-5 min-w-5 px-1.5">{poIntegrity.mismatches.length}</Badge>}
                 </Button>
               </div>
             </div>
@@ -1239,6 +1295,18 @@ export default function BuyingSheetPage() {
         {lastRefreshedAt && (
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <span className="flex items-center gap-1.5"><Zap className="h-3.5 w-3.5 text-emerald-500" />Live webhook cache · last document event {lastRefreshedAt.toLocaleTimeString()}</span>
+          </div>
+        )}
+
+        {/* PO Integrity Radar: turns silent source disagreements into an actionable queue. */}
+        {poIntegrity.mismatches.length > 0 && (
+          <div className="flex flex-col gap-3 rounded-2xl border border-amber-500/25 bg-gradient-to-r from-amber-500/10 via-card to-card px-4 py-3 sm:flex-row sm:items-center">
+            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-amber-500/15 text-amber-600"><Eye className="h-4 w-4" /></div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold">PO Integrity Radar found {poIntegrity.mismatches.length} SKU{poIntegrity.mismatches.length === 1 ? "" : "s"} to reconcile</p>
+              <p className="text-xs text-muted-foreground">{poIntegrity.unallocated} have open Zoho quantity not linked to these orders · {poIntegrity.overAllocated} have more allocated locally than Zoho reports open.</p>
+            </div>
+            <Button variant="outline" size="sm" className="rounded-xl border-amber-500/30" onClick={() => { setShowOnlyPOMismatches(true); setShowOnlyNeedOrder(false); setViewMode("table"); }}>Review differences</Button>
           </div>
         )}
 
@@ -1418,11 +1486,14 @@ export default function BuyingSheetPage() {
 
             <Card className="procurement-data-card overflow-hidden rounded-[22px] border-border/60 shadow-sm">
               <CardContent className="p-0 min-w-0">
-                <div className="overflow-hidden min-w-0 max-w-full">
-                  <Table className="procurement-data-table table-fixed w-full">
-                    <TableHeader>
+                <div className="procurement-table-scroll min-w-0 max-w-full overflow-x-auto">
+                  <Table className="procurement-data-table table-fixed">
+                    <colgroup>
+                      {[44, 104, 105, 215, 78, 78, 96, 126, 90, 92, 68, 82, 180, 78, 54].map((width, index) => <col key={index} style={{ width }} />)}
+                    </colgroup>
+                    <TableHeader className="sticky top-0 z-10 bg-card/95 backdrop-blur-md">
                       <TableRow>
-                        <TableHead className="w-8"><Checkbox checked={selectedSkus.size === sortedRows.length && sortedRows.length > 0} onCheckedChange={toggleSelectAll} /></TableHead>
+                        <TableHead><Checkbox checked={selectedSkus.size === sortedRows.length && sortedRows.length > 0} onCheckedChange={toggleSelectAll} /></TableHead>
                         <SortableHeader field="priorityScore">Priority</SortableHeader>
                         <SortableHeader field="sku">SKU</SortableHeader>
                         <SortableHeader field="itemName">Item</SortableHeader>
@@ -1436,12 +1507,12 @@ export default function BuyingSheetPage() {
                         <SortableHeader field="daysWaiting" className="text-center">Wait</SortableHeader>
                         <SortableHeader field="supplierName">Supplier</SortableHeader>
                         <TableHead>Orders</TableHead>
-                        <TableHead className="w-16"><StickyNote className="h-3 w-3 text-muted-foreground" /></TableHead>
+                        <TableHead className="text-center"><StickyNote className="mx-auto h-3 w-3 text-muted-foreground" /></TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {sortedRows.length === 0 ? (
-                        <TableRow><TableCell colSpan={15} className="text-center py-8 text-muted-foreground">{showOnlyNeedOrder ? "All items are covered by stock and POs! 🎉" : "No items found"}</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={15} className="text-center py-8 text-muted-foreground">{showOnlyPOMismatches ? "No PO quantity differences match these filters." : showOnlyNeedOrder ? "All items are covered by stock and POs! 🎉" : "No items found"}</TableCell></TableRow>
                       ) : groupedRows ? (
                         groupedRows.map(([supplier, items]) => {
                           const isCollapsed = collapsedSuppliers.has(supplier);

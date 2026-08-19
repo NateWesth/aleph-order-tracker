@@ -1178,43 +1178,30 @@ html, body, #root {
 }
 .procurement-page [data-radix-collection-item] { max-width: 100%; }
 .procurement-data-card { max-width: 100%; }
-.procurement-data-table { width: 100% !important; max-width: 100%; }
+.procurement-table-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--primary) / .35) transparent;
+  overscroll-behavior-inline: contain;
+}
+.procurement-table-scroll > .aleph-data-deck {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--primary) / .35) transparent;
+  overscroll-behavior-inline: contain;
+}
+.procurement-data-table {
+  width: 1490px !important;
+  min-width: 1490px;
+  max-width: none;
+}
 .procurement-data-table th,
 .procurement-data-table td {
   min-width: 0 !important;
-  max-width: 100%;
-  overflow-wrap: anywhere;
-  word-break: break-word;
+  overflow: hidden;
+  text-overflow: ellipsis;
   padding-left: .45rem;
   padding-right: .45rem;
 }
 .procurement-data-table input { min-width: 0 !important; width: 100% !important; }
-
-@media (max-width: 1399px) {
-  /* Secondary analytics columns disappear before they can force width. */
-  .procurement-data-table th:nth-child(8), .procurement-data-table td:nth-child(8),
-  .procurement-data-table th:nth-child(10), .procurement-data-table td:nth-child(10),
-  .procurement-data-table th:nth-child(11), .procurement-data-table td:nth-child(11),
-  .procurement-data-table th:nth-child(12), .procurement-data-table td:nth-child(12),
-  .procurement-data-table th:nth-child(14), .procurement-data-table td:nth-child(14),
-  .procurement-data-table th:nth-child(15), .procurement-data-table td:nth-child(15) {
-    display: none;
-  }
-}
-@media (max-width: 1099px) {
-  .procurement-data-table th:nth-child(6), .procurement-data-table td:nth-child(6),
-  .procurement-data-table th:nth-child(7), .procurement-data-table td:nth-child(7),
-  .procurement-data-table th:nth-child(13), .procurement-data-table td:nth-child(13) {
-    display: none;
-  }
-}
-@media (max-width: 719px) {
-  .procurement-data-table th:nth-child(2), .procurement-data-table td:nth-child(2),
-  .procurement-data-table th:nth-child(5), .procurement-data-table td:nth-child(5) {
-    display: none;
-  }
-  .procurement-data-table th, .procurement-data-table td { font-size: .7rem; padding: .5rem .3rem; }
-}
 
 /* Commission cockpit */
 .commission-page .commission-info,
