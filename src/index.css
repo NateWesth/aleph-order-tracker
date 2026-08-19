@@ -2002,14 +2002,18 @@ html.toolbar-glass .aleph-toolbar-watermark { opacity: .11; }
 }
 
 .aleph-home-button {
-  border: 1px solid hsl(var(--border) / .58);
-  background: hsl(var(--background) / .72) !important;
-  box-shadow: 0 12px 28px -20px hsl(var(--foreground) / .42);
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
 }
 
-.aleph-home-button:hover {
-  transform: translateY(-1px) scale(1.025);
-  border-color: hsl(var(--primary) / .3);
+.aleph-home-button:hover,
+.aleph-home-button:focus,
+.aleph-home-button:active {
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  transform: none;
 }
 
 .aleph-smart-search { max-width: 760px; }
