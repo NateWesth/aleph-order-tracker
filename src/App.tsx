@@ -10,6 +10,7 @@ import { FloatingUploadButton } from './components/FloatingUploadButton';
 import { PWAInstallPrompt } from './components/PWAInstallPrompt';
 import { PWAUpdatePrompt } from './components/PWAUpdatePrompt';
 import { NetworkStatusIndicator } from './components/ui/NetworkStatusIndicator';
+import { AppErrorBoundary } from './components/ui/AppErrorBoundary';
 import { useGlobalDocumentScroll } from './hooks/useGlobalDocumentScroll';
 
 // Lazy load heavy components for better Speed Index
@@ -53,7 +54,8 @@ function App() {
     localStorage.setItem('resetPasswordParams', hashParams);
   }
   return (
-    <QueryClientProvider client={queryClient}>
+    <AppErrorBoundary>
+      <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <AuthProvider>
           <Router>
@@ -100,7 +102,8 @@ function App() {
           </Router>
         </AuthProvider>
       </ThemeProvider>
-    </QueryClientProvider>
+      </QueryClientProvider>
+    </AppErrorBoundary>
   );
 }
 

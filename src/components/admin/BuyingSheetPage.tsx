@@ -83,6 +83,8 @@ export default function BuyingSheetPage() {
   const [supplierReliabilityMap, setSupplierReliabilityMap] = useState<Map<string, number>>(new Map());
   const [weeklyHistory, setWeeklyHistory] = useState<Map<string, { thisWeek: number; lastWeek: number }>>(new Map());
   const [costHistory, setCostHistory] = useState<Map<string, number>>(new Map());
+  const [insightsReady, setInsightsReady] = useState(false);
+  const fetchLocalDataRef = useRef<() => Promise<void>>(async () => undefined);
   const printRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -95,17 +97,20 @@ export default function BuyingSheetPage() {
       fetchLastPurchaseDates(),
       fetchLeadTimes(),
       fetchSeasonalPatterns(),
-      fetchSupplierReliability(),
       fetchWeeklyHistory(),
       fetchCostHistory(),
-    ]).finally(() => fetchLocalData());
+    ]).finally(() => setInsightsReady(true));
   }, []);
+
+  useEffect(() => {
+    if (insightsReady) void fetchLocalDataRef.current();
+  }, [insightsReady]);
 
   // Live feed: re-pull local demand whenever orders / items / POs change
   useLiveData(["orders", "order_items", "order_purchase_orders"], () => {
-    fetchLocalData();
+    void fetchLocalDataRef.current();
     fetchLastPurchaseDates();
-  }, { fallbackIntervalMs: 0, debounceMs: 1500 });
+  }, { enabled: insightsReady, fallbackIntervalMs: 0, debounceMs: 1500, channelName: "buying-sheet-local-live-data" });
 
   // Zoho document webhooks update one shared cache row. Realtime broadcasts
   // that single change to every app, so no browser needs to poll Zoho.
@@ -120,7 +125,7 @@ export default function BuyingSheetPage() {
           if (!next?.payload) return;
           setZohoData(next.payload);
           setLastRefreshedAt(next.fetched_at ? new Date(next.fetched_at) : new Date());
-          void fetchLocalData();
+          void fetchLocalDataRef.current();
         },
       )
       .subscribe();
@@ -195,7 +200,8 @@ export default function BuyingSheetPage() {
 
   const fetchLeadTimes = async () => {
     try {
-      const { data } = await supabase.from("order_items").select("code, created_at, completed_at, order_id").eq("progress_stage", "completed").not("code", "is", null).not("completed_at", "is", null);
+      const oneYearAgo = new Date(); oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+      const { data } = await supabase.from("order_items").select("code, created_at, completed_at, order_id").eq("progress_stage", "completed").not("code", "is", null).not("completed_at", "is", null).gte("completed_at", oneYearAgo.toISOString());
       const skuLeadTimes = new Map<string, number[]>();
       (data || []).forEach(item => {
         if (!item.created_at || !item.completed_at) return;
@@ -206,13 +212,21 @@ export default function BuyingSheetPage() {
       const map = new Map<string, number>();
       skuLeadTimes.forEach((days, sku) => { map.set(sku, Math.round(days.reduce((a, b) => a + b, 0) / days.length)); });
       setLeadTimeMap(map);
+      const reliability = new Map<string, number>();
+      skuLeadTimes.forEach((days, sku) => {
+        const average = map.get(sku) || 14;
+        const onTime = days.filter((daysTaken) => daysTaken <= average * 1.2).length;
+        reliability.set(sku, Math.round((onTime / days.length) * 100));
+      });
+      setSupplierReliabilityMap(reliability);
     } catch (err) { console.error("Failed to fetch lead times:", err); }
   };
 
   const fetchSeasonalPatterns = async () => {
     try {
       const currentMonth = new Date().getMonth();
-      const { data } = await supabase.from("order_items").select("code, quantity, created_at").not("code", "is", null);
+      const oneYearAgo = new Date(); oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+      const { data } = await supabase.from("order_items").select("code, quantity, created_at").not("code", "is", null).gte("created_at", oneYearAgo.toISOString());
       const skuMonthlyTotals = new Map<string, Map<number, number[]>>();
       (data || []).forEach(item => {
         const sku = (item.code || "").toUpperCase();
@@ -359,30 +373,6 @@ export default function BuyingSheetPage() {
     return "stable";
   };
 
-  // Supplier reliability: % of items delivered within expected lead time
-  const fetchSupplierReliability = async () => {
-    try {
-      const { data } = await supabase.from("order_items").select("code, created_at, completed_at, order_id").eq("progress_stage", "completed").not("code", "is", null).not("completed_at", "is", null);
-      if (!data?.length) return;
-      const supplierDeliveries = new Map<string, { onTime: number; total: number }>();
-      // We approximate by SKU lead time vs actual
-      for (const item of data) {
-        const sku = (item.code || "").toUpperCase();
-        const days = Math.max(0, Math.round((new Date(item.completed_at!).getTime() - new Date(item.created_at).getTime()) / (1000 * 60 * 60 * 24)));
-        const avgLead = leadTimeMap.get(sku) || 14;
-        const existing = supplierDeliveries.get(sku) || { onTime: 0, total: 0 };
-        existing.total++;
-        if (days <= avgLead * 1.2) existing.onTime++;
-        supplierDeliveries.set(sku, existing);
-      }
-      const map = new Map<string, number>();
-      supplierDeliveries.forEach((stats, sku) => {
-        map.set(sku, Math.round((stats.onTime / stats.total) * 100));
-      });
-      setSupplierReliabilityMap(map);
-    } catch (err) { console.error("Failed to fetch supplier reliability:", err); }
-  };
-
   // Weekly velocity history
   const fetchWeeklyHistory = async () => {
     try {
@@ -408,10 +398,11 @@ export default function BuyingSheetPage() {
   // Cost estimation from historical order amounts
   const fetchCostHistory = async () => {
     try {
-      const { data } = await supabase.from("orders").select("id, total_amount").not("total_amount", "is", null).gt("total_amount", 0);
+      const oneYearAgo = new Date(); oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+      const { data } = await supabase.from("orders").select("id, total_amount").not("total_amount", "is", null).gt("total_amount", 0).gte("created_at", oneYearAgo.toISOString());
       if (!data?.length) return;
       const orderAmounts = new Map(data.map(o => [o.id, o.total_amount as number]));
-      const { data: items } = await supabase.from("order_items").select("code, quantity, order_id").not("code", "is", null);
+      const { data: items } = await supabase.from("order_items").select("code, quantity, order_id").not("code", "is", null).gte("created_at", oneYearAgo.toISOString());
       if (!items?.length) return;
       // Rough unit cost: order total / total items in order
       const skuCosts = new Map<string, number[]>();
@@ -482,10 +473,16 @@ export default function BuyingSheetPage() {
       if (!orderItems?.length) { setRows([]); setLoading(false); fetchSuggestedRestock(activeSkus); return; }
 
       const orderIds = [...new Set(orderItems.map(i => i.order_id))];
-      const { data: orders } = await supabase.from("orders").select("id, order_number, company_id, supplier_id, urgency").in("id", orderIds);
+      const [ordersResult, poResult] = await Promise.all([
+        supabase.from("orders").select("id, order_number, company_id, supplier_id, urgency").in("id", orderIds),
+        supabase.from("order_purchase_orders").select("order_id, supplier_id").in("order_id", orderIds),
+      ]);
+      if (ordersResult.error) throw ordersResult.error;
+      if (poResult.error) throw poResult.error;
+      const orders = ordersResult.data || [];
+      const orderPOs = poResult.data || [];
       const companyIds = [...new Set((orders || []).map(o => o.company_id).filter(Boolean))] as string[];
       const supplierIdsFromOrders = [...new Set((orders || []).map(o => o.supplier_id).filter(Boolean))] as string[];
-      const { data: orderPOs } = await supabase.from("order_purchase_orders").select("order_id, supplier_id").in("order_id", orderIds);
       const allSupplierIds = [...new Set([...supplierIdsFromOrders, ...(orderPOs || []).map(p => p.supplier_id)])];
       const [companiesRes, suppliersRes] = await Promise.all([
         companyIds.length > 0 ? supabase.from("companies").select("id, name").in("id", companyIds) : { data: [] },
@@ -610,6 +607,10 @@ export default function BuyingSheetPage() {
       }
     });
   };
+
+  // Realtime callbacks are registered once, but always execute the newest
+  // calculation closure with the current insight maps and Zoho snapshot.
+  fetchLocalDataRef.current = fetchLocalData;
 
   // ── Actions ──────────────────────────────────────────────────────────
   const handleSort = useCallback((field: SortField) => {

@@ -4,7 +4,6 @@ import { PullToRefresh } from "@/components/ui/PullToRefresh";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { useGlobalRealtimeOrders } from "./hooks/useGlobalRealtimeOrders";
 import { getUserRole, getUserProfile } from "@/utils/authService";
 import OrdersHeader from "./components/OrdersHeader";
 import OrderTable from "./components/OrderTable";
@@ -183,15 +182,11 @@ export default function CompletedPage({
     }
   };
 
-  useGlobalRealtimeOrders({
-    onOrdersChange: () => {
-      fetchCompletedOrders();
-    },
-    isAdmin,
-    pageType: 'completed'
+  useLiveData(["orders", "order_items", "order_purchase_orders", "order_files"], () => fetchCompletedOrders(), {
+    channelName: "completed-orders-live-data",
+    debounceMs: 400,
+    fallbackIntervalMs: 0,
   });
-
-  useLiveData(["orders", "order_items", "order_purchase_orders", "order_files"], () => fetchCompletedOrders());
 
   useEffect(() => {
     if (user?.id) {

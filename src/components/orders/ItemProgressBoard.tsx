@@ -11,7 +11,7 @@ import { ChevronDown, ChevronRight, Package, Clock, Truck, CheckCircle, Box, Loa
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserData } from "@/hooks/useUserData";
-import { useOptimizedRealtime } from "@/hooks/useOptimizedRealtime";
+import { useLiveData } from "@/hooks/useLiveData";
 import { useIsMobile } from "@/hooks/use-mobile";
 import OrderItemComments from "./components/OrderItemComments";
 import {
@@ -382,31 +382,13 @@ export default function ItemProgressBoard({ isAdmin }: ItemProgressBoardProps) {
     }
   }, [user?.id, userRole, userCompanyId]);
 
-  // Reconciliation can update many rows before a realtime channel reconnects.
-  // Refresh on focus/visibility and periodically so the board never keeps stale
-  // stage quantities after a Zoho sync has completed.
-  useEffect(() => {
-    if (!user?.id) return;
-
-    const refreshWhenVisible = () => {
-      if (document.visibilityState === 'visible') void fetchOrdersWithItems();
-    };
-    const interval = window.setInterval(refreshWhenVisible, 60_000);
-
-    window.addEventListener('focus', refreshWhenVisible);
-    document.addEventListener('visibilitychange', refreshWhenVisible);
-    return () => {
-      window.clearInterval(interval);
-      window.removeEventListener('focus', refreshWhenVisible);
-      document.removeEventListener('visibilitychange', refreshWhenVisible);
-    };
-  }, [user?.id, userRole, userCompanyId]);
-
-  // Set up realtime subscription
-  useOptimizedRealtime({
-    table: 'order_items',
-    event: '*',
-    onUpdate: fetchOrdersWithItems,
+  // Coalesce bulk Zoho reconciliation events into one refresh. This handles
+  // inserts, updates and deletes and recovers on focus without minute polling.
+  useLiveData(["orders", "order_items"], fetchOrdersWithItems, {
+    enabled: Boolean(user?.id && userRole && (userRole === 'admin' || userCompanyId !== null)),
+    channelName: "item-progress-live-data",
+    debounceMs: 500,
+    fallbackIntervalMs: 0,
   });
 
   // Move a quantity of an item between stages

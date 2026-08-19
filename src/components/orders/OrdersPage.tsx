@@ -30,7 +30,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme, boardSingleColors, colorfulPresets } from "@/contexts/ThemeContext";
-import { useGlobalRealtimeOrders } from "./hooks/useGlobalRealtimeOrders";
 import { useCompanyData } from "@/components/admin/hooks/useCompanyData";
 import OrderForm from "./components/OrderForm";
 import OrderStatusColumn from "./components/OrderStatusColumn";
@@ -330,27 +329,51 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
       if (error) throw error;
 
       const companyIds = [...new Set(data?.map((o) => o.company_id).filter(Boolean))];
+      const orderIds = data?.map((o) => o.id) || [];
+      const userIds = [...new Set(data?.map((o) => o.user_id).filter(Boolean))] as string[];
+
+      // Fetch independent relationships together. The previous sequence waited
+      // for companies, then items/comments, then POs/suppliers, then profiles.
+      const [companiesResult, itemsResult, posResult, profilesResult] = await Promise.all([
+        companyIds.length > 0
+          ? supabase.from("companies").select("id, name").in("id", companyIds)
+          : Promise.resolve({ data: [], error: null }),
+        orderIds.length > 0
+          ? supabase
+              .from("order_items")
+              .select("id, order_id, name, code, quantity, stock_status, qty_on_po, qty_received, qty_invoiced, qty_completed")
+              .in("order_id", orderIds)
+          : Promise.resolve({ data: [], error: null }),
+        orderIds.length > 0
+          ? supabase
+              .from("order_purchase_orders")
+              .select("id, order_id, supplier_id, purchase_order_number")
+              .in("order_id", orderIds)
+          : Promise.resolve({ data: [], error: null }),
+        userIds.length > 0
+          ? supabase.from("profiles").select("id, full_name").in("id", userIds)
+          : Promise.resolve({ data: [], error: null }),
+      ]);
+
+      const relationshipError = companiesResult.error || itemsResult.error || posResult.error || profilesResult.error;
+      if (relationshipError) throw relationshipError;
+
+      const poSupplierIds = [...new Set((posResult.data || []).map((po) => po.supplier_id))];
+      const suppliersPromise = poSupplierIds.length > 0
+        ? supabase.from("suppliers").select("id, name").in("id", poSupplierIds)
+        : Promise.resolve({ data: [], error: null });
 
       let companyMap = new Map<string, string>();
 
       if (companyIds.length > 0) {
-        const { data: companiesData } = await supabase.from("companies").select("id, name").in("id", companyIds);
-
-        companyMap = new Map(companiesData?.map((c) => [c.id, c.name]) || []);
+        companyMap = new Map(companiesResult.data?.map((c) => [c.id, c.name] as [string, string]) || []);
       }
-
-      const orderIds = data?.map((o) => o.id) || [];
 
       const orderItemsMap = new Map<string, OrderItem[]>();
       const orderPOsMap = new Map<string, PurchaseOrderInfo[]>();
 
       if (orderIds.length > 0) {
-        const { data: itemsData } = await supabase
-          .from("order_items")
-          .select(
-            "id, order_id, name, code, quantity, stock_status, qty_on_po, qty_received, qty_invoiced, qty_completed",
-          )
-          .in("order_id", orderIds);
+        const itemsData = itemsResult.data;
 
         if (itemsData) {
           const itemIds = itemsData.map((item: any) => item.id);
@@ -396,20 +419,15 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
           });
         }
 
-        const { data: posData } = await supabase
-          .from("order_purchase_orders")
-          .select("id, order_id, supplier_id, purchase_order_number")
-          .in("order_id", orderIds);
+        const posData = posResult.data;
 
         if (posData && posData.length > 0) {
-          const poSupplierIds = [...new Set(posData.map((po) => po.supplier_id))];
-
           let supplierMap = new Map<string, string>();
 
           if (poSupplierIds.length > 0) {
-            const { data: suppliersData } = await supabase.from("suppliers").select("id, name").in("id", poSupplierIds);
-
-            supplierMap = new Map(suppliersData?.map((s) => [s.id, s.name]) || []);
+            const suppliersResult = await suppliersPromise;
+            if (suppliersResult.error) throw suppliersResult.error;
+            supplierMap = new Map(suppliersResult.data?.map((s) => [s.id, s.name] as [string, string]) || []);
           }
 
           posData.forEach((po) => {
@@ -427,14 +445,10 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
         }
       }
 
-      const userIds = [...new Set(data?.map((o) => o.user_id).filter(Boolean))] as string[];
-
       let userMap = new Map<string, string>();
 
       if (userIds.length > 0) {
-        const { data: profilesData } = await supabase.from("profiles").select("id, full_name").in("id", userIds);
-
-        userMap = new Map(profilesData?.map((p) => [p.id, p.full_name || "Unknown"]) || []);
+        userMap = new Map(profilesResult.data?.map((p) => [p.id, p.full_name || "Unknown"] as [string, string]) || []);
       }
 
       const ordersWithData = (data || []).map((order) => ({
@@ -457,13 +471,7 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
        * If the currently opened bubble belongs to an order that no longer
        * exists, close it cleanly rather than leaving a stale bubble state.
        */
-      if (itemsBubble) {
-        const stillExists = ordersWithData.some((order) => order.id === itemsBubble.orderId);
-
-        if (!stillExists) {
-          setItemsBubble(null);
-        }
-      }
+      setItemsBubble((current) => current && !ordersWithData.some((order) => order.id === current.orderId) ? null : current);
     } catch (error) {
       console.error("Error fetching orders:", error);
 
@@ -475,11 +483,11 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
     } finally {
       setLoading(false);
     }
-  }, [toast, itemsBubble]);
+  }, [toast]);
 
   useLiveData(["orders", "order_items", "order_item_comments", "order_purchase_orders", "order_files"], () => fetchOrders(), {
     channelName: "orders-board-live-data",
-    fallbackIntervalMs: 15_000,
+    fallbackIntervalMs: 0,
     debounceMs: 250,
   });
 
@@ -514,12 +522,6 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
       console.error("Error fetching tags:", error);
     }
   }, []);
-
-  useGlobalRealtimeOrders({
-    onOrdersChange: fetchOrders,
-    isAdmin,
-    pageType: "orders",
-  });
 
   const handleCreateOrder = async (orderData: {
     orderNumber: string;

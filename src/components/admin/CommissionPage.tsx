@@ -864,10 +864,10 @@ const CommissionPage = () => {
     }
   }, [activeTab, selectedMonth, fetchCommissionReport]);
 
-  // Auto-refresh from Zoho every 30 minutes while the report tab is open
+  // Realtime and focus/reconnect recovery replace scheduled report polling.
   useLiveData(["orders", "order_items"], () => fetchCommissionReport(true), {
     enabled: activeTab === "report",
-    fallbackIntervalMs: 15 * 60 * 1000,
+    fallbackIntervalMs: 0,
     debounceMs: 3000,
   });
 

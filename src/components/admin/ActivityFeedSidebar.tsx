@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 
 import { supabase } from "@/integrations/supabase/client";
+import { useLiveData } from "@/hooks/useLiveData";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import {
@@ -118,40 +119,13 @@ export default function ActivityFeedSidebar() {
 
   useEffect(() => {
     fetchActivities();
-
-    // Real-time subscription
-    const channel = supabase
-      .channel("activity-feed")
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "order_activity_log" },
-        () => {
-          fetchActivities();
-        }
-      )
-      .subscribe((status) => {
-        if (status === "SUBSCRIBED") void fetchActivities();
-        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-          window.setTimeout(() => void fetchActivities(), 1000);
-        }
-      });
-
-    const refreshIfVisible = () => {
-      if (document.visibilityState === "visible") void fetchActivities();
-    };
-    const safetyPoll = window.setInterval(refreshIfVisible, 30_000);
-    document.addEventListener("visibilitychange", refreshIfVisible);
-    window.addEventListener("focus", refreshIfVisible);
-    window.addEventListener("online", refreshIfVisible);
-
-    return () => {
-      window.clearInterval(safetyPoll);
-      document.removeEventListener("visibilitychange", refreshIfVisible);
-      window.removeEventListener("focus", refreshIfVisible);
-      window.removeEventListener("online", refreshIfVisible);
-      supabase.removeChannel(channel);
-    };
   }, []);
+
+  useLiveData(["order_activity_log"], fetchActivities, {
+    channelName: "activity-feed-live-data",
+    debounceMs: 500,
+    fallbackIntervalMs: 0,
+  });
 
   const handleExpand = () => {
     setCollapsed(false);

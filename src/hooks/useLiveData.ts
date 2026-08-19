@@ -12,7 +12,7 @@ export function useLiveData(
   options?: {
     enabled?: boolean;
     debounceMs?: number;
-    /** Safety-net polling interval in ms (0 disables). */
+    /** Safety-net polling interval in ms (0 disables). Realtime + focus recovery is the default. */
     fallbackIntervalMs?: number;
     channelName?: string;
   }
@@ -20,7 +20,7 @@ export function useLiveData(
   const {
     enabled = true,
     debounceMs = 400,
-    fallbackIntervalMs = 30 * 1000,
+    fallbackIntervalMs = 0,
     channelName,
   } = options ?? {};
 
@@ -35,9 +35,32 @@ export function useLiveData(
     if (!enabled) return;
 
     let timer: number | undefined;
+    let inFlight = false;
+    let rerunRequested = false;
+
+    const run = async () => {
+      if (inFlight) {
+        rerunRequested = true;
+        return;
+      }
+
+      inFlight = true;
+      try {
+        await cbRef.current();
+      } catch (error) {
+        console.error(`Live data refresh failed for ${key}`, error);
+      } finally {
+        inFlight = false;
+        if (rerunRequested) {
+          rerunRequested = false;
+          fire();
+        }
+      }
+    };
+
     const fire = () => {
       if (timer) window.clearTimeout(timer);
-      timer = window.setTimeout(() => void cbRef.current(), debounceMs);
+      timer = window.setTimeout(() => void run(), debounceMs);
     };
 
     const channel = supabase.channel(
@@ -52,9 +75,7 @@ export function useLiveData(
       );
     }
     channel.subscribe((status) => {
-      if (status === "SUBSCRIBED") {
-        fire();
-      } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+      if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
         // Supabase reconnects the socket internally. Refreshing here prevents
         // a missed event from leaving another user's screen stale meanwhile.
         window.setTimeout(fire, 1000);
@@ -70,7 +91,7 @@ export function useLiveData(
 
     const interval =
       fallbackIntervalMs > 0
-        ? window.setInterval(() => void cbRef.current(), fallbackIntervalMs)
+        ? window.setInterval(() => void run(), fallbackIntervalMs)
         : undefined;
 
     return () => {
