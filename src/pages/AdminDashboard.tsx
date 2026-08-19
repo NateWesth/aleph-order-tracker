@@ -280,12 +280,12 @@ const AdminDashboard = () => {
           <div className="flex items-center gap-2 sm:gap-4">
             {/* Home/Brand */}
             <Button
-              variant={activeView === "home" ? "secondary" : "ghost"}
+              variant="ghost"
               size="icon"
               onClick={() => setActiveView("home")}
               onPointerEnter={() => prefetchWorkspace("home")}
               onFocus={() => prefetchWorkspace("home")}
-              className="aleph-home-button shrink-0 rounded-2xl h-12 w-12 sm:h-14 sm:w-14 p-1.5"
+              className="aleph-home-button shrink-0 rounded-2xl h-12 w-12 sm:h-14 sm:w-14 p-1.5 bg-transparent hover:bg-transparent focus:bg-transparent active:bg-transparent"
               data-tour="home"
               title="Home"
             >
