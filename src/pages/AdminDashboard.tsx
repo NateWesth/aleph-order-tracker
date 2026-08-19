@@ -285,7 +285,7 @@ const AdminDashboard = () => {
               onClick={() => setActiveView("home")}
               onPointerEnter={() => prefetchWorkspace("home")}
               onFocus={() => prefetchWorkspace("home")}
-              className="aleph-home-button shrink-0 rounded-2xl h-12 w-12 sm:h-14 sm:w-14 p-1.5 bg-transparent hover:bg-transparent focus:bg-transparent active:bg-transparent"
+              className="aleph-home-button shrink-0 h-12 w-12 sm:h-14 sm:w-14 p-1.5 bg-transparent hover:bg-transparent focus:bg-transparent active:bg-transparent border-0 shadow-none ring-0 outline-none hover:shadow-none focus:shadow-none focus-visible:ring-0 focus-visible:outline-none"
               data-tour="home"
               title="Home"
             >
