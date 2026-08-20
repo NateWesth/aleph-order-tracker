@@ -3,7 +3,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { useLiveData } from "@/hooks/useLiveData";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import PageHeader from "@/components/ui/PageHeader";
+import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -20,10 +21,12 @@ import {
   CheckCircle2,
   CircleDashed,
   Clock,
+  Flame,
   Loader2,
   Plus,
   Radar,
   Trash2,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -48,11 +51,11 @@ const PRIORITY_ORDER: Record<Priority, number> = {
   low: 3,
 };
 
-const PRIORITY_STYLES: Record<Priority, string> = {
-  critical: "border-destructive/40 bg-destructive/10 text-destructive",
-  high: "border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400",
-  medium: "border-primary/30 bg-primary/10 text-primary",
-  low: "border-border bg-muted text-muted-foreground",
+const PRIORITY_META: Record<Priority, { label: string; dot: string; badge: string }> = {
+  critical: { label: "Critical", dot: "bg-destructive", badge: "border-destructive/30 bg-destructive/10 text-destructive" },
+  high: { label: "High", dot: "bg-warning", badge: "border-warning/30 bg-warning/10 text-warning" },
+  medium: { label: "Medium", dot: "bg-info", badge: "border-info/30 bg-info/10 text-info" },
+  low: { label: "Low", dot: "bg-muted-foreground/40", badge: "border-border bg-muted text-muted-foreground" },
 };
 
 const STATUS_LABEL: Record<Status, string> = {
@@ -102,6 +105,7 @@ export default function OperationsControlTower() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [statusFilter, setStatusFilter] = useState<"active" | Status>("active");
+  const [showComposer, setShowComposer] = useState(false);
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -146,6 +150,9 @@ export default function OperationsControlTower() {
     },
     [members]
   );
+
+  const memberInitials = (name: string) =>
+    name.split(" ").filter(Boolean).slice(0, 2).map((p) => p[0]?.toUpperCase()).join("") || "?";
 
   const visibleItems = useMemo(() => {
     const filtered = items.filter((item) =>
@@ -207,6 +214,7 @@ export default function OperationsControlTower() {
       return;
     }
     resetForm();
+    setShowComposer(false);
     void fetchItems();
   };
 
@@ -246,231 +254,225 @@ export default function OperationsControlTower() {
 
   return (
     <div className="space-y-4">
-      <Card className="glass-panel">
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Radar className="h-4 w-4 text-primary" />
-            Operations Control Tower
-          </CardTitle>
-          <p className="text-xs text-muted-foreground">
-            One shared queue for whatever the team needs to chase next.
-          </p>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {[
-              { label: "Open", value: counts.open },
-              { label: "In progress", value: counts.in_progress },
-              { label: "Overdue", value: counts.overdue },
-              { label: "Done", value: counts.done },
-            ].map((stat) => (
-              <div key={stat.label} className="rounded-lg border border-border/60 bg-card/50 p-3">
-                <div className="text-xl font-semibold tabular-nums">{stat.value}</div>
-                <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                  {stat.label}
-                </div>
-              </div>
-            ))}
-          </div>
+      <PageHeader
+        title="Control Tower"
+        icon={Radar}
+        description="One shared queue for whatever the team needs to chase next."
+        stats={[
+          { label: "open", value: counts.open, icon: CircleDashed },
+          { label: "in progress", value: counts.in_progress, icon: Clock },
+          { label: "overdue", value: counts.overdue, icon: Flame },
+          { label: "done", value: counts.done, icon: CheckCircle2 },
+        ]}
+        actions={
+          <Button onClick={() => setShowComposer((v) => !v)} className="gap-1.5">
+            {showComposer ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+            {showComposer ? "Cancel" : "New task"}
+          </Button>
+        }
+      />
 
-          <div className="grid gap-2 rounded-lg border border-border/60 bg-card/40 p-3 md:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))_auto]">
-            <Input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="What needs to happen?"
-              className="h-9"
-              onKeyDown={(e) => {
-                if (e.key === "Enter") void createItem();
-              }}
-            />
+      {/* Quick-add composer - tucked away until needed, instead of a permanent dense form */}
+      {showComposer && (
+        <Card className="border-2 border-primary/20 shadow-soft p-4 space-y-3 animate-scale-in">
+          <Input
+            autoFocus
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="What needs to happen?"
+            className="h-10 text-sm font-medium"
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) void createItem();
+            }}
+          />
+          <Textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Optional detail or context"
+            className="min-h-[60px] text-sm resize-none"
+            rows={2}
+          />
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             <Select value={priority} onValueChange={(v) => setPriority(v as Priority)}>
-              <SelectTrigger className="h-9">
-                <SelectValue />
-              </SelectTrigger>
+              <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="critical">Critical</SelectItem>
-                <SelectItem value="high">High</SelectItem>
-                <SelectItem value="medium">Medium</SelectItem>
-                <SelectItem value="low">Low</SelectItem>
+                {(Object.keys(PRIORITY_META) as Priority[]).map((p) => (
+                  <SelectItem key={p} value={p}>{PRIORITY_META[p].label}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
             <Select value={workspace} onValueChange={setWorkspace}>
-              <SelectTrigger className="h-9">
-                <SelectValue />
-              </SelectTrigger>
+              <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {WORKSPACES.map((w) => (
-                  <SelectItem key={w.id} value={w.id}>
-                    {w.label}
-                  </SelectItem>
+                  <SelectItem key={w.id} value={w.id}>{w.label}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
             <Select value={assignedTo} onValueChange={setAssignedTo}>
-              <SelectTrigger className="h-9">
-                <SelectValue placeholder="Assign" />
-              </SelectTrigger>
+              <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Assign" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="unassigned">Unassigned</SelectItem>
                 {members.map((m) => (
-                  <SelectItem key={m.id} value={m.id}>
-                    {m.full_name || m.email || "Team member"}
-                  </SelectItem>
+                  <SelectItem key={m.id} value={m.id}>{m.full_name || m.email || "Team member"}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            <Button onClick={() => void createItem()} disabled={saving} className="h-9">
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-              <span className="ml-1">Add</span>
-            </Button>
-            <Textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Optional detail or context"
-              className="min-h-[38px] md:col-span-3"
-              rows={1}
-            />
             <Input
               type="date"
               value={dueAt}
               onChange={(e) => setDueAt(e.target.value)}
-              className="h-9 md:col-span-2"
+              className="h-9 text-xs"
             />
           </div>
-
-          <div className="flex flex-wrap gap-1.5">
-            {(["active", "open", "in_progress", "done"] as const).map((key) => (
-              <Button
-                key={key}
-                size="sm"
-                variant={statusFilter === key ? "secondary" : "ghost"}
-                className="h-7 text-xs"
-                onClick={() => setStatusFilter(key)}
-              >
-                {key === "active" ? "Active" : STATUS_LABEL[key]}
-              </Button>
-            ))}
+          <div className="flex justify-end">
+            <Button onClick={() => void createItem()} disabled={saving} className="gap-1.5">
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+              Add task
+            </Button>
           </div>
+        </Card>
+      )}
 
-          {loading ? (
-            <div className="flex items-center justify-center py-10 text-sm text-muted-foreground">
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading action queue…
-            </div>
-          ) : visibleItems.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-border/60 py-10 text-center">
-              <CheckCircle2 className="mx-auto mb-2 h-8 w-8 text-primary/60" />
-              <p className="text-sm font-medium">Nothing in this lane</p>
-              <p className="text-xs text-muted-foreground">Add a task above to get the team moving.</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {visibleItems.map((item) => {
-                const due = formatDue(item.due_at);
-                const assignee = memberName(item.assigned_to);
-                return (
-                  <div
-                    key={item.id}
-                    className={cn(
-                      "flex items-start gap-3 rounded-lg border border-border/60 bg-card/50 p-3 transition-colors hover:bg-muted/50",
-                      item.status === "done" && "opacity-60"
-                    )}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => cycleStatus(item)}
-                      className="mt-0.5 text-muted-foreground transition-colors hover:text-primary"
-                      aria-label={`Mark task ${STATUS_LABEL[item.status]}`}
-                    >
-                      {item.status === "done" ? (
-                        <CheckCircle2 className="h-5 w-5 text-primary" />
-                      ) : item.status === "in_progress" ? (
-                        <Clock className="h-5 w-5 text-amber-500" />
-                      ) : (
-                        <CircleDashed className="h-5 w-5" />
-                      )}
-                    </button>
+      {/* Filter pills */}
+      <div className="inline-flex items-center gap-0.5 rounded-xl bg-muted p-1">
+        {(["active", "open", "in_progress", "done"] as const).map((key) => (
+          <button
+            key={key}
+            onClick={() => setStatusFilter(key)}
+            className={cn(
+              "rounded-lg px-3 py-1.5 text-xs font-semibold transition-all",
+              statusFilter === key ? "bg-background text-foreground shadow-soft" : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            {key === "active" ? "Active" : STATUS_LABEL[key]}
+          </button>
+        ))}
+      </div>
 
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span
-                          className={cn(
-                            "text-sm font-medium",
-                            item.status === "done" && "line-through"
-                          )}
-                        >
-                          {item.title}
-                        </span>
-                        <Badge variant="outline" className={cn("text-[10px]", PRIORITY_STYLES[item.priority])}>
-                          {item.priority}
-                        </Badge>
-                        <Badge variant="outline" className="text-[10px]">
-                          {STATUS_LABEL[item.status]}
-                        </Badge>
-                        {due && (
-                          <Badge
-                            variant="outline"
-                            className={cn(
-                              "text-[10px]",
-                              due.overdue && item.status !== "done" &&
-                                "border-destructive/40 bg-destructive/10 text-destructive"
-                            )}
-                          >
-                            Due {due.label}
-                          </Badge>
+      {/* Task list */}
+      {loading ? (
+        <div className="flex items-center justify-center py-16 text-sm text-muted-foreground">
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading action queue...
+        </div>
+      ) : visibleItems.length === 0 ? (
+        <div className="rounded-2xl border-2 border-dashed border-border py-16 text-center">
+          <CheckCircle2 className="mx-auto mb-3 h-9 w-9 text-success/60" />
+          <p className="text-sm font-semibold text-foreground">Nothing in this lane</p>
+          <p className="text-xs text-muted-foreground mt-1">Add a task to get the team moving.</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {visibleItems.map((item) => {
+            const due = formatDue(item.due_at);
+            const assignee = memberName(item.assigned_to);
+            const meta = PRIORITY_META[item.priority];
+            return (
+              <Card
+                key={item.id}
+                className={cn(
+                  "flex items-start gap-3 border-2 p-3.5 transition-all hover:border-primary/25 hover:shadow-soft",
+                  item.status === "done" && "opacity-60"
+                )}
+              >
+                <button
+                  type="button"
+                  onClick={() => cycleStatus(item)}
+                  className="mt-0.5 shrink-0 text-muted-foreground transition-colors hover:text-primary"
+                  aria-label={`Mark task ${STATUS_LABEL[item.status]}`}
+                >
+                  {item.status === "done" ? (
+                    <CheckCircle2 className="h-5 w-5 text-success" />
+                  ) : item.status === "in_progress" ? (
+                    <Clock className="h-5 w-5 text-info" />
+                  ) : (
+                    <CircleDashed className="h-5 w-5" />
+                  )}
+                </button>
+
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className={cn("h-1.5 w-1.5 rounded-full shrink-0", meta.dot)} />
+                    <span className={cn("text-sm font-semibold", item.status === "done" && "line-through text-muted-foreground")}>
+                      {item.title}
+                    </span>
+                    <Badge variant="outline" className={cn("text-[10px] font-semibold", meta.badge)}>
+                      {meta.label}
+                    </Badge>
+                    {due && (
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          "text-[10px]",
+                          due.overdue && item.status !== "done" && "border-destructive/30 bg-destructive/10 text-destructive"
                         )}
-                      </div>
-                      {item.description && (
-                        <p className="mt-1 text-xs text-muted-foreground">{item.description}</p>
-                      )}
-                      <div className="mt-1 text-[11px] text-muted-foreground">
-                        {assignee ? `Assigned to ${assignee}` : "Unassigned"}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-1">
-                      <Select
-                        value={item.assigned_to ?? "unassigned"}
-                        onValueChange={(v) =>
-                          void updateItem(item, { assigned_to: v === "unassigned" ? null : v })
-                        }
                       >
-                        <SelectTrigger className="hidden h-7 w-[140px] text-xs sm:flex">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="unassigned">Unassigned</SelectItem>
-                          {members.map((m) => (
-                            <SelectItem key={m.id} value={m.id}>
-                              {m.full_name || m.email || "Team member"}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-7 w-7"
-                        title={`Open ${item.workspace}`}
-                        onClick={() => openWorkspace(item.workspace)}
-                      >
-                        <ArrowUpRight className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                        onClick={() => void removeItem(item)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
+                        Due {due.label}
+                      </Badge>
+                    )}
                   </div>
-                );
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                  {item.description && (
+                    <p className="mt-1 text-xs text-muted-foreground">{item.description}</p>
+                  )}
+                  <div className="mt-1.5 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                    {assignee ? (
+                      <>
+                        <span className="flex h-4 w-4 items-center justify-center rounded-full bg-primary/10 text-[8px] font-bold text-primary">
+                          {memberInitials(assignee)}
+                        </span>
+                        {assignee}
+                      </>
+                    ) : (
+                      "Unassigned"
+                    )}
+                    <span className="text-muted-foreground/40">·</span>
+                    <button
+                      onClick={() => openWorkspace(item.workspace)}
+                      className="hover:text-primary hover:underline"
+                    >
+                      {WORKSPACES.find((w) => w.id === item.workspace)?.label ?? item.workspace}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1 shrink-0">
+                  <Select
+                    value={item.assigned_to ?? "unassigned"}
+                    onValueChange={(v) => void updateItem(item, { assigned_to: v === "unassigned" ? null : v })}
+                  >
+                    <SelectTrigger className="hidden h-7 w-[130px] text-xs sm:flex">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="unassigned">Unassigned</SelectItem>
+                      {members.map((m) => (
+                        <SelectItem key={m.id} value={m.id}>{m.full_name || m.email || "Team member"}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-7 w-7"
+                    title={`Open ${item.workspace}`}
+                    onClick={() => openWorkspace(item.workspace)}
+                  >
+                    <ArrowUpRight className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                    onClick={() => void removeItem(item)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

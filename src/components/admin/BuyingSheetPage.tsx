@@ -208,8 +208,8 @@ export default function BuyingSheetPage() {
       ]);
       const lastMap = new Map<string, number>();
       const prevMap = new Map<string, number>();
-      (lastRes.data || []).forEach(i => { const sku = (i.code || "").toUpperCase(); lastMap.set(sku, (lastMap.get(sku) || 0) + (i.quantity || 1)); });
-      (prevRes.data || []).forEach(i => { const sku = (i.code || "").toUpperCase(); prevMap.set(sku, (prevMap.get(sku) || 0) + (i.quantity || 1)); });
+      (lastRes.data || []).forEach(i => { const sku = (i.code || "").trim().toUpperCase(); lastMap.set(sku, (lastMap.get(sku) || 0) + (i.quantity || 1)); });
+      (prevRes.data || []).forEach(i => { const sku = (i.code || "").trim().toUpperCase(); prevMap.set(sku, (prevMap.get(sku) || 0) + (i.quantity || 1)); });
       const history = new Map<string, { lastMonth: number; prevMonth: number }>();
       new Set([...lastMap.keys(), ...prevMap.keys()]).forEach(sku => { history.set(sku, { lastMonth: lastMap.get(sku) || 0, prevMonth: prevMap.get(sku) || 0 }); });
       setDemandHistory(history);
@@ -223,7 +223,7 @@ export default function BuyingSheetPage() {
       const skuLeadTimes = new Map<string, number[]>();
       (data || []).forEach(item => {
         if (!item.created_at || !item.completed_at) return;
-        const sku = (item.code || "").toUpperCase();
+        const sku = (item.code || "").trim().toUpperCase();
         const days = Math.max(0, Math.round((new Date(item.completed_at).getTime() - new Date(item.created_at).getTime()) / (1000 * 60 * 60 * 24)));
         const arr = skuLeadTimes.get(sku) || []; arr.push(days); skuLeadTimes.set(sku, arr);
       });
@@ -247,7 +247,7 @@ export default function BuyingSheetPage() {
       const { data } = await supabase.from("order_items").select("code, quantity, created_at").not("code", "is", null).gte("created_at", oneYearAgo.toISOString());
       const skuMonthlyTotals = new Map<string, Map<number, number[]>>();
       (data || []).forEach(item => {
-        const sku = (item.code || "").toUpperCase();
+        const sku = (item.code || "").trim().toUpperCase();
         const month = new Date(item.created_at).getMonth();
         if (!skuMonthlyTotals.has(sku)) skuMonthlyTotals.set(sku, new Map());
         const monthMap = skuMonthlyTotals.get(sku)!;
@@ -276,7 +276,7 @@ export default function BuyingSheetPage() {
     try {
       const { data } = await supabase.from("order_items").select("code, completed_at").eq("progress_stage", "completed").not("code", "is", null).not("completed_at", "is", null).order("completed_at", { ascending: false });
       const map = new Map<string, string>();
-      (data || []).forEach(item => { const sku = (item.code || "").toUpperCase(); if (!map.has(sku) && item.completed_at) map.set(sku, item.completed_at); });
+      (data || []).forEach(item => { const sku = (item.code || "").trim().toUpperCase(); if (!map.has(sku) && item.completed_at) map.set(sku, item.completed_at); });
       setLastPurchaseMap(map);
     } catch (err) { console.error("Failed to fetch last purchase dates:", err); }
   };
@@ -318,7 +318,7 @@ export default function BuyingSheetPage() {
       if (error || !completedItems?.length) return;
       const skuMonthMap = new Map<string, { itemName: string; months: Map<string, number>; totalOrders: number; lastDate: string }>();
       for (const item of completedItems) {
-        const sku = (item.code || "").toUpperCase();
+        const sku = (item.code || "").trim().toUpperCase();
         if (!sku || activeSkus.has(sku)) continue;
         const monthKey = (item.completed_at || "").substring(0, 7);
         if (!monthKey) continue;
@@ -403,8 +403,8 @@ export default function BuyingSheetPage() {
       ]);
       const thisMap = new Map<string, number>();
       const lastMap = new Map<string, number>();
-      (thisRes.data || []).forEach(i => { const sku = (i.code || "").toUpperCase(); thisMap.set(sku, (thisMap.get(sku) || 0) + (i.quantity || 1)); });
-      (lastRes.data || []).forEach(i => { const sku = (i.code || "").toUpperCase(); lastMap.set(sku, (lastMap.get(sku) || 0) + (i.quantity || 1)); });
+      (thisRes.data || []).forEach(i => { const sku = (i.code || "").trim().toUpperCase(); thisMap.set(sku, (thisMap.get(sku) || 0) + (i.quantity || 1)); });
+      (lastRes.data || []).forEach(i => { const sku = (i.code || "").trim().toUpperCase(); lastMap.set(sku, (lastMap.get(sku) || 0) + (i.quantity || 1)); });
       const map = new Map<string, { thisWeek: number; lastWeek: number }>();
       new Set([...thisMap.keys(), ...lastMap.keys()]).forEach(sku => {
         map.set(sku, { thisWeek: thisMap.get(sku) || 0, lastWeek: lastMap.get(sku) || 0 });
@@ -430,7 +430,7 @@ export default function BuyingSheetPage() {
         const orderTotal = orderAmounts.get(i.order_id);
         const itemCount = orderItemCounts.get(i.order_id) || 1;
         if (orderTotal && itemCount > 0) {
-          const sku = (i.code || "").toUpperCase();
+          const sku = (i.code || "").trim().toUpperCase();
           const unitCost = (orderTotal / itemCount) * (i.quantity || 1) / (i.quantity || 1);
           const arr = skuCosts.get(sku) || []; arr.push(unitCost); skuCosts.set(sku, arr);
         }
@@ -520,7 +520,7 @@ export default function BuyingSheetPage() {
         const requested = Math.max(0, item.quantity || 0);
         const allocatedOnPO = Math.min(requested, Math.max(0, item.qty_on_po || 0));
         if (requested <= 0) continue;
-        const sku = (item.code || "NO-SKU").toUpperCase(); activeSkus.add(sku);
+        const sku = (item.code || "NO-SKU").trim().toUpperCase(); activeSkus.add(sku);
         const order = ordersMap.get(item.order_id);
         const waitingSince = earliestTimestamp(order?.created_at, item.created_at);
         const customerName = order?.company_id ? companiesMap.get(order.company_id) || "Unknown" : "Unknown";
