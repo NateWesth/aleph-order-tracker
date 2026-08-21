@@ -70,11 +70,22 @@ export default function NotificationCenter({ onNavigateToOrder }: NotificationCe
   const { notifications, unreadCount, loading, markAsRead, markAllAsRead, clearAll } = useNotifications();
   const [isOpen, setIsOpen] = useState(false);
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
+  const [category, setCategory] = useState<'orders' | 'comments'>('orders');
   const panelRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [coords, setCoords] = useState({ top: 0, right: 8 });
-  const visibleNotifications = filter === 'unread' ? notifications.filter(item => !item.read) : notifications;
+
+  const commentTypes = ['order_update_message', 'item_comment'];
+  const isComment = (n: Notification) => commentTypes.includes(n.type);
+  const orderNotifications = notifications.filter(n => !isComment(n));
+  const commentNotifications = notifications.filter(isComment);
+  const categoryNotifications = category === 'comments' ? commentNotifications : orderNotifications;
+  const categoryUnread = categoryNotifications.filter(n => !n.read).length;
+  const visibleNotifications = filter === 'unread'
+    ? categoryNotifications.filter(item => !item.read)
+    : categoryNotifications;
+
 
   // Position the portalled panel under the bell button
   useLayoutEffect(() => {
