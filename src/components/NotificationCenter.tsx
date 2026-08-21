@@ -88,6 +88,7 @@ export default function NotificationCenter({ onNavigateToOrder }: NotificationCe
     <div className="relative" ref={panelRef}>
       {/* Bell Button */}
       <Button
+        ref={buttonRef}
         variant="ghost"
         size="icon"
         onClick={() => setIsOpen(prev => !prev)}
@@ -101,9 +102,14 @@ export default function NotificationCenter({ onNavigateToOrder }: NotificationCe
         )}
       </Button>
 
-      {/* Dropdown Panel */}
-      {isOpen && (
-        <div className="fixed sm:absolute right-2 sm:right-0 left-2 sm:left-auto top-14 sm:top-full sm:mt-2 sm:w-[360px] bg-card border border-border rounded-xl shadow-lg z-[100] animate-in slide-in-from-top-2 fade-in-0 duration-200">
+      {/* Dropdown Panel — portalled so no ancestor can clip or stack above it */}
+      {isOpen && createPortal(
+        <div
+          ref={dropdownRef}
+          style={{ top: coords.top, right: coords.right }}
+          className="fixed w-[min(360px,calc(100vw-1rem))] max-w-[calc(100vw-1rem)] bg-card border border-border rounded-xl shadow-2xl z-[2147483000] animate-in slide-in-from-top-2 fade-in-0 duration-200"
+        >
+
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-border">
             <div className="flex items-center gap-2">
