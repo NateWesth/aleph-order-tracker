@@ -191,6 +191,36 @@ export default function NotificationCenter({ onNavigateToOrder }: NotificationCe
             </div>
           </div>
 
+          {/* Category tabs */}
+          <div className="grid grid-cols-2 border-b border-border">
+            {([
+              { value: 'orders' as const, label: 'Order updates', items: orderNotifications },
+              { value: 'comments' as const, label: 'Comments & notes', items: commentNotifications },
+            ]).map(tab => {
+              const tabUnread = tab.items.filter(n => !n.read).length;
+              return (
+                <button
+                  key={tab.value}
+                  type="button"
+                  onClick={() => setCategory(tab.value)}
+                  className={cn(
+                    "relative flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold transition-colors",
+                    category === tab.value
+                      ? "text-foreground after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:rounded-full after:bg-primary"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  {tab.label}
+                  {tabUnread > 0 && (
+                    <span className="min-w-[16px] h-4 px-1 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center">
+                      {tabUnread > 99 ? '99+' : tabUnread}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
           <div className="flex items-center gap-1 border-b border-border px-3 py-2">
             {(['all', 'unread'] as const).map(value => (
               <button
@@ -202,7 +232,7 @@ export default function NotificationCenter({ onNavigateToOrder }: NotificationCe
                   filter === value ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
                 )}
               >
-                {value === 'all' ? `All ${notifications.length}` : `Unread ${unreadCount}`}
+                {value === 'all' ? `All ${categoryNotifications.length}` : `Unread ${categoryUnread}`}
               </button>
             ))}
           </div>
@@ -216,8 +246,15 @@ export default function NotificationCenter({ onNavigateToOrder }: NotificationCe
             ) : visibleNotifications.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-10 text-muted-foreground">
                 <Inbox className="h-8 w-8 mb-2 opacity-30" />
-                <p className="text-sm">{filter === 'unread' ? 'You’re all caught up' : 'No notifications yet'}</p>
+                <p className="text-sm">
+                  {filter === 'unread'
+                    ? 'You’re all caught up'
+                    : category === 'comments'
+                      ? 'No comments or notes yet'
+                      : 'No order updates yet'}
+                </p>
               </div>
+
             ) : (
               <div className="py-1 px-1">
                 {visibleNotifications.map((notification) => (
