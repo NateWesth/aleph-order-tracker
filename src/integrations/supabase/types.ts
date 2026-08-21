@@ -622,12 +622,45 @@ export type Database = {
         }
         Relationships: []
       }
+      order_item_comment_reactions: {
+        Row: {
+          comment_id: string
+          created_at: string
+          emoji: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          comment_id: string
+          created_at?: string
+          emoji: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          comment_id?: string
+          created_at?: string
+          emoji?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_item_comment_reactions_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: false
+            referencedRelation: "order_item_comments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_item_comments: {
         Row: {
           body: string
           created_at: string
           id: string
           order_item_id: string
+          reply_to_id: string | null
           user_id: string
         }
         Insert: {
@@ -635,6 +668,7 @@ export type Database = {
           created_at?: string
           id?: string
           order_item_id: string
+          reply_to_id?: string | null
           user_id: string
         }
         Update: {
@@ -642,6 +676,7 @@ export type Database = {
           created_at?: string
           id?: string
           order_item_id?: string
+          reply_to_id?: string | null
           user_id?: string
         }
         Relationships: [
@@ -650,6 +685,13 @@ export type Database = {
             columns: ["order_item_id"]
             isOneToOne: false
             referencedRelation: "order_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_item_comments_reply_to_id_fkey"
+            columns: ["reply_to_id"]
+            isOneToOne: false
+            referencedRelation: "order_item_comments"
             referencedColumns: ["id"]
           },
         ]
