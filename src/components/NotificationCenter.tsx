@@ -196,8 +196,10 @@ export default function NotificationCenter({ onNavigateToOrder }: NotificationCe
               </div>
             )}
           </ScrollArea>
-        </div>
+        </div>,
+        document.body
       )}
+
     </div>
   );
 }
