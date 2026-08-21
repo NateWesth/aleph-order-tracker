@@ -1,53 +1,48 @@
-## Rep Commission Calculator
+# @Mentions, Reply Notifications, Order Assignees + Mobile Pass
 
-Build a new "Commission" tab in the admin dashboard that reads Zoho invoices, maps them to reps via a manual rep-to-company assignment, and calculates commission per rep based on individual commission rates.
+## 1. @mentions in order comments
 
-### Database changes
+- Typing `@` in an order item comment (and in order updates/messages) opens an inline picker of approved teammates, filtered as you type.
+- Selected names are stored with the comment and rendered as highlighted chips in the thread.
+- Mentioned users get a notification: "Nathan mentioned you on Order ORD-1042".
 
-1. **New `reps` table** — stores sales reps with their commission percentage
-   - `id` (uuid, PK)
-   - `name` (text)
-   - `commission_rate` (numeric) — e.g. 5.0 for 5%
-   - `email` (text, nullable)
-   - `created_at`, `updated_at`
-   - RLS: admin-only management, authenticated read
+## 2. Reply + mention notifications
 
-2. **New `rep_company_assignments` table** — links reps to companies
-   - `id` (uuid, PK)
-   - `rep_id` (uuid, FK → reps)
-   - `company_id` (uuid, FK → companies)
-   - `created_at`
-   - Unique constraint on (rep_id, company_id)
-   - RLS: admin-only management, authenticated read
+- Replying to a comment notifies the original comment author (unless it's you).
+- Mentions notify every mentioned user once per comment.
+- Both land in the existing Notification Center under the "Comments & notes" tab, deep-linking to the order and item.
 
-### Edge function: `rep-commission-data`
+## 3. Order assignee
 
-- Accepts a date range (month/custom) and optional rep_id filter
-- Fetches Zoho invoices for the period via the Zoho Books API (`/invoices` endpoint with `date` filters)
-- Matches each invoice's customer to local companies (using existing Zoho contact matching logic)
-- Looks up which rep owns each company via `rep_company_assignments`
-- Calculates commission: `invoice_total * rep.commission_rate / 100`
-- Returns per-rep summary: total invoiced, commission earned, invoice count, plus line-item breakdown
-- Resource-aware: paginated Zoho fetch, limited to the selected date range
+- New "Assigned to" field on orders, editable from the order details dialog and from the order row quick edit.
+- Assignee avatar/initials shown on order cards and in the order table so everyone sees who is handling what.
+- Assigning someone notifies them ("You were assigned Order ORD-1042"); reassignment notifies the new owner.
+- Filter on the Orders board: All / Assigned to me / Unassigned.
 
-### Frontend: `CommissionPage.tsx`
+## 4. Mobile
 
-- **Rep management section**: Add/edit/delete reps with name, email, commission rate; assign companies to each rep via multi-select
-- **Commission report section**:
-  - Month picker (defaults to current month)
-  - Per-rep cards showing: total invoiced amount, commission rate, commission earned, number of invoices
-  - Expandable detail rows showing individual invoices
-  - Summary totals at the bottom
-  - Export to CSV button
+Bring the above to mobile in a mobile-suited form:
 
-### Admin Dashboard integration
+- Mention picker becomes a bottom sheet with large tap targets instead of a floating dropdown.
+- Comment composer becomes a full-width sticky sheet with the keyboard, respecting safe-area insets.
+- Assignee picker uses the same bottom-sheet pattern; assignee shows as a compact initials chip on order cards.
+- Notification Center panel goes full-screen on small viewports with the existing two tabs.
 
-- Add a new nav item `{ id: "commission", label: "Commission", icon: Percent, badge: 0 }` to the `navItems` array
-- Render `<CommissionPage />` when `activeView === "commission"`
+## 5. Mobile scrolling fix
 
-### Technical details
+Diagnosis (confirmed by reading the shell and stylesheet): the dashboard shell is rendered as a fixed-height `h-[100dvh] overflow-hidden` container whose `<main>` is the intended scroll region, but `src/index.css` later forces `.app-shell`, `.app-shell > div`, `.app-shell main` and `.app-page-stage` to `height: auto !important; overflow-y: visible !important`. So neither the shell nor `main` can own the scroll, and on touch devices the page ends up with no working scroll owner.
 
-- Edge function uses same auth pattern (`getAuthHeaders`) and Zoho token refresh as existing functions
-- Zoho invoice endpoint: `GET /books/v3/invoices?organization_id={org}&date_start={start}&date_end={end}&per_page=200`
-- Company matching: case-insensitive name match + Zoho customer_id lookup (existing pattern)
-- Commission rate stored per-rep, not per-company, keeping the model simple
+Fix: pick one scroll owner and remove the contradiction.
+
+- Desktop keeps the current behaviour: `main` scrolls independently (columns stay pinned).
+- Mobile: let the document scroll — shell height becomes auto, `main` stops being a clipped viewport, and `overscroll-behavior` / `touch-action` are set so vertical panning always works.
+- Remove leftover blanket `!important` overrides in `index.css` that fight the shell layout, and keep `-webkit-overflow-scrolling: touch` on genuine inner scrollers (dialogs, comment feeds, board columns).
+- Verify by driving the preview at a mobile viewport and confirming the Orders, Buying Sheet, PO Tracking and Settings pages scroll to the bottom.
+
+## Technical notes
+
+- Migration: add `assigned_to uuid` to `public.orders` (nullable, references `profiles.id` logically, indexed) and a `mentioned_user_ids uuid[]` column on `order_item_comments` and `order_updates`; RLS unchanged (existing order-scoped policies cover them). Grants included for `authenticated`/`service_role` on any new object.
+- Notifications reuse the existing `notifications` table with new `type` values `comment_mention`, `comment_reply`, `order_assigned`, inserted from database triggers (SECURITY DEFINER, `SET search_path = public`) so they fire regardless of client.
+- Mention parsing stores user ids explicitly rather than re-parsing text, so renames don't break links.
+- Mobile sheets use the existing shadcn `Sheet` primitive plus `useIsMobile()`.
+- No changes to Zoho sync, commission or buying-sheet logic.
