@@ -652,6 +652,13 @@ export type Database = {
             referencedRelation: "order_item_comments"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "order_item_comment_reactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
         ]
       }
       order_item_comments: {
