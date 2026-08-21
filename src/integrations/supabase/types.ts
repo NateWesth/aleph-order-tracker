@@ -666,6 +666,7 @@ export type Database = {
           body: string
           created_at: string
           id: string
+          mentioned_user_ids: string[]
           order_item_id: string
           reply_to_id: string | null
           user_id: string
@@ -674,6 +675,7 @@ export type Database = {
           body: string
           created_at?: string
           id?: string
+          mentioned_user_ids?: string[]
           order_item_id: string
           reply_to_id?: string | null
           user_id: string
@@ -682,6 +684,7 @@ export type Database = {
           body?: string
           created_at?: string
           id?: string
+          mentioned_user_ids?: string[]
           order_item_id?: string
           reply_to_id?: string | null
           user_id?: string
@@ -1005,6 +1008,7 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          mentioned_user_ids: string[]
           message: string
           order_id: string
           parent_id: string | null
@@ -1014,6 +1018,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          mentioned_user_ids?: string[]
           message: string
           order_id: string
           parent_id?: string | null
@@ -1023,6 +1028,7 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          mentioned_user_ids?: string[]
           message?: string
           order_id?: string
           parent_id?: string | null
@@ -1041,6 +1047,7 @@ export type Database = {
       }
       orders: {
         Row: {
+          assigned_to: string | null
           company_id: string | null
           completed_date: string | null
           created_at: string | null
@@ -1059,6 +1066,7 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          assigned_to?: string | null
           company_id?: string | null
           completed_date?: string | null
           created_at?: string | null
@@ -1077,6 +1085,7 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          assigned_to?: string | null
           company_id?: string | null
           completed_date?: string | null
           created_at?: string | null
