@@ -1,4 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
+import { createPortal } from 'react-dom';
+
 import { Bell, CheckCheck, Trash2, Package, ArrowRightLeft, MessageCircle, X, Inbox } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -69,14 +71,38 @@ export default function NotificationCenter({ onNavigateToOrder }: NotificationCe
   const [isOpen, setIsOpen] = useState(false);
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
   const panelRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [coords, setCoords] = useState({ top: 0, right: 8 });
   const visibleNotifications = filter === 'unread' ? notifications.filter(item => !item.read) : notifications;
+
+  // Position the portalled panel under the bell button
+  useLayoutEffect(() => {
+    if (!isOpen) return;
+    const update = () => {
+      const rect = buttonRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      setCoords({
+        top: Math.round(rect.bottom + 8),
+        right: Math.max(8, Math.round(window.innerWidth - rect.right)),
+      });
+    };
+    update();
+    window.addEventListener('resize', update);
+    window.addEventListener('scroll', update, true);
+    return () => {
+      window.removeEventListener('resize', update);
+      window.removeEventListener('scroll', update, true);
+    };
+  }, [isOpen]);
 
   // Close on outside click
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
-      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
-        setIsOpen(false);
-      }
+      const target = e.target as Node;
+      if (panelRef.current?.contains(target)) return;
+      if (dropdownRef.current?.contains(target)) return;
+      setIsOpen(false);
     }
     if (isOpen) {
       document.addEventListener('mousedown', handleClickOutside);
@@ -84,10 +110,12 @@ export default function NotificationCenter({ onNavigateToOrder }: NotificationCe
     }
   }, [isOpen]);
 
+
   return (
     <div className="relative" ref={panelRef}>
       {/* Bell Button */}
       <Button
+        ref={buttonRef}
         variant="ghost"
         size="icon"
         onClick={() => setIsOpen(prev => !prev)}
@@ -101,9 +129,14 @@ export default function NotificationCenter({ onNavigateToOrder }: NotificationCe
         )}
       </Button>
 
-      {/* Dropdown Panel */}
-      {isOpen && (
-        <div className="fixed sm:absolute right-2 sm:right-0 left-2 sm:left-auto top-14 sm:top-full sm:mt-2 sm:w-[360px] bg-card border border-border rounded-xl shadow-lg z-[100] animate-in slide-in-from-top-2 fade-in-0 duration-200">
+      {/* Dropdown Panel — portalled so no ancestor can clip or stack above it */}
+      {isOpen && createPortal(
+        <div
+          ref={dropdownRef}
+          style={{ top: coords.top, right: coords.right }}
+          className="fixed w-[min(360px,calc(100vw-1rem))] max-w-[calc(100vw-1rem)] bg-card border border-border rounded-xl shadow-2xl z-[2147483000] animate-in slide-in-from-top-2 fade-in-0 duration-200"
+        >
+
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-border">
             <div className="flex items-center gap-2">
@@ -190,8 +223,10 @@ export default function NotificationCenter({ onNavigateToOrder }: NotificationCe
               </div>
             )}
           </ScrollArea>
-        </div>
+        </div>,
+        document.body
       )}
+
     </div>
   );
 }
