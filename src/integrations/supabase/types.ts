@@ -462,6 +462,38 @@ export type Database = {
         }
         Relationships: []
       }
+      fulfillment_settings: {
+        Row: {
+          auto_assign_enabled: boolean
+          default_method: string
+          id: boolean
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          auto_assign_enabled?: boolean
+          default_method?: string
+          id?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          auto_assign_enabled?: boolean
+          default_method?: string
+          id?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fulfillment_settings_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       items: {
         Row: {
           code: string
@@ -1052,6 +1084,12 @@ export type Database = {
           completed_date: string | null
           created_at: string | null
           description: string | null
+          fulfillment_assigned_to: string | null
+          fulfillment_method: string
+          fulfillment_notes: string | null
+          fulfillment_routed_at: string | null
+          fulfillment_scheduled_for: string | null
+          fulfillment_status: string
           id: string
           notes: string | null
           order_number: string
@@ -1071,6 +1109,12 @@ export type Database = {
           completed_date?: string | null
           created_at?: string | null
           description?: string | null
+          fulfillment_assigned_to?: string | null
+          fulfillment_method?: string
+          fulfillment_notes?: string | null
+          fulfillment_routed_at?: string | null
+          fulfillment_scheduled_for?: string | null
+          fulfillment_status?: string
           id?: string
           notes?: string | null
           order_number: string
@@ -1090,6 +1134,12 @@ export type Database = {
           completed_date?: string | null
           created_at?: string | null
           description?: string | null
+          fulfillment_assigned_to?: string | null
+          fulfillment_method?: string
+          fulfillment_notes?: string | null
+          fulfillment_routed_at?: string | null
+          fulfillment_scheduled_for?: string | null
+          fulfillment_status?: string
           id?: string
           notes?: string | null
           order_number?: string
@@ -1109,6 +1159,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_fulfillment_assigned_to_fkey"
+            columns: ["fulfillment_assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
