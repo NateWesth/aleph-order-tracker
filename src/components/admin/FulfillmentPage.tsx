@@ -144,6 +144,74 @@ interface CollectionPOView extends ZohoPO {
 
 const PO_CACHE_ID = "00000000-0000-0000-0000-000000000003";
 
+const normalisePoCachePayload = (payload: unknown): ZohoPO[] => {
+  const raw = payload as any;
+  const list = Array.isArray(raw)
+    ? raw
+    : Array.isArray(raw?.purchaseOrders)
+      ? raw.purchaseOrders
+      : Array.isArray(raw?.purchase_orders)
+        ? raw.purchase_orders
+        : Array.isArray(raw?.data)
+          ? raw.data
+          : [];
+
+  return list
+    .map((po: any) => {
+      const linesSource = Array.isArray(po?.lines)
+        ? po.lines
+        : Array.isArray(po?.line_items)
+          ? po.line_items
+          : Array.isArray(po?.items)
+            ? po.items
+            : [];
+
+      const lines: POLine[] = linesSource.map((line: any) => {
+        const quantity = Number(line?.quantity ?? line?.qty ?? 0) || 0;
+        const quantityBilled = Number(line?.quantityBilled ?? line?.quantity_billed ?? line?.billed_quantity ?? 0) || 0;
+        const quantityReceived =
+          Number(line?.quantityReceived ?? line?.quantity_received ?? line?.received_quantity ?? 0) || 0;
+        const explicitOutstanding = Number(line?.outstanding ?? line?.unbilled_quantity);
+        const outstanding = Number.isFinite(explicitOutstanding)
+          ? Math.max(0, explicitOutstanding)
+          : Math.max(0, quantity - quantityBilled);
+
+        return {
+          sku: String(line?.sku ?? line?.item_sku ?? line?.item_code ?? ""),
+          name: String(line?.name ?? line?.item_name ?? line?.description ?? "PO item"),
+          description: String(line?.description ?? ""),
+          quantity,
+          quantityReceived,
+          quantityBilled,
+          outstanding,
+          rate: Number(line?.rate ?? 0) || 0,
+        };
+      });
+
+      const purchaseOrderId = String(po?.purchaseOrderId ?? po?.purchaseorder_id ?? po?.purchase_order_id ?? "").trim();
+      if (!purchaseOrderId) return null;
+
+      return {
+        purchaseOrderId,
+        purchaseOrderNumber: String(
+          po?.purchaseOrderNumber ?? po?.purchaseorder_number ?? po?.purchase_order_number ?? purchaseOrderId,
+        ),
+        vendorId: String(po?.vendorId ?? po?.vendor_id ?? ""),
+        vendorName: String(po?.vendorName ?? po?.vendor_name ?? "Unknown supplier"),
+        vendorEmail: String(po?.vendorEmail ?? po?.vendor_email ?? ""),
+        date: String(po?.date ?? po?.purchase_order_date ?? ""),
+        expectedDeliveryDate: po?.expectedDeliveryDate ?? po?.expected_delivery_date ?? null,
+        status: String(po?.status ?? ""),
+        receivedStatus: String(po?.receivedStatus ?? po?.received_status ?? ""),
+        billedStatus: String(po?.billedStatus ?? po?.billed_status ?? ""),
+        total: Number(po?.total ?? 0) || 0,
+        outstandingValue: Number(po?.outstandingValue ?? po?.outstanding_value ?? 0) || 0,
+        lines,
+      } as ZohoPO;
+    })
+    .filter(Boolean) as ZohoPO[];
+};
+
 const readyUnits = (item: FulfillmentItem) =>
   Math.max(0, Math.min(item.qty_invoiced ?? 0, item.quantity) - Math.min(item.qty_completed ?? 0, item.quantity));
 
@@ -252,6 +320,7 @@ export default function FulfillmentPage() {
       if (ordersRes.error) throw ordersRes.error;
       if (deliveryHistoryRes.error) throw deliveryHistoryRes.error;
       if (profilesRes.error) throw profilesRes.error;
+      if (settingsRes.error) throw settingsRes.error;
       if (cacheRes.error) throw cacheRes.error;
       if (statesRes.error) throw statesRes.error;
       if (eventsRes.error) throw eventsRes.error;
@@ -302,7 +371,7 @@ export default function FulfillmentPage() {
         );
 
       const historyDeliveries = historicBase.map(decorateOrder);
-      const poPayload = Array.isArray(cacheRes.data?.payload) ? (cacheRes.data?.payload as unknown as ZohoPO[]) : [];
+      const poPayload = normalisePoCachePayload(cacheRes.data?.payload);
       const eventRows = (eventsRes.data || []) as CollectionEvent[];
       const eventIds = eventRows.map((event) => event.id);
       const linesRes = eventIds.length
@@ -324,7 +393,10 @@ export default function FulfillmentPage() {
 
       // Ensure every current unbilled PO has a persistent assignment/state row.
       const knownIds = new Set((statesRes.data || []).map((row: any) => row.purchase_order_id));
-      const missing = poPayload.filter((po) => !knownIds.has(po.purchaseOrderId));
+      const missing = poPayload.filter(
+        (po) =>
+          !knownIds.has(po.purchaseOrderId) && po.lines.some((line) => Math.max(0, Number(line.outstanding || 0)) > 0),
+      );
       if (missing.length) {
         await supabase.from("po_collection_state").upsert(
           missing.map((po) => ({
@@ -443,8 +515,9 @@ export default function FulfillmentPage() {
     setSettings(next);
     const { error } = await supabase
       .from("fulfillment_settings")
-      .update({ ...patch, updated_at: new Date().toISOString(), updated_by: user?.id || null } as any)
-      .eq("id", true);
+      .upsert({ id: true, ...next, updated_at: new Date().toISOString(), updated_by: user?.id || null } as any, {
+        onConflict: "id",
+      });
     if (error) toast({ title: "Settings not saved", description: error.message, variant: "destructive" });
   };
 
