@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 
-import { Bell, CheckCheck, Trash2, Package, ArrowRightLeft, MessageCircle, X, Inbox } from 'lucide-react';
+import { Bell, CheckCheck, Trash2, Package, ArrowRightLeft, MessageCircle, X, Inbox, Reply, AtSign, SmilePlus, UserCog } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -17,7 +17,11 @@ const typeConfig: Record<string, { icon: typeof Package; color: string }> = {
   order_created: { icon: Package, color: 'text-emerald-500' },
   order_status_changed: { icon: ArrowRightLeft, color: 'text-blue-500' },
   order_update_message: { icon: MessageCircle, color: 'text-amber-500' },
+  order_assigned: { icon: UserCog, color: 'text-primary' },
   item_comment: { icon: MessageCircle, color: 'text-blue-500' },
+  comment_reply: { icon: Reply, color: 'text-blue-500' },
+  comment_mention: { icon: AtSign, color: 'text-warning' },
+  comment_reaction: { icon: SmilePlus, color: 'text-blue-500' },
 };
 
 function NotificationItem({
@@ -44,7 +48,8 @@ function NotificationItem({
         "w-full flex items-start gap-3 p-3 text-left transition-colors rounded-lg",
         "hover:bg-muted/60",
         !notification.read && "bg-primary/5",
-        notification.type === 'item_comment' && !notification.read && "border border-blue-500/15 bg-blue-500/[0.07] shadow-[0_10px_28px_-24px_rgba(59,130,246,.75)]"
+        notification.type === 'item_comment' && !notification.read && "border border-blue-500/15 bg-blue-500/[0.07] shadow-[0_10px_28px_-24px_rgba(59,130,246,.75)]",
+        notification.type === 'comment_mention' && !notification.read && "border border-warning/25 bg-warning/[0.08]"
       )}
     >
       <div className={cn("mt-0.5 shrink-0", config.color)}>
@@ -76,7 +81,7 @@ export default function NotificationCenter({ onNavigateToOrder }: NotificationCe
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [coords, setCoords] = useState({ top: 0, right: 8 });
 
-  const commentTypes = ['order_update_message', 'item_comment'];
+  const commentTypes = ['order_update_message', 'item_comment', 'comment_reply', 'comment_mention', 'comment_reaction'];
   const isComment = (n: Notification) => commentTypes.includes(n.type);
   const orderNotifications = notifications.filter(n => !isComment(n));
   const commentNotifications = notifications.filter(isComment);
