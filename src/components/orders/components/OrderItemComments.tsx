@@ -29,6 +29,12 @@ interface ReactionRow {
   emoji: string;
 }
 
+interface TeamMember {
+  id: string;
+  full_name: string | null;
+  email: string | null;
+}
+
 interface OrderItemCommentsProps {
   orderItemId: string;
   className?: string;
@@ -58,6 +64,9 @@ export default function OrderItemComments({ orderItemId, className, initialCount
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [replyTo, setReplyTo] = useState<OrderItemComment | null>(null);
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const [mentionedIds, setMentionedIds] = useState<Map<string, string>>(new Map()); // name -> id
 
   const fetchComments = useCallback(async () => {
     if (!orderItemId) return;
@@ -132,6 +141,12 @@ export default function OrderItemComments({ orderItemId, className, initialCount
     if (!open || !orderItemId) return;
     fetchComments();
 
+    void supabase
+      .from("profiles")
+      .select("id, full_name, email")
+      .order("full_name", { ascending: true })
+      .then(({ data }) => setTeamMembers((data || []) as TeamMember[]));
+
     const channel = supabase
       .channel(`order-item-comments-${orderItemId}`)
       .on(
@@ -162,6 +177,28 @@ export default function OrderItemComments({ orderItemId, className, initialCount
     return map;
   }, [comments]);
 
+  const mentionSuggestions = useMemo(() => {
+    if (mentionQuery === null) return [];
+    const q = mentionQuery.toLowerCase();
+    return teamMembers
+      .filter((m) => (m.full_name || m.email || "").toLowerCase().includes(q))
+      .slice(0, 6);
+  }, [mentionQuery, teamMembers]);
+
+  const handleBodyChange = (value: string) => {
+    setBody(value);
+    const upToCursor = value; // textarea selection tracking kept simple - checks trailing text
+    const match = upToCursor.match(/@([a-zA-Z0-9 ]{0,30})$/);
+    setMentionQuery(match ? match[1] : null);
+  };
+
+  const selectMention = (member: TeamMember) => {
+    const name = member.full_name || member.email || "Team member";
+    setBody((prev) => prev.replace(/@([a-zA-Z0-9 ]{0,30})$/, `@${name} `));
+    setMentionedIds((prev) => new Map(prev).set(name, member.id));
+    setMentionQuery(null);
+  };
+
   const nameFor = (c: OrderItemComment) => {
     if (c.user_id === user?.id) return "You";
     return c.author?.full_name || "Team member";
@@ -191,12 +228,17 @@ export default function OrderItemComments({ orderItemId, className, initialCount
     setBody("");
     const wasReplyingTo = replyTo;
     setReplyTo(null);
+    const mentionIdsToSend = [...mentionedIds.entries()]
+      .filter(([name]) => trimmed.includes(`@${name}`))
+      .map(([, id]) => id);
+    setMentionedIds(new Map());
     try {
       const { error } = await supabase.from("order_item_comments").insert({
         order_item_id: orderItemId,
         user_id: user.id,
         body: trimmed,
         reply_to_id: wasReplyingTo?.id ?? null,
+        mentioned_user_ids: mentionIdsToSend,
       });
 
       if (error) throw error;
@@ -286,35 +328,35 @@ export default function OrderItemComments({ orderItemId, className, initialCount
         align="end"
         side="left"
         sideOffset={8}
-        className="w-[min(380px,calc(100vw-24px))] rounded-2xl p-0 overflow-hidden"
+        className="w-[min(460px,calc(100vw-24px))] rounded-2xl p-0 overflow-hidden"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="border-b border-border/60 bg-primary/5 px-4 py-3">
+        <div className="border-b border-border/60 bg-primary/5 px-4 py-3.5">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-xs font-semibold text-foreground">Item comments</p>
-              <p className="text-[10px] text-muted-foreground">
+              <p className="text-sm font-semibold text-foreground">Item comments</p>
+              <p className="text-xs text-muted-foreground">
                 Shared with everyone who can access this order
               </p>
             </div>
             {commentCount > 0 && (
-              <span className="rounded-full bg-primary/10 px-2 py-1 text-[10px] font-semibold text-primary">
+              <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">
                 {commentCount}
               </span>
             )}
           </div>
         </div>
 
-        <div className="max-h-72 overflow-y-auto p-3 space-y-2.5 bg-muted/10">
+        <div className="max-h-[26rem] overflow-y-auto p-3.5 space-y-3 bg-muted/10">
           {loading && comments.length === 0 ? (
             <div className="flex items-center justify-center py-6 text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
             </div>
           ) : comments.length === 0 ? (
-            <div className="rounded-xl bg-muted/40 px-3 py-5 text-center">
-              <MessageCircle className="mx-auto mb-2 h-5 w-5 text-muted-foreground/50" />
-              <p className="text-xs font-medium text-foreground">No comments yet</p>
-              <p className="mt-0.5 text-[10px] text-muted-foreground">
+            <div className="rounded-xl bg-muted/40 px-4 py-7 text-center">
+              <MessageCircle className="mx-auto mb-2 h-6 w-6 text-muted-foreground/50" />
+              <p className="text-sm font-medium text-foreground">No comments yet</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
                 Add a note for the team.
               </p>
             </div>
@@ -327,27 +369,22 @@ export default function OrderItemComments({ orderItemId, className, initialCount
                 <div key={comment.id} className={cn("group flex flex-col", mine ? "items-end" : "items-start")}>
                   <div
                     className={cn(
-                      "max-w-[85%] rounded-2xl px-3 py-2 text-xs break-words shadow-sm",
+                      "max-w-[88%] rounded-2xl px-3.5 py-2.5 text-sm break-words shadow-sm bg-white dark:bg-card border",
                       mine
-                        ? "bg-primary text-primary-foreground rounded-tr-sm"
-                        : "bg-card border border-border/70 text-foreground rounded-tl-sm"
+                        ? "border-primary/30 rounded-tr-sm"
+                        : "border-border text-foreground rounded-tl-sm"
                     )}
                   >
-                    {!mine && (
-                      <div className="text-[10px] font-semibold text-primary mb-0.5">{nameFor(comment)}</div>
-                    )}
+                    <div className={cn("text-[11px] font-semibold mb-0.5", mine ? "text-primary" : "text-primary/90")}>
+                      {nameFor(comment)}
+                    </div>
                     {parent && (
-                      <div
-                        className={cn(
-                          "mb-1.5 rounded-lg border-l-2 px-2 py-1 text-[10px] opacity-80",
-                          mine ? "border-primary-foreground/50 bg-black/10" : "border-primary/50 bg-primary/5"
-                        )}
-                      >
+                      <div className="mb-1.5 rounded-lg border-l-2 border-primary/40 bg-primary/5 px-2 py-1 text-xs opacity-80">
                         <div className="font-semibold">{nameFor(parent)}</div>
                         <div className="line-clamp-2">{parent.body}</div>
                       </div>
                     )}
-                    <p className="whitespace-pre-wrap break-words">{comment.body}</p>
+                    <p className="whitespace-pre-wrap break-words text-foreground">{comment.body}</p>
                   </div>
 
                   {summary.length > 0 && (
@@ -357,7 +394,7 @@ export default function OrderItemComments({ orderItemId, className, initialCount
                           key={s.emoji}
                           onClick={() => toggleReaction(comment.id, s.emoji)}
                           className={cn(
-                            "flex items-center gap-0.5 rounded-full border px-1.5 py-0.5 text-[10px] transition-colors",
+                            "flex items-center gap-1 rounded-full border px-2 py-1 text-xs transition-colors",
                             s.mine ? "border-primary/40 bg-primary/10 text-primary" : "border-border bg-muted text-muted-foreground hover:bg-muted/70"
                           )}
                         >
@@ -369,27 +406,27 @@ export default function OrderItemComments({ orderItemId, className, initialCount
                   )}
 
                   <div className="flex items-center gap-2 mt-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
-                    <span className="text-[9px] text-muted-foreground">{formatCommentTime(comment.created_at)}</span>
+                    <span className="text-[10px] text-muted-foreground">{formatCommentTime(comment.created_at)}</span>
                     <button
                       onClick={() => setReplyTo(comment)}
-                      className="text-[9px] text-muted-foreground hover:text-primary flex items-center gap-0.5"
+                      className="text-[10px] text-muted-foreground hover:text-primary flex items-center gap-1"
                     >
-                      <CornerUpLeft className="h-2.5 w-2.5" />Reply
+                      <CornerUpLeft className="h-3 w-3" />Reply
                     </button>
                     <EmojiPicker
                       onSelect={(emoji) => toggleReaction(comment.id, emoji)}
                       trigger={
                         <button className="text-muted-foreground hover:text-primary">
-                          <SmilePlus className="h-2.5 w-2.5" />
+                          <SmilePlus className="h-3 w-3" />
                         </button>
                       }
                     />
-                    <div className="flex gap-0.5">
+                    <div className="flex gap-1">
                       {QUICK_REACTIONS.slice(0, 3).map((emoji) => (
                         <button
                           key={emoji}
                           onClick={() => toggleReaction(comment.id, emoji)}
-                          className="text-[10px] hover:scale-125 transition-transform"
+                          className="text-sm hover:scale-125 transition-transform"
                         >
                           {emoji}
                         </button>
@@ -402,10 +439,26 @@ export default function OrderItemComments({ orderItemId, className, initialCount
           )}
         </div>
 
-        <div className="border-t border-border/60">
+        <div className="border-t border-border/60 relative">
+          {mentionSuggestions.length > 0 && (
+            <div className="absolute bottom-full left-3 right-3 mb-1 rounded-xl border border-border bg-popover shadow-lg overflow-hidden z-10">
+              {mentionSuggestions.map((member) => (
+                <button
+                  key={member.id}
+                  onClick={() => selectMention(member)}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-primary/10"
+                >
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary shrink-0">
+                    {(member.full_name || member.email || "?").slice(0, 1).toUpperCase()}
+                  </span>
+                  <span className="truncate">{member.full_name || member.email}</span>
+                </button>
+              ))}
+            </div>
+          )}
           {replyTo && (
             <div className="flex items-center justify-between gap-2 px-3 py-1.5 bg-primary/5 border-b border-border/60">
-              <div className="min-w-0 text-[10px]">
+              <div className="min-w-0 text-xs">
                 <span className="font-semibold text-primary">Replying to {nameFor(replyTo)}: </span>
                 <span className="text-muted-foreground line-clamp-1">{replyTo.body}</span>
               </div>
@@ -426,15 +479,16 @@ export default function OrderItemComments({ orderItemId, className, initialCount
               />
               <Textarea
                 value={body}
-                onChange={(event) => setBody(event.target.value)}
+                onChange={(event) => handleBodyChange(event.target.value)}
                 onKeyDown={(event) => {
                   if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
                     event.preventDefault();
                     handleSend();
                   }
+                  if (event.key === "Escape") setMentionQuery(null);
                 }}
-                placeholder={replyTo ? "Reply..." : "Add a comment..."}
-                className="min-h-[68px] resize-none rounded-xl text-xs"
+                placeholder={replyTo ? "Reply..." : "Add a comment... (@ to mention someone)"}
+                className="min-h-[68px] resize-none rounded-xl text-sm"
                 maxLength={1000}
                 disabled={!user || sending}
               />
