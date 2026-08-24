@@ -264,4 +264,4 @@ $$;
 DROP TRIGGER IF EXISTS trg_auto_route_ready_fulfillment ON public.order_items;
 CREATE TRIGGER trg_auto_route_ready_fulfillment
 AFTER INSERT OR UPDATE OF qty_invoiced, qty_completed, quantity ON public.order_items
-FOR EACH ROW EXECUTE FUNCTION public.auto_route_ready_fulfillment();
+FOR EACH ROW EXECUTE FUNCTION public.
