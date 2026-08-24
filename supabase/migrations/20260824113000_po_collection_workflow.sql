@@ -89,6 +89,33 @@ GRANT SELECT, INSERT ON public.po_collection_events TO authenticated;
 GRANT SELECT, INSERT ON public.po_collection_event_lines TO authenticated;
 GRANT ALL ON public.po_collection_state, public.po_collection_events, public.po_collection_event_lines TO service_role;
 
+-- Realtime: add the collection tables to the standard Supabase publication, but only
+-- when they are not already present. This keeps the migration safe to re-run.
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'po_collection_state'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.po_collection_state;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'po_collection_events'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.po_collection_events;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'po_collection_event_lines'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.po_collection_event_lines;
+  END IF;
+END
+$$;
+
 -- Keep collection-state records warm whenever the webhook-driven PO cache changes.
 -- This does not decide whether a PO is finished: the UI subtracts immutable collection
 -- events from the current unbilled line quantities so partial POs automatically reappear.
@@ -100,6 +127,7 @@ SET search_path = public
 AS $$
 DECLARE
   po jsonb;
+  po_id text;
   cfg public.fulfillment_settings%ROWTYPE;
   candidate uuid;
 BEGIN
@@ -111,6 +139,11 @@ BEGIN
 
   FOR po IN SELECT * FROM jsonb_array_elements(NEW.payload)
   LOOP
+    po_id := NULLIF(BTRIM(COALESCE(po->>'purchaseOrderId', po->>'purchaseorder_id', po->>'purchase_order_id', '')), '');
+    IF po_id IS NULL THEN
+      CONTINUE;
+    END IF;
+
     candidate := NULL;
 
     IF COALESCE(cfg.auto_assign_enabled, false) THEN
@@ -135,8 +168,8 @@ BEGIN
       last_seen_at,
       updated_at
     ) VALUES (
-      COALESCE(po->>'purchaseOrderId', po->>'purchaseorder_id'),
-      COALESCE(po->>'purchaseOrderNumber', po->>'purchaseorder_number', 'Unknown PO'),
+      po_id,
+      COALESCE(po->>'purchaseOrderNumber', po->>'purchaseorder_number', po->>'purchase_order_number', po_id),
       COALESCE(po->>'vendorId', po->>'vendor_id'),
       COALESCE(po->>'vendorName', po->>'vendor_name', 'Unknown supplier'),
       candidate,
@@ -224,3 +257,11 @@ BEGIN
   RETURN NEW;
 END;
 $$;
+
+
+-- Ensure the ready-fulfillment trigger is attached even if the previous fulfillment
+-- migration was applied in a different environment/order. Recreating it is safe.
+DROP TRIGGER IF EXISTS trg_auto_route_ready_fulfillment ON public.order_items;
+CREATE TRIGGER trg_auto_route_ready_fulfillment
+AFTER INSERT OR UPDATE OF qty_invoiced, qty_completed, quantity ON public.order_items
+FOR EACH ROW EXECUTE FUNCTION public.auto_route_ready_fulfillment();
