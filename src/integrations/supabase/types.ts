@@ -1277,8 +1277,10 @@ export type Database = {
       po_collection_state: {
         Row: {
           assigned_to: string | null
+          collection_method: string
           completed_at: string | null
           created_at: string
+          is_urgent: boolean
           last_seen_at: string
           notes: string | null
           purchase_order_id: string
@@ -1291,8 +1293,10 @@ export type Database = {
         }
         Insert: {
           assigned_to?: string | null
+          collection_method?: string
           completed_at?: string | null
           created_at?: string
+          is_urgent?: boolean
           last_seen_at?: string
           notes?: string | null
           purchase_order_id: string
@@ -1305,8 +1309,10 @@ export type Database = {
         }
         Update: {
           assigned_to?: string | null
+          collection_method?: string
           completed_at?: string | null
           created_at?: string
+          is_urgent?: boolean
           last_seen_at?: string
           notes?: string | null
           purchase_order_id?: string
@@ -1871,6 +1877,10 @@ export type Database = {
     }
     Functions: {
       can_edit_commission: { Args: { _user_id: string }; Returns: boolean }
+      complete_fulfillment_delivery: {
+        Args: { p_order_id: string }
+        Returns: Json
+      }
       get_current_user_role: {
         Args: never
         Returns: Database["public"]["Enums"]["app_role"]
@@ -1915,6 +1925,20 @@ export type Database = {
       mark_order_update_as_read: {
         Args: { update_id: string; user_uuid: string }
         Returns: undefined
+      }
+      record_po_collection: {
+        Args: {
+          p_collection_method?: string
+          p_fully_collected: boolean
+          p_lines: Json
+          p_notes?: string
+          p_purchase_order_id: string
+          p_purchase_order_number: string
+          p_source_snapshot?: Json
+          p_vendor_id: string
+          p_vendor_name: string
+        }
+        Returns: Json
       }
       release_zoho_sync_lock: {
         Args: { requested_key: string }
