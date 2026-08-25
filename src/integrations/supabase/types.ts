@@ -1177,6 +1177,156 @@ export type Database = {
           },
         ]
       }
+      po_collection_event_lines: {
+        Row: {
+          created_at: string
+          description: string | null
+          event_id: string
+          id: string
+          line_key: string
+          name: string
+          quantity_collected: number
+          sku: string | null
+          source_unbilled_quantity: number
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          event_id: string
+          id?: string
+          line_key: string
+          name: string
+          quantity_collected: number
+          sku?: string | null
+          source_unbilled_quantity?: number
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          event_id?: string
+          id?: string
+          line_key?: string
+          name?: string
+          quantity_collected?: number
+          sku?: string | null
+          source_unbilled_quantity?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "po_collection_event_lines_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "po_collection_events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      po_collection_events: {
+        Row: {
+          collected_at: string
+          collected_by: string
+          created_at: string
+          fully_collected: boolean
+          id: string
+          notes: string | null
+          purchase_order_id: string
+          purchase_order_number: string
+          source_snapshot: Json
+          total_units: number
+          vendor_id: string | null
+          vendor_name: string
+        }
+        Insert: {
+          collected_at?: string
+          collected_by: string
+          created_at?: string
+          fully_collected?: boolean
+          id?: string
+          notes?: string | null
+          purchase_order_id: string
+          purchase_order_number: string
+          source_snapshot?: Json
+          total_units?: number
+          vendor_id?: string | null
+          vendor_name?: string
+        }
+        Update: {
+          collected_at?: string
+          collected_by?: string
+          created_at?: string
+          fully_collected?: boolean
+          id?: string
+          notes?: string | null
+          purchase_order_id?: string
+          purchase_order_number?: string
+          source_snapshot?: Json
+          total_units?: number
+          vendor_id?: string | null
+          vendor_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "po_collection_events_collected_by_fkey"
+            columns: ["collected_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      po_collection_state: {
+        Row: {
+          assigned_to: string | null
+          completed_at: string | null
+          created_at: string
+          last_seen_at: string
+          notes: string | null
+          purchase_order_id: string
+          purchase_order_number: string
+          scheduled_for: string | null
+          status: string
+          updated_at: string
+          vendor_id: string | null
+          vendor_name: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          completed_at?: string | null
+          created_at?: string
+          last_seen_at?: string
+          notes?: string | null
+          purchase_order_id: string
+          purchase_order_number: string
+          scheduled_for?: string | null
+          status?: string
+          updated_at?: string
+          vendor_id?: string | null
+          vendor_name?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          completed_at?: string | null
+          created_at?: string
+          last_seen_at?: string
+          notes?: string | null
+          purchase_order_id?: string
+          purchase_order_number?: string
+          scheduled_for?: string | null
+          status?: string
+          updated_at?: string
+          vendor_id?: string | null
+          vendor_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "po_collection_state_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       po_tracking_cache: {
         Row: {
           created_at: string
