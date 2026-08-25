@@ -1463,88 +1463,156 @@ export default function FulfillmentPage() {
 
   return (
     <div className="fulfillment-v3 aleph-page-workspace min-w-0 space-y-5 pb-10">
-      <section className="fulfillment-dispatch-hero relative overflow-hidden rounded-[32px] border border-white/10 px-5 py-6 text-white shadow-2xl sm:px-7 sm:py-8">
-        <div className="fulfillment-route-art" aria-hidden />
-        <div className="relative z-10 grid gap-7 xl:grid-cols-[minmax(0,1fr)_360px] xl:items-end">
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge className="border-white/15 bg-white/10 text-white hover:bg-white/10">
-                <Route className="mr-1.5 h-3.5 w-3.5" />
-                Live dispatch room
-              </Badge>
-              <Badge className="border-white/15 bg-white/10 text-white hover:bg-white/10">
-                <CalendarDays className="mr-1.5 h-3.5 w-3.5" />
-                Focused 14-day window
-              </Badge>
-              <span className="flex items-center gap-1.5 text-xs text-white/60">
-                <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-300" />
-                Realtime workflow
-              </span>
-            </div>
-            <p className="mt-6 text-[10px] font-black uppercase tracking-[0.25em] text-cyan-200/70">
-              Deliveries · supplier pickups · proof of flow
-            </p>
-            <h1 className="mt-2 max-w-3xl text-3xl font-black tracking-[-0.045em] sm:text-5xl">
-              Move every package with a clear owner and next step.
-            </h1>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-white/65">
-              Plan routes in batches, claim work instantly, record partial collections accurately and complete
-              deliveries with one atomic handover.
-            </p>
-            <div className="mt-6 flex flex-wrap gap-2">
-              <Button
-                className="rounded-2xl bg-white text-slate-950 hover:bg-white/90"
-                onClick={() => setActiveMode(counts.delivery ? "delivery" : "collection")}
-              >
-                <Navigation className="mr-1.5 h-4 w-4" />
-                Open active board
-              </Button>
-              <Button
-                variant="outline"
-                className="rounded-2xl border-white/15 bg-white/5 text-white hover:bg-white/10 hover:text-white"
-                onClick={printDispatchManifest}
-              >
-                <Printer className="mr-1.5 h-4 w-4" />
-                Dispatch manifest
-              </Button>
-              <Button
-                variant="outline"
-                className="rounded-2xl border-white/15 bg-white/5 text-white hover:bg-white/10 hover:text-white"
-                onClick={() => void refreshNow()}
-                disabled={refreshing}
-              >
-                <RefreshCw className={cn("mr-1.5 h-4 w-4", refreshing && "animate-spin")} />
-                Live refresh
-              </Button>
+      <section className="fulfillment-command-header overflow-hidden rounded-[26px] border border-border/60 bg-card/90 shadow-sm backdrop-blur-xl">
+        <div className="flex flex-col gap-4 p-4 sm:p-5 xl:flex-row xl:items-center">
+          <div className="flex min-w-0 items-center gap-3 xl:w-[330px]">
+            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-primary text-primary-foreground shadow-[0_14px_28px_-16px_hsl(var(--primary))]">
+              <MapPinned className="h-5 w-5" />
+            </span>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <p className="text-[9px] font-black uppercase tracking-[0.2em] text-primary">Movement desk</p>
+                <span className="flex items-center gap-1 text-[9px] font-bold text-emerald-600">
+                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
+                  Live
+                </span>
+              </div>
+              <h1 className="truncate text-xl font-black tracking-[-0.035em] sm:text-2xl">Delivery & collection</h1>
+              <p className="truncate text-[10px] text-muted-foreground">Only work within 14 days of today</p>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div className="rounded-3xl border border-white/10 bg-black/15 p-4 backdrop-blur-xl">
-              <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/45">Ready to deliver</p>
-              <p className="mt-2 text-3xl font-black">{counts.readyUnits}</p>
-              <p className="mt-1 text-[10px] text-white/50">units across {counts.delivery} orders</p>
-            </div>
-            <div className="rounded-3xl border border-white/10 bg-black/15 p-4 backdrop-blur-xl">
-              <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/45">Supplier arrivals</p>
-              <p className="mt-2 text-3xl font-black">{counts.collectionUnits}</p>
-              <p className="mt-1 text-[10px] text-white/50">pickup or delivery across {counts.collection} POs</p>
-            </div>
-            <div className="rounded-3xl border border-white/10 bg-black/15 p-4 backdrop-blur-xl">
-              <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/45">Scheduled today</p>
-              <p className="mt-2 text-3xl font-black text-emerald-300">{counts.scheduledToday}</p>
-              <p className="mt-1 text-[10px] text-white/50">planned movements</p>
-            </div>
+
+          <div className="grid flex-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
             <button
-              onClick={() => setFocusFilter("late")}
-              className="rounded-3xl border border-white/10 bg-black/15 p-4 text-left backdrop-blur-xl transition-colors hover:bg-white/10"
+              type="button"
+              onClick={() => setActiveMode("delivery")}
+              className={cn(
+                "group flex items-center gap-3 rounded-2xl border px-3 py-2.5 text-left transition-all",
+                activeMode === "delivery"
+                  ? "border-cyan-500/30 bg-cyan-500/10 shadow-sm"
+                  : "border-border/50 bg-muted/25 hover:bg-muted/50",
+              )}
             >
-              <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/45">Late movements</p>
-              <p className={cn("mt-2 text-3xl font-black", counts.late ? "text-rose-300" : "text-emerald-300")}>
-                {counts.late}
-              </p>
-              <p className="mt-1 text-[10px] text-white/50">click to focus</p>
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-cyan-500/15 text-cyan-600">
+                <Truck className="h-4 w-4" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[9px] font-black uppercase tracking-wider text-muted-foreground">
+                  Deliveries
+                </span>
+                <span className="block text-lg font-black leading-5">{counts.delivery}</span>
+              </span>
+              <span className="text-[10px] font-bold text-cyan-600">{counts.readyUnits} units</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveMode("collection")}
+              className={cn(
+                "group flex items-center gap-3 rounded-2xl border px-3 py-2.5 text-left transition-all",
+                activeMode === "collection"
+                  ? "border-violet-500/30 bg-violet-500/10 shadow-sm"
+                  : "border-border/50 bg-muted/25 hover:bg-muted/50",
+              )}
+            >
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-violet-500/15 text-violet-600">
+                <Warehouse className="h-4 w-4" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[9px] font-black uppercase tracking-wider text-muted-foreground">
+                  Collections
+                </span>
+                <span className="block text-lg font-black leading-5">{counts.collection}</span>
+              </span>
+              <span className="text-[10px] font-bold text-violet-600">{counts.collectionUnits} units</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setFocusFilter("today");
+                if (activeMode === "history") setActiveMode("delivery");
+              }}
+              className="flex items-center gap-3 rounded-2xl border border-border/50 bg-muted/25 px-3 py-2.5 text-left transition-all hover:border-emerald-500/25 hover:bg-emerald-500/[0.07]"
+            >
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-emerald-500/15 text-emerald-600">
+                <CalendarClock className="h-4 w-4" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[9px] font-black uppercase tracking-wider text-muted-foreground">
+                  Today
+                </span>
+                <span className="block text-lg font-black leading-5">{counts.scheduledToday}</span>
+              </span>
+              <ChevronRight className="h-4 w-4 text-muted-foreground/40" />
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setFocusFilter("late");
+                if (activeMode === "history") setActiveMode("delivery");
+              }}
+              className={cn(
+                "flex items-center gap-3 rounded-2xl border px-3 py-2.5 text-left transition-all",
+                counts.late
+                  ? "border-destructive/25 bg-destructive/[0.07] hover:bg-destructive/10"
+                  : "border-border/50 bg-muted/25 hover:bg-muted/50",
+              )}
+            >
+              <span
+                className={cn(
+                  "grid h-9 w-9 shrink-0 place-items-center rounded-xl",
+                  counts.late ? "bg-destructive/15 text-destructive" : "bg-emerald-500/15 text-emerald-600",
+                )}
+              >
+                <Timer className="h-4 w-4" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[9px] font-black uppercase tracking-wider text-muted-foreground">Late</span>
+                <span className="block text-lg font-black leading-5">{counts.late}</span>
+              </span>
+              <ChevronRight className="h-4 w-4 text-muted-foreground/40" />
             </button>
           </div>
+
+          <div className="flex shrink-0 items-center gap-2 xl:border-l xl:border-border/60 xl:pl-4">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-10 flex-1 rounded-xl xl:flex-none"
+              onClick={printDispatchManifest}
+            >
+              <Printer className="mr-1.5 h-3.5 w-3.5" />
+              Manifest
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-10 w-10 shrink-0 rounded-xl"
+              aria-label="Refresh live fulfillment data"
+              onClick={() => void refreshNow()}
+              disabled={refreshing}
+            >
+              <RefreshCw className={cn("h-4 w-4", refreshing && "animate-spin")} />
+            </Button>
+          </div>
+        </div>
+        <div className="grid border-t border-border/55 bg-muted/25 text-[9px] font-bold text-muted-foreground sm:grid-cols-3">
+          <div className="flex items-center gap-2 px-4 py-2">
+            <Users className="h-3.5 w-3.5 text-amber-500" />
+            <span>{counts.unassignedDeliveries + counts.unassignedCollections} movements need an owner</span>
+          </div>
+          <div className="flex items-center gap-2 border-t border-border/45 px-4 py-2 sm:border-l sm:border-t-0">
+            <CalendarDays className="h-3.5 w-3.5 text-primary" />
+            <span>Rolling operational window: ±14 days</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setActiveMode("history")}
+            className="flex items-center gap-2 border-t border-border/45 px-4 py-2 text-left transition-colors hover:bg-muted/50 sm:border-l sm:border-t-0"
+          >
+            <History className="h-3.5 w-3.5 text-emerald-600" />
+            <span>{counts.deliveryHistory + counts.collectionHistory} recent completed movements</span>
+            <ArrowRight className="ml-auto h-3 w-3" />
+          </button>
         </div>
       </section>
 
