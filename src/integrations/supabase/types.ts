@@ -462,16 +462,43 @@ export type Database = {
         }
         Relationships: []
       }
+      fulfillment_settings: {
+        Row: {
+          auto_assign_enabled: boolean
+          default_method: string
+          id: boolean
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          auto_assign_enabled?: boolean
+          default_method?: string
+          id?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          auto_assign_enabled?: boolean
+          default_method?: string
+          id?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fulfillment_settings_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       items: {
         Row: {
           code: string
           created_at: string
           description: string | null
-          fulfillment_assigned_to: string | null
-          fulfillment_method: string
-          fulfillment_notes: string | null
-          fulfillment_scheduled_for: string | null
-          fulfillment_status: string
           id: string
           name: string
           unit: string | null
@@ -481,11 +508,6 @@ export type Database = {
           code: string
           created_at?: string
           description?: string | null
-          fulfillment_assigned_to?: string | null
-          fulfillment_method?: string
-          fulfillment_notes?: string | null
-          fulfillment_scheduled_for?: string | null
-          fulfillment_status?: string
           id?: string
           name: string
           unit?: string | null
@@ -495,11 +517,6 @@ export type Database = {
           code?: string
           created_at?: string
           description?: string | null
-          fulfillment_assigned_to?: string | null
-          fulfillment_method?: string
-          fulfillment_notes?: string | null
-          fulfillment_scheduled_for?: string | null
-          fulfillment_status?: string
           id?: string
           name?: string
           unit?: string | null
@@ -1145,6 +1162,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "orders_fulfillment_assigned_to_fkey"
+            columns: ["fulfillment_assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "orders_supplier_id_fkey"
             columns: ["supplier_id"]
             isOneToOne: false
@@ -1153,55 +1177,46 @@ export type Database = {
           },
         ]
       }
-      po_collection_state: {
+      po_collection_event_lines: {
         Row: {
-          assigned_to: string | null
-          completed_at: string | null
           created_at: string
-          last_seen_at: string
-          notes: string | null
-          purchase_order_id: string
-          purchase_order_number: string
-          scheduled_for: string | null
-          status: string
-          updated_at: string
-          vendor_id: string | null
-          vendor_name: string
+          description: string | null
+          event_id: string
+          id: string
+          line_key: string
+          name: string
+          quantity_collected: number
+          sku: string | null
+          source_unbilled_quantity: number
         }
         Insert: {
-          assigned_to?: string | null
-          completed_at?: string | null
           created_at?: string
-          last_seen_at?: string
-          notes?: string | null
-          purchase_order_id: string
-          purchase_order_number: string
-          scheduled_for?: string | null
-          status?: string
-          updated_at?: string
-          vendor_id?: string | null
-          vendor_name?: string
+          description?: string | null
+          event_id: string
+          id?: string
+          line_key: string
+          name: string
+          quantity_collected: number
+          sku?: string | null
+          source_unbilled_quantity?: number
         }
         Update: {
-          assigned_to?: string | null
-          completed_at?: string | null
           created_at?: string
-          last_seen_at?: string
-          notes?: string | null
-          purchase_order_id?: string
-          purchase_order_number?: string
-          scheduled_for?: string | null
-          status?: string
-          updated_at?: string
-          vendor_id?: string | null
-          vendor_name?: string
+          description?: string | null
+          event_id?: string
+          id?: string
+          line_key?: string
+          name?: string
+          quantity_collected?: number
+          sku?: string | null
+          source_unbilled_quantity?: number
         }
         Relationships: [
           {
-            foreignKeyName: "po_collection_state_assigned_to_fkey"
-            columns: ["assigned_to"]
+            foreignKeyName: "po_collection_event_lines_event_id_fkey"
+            columns: ["event_id"]
             isOneToOne: false
-            referencedRelation: "profiles"
+            referencedRelation: "po_collection_events"
             referencedColumns: ["id"]
           },
         ]
@@ -1259,46 +1274,55 @@ export type Database = {
           },
         ]
       }
-      po_collection_event_lines: {
+      po_collection_state: {
         Row: {
+          assigned_to: string | null
+          completed_at: string | null
           created_at: string
-          description: string | null
-          event_id: string
-          id: string
-          line_key: string
-          name: string
-          quantity_collected: number
-          sku: string | null
-          source_unbilled_quantity: number
+          last_seen_at: string
+          notes: string | null
+          purchase_order_id: string
+          purchase_order_number: string
+          scheduled_for: string | null
+          status: string
+          updated_at: string
+          vendor_id: string | null
+          vendor_name: string
         }
         Insert: {
+          assigned_to?: string | null
+          completed_at?: string | null
           created_at?: string
-          description?: string | null
-          event_id: string
-          id?: string
-          line_key: string
-          name: string
-          quantity_collected: number
-          sku?: string | null
-          source_unbilled_quantity?: number
+          last_seen_at?: string
+          notes?: string | null
+          purchase_order_id: string
+          purchase_order_number: string
+          scheduled_for?: string | null
+          status?: string
+          updated_at?: string
+          vendor_id?: string | null
+          vendor_name?: string
         }
         Update: {
+          assigned_to?: string | null
+          completed_at?: string | null
           created_at?: string
-          description?: string | null
-          event_id?: string
-          id?: string
-          line_key?: string
-          name?: string
-          quantity_collected?: number
-          sku?: string | null
-          source_unbilled_quantity?: number
+          last_seen_at?: string
+          notes?: string | null
+          purchase_order_id?: string
+          purchase_order_number?: string
+          scheduled_for?: string | null
+          status?: string
+          updated_at?: string
+          vendor_id?: string | null
+          vendor_name?: string
         }
         Relationships: [
           {
-            foreignKeyName: "po_collection_event_lines_event_id_fkey"
-            columns: ["event_id"]
+            foreignKeyName: "po_collection_state_assigned_to_fkey"
+            columns: ["assigned_to"]
             isOneToOne: false
-            referencedRelation: "po_collection_events"
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -1323,38 +1347,6 @@ export type Database = {
           payload?: Json
         }
         Relationships: []
-      }
-      fulfillment_settings: {
-        Row: {
-          auto_assign_enabled: boolean
-          default_method: string
-          id: boolean
-          updated_at: string
-          updated_by: string | null
-        }
-        Insert: {
-          auto_assign_enabled?: boolean
-          default_method?: string
-          id?: boolean
-          updated_at?: string
-          updated_by?: string | null
-        }
-        Update: {
-          auto_assign_enabled?: boolean
-          default_method?: string
-          id?: boolean
-          updated_at?: string
-          updated_by?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "fulfillment_settings_updated_by_fkey"
-            columns: ["updated_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       profiles: {
         Row: {
