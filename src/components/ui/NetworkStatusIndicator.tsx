@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { WifiOff, Wifi } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { flushOfflineOperations, subscribeOfflineQueue } from "@/services/offlineOperations";
 
 /**
  * Floating pill that appears when the browser goes offline and
@@ -12,6 +13,8 @@ export function NetworkStatusIndicator() {
     typeof navigator !== "undefined" ? navigator.onLine : true
   );
   const [showRestored, setShowRestored] = useState(false);
+  const [pendingChanges, setPendingChanges] = useState(0);
+  const [syncing, setSyncing] = useState(false);
 
   useEffect(() => {
     let restoredTimer: number | undefined;
@@ -23,6 +26,8 @@ export function NetworkStatusIndicator() {
     const handleOnline = () => {
       setIsOnline(true);
       setShowRestored(true);
+      setSyncing(true);
+      void flushOfflineOperations().finally(() => setSyncing(false));
       if (restoredTimer) window.clearTimeout(restoredTimer);
       restoredTimer = window.setTimeout(() => setShowRestored(false), 2500);
     };
@@ -36,7 +41,9 @@ export function NetworkStatusIndicator() {
     };
   }, []);
 
-  if (isOnline && !showRestored) return null;
+  useEffect(() => subscribeOfflineQueue(setPendingChanges), []);
+
+  if (isOnline && !showRestored && pendingChanges === 0 && !syncing) return null;
 
   return (
     <div
@@ -58,12 +65,12 @@ export function NetworkStatusIndicator() {
         {isOnline ? (
           <>
             <Wifi className="h-4 w-4" />
-            Back online
+            {syncing ? `Syncing ${pendingChanges} saved change${pendingChanges === 1 ? "" : "s"}…` : pendingChanges ? `${pendingChanges} change${pendingChanges === 1 ? "" : "s"} waiting to sync` : "Back online · all changes synced"}
           </>
         ) : (
           <>
             <WifiOff className="h-4 w-4" />
-            You're offline — reconnect before saving changes
+            Offline mode · {pendingChanges ? `${pendingChanges} change${pendingChanges === 1 ? "" : "s"} safely queued` : "changes will be safely queued"}
           </>
         )}
       </div>

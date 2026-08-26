@@ -5,9 +5,28 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ChevronDown, ChevronRight, Search, Truck, Package, FileText, Mail } from "lucide-react";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  ChevronDown,
+  ChevronRight,
+  Search,
+  Truck,
+  Package,
+  FileText,
+  Mail,
+} from "lucide-react";
 import { format } from "date-fns";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
@@ -62,18 +81,13 @@ interface LocalCollectionProgress {
 }
 
 const poLineKey = (line: Pick<POLine, "sku" | "name" | "description">) => {
-  const sku = String(line.sku || "")
-    .trim()
-    .toLowerCase();
+  const sku = String(line.sku || "").trim().toLowerCase();
   if (sku) return `sku:${sku}`;
-  return `nm:${String(line.name || "")
-    .trim()
-    .toLowerCase()}|${String(line.description || "")
-    .trim()
-    .toLowerCase()}`;
+  return `nm:${String(line.name || "").trim().toLowerCase()}|${String(line.description || "").trim().toLowerCase()}`;
 };
 
-const money = (n: number) => `R${n.toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const money = (n: number) =>
+  `R${n.toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export default function POTrackingPage() {
   const [pos, setPos] = useState<ZohoPO[]>([]);
@@ -107,12 +121,7 @@ export default function POTrackingPage() {
       .channel("po-tracking-event-cache")
       .on(
         "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "po_tracking_cache",
-          filter: "id=eq.00000000-0000-0000-0000-000000000003",
-        },
+        { event: "*", schema: "public", table: "po_tracking_cache", filter: "id=eq.00000000-0000-0000-0000-000000000003" },
         (change) => {
           const next = change.new as { payload?: unknown; fetched_at?: string };
           if (!next?.payload) return;
@@ -120,17 +129,17 @@ export default function POTrackingPage() {
           setFetchedAt(next.fetched_at || new Date().toISOString());
         },
       )
-      .on("postgres_changes", { event: "*", schema: "public", table: "order_purchase_orders" }, () => {
-        window.clearTimeout(localRefreshTimer);
-        localRefreshTimer = window.setTimeout(() => void fetchLinkedOrders(), 500);
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "po_collection_state" }, queueFulfillmentRefresh)
-      .on("postgres_changes", { event: "*", schema: "public", table: "po_collection_events" }, queueFulfillmentRefresh)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "po_collection_event_lines" },
-        queueFulfillmentRefresh,
+        { event: "*", schema: "public", table: "order_purchase_orders" },
+        () => {
+          window.clearTimeout(localRefreshTimer);
+          localRefreshTimer = window.setTimeout(() => void fetchLinkedOrders(), 500);
+        },
       )
+      .on("postgres_changes", { event: "*", schema: "public", table: "po_collection_state" }, queueFulfillmentRefresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "po_collection_events" }, queueFulfillmentRefresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "po_collection_event_lines" }, queueFulfillmentRefresh)
       .subscribe();
 
     return () => {
@@ -139,6 +148,7 @@ export default function POTrackingPage() {
       void supabase.removeChannel(channel);
     };
   }, []);
+
 
   const fetchLinkedOrders = async () => {
     const { data: links, error: linksError } = await supabase
@@ -162,10 +172,7 @@ export default function POTrackingPage() {
     const companyIds = [...new Set((ordersData || []).map((o) => o.company_id).filter(Boolean))] as string[];
     let companyMap = new Map<string, string>();
     if (companyIds.length) {
-      const { data: companies, error: companiesError } = await supabase
-        .from("companies")
-        .select("id, name")
-        .in("id", companyIds);
+      const { data: companies, error: companiesError } = await supabase.from("companies").select("id, name").in("id", companyIds);
       if (companiesError) throw companiesError;
       companyMap = new Map((companies || []).map((c) => [c.id, c.name]));
     }
@@ -205,10 +212,7 @@ export default function POTrackingPage() {
     const eventToPO = new Map((events || []).map((event) => [event.id, event.purchase_order_id]));
     const eventIds = [...eventToPO.keys()];
     const { data: lines, error: linesError } = eventIds.length
-      ? await supabase
-          .from("po_collection_event_lines")
-          .select("event_id, line_key, quantity_collected")
-          .in("event_id", eventIds)
+      ? await supabase.from("po_collection_event_lines").select("event_id, line_key, quantity_collected").in("event_id", eventIds)
       : ({ data: [], error: null } as any);
     if (linesError) throw linesError;
 
@@ -253,10 +257,7 @@ export default function POTrackingPage() {
         const { data, error } = await supabase.functions.invoke("po-tracking-data", { body: { force: false } });
         if (error) throw error;
         if (data?.error) throw new Error(data.error);
-        payload = {
-          payload: data?.purchaseOrders || [],
-          fetched_at: data?.fetchedAt || new Date().toISOString(),
-        } as typeof cached;
+        payload = { payload: data?.purchaseOrders || [], fetched_at: data?.fetchedAt || new Date().toISOString() } as typeof cached;
       }
 
       const purchaseOrders = (payload?.payload || []) as unknown as ZohoPO[];
@@ -278,21 +279,20 @@ export default function POTrackingPage() {
   };
 
   const displayPos = useMemo(
-    () =>
-      pos.map((po) => {
-        const local = collectionProgress[po.purchaseOrderId];
-        if (!local) return po;
-        return {
-          ...po,
-          lines: po.lines.map((line) => ({
-            ...line,
-            quantityReceived: Math.min(
-              line.quantity,
-              Math.max(Number(line.quantityReceived || 0), Number(local.lines[poLineKey(line)] || 0)),
-            ),
-          })),
-        };
-      }),
+    () => pos.map((po) => {
+      const local = collectionProgress[po.purchaseOrderId];
+      if (!local) return po;
+      return {
+        ...po,
+        lines: po.lines.map((line) => ({
+          ...line,
+          quantityReceived: Math.min(
+            line.quantity,
+            Math.max(Number(line.quantityReceived || 0), Number(local.lines[poLineKey(line)] || 0)),
+          ),
+        })),
+      };
+    }),
     [pos, collectionProgress],
   );
 
@@ -308,10 +308,10 @@ export default function POTrackingPage() {
           (l) =>
             l.sku.toLowerCase().includes(term) ||
             l.name.toLowerCase().includes(term) ||
-            l.description.toLowerCase().includes(term),
+            l.description.toLowerCase().includes(term)
         ) ||
-        (linkedOrders[po.purchaseOrderNumber.trim().toUpperCase()] || []).some(
-          (o) => o.orderNumber.toLowerCase().includes(term) || o.companyName.toLowerCase().includes(term),
+        (linkedOrders[po.purchaseOrderNumber.trim().toUpperCase()] || []).some((o) =>
+          o.orderNumber.toLowerCase().includes(term) || o.companyName.toLowerCase().includes(term)
         )
       );
     };
@@ -327,7 +327,10 @@ export default function POTrackingPage() {
         vendorName,
         vendorEmail: vendorPOs.find((p) => p.vendorEmail)?.vendorEmail || "",
         pos: vendorPOs.sort((a, b) => (b.date || "").localeCompare(a.date || "")),
-        outstandingUnits: vendorPOs.reduce((sum, p) => sum + p.lines.reduce((s, l) => s + l.outstanding, 0), 0),
+        outstandingUnits: vendorPOs.reduce(
+          (sum, p) => sum + p.lines.reduce((s, l) => s + l.outstanding, 0),
+          0
+        ),
         outstandingValue: vendorPOs.reduce((sum, p) => sum + p.outstandingValue, 0),
       }))
       .sort((a, b) => b.outstandingValue - a.outstandingValue);
@@ -374,14 +377,14 @@ export default function POTrackingPage() {
     const received = po.lines.reduce((s, l) => s + l.quantityReceived, 0);
     const ordered = po.lines.reduce((s, l) => s + l.quantity, 0);
     if (received <= 0) return <Badge variant="outline">Awaiting stock</Badge>;
-    if (received < ordered)
-      return (
-        <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-300">Partially received</Badge>
-      );
+    if (received < ordered) return <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-300">Partially received</Badge>;
     return <Badge className="bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-300">Received, unbilled</Badge>;
   };
 
-  const totalOutstandingUnits = displayPos.reduce((sum, p) => sum + p.lines.reduce((s, l) => s + l.outstanding, 0), 0);
+  const totalOutstandingUnits = displayPos.reduce(
+    (sum, p) => sum + p.lines.reduce((s, l) => s + l.outstanding, 0),
+    0
+  );
   const totalOutstandingValue = displayPos.reduce((sum, p) => sum + p.outstandingValue, 0);
 
   if (loading) return <PageSkeleton variant="table" />;
@@ -414,12 +417,15 @@ export default function POTrackingPage() {
         }
       />
 
+
       {vendorGroups.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center">
             <Truck className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
             <p className="text-lg font-medium text-muted-foreground">No outstanding purchase orders</p>
-            <p className="text-sm text-muted-foreground mt-1">Every Zoho purchase order has been fully billed</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              Every Zoho purchase order has been fully billed
+            </p>
           </CardContent>
         </Card>
       ) : (
@@ -449,26 +455,17 @@ export default function POTrackingPage() {
                     )}
                   >
                     <div className="flex items-start gap-2.5">
-                      <span
-                        className={cn(
-                          "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl",
-                          active ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground",
-                        )}
-                      >
+                      <span className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-xl", active ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground")}>
                         <Truck className="h-4 w-4" />
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-bold text-foreground">{group.vendorName}</span>
                         <span className="mt-1 flex items-center gap-2 text-[10px] text-muted-foreground">
-                          <span>
-                            {group.pos.length} PO{group.pos.length !== 1 ? "s" : ""}
-                          </span>
+                          <span>{group.pos.length} PO{group.pos.length !== 1 ? "s" : ""}</span>
                           <span>·</span>
                           <span>{group.outstandingUnits} units</span>
                         </span>
-                        <span className="mt-1 block text-xs font-black text-primary">
-                          {money(group.outstandingValue)}
-                        </span>
+                        <span className="mt-1 block text-xs font-black text-primary">{money(group.outstandingValue)}</span>
                       </span>
                     </div>
                   </button>
@@ -478,176 +475,146 @@ export default function POTrackingPage() {
           </aside>
 
           <section className="min-w-0 space-y-3">
-            {vendorGroups
-              .filter((group) => group.vendorName === selectedVendor)
-              .map((group) => (
-                <Card
-                  key={group.vendorName}
-                  className="overflow-hidden border-2 hover:border-primary/25 transition-colors"
-                >
-                  <Collapsible
-                    open={openVendors.has(group.vendorName)}
-                    onOpenChange={() => toggle(openVendors, group.vendorName, setOpenVendors)}
-                  >
-                    <CollapsibleTrigger className="w-full">
-                      <CardHeader className="py-3 px-4 hover:bg-muted/50 transition-colors cursor-pointer">
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="flex items-center gap-3 min-w-0">
-                            {openVendors.has(group.vendorName) ? (
-                              <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
-                            ) : (
-                              <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-                            )}
-                            <Truck className="h-4 w-4 text-primary shrink-0" />
-                            <span className="font-semibold truncate">{group.vendorName}</span>
-                            {group.vendorEmail && !isMobile && (
-                              <span className="text-xs text-muted-foreground flex items-center gap-1 truncate">
-                                <Mail className="h-3 w-3" />
-                                {group.vendorEmail}
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2 shrink-0">
-                            <Badge variant="secondary">
-                              {group.pos.length} PO{group.pos.length !== 1 ? "s" : ""}
-                            </Badge>
-                            <Badge variant="outline">{group.outstandingUnits} units</Badge>
-                            {!isMobile && <Badge variant="outline">{money(group.outstandingValue)}</Badge>}
-                          </div>
-                        </div>
-                      </CardHeader>
-                    </CollapsibleTrigger>
+          {vendorGroups.filter((group) => group.vendorName === selectedVendor).map((group) => (
+            <Card key={group.vendorName} className="overflow-hidden border-2 hover:border-primary/25 transition-colors">
+              <Collapsible
+                open={openVendors.has(group.vendorName)}
+                onOpenChange={() => toggle(openVendors, group.vendorName, setOpenVendors)}
+              >
+                <CollapsibleTrigger className="w-full">
+                  <CardHeader className="py-3 px-4 hover:bg-muted/50 transition-colors cursor-pointer">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        {openVendors.has(group.vendorName) ? (
+                          <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                        )}
+                        <Truck className="h-4 w-4 text-primary shrink-0" />
+                        <span className="font-semibold truncate">{group.vendorName}</span>
+                        {group.vendorEmail && !isMobile && (
+                          <span className="text-xs text-muted-foreground flex items-center gap-1 truncate">
+                            <Mail className="h-3 w-3" />
+                            {group.vendorEmail}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Badge variant="secondary">{group.pos.length} PO{group.pos.length !== 1 ? "s" : ""}</Badge>
+                        <Badge variant="outline">{group.outstandingUnits} units</Badge>
+                        {!isMobile && <Badge variant="outline">{money(group.outstandingValue)}</Badge>}
+                      </div>
+                    </div>
+                  </CardHeader>
+                </CollapsibleTrigger>
 
-                    <CollapsibleContent>
-                      <CardContent className="pt-0 pb-3 px-4 space-y-2">
-                        {group.pos.map((po) => {
-                          const links = linkedOrders[po.purchaseOrderNumber.trim().toUpperCase()] || [];
-                          const isOpen = openPOs.has(po.purchaseOrderId);
-                          const localProgress = collectionProgress[po.purchaseOrderId];
-                          return (
-                            <div key={po.purchaseOrderId} className="rounded-lg border bg-muted/20">
-                              <button
-                                className="w-full text-left p-3 flex flex-wrap items-center justify-between gap-2 hover:bg-muted/40 rounded-lg transition-colors"
-                                onClick={() => toggle(openPOs, po.purchaseOrderId, setOpenPOs)}
-                              >
-                                <div className="flex items-center gap-2 min-w-0">
-                                  {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                                  <span className="font-mono font-medium">{po.purchaseOrderNumber}</span>
-                                  {po.date && (
-                                    <span className="text-xs text-muted-foreground">
-                                      {format(new Date(po.date), "dd MMM yyyy")}
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  {localProgress?.status === "collected" && (
-                                    <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 dark:bg-emerald-900 dark:text-emerald-200">
-                                      {localProgress.collectionMethod === "supplier-delivery"
-                                        ? "Supplier delivery received"
-                                        : "Collected locally"}
-                                    </Badge>
-                                  )}
-                                  {localProgress?.isUrgent && <Badge variant="destructive">Urgent</Badge>}
-                                  {receiveBadge(po)}
-                                  <Badge variant="outline">
-                                    {po.lines.reduce((s, l) => s + l.outstanding, 0)} pending
-                                  </Badge>
-                                  <span className="text-sm text-muted-foreground">{money(po.outstandingValue)}</span>
-                                </div>
-                              </button>
-
-                              {isOpen && (
-                                <div className="px-3 pb-3 space-y-3">
-                                  {links.length > 0 && (
-                                    <div className="flex flex-wrap items-center gap-2 text-xs">
-                                      <span className="text-muted-foreground">Linked orders:</span>
-                                      {links.map((l) => (
-                                        <Badge
-                                          key={l.orderId}
-                                          variant="secondary"
-                                          className="cursor-pointer hover:bg-primary/20"
-                                          onClick={() => openOrder(l)}
-                                        >
-                                          {l.orderNumber} · {l.companyName}
-                                        </Badge>
-                                      ))}
-                                    </div>
-                                  )}
-
-                                  {isMobile ? (
-                                    <div className="space-y-2">
-                                      {po.lines.map((line, idx) => (
-                                        <div
-                                          key={`${po.purchaseOrderId}-${idx}`}
-                                          className="p-2 rounded-md bg-background border space-y-1"
-                                        >
-                                          <p className="text-sm font-medium">{line.name || line.description}</p>
-                                          <p className="text-xs font-mono text-muted-foreground">{line.sku || "-"}</p>
-                                          <div className="grid grid-cols-4 gap-1 text-xs">
-                                            <div>
-                                              <span className="text-muted-foreground block">Ord</span>
-                                              {line.quantity}
-                                            </div>
-                                            <div>
-                                              <span className="text-muted-foreground block">Rec</span>
-                                              {line.quantityReceived}
-                                            </div>
-                                            <div>
-                                              <span className="text-muted-foreground block">Billed</span>
-                                              {line.quantityBilled}
-                                            </div>
-                                            <div className="font-semibold">
-                                              <span className="text-muted-foreground block font-normal">Pending</span>
-                                              {line.outstanding}
-                                            </div>
-                                          </div>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  ) : (
-                                    <Table>
-                                      <TableHeader>
-                                        <TableRow>
-                                          <TableHead>SKU</TableHead>
-                                          <TableHead>Item</TableHead>
-                                          <TableHead className="text-right">Ordered</TableHead>
-                                          <TableHead className="text-right">Received</TableHead>
-                                          <TableHead className="text-right">Billed</TableHead>
-                                          <TableHead className="text-right">Pending</TableHead>
-                                          <TableHead className="text-right">Value</TableHead>
-                                        </TableRow>
-                                      </TableHeader>
-                                      <TableBody>
-                                        {po.lines.map((line, idx) => (
-                                          <TableRow key={`${po.purchaseOrderId}-${idx}`}>
-                                            <TableCell className="font-mono text-xs">{line.sku || "-"}</TableCell>
-                                            <TableCell className="max-w-[320px] truncate">
-                                              {line.name || line.description}
-                                            </TableCell>
-                                            <TableCell className="text-right">{line.quantity}</TableCell>
-                                            <TableCell className="text-right">{line.quantityReceived}</TableCell>
-                                            <TableCell className="text-right">{line.quantityBilled}</TableCell>
-                                            <TableCell className="text-right font-semibold">
-                                              {line.outstanding}
-                                            </TableCell>
-                                            <TableCell className="text-right text-muted-foreground">
-                                              {money(line.outstanding * line.rate)}
-                                            </TableCell>
-                                          </TableRow>
-                                        ))}
-                                      </TableBody>
-                                    </Table>
-                                  )}
-                                </div>
+                <CollapsibleContent>
+                  <CardContent className="pt-0 pb-3 px-4 space-y-2">
+                    {group.pos.map((po) => {
+                      const links = linkedOrders[po.purchaseOrderNumber.trim().toUpperCase()] || [];
+                      const isOpen = openPOs.has(po.purchaseOrderId);
+                      const localProgress = collectionProgress[po.purchaseOrderId];
+                      return (
+                        <div key={po.purchaseOrderId} className="rounded-lg border bg-muted/20">
+                          <button
+                            className="w-full text-left p-3 flex flex-wrap items-center justify-between gap-2 hover:bg-muted/40 rounded-lg transition-colors"
+                            onClick={() => toggle(openPOs, po.purchaseOrderId, setOpenPOs)}
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                              <span className="font-mono font-medium">{po.purchaseOrderNumber}</span>
+                              {po.date && (
+                                <span className="text-xs text-muted-foreground">
+                                  {format(new Date(po.date), "dd MMM yyyy")}
+                                </span>
                               )}
                             </div>
-                          );
-                        })}
-                      </CardContent>
-                    </CollapsibleContent>
-                  </Collapsible>
-                </Card>
-              ))}
+                            <div className="flex items-center gap-2 flex-wrap">
+                              {localProgress?.status === "collected" && <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 dark:bg-emerald-900 dark:text-emerald-200">{localProgress.collectionMethod === "supplier-delivery" ? "Supplier delivery received" : "Collected locally"}</Badge>}
+                              {localProgress?.isUrgent && <Badge variant="destructive">Urgent</Badge>}
+                              {receiveBadge(po)}
+                              <Badge variant="outline">
+                                {po.lines.reduce((s, l) => s + l.outstanding, 0)} pending
+                              </Badge>
+                              <span className="text-sm text-muted-foreground">{money(po.outstandingValue)}</span>
+                            </div>
+                          </button>
+
+                          {isOpen && (
+                            <div className="px-3 pb-3 space-y-3">
+                              {links.length > 0 && (
+                                <div className="flex flex-wrap items-center gap-2 text-xs">
+                                  <span className="text-muted-foreground">Linked orders:</span>
+                                  {links.map((l) => (
+                                    <Badge
+                                      key={l.orderId}
+                                      variant="secondary"
+                                      className="cursor-pointer hover:bg-primary/20"
+                                      onClick={() => openOrder(l)}
+                                    >
+                                      {l.orderNumber} · {l.companyName}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              )}
+
+                              {isMobile ? (
+                                <div className="space-y-2">
+                                  {po.lines.map((line, idx) => (
+                                    <div key={`${po.purchaseOrderId}-${idx}`} className="p-2 rounded-md bg-background border space-y-1">
+                                      <p className="text-sm font-medium">{line.name || line.description}</p>
+                                      <p className="text-xs font-mono text-muted-foreground">{line.sku || "-"}</p>
+                                      <div className="grid grid-cols-4 gap-1 text-xs">
+                                        <div><span className="text-muted-foreground block">Ord</span>{line.quantity}</div>
+                                        <div><span className="text-muted-foreground block">Rec</span>{line.quantityReceived}</div>
+                                        <div><span className="text-muted-foreground block">Billed</span>{line.quantityBilled}</div>
+                                        <div className="font-semibold"><span className="text-muted-foreground block font-normal">Pending</span>{line.outstanding}</div>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead>SKU</TableHead>
+                                      <TableHead>Item</TableHead>
+                                      <TableHead className="text-right">Ordered</TableHead>
+                                      <TableHead className="text-right">Received</TableHead>
+                                      <TableHead className="text-right">Billed</TableHead>
+                                      <TableHead className="text-right">Pending</TableHead>
+                                      <TableHead className="text-right">Value</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {po.lines.map((line, idx) => (
+                                      <TableRow key={`${po.purchaseOrderId}-${idx}`}>
+                                        <TableCell className="font-mono text-xs">{line.sku || "-"}</TableCell>
+                                        <TableCell className="max-w-[320px] truncate">
+                                          {line.name || line.description}
+                                        </TableCell>
+                                        <TableCell className="text-right">{line.quantity}</TableCell>
+                                        <TableCell className="text-right">{line.quantityReceived}</TableCell>
+                                        <TableCell className="text-right">{line.quantityBilled}</TableCell>
+                                        <TableCell className="text-right font-semibold">{line.outstanding}</TableCell>
+                                        <TableCell className="text-right text-muted-foreground">
+                                          {money(line.outstanding * line.rate)}
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                  </TableBody>
+                                </Table>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </CardContent>
+                </CollapsibleContent>
+              </Collapsible>
+            </Card>
+          ))}
           </section>
         </div>
       )}
