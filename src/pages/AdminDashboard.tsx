@@ -195,6 +195,16 @@ const AdminDashboard = () => {
     navigate("/");
   };
 
+  // Cross-workspace navigation events used by operational panels.
+  useEffect(() => {
+    const handleSetActiveView = (event: Event) => {
+      const view = String((event as CustomEvent<string>).detail || "").trim();
+      if (view) setActiveView(view);
+    };
+    window.addEventListener("setActiveView", handleSetActiveView);
+    return () => window.removeEventListener("setActiveView", handleSetActiveView);
+  }, []);
+
   // Keyboard shortcuts: Cmd/Ctrl+K opens actions and Cmd/Ctrl+\ toggles the rail.
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {

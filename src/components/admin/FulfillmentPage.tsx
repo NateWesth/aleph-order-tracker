@@ -181,6 +181,37 @@ interface CollectionPOView extends ZohoPO {
   collectedUnits: number;
 }
 
+interface DispatchArea {
+  id: string;
+  name: string;
+  sort_order: number;
+}
+
+interface DispatchAreaLink {
+  id: string;
+  source_type: "company" | "vendor";
+  source_id: string;
+  area_id: string;
+  address_override: string | null;
+}
+
+interface DispatchPlanningStop {
+  key: string;
+  type: "delivery" | "collection";
+  entityId: string;
+  sourceType: "company" | "vendor";
+  sourceId: string;
+  reference: string;
+  label: string;
+  address: string | null;
+  urgency: string | null;
+  scheduledFor: string | null;
+  assigneeId: string | null;
+  areaId: string | null;
+  areaName: string | null;
+  areaSortOrder: number;
+}
+
 const PO_CACHE_ID = "00000000-0000-0000-0000-000000000003";
 const FULFILLMENT_WINDOW_DAYS = 14;
 const FULFILLMENT_WINDOW_MS = FULFILLMENT_WINDOW_DAYS * 86_400_000;
@@ -269,6 +300,11 @@ export default function FulfillmentPage() {
   const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
   const [confirmDeliveryId, setConfirmDeliveryId] = useState<string | null>(null);
   const [deliverySelection, setDeliverySelection] = useState<Set<string>>(new Set());
+  const [collectionSelection, setCollectionSelection] = useState<Set<string>>(new Set());
+  const [dispatchAreas, setDispatchAreas] = useState<DispatchArea[]>([]);
+  const [dispatchAreaLinks, setDispatchAreaLinks] = useState<DispatchAreaLink[]>([]);
+  const [newAreaName, setNewAreaName] = useState("");
+  const [areaSavingKey, setAreaSavingKey] = useState<string | null>(null);
   const [bulkAssignee, setBulkAssignee] = useState("keep");
   const [bulkSchedule, setBulkSchedule] = useState("");
   const [bulkSaving, setBulkSaving] = useState(false);
@@ -293,7 +329,7 @@ export default function FulfillmentPage() {
     if (!loadedRef.current) setLoading(true);
     try {
       const historyCutoff = new Date(Date.now() - FULFILLMENT_WINDOW_MS).toISOString();
-      const [ordersRes, deliveryHistoryRes, profilesRes, settingsRes, cacheRes, statesRes, eventsRes, timelineRes] = await Promise.all([
+      const [ordersRes, deliveryHistoryRes, profilesRes, settingsRes, cacheRes, statesRes, eventsRes, areaRes, areaLinksRes, timelineRes] = await Promise.all([
         supabase
           .from("orders")
           .select("id, order_number, reference, urgency, company_id, created_at, fulfillment_method, fulfillment_status, fulfillment_assigned_to, fulfillment_scheduled_for, fulfillment_notes, fulfillment_routed_at")
@@ -317,6 +353,8 @@ export default function FulfillmentPage() {
           .gte("collected_at", historyCutoff)
           .order("collected_at", { ascending: false })
           .limit(250),
+        supabase.from("dispatch_areas").select("id,name,sort_order").order("sort_order").order("name"),
+        supabase.from("dispatch_area_links").select("id,source_type,source_id,area_id,address_override"),
         supabase
           .from("fulfillment_timeline_events")
           .select("id, entity_type, entity_id, event_type, title, description, actor_id, occurred_at")
@@ -331,6 +369,8 @@ export default function FulfillmentPage() {
       if (cacheRes.error) throw cacheRes.error;
       if (statesRes.error) throw statesRes.error;
       if (eventsRes.error) throw eventsRes.error;
+      if (areaRes.error) throw areaRes.error;
+      if (areaLinksRes.error) throw areaLinksRes.error;
       if (timelineRes.error) throw timelineRes.error;
 
       const activeBase = (ordersRes.data || []).filter((order) =>
@@ -412,6 +452,8 @@ export default function FulfillmentPage() {
       setCollectionEventLines((linesRes.data || []) as CollectionEventLine[]);
       setTimelineEvents((timelineRes.data || []) as FulfillmentTimelineEvent[]);
       setTeam((profilesRes.data || []) as TeamMember[]);
+      setDispatchAreas((areaRes.data || []) as DispatchArea[]);
+      setDispatchAreaLinks((areaLinksRes.data || []) as DispatchAreaLink[]);
       if (settingsRes.data) setSettings(settingsRes.data as FulfillmentSettings);
 
       // Ensure every current unbilled PO has a persistent assignment/state row.
@@ -444,7 +486,7 @@ export default function FulfillmentPage() {
     void fetchData();
   }, [fetchData]);
 
-  useLiveData(["orders", "order_items", "po_tracking_cache", "po_collection_state", "po_collection_events", "po_collection_event_lines", "fulfillment_timeline_events", "dispatch_routes"], fetchData, {
+  useLiveData(["orders", "order_items", "po_tracking_cache", "po_collection_state", "po_collection_events", "po_collection_event_lines", "fulfillment_timeline_events", "dispatch_routes", "dispatch_areas", "dispatch_area_links"], fetchData, {
     debounceMs: 900,
     fallbackIntervalMs: 0,
     channelName: "fulfillment-workspace-v3-live",
@@ -738,72 +780,242 @@ export default function FulfillmentPage() {
     });
   };
 
-  const routePlanOrders = useMemo(() => {
-    const selected = deliveryOrders.filter((order) => deliverySelection.has(order.id));
-    const clusterKey = (address: string | null) => String(address || "zzzz").split(",").slice(-2).reverse().join("|").trim().toLowerCase();
-    return selected.sort((a, b) => {
-      const area = clusterKey(a.companyAddress).localeCompare(clusterKey(b.companyAddress));
-      if (area) return area;
+  const toggleCollectionSelection = (purchaseOrderId: string) => {
+    setCollectionSelection((current) => {
+      const next = new Set(current);
+      if (next.has(purchaseOrderId)) next.delete(purchaseOrderId);
+      else next.add(purchaseOrderId);
+      return next;
+    });
+  };
+
+  const areaLinkMap = useMemo(() => new Map(
+    dispatchAreaLinks.map((link) => [`${link.source_type}::${link.source_id}`, link]),
+  ), [dispatchAreaLinks]);
+
+  const areaMap = useMemo(() => new Map(dispatchAreas.map((area) => [area.id, area])), [dispatchAreas]);
+
+  const allDispatchStops = useMemo<DispatchPlanningStop[]>(() => {
+    const deliveries = deliveryOrders.map((order) => {
+      const sourceId = order.company_id || order.id;
+      const link = areaLinkMap.get(`company::${sourceId}`);
+      const area = link ? areaMap.get(link.area_id) : null;
+      return {
+        key: `delivery::${order.id}`,
+        type: "delivery" as const,
+        entityId: order.id,
+        sourceType: "company" as const,
+        sourceId,
+        reference: order.order_number,
+        label: order.companyName,
+        address: link?.address_override || order.companyAddress || null,
+        urgency: order.urgency,
+        scheduledFor: order.fulfillment_scheduled_for,
+        assigneeId: order.fulfillment_assigned_to,
+        areaId: link?.area_id || null,
+        areaName: area?.name || null,
+        areaSortOrder: area?.sort_order ?? 9999,
+      };
+    });
+    const collections = collectionQueue.map((po) => {
+      const sourceId = po.vendorId || po.purchaseOrderId;
+      const link = areaLinkMap.get(`vendor::${sourceId}`);
+      const area = link ? areaMap.get(link.area_id) : null;
+      const raw = po as any;
+      const rawAddress = raw.vendorAddress || raw.vendor_address || raw.shippingAddress || raw.shipping_address || null;
+      return {
+        key: `collection::${po.purchaseOrderId}`,
+        type: "collection" as const,
+        entityId: po.purchaseOrderId,
+        sourceType: "vendor" as const,
+        sourceId,
+        reference: po.purchaseOrderNumber,
+        label: po.vendorName,
+        address: link?.address_override || rawAddress || null,
+        urgency: po.state?.is_urgent ? "urgent" : "normal",
+        scheduledFor: po.state?.scheduled_for || po.expectedDeliveryDate || null,
+        assigneeId: po.state?.assigned_to || null,
+        areaId: link?.area_id || null,
+        areaName: area?.name || null,
+        areaSortOrder: area?.sort_order ?? 9999,
+      };
+    });
+    return [...deliveries, ...collections];
+  }, [deliveryOrders, collectionQueue, areaLinkMap, areaMap]);
+
+  const selectedDispatchStops = useMemo(() => allDispatchStops.filter((stop) =>
+    stop.type === "delivery" ? deliverySelection.has(stop.entityId) : collectionSelection.has(stop.entityId)
+  ), [allDispatchStops, deliverySelection, collectionSelection]);
+
+  const routePlanStops = useMemo(() => {
+    const proximityKey = (address: string | null) => String(address || "zzzz")
+      .toLowerCase()
+      .split(",")
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .slice(-3)
+      .reverse()
+      .join("|");
+    return [...selectedDispatchStops].sort((a, b) => {
+      const areaOrder = a.areaSortOrder - b.areaSortOrder;
+      if (areaOrder) return areaOrder;
+      const areaName = String(a.areaName || "zzzz").localeCompare(String(b.areaName || "zzzz"));
+      if (areaName) return areaName;
+      const proximity = proximityKey(a.address).localeCompare(proximityKey(b.address));
+      if (proximity) return proximity;
       const urgency = Number(b.urgency === "urgent") - Number(a.urgency === "urgent");
       if (urgency) return urgency;
-      return String(a.fulfillment_scheduled_for || "").localeCompare(String(b.fulfillment_scheduled_for || ""));
+      return String(a.scheduledFor || "").localeCompare(String(b.scheduledFor || ""));
     });
-  }, [deliveryOrders, deliverySelection]);
+  }, [selectedDispatchStops]);
 
   const routeMapUrl = useMemo(() => {
-    const addresses = routePlanOrders.map((order) => order.companyAddress).filter(Boolean) as string[];
+    const addresses = routePlanStops.map((stop) => stop.address).filter(Boolean) as string[];
     if (!addresses.length) return null;
     if (addresses.length === 1) return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addresses[0])}`;
     const origin = encodeURIComponent(addresses[0]);
     const destination = encodeURIComponent(addresses[addresses.length - 1]);
     const waypoints = addresses.slice(1, -1).map(encodeURIComponent).join("%7C");
     return `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}${waypoints ? `&waypoints=${waypoints}` : ""}&travelmode=driving`;
-  }, [routePlanOrders]);
+  }, [routePlanStops]);
+
+  const createDispatchArea = async () => {
+    const name = newAreaName.trim();
+    if (!name) return;
+    const { data, error } = await supabase.from("dispatch_areas").insert({ name, sort_order: dispatchAreas.length * 10 } as any).select("id,name,sort_order").single();
+    if (error) {
+      toast({ title: "Could not create area", description: error.message, variant: "destructive" });
+      return;
+    }
+    setDispatchAreas((current) => [...current, data as DispatchArea].sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name)));
+    setNewAreaName("");
+    toast({ title: "Dispatch area created", description: `${name} can now be reused for future stops.` });
+  };
+
+  const saveStopAreaLink = async (stop: DispatchPlanningStop, areaId: string, addressOverride?: string | null) => {
+    setAreaSavingKey(stop.key);
+    const existing = areaLinkMap.get(`${stop.sourceType}::${stop.sourceId}`);
+    const payload = {
+      source_type: stop.sourceType,
+      source_id: stop.sourceId,
+      area_id: areaId,
+      address_override: addressOverride === undefined ? existing?.address_override || null : (addressOverride?.trim() || null),
+    };
+    const { data, error } = await supabase.from("dispatch_area_links").upsert(payload as any, { onConflict: "source_type,source_id" }).select("id,source_type,source_id,area_id,address_override").single();
+    setAreaSavingKey(null);
+    if (error) {
+      toast({ title: "Area link failed", description: error.message, variant: "destructive" });
+      return;
+    }
+    const saved = data as DispatchAreaLink;
+    setDispatchAreaLinks((current) => [...current.filter((link) => !(link.source_type === saved.source_type && link.source_id === saved.source_id)), saved]);
+  };
+
+  useEffect(() => {
+    const openRequestedPlanner = () => {
+      if (window.sessionStorage.getItem("aleph:open-dispatch-planner") === "1") {
+        window.sessionStorage.removeItem("aleph:open-dispatch-planner");
+        setRoutePlannerOpen(true);
+      }
+    };
+    openRequestedPlanner();
+    const handler = () => setRoutePlannerOpen(true);
+    window.addEventListener("aleph:open-dispatch-planner", handler);
+    return () => window.removeEventListener("aleph:open-dispatch-planner", handler);
+  }, []);
 
   const saveOptimizedRoute = async () => {
-    if (!routePlanOrders.length || !user?.id) return;
+    if (!routePlanStops.length || !user?.id) return;
+    const unlinked = routePlanStops.filter((stop) => !stop.areaId);
+    if (unlinked.length) {
+      toast({ title: "Link every stop to an area first", description: `${unlinked.length} selected stop${unlinked.length === 1 ? " still needs" : "s still need"} an area. Once linked, future work for the same client or supplier is automatic.`, variant: "destructive" });
+      return;
+    }
     setRouteSaving(true);
     const scheduledAt = new Date(`${routeDate}T08:00:00`).toISOString();
     const driverId = bulkAssignee !== "keep" && bulkAssignee !== "unassigned"
       ? bulkAssignee
-      : routePlanOrders.every((order) => order.fulfillment_assigned_to === routePlanOrders[0]?.fulfillment_assigned_to)
-        ? routePlanOrders[0]?.fulfillment_assigned_to || null
+      : routePlanStops.every((stop) => stop.assigneeId === routePlanStops[0]?.assigneeId)
+        ? routePlanStops[0]?.assigneeId || null
         : null;
+    const deliveryStops = routePlanStops.filter((stop) => stop.type === "delivery");
+    const collectionStops = routePlanStops.filter((stop) => stop.type === "collection");
     const routePayload = {
-      name: routeName.trim() || `Delivery run · ${new Date(`${routeDate}T12:00:00`).toLocaleDateString("en-ZA", { day: "2-digit", month: "short" })}`,
+      name: routeName.trim() || `Dispatch run · ${new Date(`${routeDate}T12:00:00`).toLocaleDateString("en-ZA", { day: "2-digit", month: "short" })}`,
       route_date: routeDate,
       status: "ready",
       driver_id: driverId,
-      total_stops: routePlanOrders.length,
+      total_stops: routePlanStops.length,
       completed_stops: 0,
       map_url: routeMapUrl,
-      stops: routePlanOrders.map((order, index) => ({
+      stops: routePlanStops.map((stop, index) => ({
         sequence: index + 1,
-        orderId: order.id,
-        orderNumber: order.order_number,
-        client: order.companyName,
-        address: order.companyAddress,
-        urgency: order.urgency,
+        stopType: stop.type,
+        entityId: stop.entityId,
+        reference: stop.reference,
+        label: stop.label,
+        address: stop.address,
+        areaId: stop.areaId,
+        areaName: stop.areaName,
+        urgency: stop.urgency,
         completed: false,
       })),
+      notes: `${deliveryStops.length} deliveries · ${collectionStops.length} collections`,
       created_by: user.id,
     };
     try {
       if (!navigator.onLine) {
         queueOfflineOperation({ kind: "create-route", payload: routePayload });
-        routePlanOrders.forEach((order) => queueOfflineOperation({ kind: "update-order", payload: { orderId: order.id, patch: { fulfillment_status: "scheduled", fulfillment_scheduled_for: scheduledAt, ...(driverId ? { fulfillment_assigned_to: driverId } : {}) } } }));
+        deliveryStops.forEach((stop) => queueOfflineOperation({ kind: "update-order", payload: { orderId: stop.entityId, patch: { fulfillment_status: "scheduled", fulfillment_scheduled_for: scheduledAt, ...(driverId ? { fulfillment_assigned_to: driverId } : {}) } } }));
+        collectionStops.forEach((stop) => {
+          const po = collectionQueue.find((candidate) => candidate.purchaseOrderId === stop.entityId);
+          if (!po) return;
+          queueOfflineOperation({ kind: "upsert-collection", payload: {
+            purchase_order_id: po.purchaseOrderId,
+            purchase_order_number: po.purchaseOrderNumber,
+            vendor_id: po.vendorId || null,
+            vendor_name: po.vendorName || "Unknown supplier",
+            status: "scheduled",
+            scheduled_for: scheduledAt,
+            ...(driverId ? { assigned_to: driverId } : {}),
+          } });
+        });
       } else {
         const { data: route, error } = await supabase.from("dispatch_routes").insert(routePayload as any).select("id").single();
         if (error) throw error;
-        const orderPatch = { fulfillment_status: "scheduled", fulfillment_scheduled_for: scheduledAt, ...(driverId ? { fulfillment_assigned_to: driverId } : {}) };
-        const { error: orderError } = await supabase.from("orders").update(orderPatch as any).in("id", routePlanOrders.map((order) => order.id));
-        if (orderError) throw orderError;
-        await supabase.from("fulfillment_timeline_events").insert({ entity_type: "route", entity_id: route.id, event_type: "route_created", title: `Route created with ${routePlanOrders.length} stops`, metadata: { routeName: routePayload.name } } as any);
+        if (deliveryStops.length) {
+          const orderPatch = { fulfillment_status: "scheduled", fulfillment_scheduled_for: scheduledAt, ...(driverId ? { fulfillment_assigned_to: driverId } : {}) };
+          const { error: orderError } = await supabase.from("orders").update(orderPatch as any).in("id", deliveryStops.map((stop) => stop.entityId));
+          if (orderError) throw orderError;
+        }
+        if (collectionStops.length) {
+          const collectionPayloads = collectionStops.map((stop) => {
+            const po = collectionQueue.find((candidate) => candidate.purchaseOrderId === stop.entityId)!;
+            return {
+              purchase_order_id: po.purchaseOrderId,
+              purchase_order_number: po.purchaseOrderNumber,
+              vendor_id: po.vendorId || null,
+              vendor_name: po.vendorName || "Unknown supplier",
+              assigned_to: driverId || po.state?.assigned_to || null,
+              status: "scheduled",
+              scheduled_for: scheduledAt,
+              collection_method: po.state?.collection_method || "pickup",
+              is_urgent: Boolean(po.state?.is_urgent),
+              notes: po.state?.notes || null,
+              last_seen_at: new Date().toISOString(),
+            };
+          });
+          const { error: collectionError } = await supabase.from("po_collection_state").upsert(collectionPayloads as any, { onConflict: "purchase_order_id" });
+          if (collectionError) throw collectionError;
+        }
+        await supabase.from("fulfillment_timeline_events").insert({ entity_type: "route", entity_id: route.id, event_type: "route_created", title: `Dispatch run created with ${routePlanStops.length} stops`, metadata: { routeName: routePayload.name, deliveries: deliveryStops.length, collections: collectionStops.length } } as any);
       }
       setDeliveryOrders((current) => current.map((order) => deliverySelection.has(order.id) ? ({ ...order, fulfillment_status: "scheduled", fulfillment_scheduled_for: scheduledAt, ...(driverId ? { fulfillment_assigned_to: driverId } : {}) } as FulfillmentOrder) : order));
-      toast({ title: navigator.onLine ? "Optimized route saved" : "Route saved offline", description: `${routePlanOrders.length} stops grouped by delivery area, priority and schedule.` });
+      setCollectionStates((current) => current.map((state) => collectionSelection.has(state.purchase_order_id) ? ({ ...state, status: "scheduled", scheduled_for: scheduledAt, ...(driverId ? { assigned_to: driverId } : {}) } as POCollectionState) : state));
+      toast({ title: navigator.onLine ? "Dispatch run saved" : "Dispatch run saved offline", description: `${deliveryStops.length} deliver${deliveryStops.length === 1 ? "y" : "ies"} and ${collectionStops.length} collection${collectionStops.length === 1 ? "" : "s"} grouped by learned area.` });
       setRoutePlannerOpen(false);
       setDeliverySelection(new Set());
+      setCollectionSelection(new Set());
       setRouteName("");
     } catch (error: any) {
       toast({ title: "Route could not be saved", description: error.message || "Please try again.", variant: "destructive" });
@@ -1134,18 +1346,17 @@ export default function FulfillmentPage() {
             <div className="grid grid-cols-4 gap-1 rounded-xl bg-muted/45 p-1">{(["all", "mine", "today", "late"] as FocusFilter[]).map((filter) => <button key={filter} onClick={() => setFocusFilter(filter)} className={cn("rounded-lg px-2.5 py-2 text-[10px] font-bold capitalize", focusFilter === filter ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>{filter}</button>)}</div>
             <div className="flex items-center gap-2 rounded-xl border border-border/60 px-3 py-1.5"><Switch checked={settings.auto_assign_enabled} onCheckedChange={(checked) => void saveSettings({ auto_assign_enabled: checked })} /><div className="whitespace-nowrap"><p className="text-[10px] font-bold">Auto assign</p><p className="text-[9px] text-muted-foreground">Balance new work</p></div></div>
             {activeMode === "collection" && <Button variant="outline" className="h-10 rounded-xl" onClick={() => void autoAssignCollections()} disabled={assigning || !collectionQueue.length}><Sparkles className="mr-1.5 h-3.5 w-3.5" />{assigning ? "Assigning…" : "Balance"}</Button>}
+            <Button className="h-10 rounded-xl" onClick={() => setRoutePlannerOpen(true)}><Route className="mr-1.5 h-3.5 w-3.5" />Plan dispatch run</Button>
           </div>}
         </div>
       </section>
 
-      {activeMode === "delivery" && deliverySelection.size > 0 && (
+      {(deliverySelection.size + collectionSelection.size) > 0 && (
         <section className="flex flex-col gap-3 rounded-[24px] border border-primary/20 bg-primary/[0.045] p-3 shadow-sm lg:flex-row lg:items-center">
-          <div className="flex items-center gap-2 px-1"><Checkbox checked /><span className="text-sm font-bold">{deliverySelection.size} selected</span><button className="rounded-lg p-1 text-muted-foreground hover:bg-muted" onClick={() => setDeliverySelection(new Set())}><X className="h-3.5 w-3.5" /></button></div>
-          <div className="grid flex-1 gap-2 sm:grid-cols-[200px_minmax(220px,1fr)_auto_auto]">
-            <Select value={bulkAssignee} onValueChange={setBulkAssignee}><SelectTrigger className="h-10 rounded-xl bg-background"><SelectValue placeholder="Keep assignee" /></SelectTrigger><SelectContent><SelectItem value="keep">Keep current assignee</SelectItem><SelectItem value="unassigned">Remove assignee</SelectItem>{team.map((member) => <SelectItem key={member.id} value={member.id}>{member.full_name || member.email || "Team member"}</SelectItem>)}</SelectContent></Select>
-            <Input type="datetime-local" className="h-10 rounded-xl bg-background" value={bulkSchedule} onChange={(event) => setBulkSchedule(event.target.value)} />
-            <Button className="h-10 rounded-xl" onClick={() => void applyBulkDeliveryPlan()} disabled={bulkSaving || (bulkAssignee === "keep" && !bulkSchedule)}>{bulkSaving ? <RefreshCw className="mr-1.5 h-4 w-4 animate-spin" /> : <Route className="mr-1.5 h-4 w-4" />}Plan selected</Button>
-            <Button variant="secondary" className="h-10 rounded-xl" onClick={() => setRoutePlannerOpen(true)}><WandSparkles className="mr-1.5 h-4 w-4" />Optimize route</Button>
+          <div className="flex flex-wrap items-center gap-2 px-1"><Checkbox checked /><span className="text-sm font-bold">{deliverySelection.size + collectionSelection.size} dispatch stops selected</span>{deliverySelection.size > 0 && <Badge variant="outline" className="rounded-full bg-cyan-500/10 text-cyan-700">{deliverySelection.size} delivery</Badge>}{collectionSelection.size > 0 && <Badge variant="outline" className="rounded-full bg-violet-500/10 text-violet-700">{collectionSelection.size} collection</Badge>}<button className="rounded-lg p-1 text-muted-foreground hover:bg-muted" onClick={() => { setDeliverySelection(new Set()); setCollectionSelection(new Set()); }}><X className="h-3.5 w-3.5" /></button></div>
+          <div className="flex flex-1 flex-wrap justify-end gap-2">
+            {activeMode === "delivery" && deliverySelection.size > 0 && <Button variant="outline" className="h-10 rounded-xl" onClick={() => void applyBulkDeliveryPlan()} disabled={bulkSaving || (bulkAssignee === "keep" && !bulkSchedule)}><Route className="mr-1.5 h-4 w-4" />Quick schedule deliveries</Button>}
+            <Button className="h-10 rounded-xl" onClick={() => setRoutePlannerOpen(true)}><WandSparkles className="mr-1.5 h-4 w-4" />Plan mixed dispatch run</Button>
           </div>
         </section>
       )}
@@ -1168,34 +1379,57 @@ export default function FulfillmentPage() {
         )
       ) : collectionFiltered.length === 0 ? <EmptyState icon={Warehouse} title="No collections match this view" body="Open Zoho purchase orders appear automatically. Try All if a focus filter is active." /> : (
         <div className="fulfillment-board-grid grid min-w-0 gap-4 xl:grid-cols-3">
-          {collectionLanes.map((lane) => <DispatchLane key={lane.id} label={lane.label} hint={lane.hint} icon={lane.icon} count={lane.items.length} tone={lane.id === "collecting" ? "route" : lane.id === "scheduled" ? "planned" : "ready"}>{lane.items.map((po) => <CollectionDispatchCard key={po.purchaseOrderId} po={po} memberName={memberName} onToggleUrgent={() => void updateCollectionState(po, { is_urgent: !po.state?.is_urgent })} onOpen={() => setSelectedCollectionId(po.purchaseOrderId)} onClaim={() => void updateCollectionState(po, { assigned_to: user?.id || null })} onAdvance={() => po.state?.status === "scheduled" || po.state?.status === "pending" ? void updateCollectionState(po, { status: "collecting" }) : setSelectedCollectionId(po.purchaseOrderId)} />)}</DispatchLane>)}
+          {collectionLanes.map((lane) => <DispatchLane key={lane.id} label={lane.label} hint={lane.hint} icon={lane.icon} count={lane.items.length} tone={lane.id === "collecting" ? "route" : lane.id === "scheduled" ? "planned" : "ready"}>{lane.items.map((po) => <CollectionDispatchCard key={po.purchaseOrderId} po={po} memberName={memberName} selected={collectionSelection.has(po.purchaseOrderId)} onToggle={() => toggleCollectionSelection(po.purchaseOrderId)} onToggleUrgent={() => void updateCollectionState(po, { is_urgent: !po.state?.is_urgent })} onOpen={() => setSelectedCollectionId(po.purchaseOrderId)} onClaim={() => void updateCollectionState(po, { assigned_to: user?.id || null })} onAdvance={() => po.state?.status === "scheduled" || po.state?.status === "pending" ? void updateCollectionState(po, { status: "collecting" }) : setSelectedCollectionId(po.purchaseOrderId)} />)}</DispatchLane>)}
         </div>
       )}
 
       <Sheet open={routePlannerOpen} onOpenChange={setRoutePlannerOpen}>
-        <SheetContent className="w-full overflow-y-auto p-0 sm:max-w-2xl">
-          <div className="border-b border-border/60 bg-gradient-to-br from-primary/12 via-background to-cyan-500/10 p-6 pt-9">
+        <SheetContent className="w-full overflow-y-auto p-0 sm:max-w-3xl">
+          <div className="border-b border-border/60 bg-gradient-to-br from-primary/12 via-background to-violet-500/10 p-6 pt-9">
             <SheetHeader>
-              <div className="flex items-center gap-2"><Badge className="rounded-full"><WandSparkles className="mr-1 h-3 w-3" />Smart route</Badge>{!navigator.onLine && <Badge variant="outline" className="rounded-full"><WifiOff className="mr-1 h-3 w-3" />Saves offline</Badge>}</div>
-              <SheetTitle className="mt-3 text-left text-2xl font-black tracking-tight">Turn selected stops into one dispatch run</SheetTitle>
+              <div className="flex flex-wrap items-center gap-2"><Badge className="rounded-full"><WandSparkles className="mr-1 h-3 w-3" />Mixed dispatch planner</Badge><Badge variant="outline" className="rounded-full bg-cyan-500/10 text-cyan-700">Delivery</Badge><Badge variant="outline" className="rounded-full bg-violet-500/10 text-violet-700">Collection</Badge>{!navigator.onLine && <Badge variant="outline" className="rounded-full"><WifiOff className="mr-1 h-3 w-3" />Saves offline</Badge>}</div>
+              <SheetTitle className="mt-3 text-left text-2xl font-black tracking-tight">Build one run from deliveries and collections</SheetTitle>
             </SheetHeader>
-            <p className="mt-2 max-w-xl text-sm text-muted-foreground">Stops are grouped by address, urgency and promised time. Open the route in Maps, then save it so every user sees the same live plan.</p>
+            <p className="mt-2 max-w-2xl text-sm text-muted-foreground">The first time a client or supplier appears, link it to a dispatch area. That area is remembered permanently, so future deliveries and collections are grouped automatically before the route is built.</p>
           </div>
           <div className="space-y-6 p-5 sm:p-6">
             <section className="grid gap-3 sm:grid-cols-2">
-              <Field label="Route name" icon={Route}><Input value={routeName} onChange={(event) => setRouteName(event.target.value)} placeholder="Morning Johannesburg run" className="rounded-xl" /></Field>
+              <Field label="Route name" icon={Route}><Input value={routeName} onChange={(event) => setRouteName(event.target.value)} placeholder="East Rand morning run" className="rounded-xl" /></Field>
               <Field label="Route date" icon={CalendarDays}><Input type="date" value={routeDate} onChange={(event) => setRouteDate(event.target.value)} className="rounded-xl" /></Field>
             </section>
             <Field label="Driver" icon={UserRound}>
-              <Select value={bulkAssignee} onValueChange={setBulkAssignee}><SelectTrigger className="rounded-xl"><SelectValue placeholder="Choose a driver" /></SelectTrigger><SelectContent><SelectItem value="keep">Keep each current driver</SelectItem><SelectItem value="unassigned">Leave unassigned</SelectItem>{team.map((member) => <SelectItem key={member.id} value={member.id}>{member.full_name || member.email || "Team member"}</SelectItem>)}</SelectContent></Select>
+              <Select value={bulkAssignee} onValueChange={setBulkAssignee}><SelectTrigger className="rounded-xl"><SelectValue placeholder="Choose a driver" /></SelectTrigger><SelectContent><SelectItem value="keep">Keep current owners when identical</SelectItem><SelectItem value="unassigned">Leave unassigned</SelectItem>{team.map((member) => <SelectItem key={member.id} value={member.id}>{member.full_name || member.email || "Team member"}</SelectItem>)}</SelectContent></Select>
             </Field>
+
+            <section className="rounded-3xl border border-border/60 bg-muted/20 p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                <div><p className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">1 · Select stops</p><p className="mt-1 text-xs text-muted-foreground">Choose any mixture of customer deliveries and supplier collections.</p></div>
+                <div className="flex gap-2"><Badge variant="secondary" className="rounded-full">{deliverySelection.size} deliveries</Badge><Badge variant="secondary" className="rounded-full">{collectionSelection.size} collections</Badge></div>
+              </div>
+              <div className="mt-4 grid gap-2 md:grid-cols-2">
+                {allDispatchStops.map((stop) => {
+                  const selected = stop.type === "delivery" ? deliverySelection.has(stop.entityId) : collectionSelection.has(stop.entityId);
+                  return <button type="button" key={stop.key} onClick={() => stop.type === "delivery" ? toggleDeliverySelection(stop.entityId) : toggleCollectionSelection(stop.entityId)} className={cn("flex items-start gap-3 rounded-2xl border p-3 text-left transition-all", selected ? "border-primary/30 bg-primary/[0.07] shadow-sm" : "border-border/55 bg-background/70 hover:border-primary/20 hover:bg-muted/35")}><Checkbox checked={selected} className="mt-0.5" /><span className={cn("mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-xl", stop.type === "delivery" ? "bg-cyan-500/12 text-cyan-700" : "bg-violet-500/12 text-violet-700")}>{stop.type === "delivery" ? <Truck className="h-4 w-4" /> : <Warehouse className="h-4 w-4" />}</span><span className="min-w-0 flex-1"><span className="flex flex-wrap items-center gap-1.5"><strong className="text-xs">{stop.reference}</strong><Badge variant="outline" className={cn("h-5 px-1.5 text-[8px] font-black uppercase", stop.type === "delivery" ? "border-cyan-500/25 text-cyan-700" : "border-violet-500/25 text-violet-700")}>{stop.type}</Badge>{stop.areaName && <Badge variant="secondary" className="h-5 px-1.5 text-[8px]">{stop.areaName}</Badge>}</span><span className="mt-0.5 block truncate text-[11px] font-semibold">{stop.label}</span><span className="mt-1 block truncate text-[9px] text-muted-foreground">{stop.address || "No navigation address saved yet"}</span></span></button>;
+                })}
+              </div>
+              {!allDispatchStops.length && <p className="mt-4 rounded-2xl border border-dashed border-border/70 p-6 text-center text-xs text-muted-foreground">No active deliveries or collections are available to dispatch.</p>}
+            </section>
+
+            <section className="rounded-3xl border border-border/60 bg-background p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">2 · Teach the area once</p><p className="mt-1 text-xs text-muted-foreground">Area links are saved against the client or supplier, not this individual order.</p></div><div className="flex min-w-0 gap-2 sm:w-[320px]"><Input value={newAreaName} onChange={(event) => setNewAreaName(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void createDispatchArea(); } }} placeholder="New area, e.g. Jet Park" className="h-9 rounded-xl" /><Button variant="outline" className="h-9 rounded-xl" disabled={!newAreaName.trim()} onClick={() => void createDispatchArea()}>Add</Button></div></div>
+              <div className="mt-4 space-y-2">
+                {selectedDispatchStops.map((stop) => <div key={`area-${stop.key}`} className={cn("grid gap-2 rounded-2xl border p-3 sm:grid-cols-[minmax(0,1fr)_180px_minmax(180px,1fr)] sm:items-center", stop.areaId ? "border-border/55 bg-muted/20" : "border-amber-500/30 bg-amber-500/[0.06]")}><div className="min-w-0"><div className="flex flex-wrap items-center gap-1.5"><Badge variant="outline" className={cn("h-5 text-[8px] uppercase", stop.type === "delivery" ? "border-cyan-500/30 text-cyan-700" : "border-violet-500/30 text-violet-700")}>{stop.type}</Badge><strong className="text-xs">{stop.reference}</strong>{!stop.areaId && <Badge variant="destructive" className="h-5 text-[8px]">Area required</Badge>}</div><p className="mt-0.5 truncate text-[10px] text-muted-foreground">{stop.label}</p></div><Select value={stop.areaId || "unlinked"} onValueChange={(value) => value !== "unlinked" && void saveStopAreaLink(stop, value)} disabled={areaSavingKey === stop.key}><SelectTrigger className="h-9 rounded-xl bg-background"><SelectValue placeholder="Choose area" /></SelectTrigger><SelectContent><SelectItem value="unlinked" disabled>Choose area</SelectItem>{dispatchAreas.map((area) => <SelectItem key={area.id} value={area.id}>{area.name}</SelectItem>)}</SelectContent></Select><Input key={`${stop.key}-${stop.address || "empty"}`} defaultValue={stop.address || ""} disabled={!stop.areaId || areaSavingKey === stop.key} onBlur={(event) => stop.areaId && void saveStopAreaLink(stop, stop.areaId, event.target.value)} placeholder={stop.type === "collection" ? "Supplier pickup address" : "Navigation address override"} className="h-9 rounded-xl bg-background text-xs" /></div>)}
+                {!selectedDispatchStops.length && <p className="rounded-2xl bg-muted/30 px-4 py-6 text-center text-xs text-muted-foreground">Select stops above to link their areas.</p>}
+              </div>
+            </section>
+
             <section>
-              <div className="mb-3 flex items-end justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">Suggested stop order</p><p className="mt-1 text-xs text-muted-foreground">{routePlanOrders.length} selected stops · priority work is moved forward</p></div><Badge variant="secondary" className="rounded-full">{routePlanOrders.filter((order) => !order.companyAddress).length} missing addresses</Badge></div>
-              <div className="space-y-2">{routePlanOrders.map((order, index) => <div key={order.id} className="grid grid-cols-[38px_minmax(0,1fr)] gap-3 rounded-2xl border border-border/55 bg-muted/25 p-3"><span className="grid h-9 w-9 place-items-center rounded-xl bg-primary text-sm font-black text-primary-foreground">{index + 1}</span><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="font-black text-primary">{order.order_number}</p>{order.urgency === "urgent" && <Badge variant="destructive" className="h-5 text-[9px]">Urgent</Badge>}</div><p className="truncate text-xs font-semibold">{order.companyName}</p><p className={cn("mt-1 flex items-center gap-1 text-[10px]", order.companyAddress ? "text-muted-foreground" : "font-bold text-amber-600")}><MapPin className="h-3 w-3 shrink-0" />{order.companyAddress || "Add a company address before navigation"}</p></div></div>)}</div>
+              <div className="mb-3 flex flex-wrap items-end justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">3 · Suggested stop order</p><p className="mt-1 text-xs text-muted-foreground">{routePlanStops.length} selected stops · grouped by learned area, then nearby address text and urgency.</p></div><div className="flex gap-2"><Badge variant={routePlanStops.some((stop) => !stop.areaId) ? "destructive" : "secondary"} className="rounded-full">{routePlanStops.filter((stop) => !stop.areaId).length} unlinked</Badge><Badge variant="secondary" className="rounded-full">{routePlanStops.filter((stop) => !stop.address).length} missing addresses</Badge></div></div>
+              <div className="space-y-2">{routePlanStops.map((stop, index) => <div key={stop.key} className="grid grid-cols-[38px_minmax(0,1fr)] gap-3 rounded-2xl border border-border/55 bg-muted/25 p-3"><span className="grid h-9 w-9 place-items-center rounded-xl bg-primary text-sm font-black text-primary-foreground">{index + 1}</span><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="font-black text-primary">{stop.reference}</p><Badge variant="outline" className={cn("h-5 text-[8px] font-black uppercase", stop.type === "delivery" ? "border-cyan-500/30 text-cyan-700" : "border-violet-500/30 text-violet-700")}>{stop.type}</Badge>{stop.areaName && <Badge variant="secondary" className="h-5 text-[8px]">{stop.areaName}</Badge>}{stop.urgency === "urgent" && <Badge variant="destructive" className="h-5 text-[9px]">Urgent</Badge>}</div><p className="truncate text-xs font-semibold">{stop.label}</p><p className={cn("mt-1 flex items-center gap-1 text-[10px]", stop.address ? "text-muted-foreground" : "font-bold text-amber-600")}><MapPin className="h-3 w-3 shrink-0" />{stop.address || "Add a navigation address above"}</p></div></div>)}</div>
             </section>
             <div className="flex flex-col gap-2 border-t border-border/60 pt-4 sm:flex-row">
               <Button variant="outline" className="rounded-xl" disabled={!routeMapUrl} onClick={() => routeMapUrl && window.open(routeMapUrl, "_blank", "noopener,noreferrer")}><MapPinned className="mr-1.5 h-4 w-4" />Preview in Maps</Button>
-              <Button className="flex-1 rounded-xl" disabled={routeSaving || !routePlanOrders.length || !routeName.trim()} onClick={() => void saveOptimizedRoute()}>{routeSaving ? <RefreshCw className="mr-1.5 h-4 w-4 animate-spin" /> : <Navigation className="mr-1.5 h-4 w-4" />}{routeSaving ? "Saving route…" : "Save and schedule route"}</Button>
+              <Button className="flex-1 rounded-xl" disabled={routeSaving || !routePlanStops.length || routePlanStops.some((stop) => !stop.areaId)} onClick={() => void saveOptimizedRoute()}>{routeSaving ? <RefreshCw className="mr-1.5 h-4 w-4 animate-spin" /> : <Navigation className="mr-1.5 h-4 w-4" />}{routeSaving ? "Saving route…" : `Save run · ${routePlanStops.length} stops`}</Button>
             </div>
           </div>
         </SheetContent>
@@ -1285,12 +1519,12 @@ function DeliveryDispatchCard({ order, memberName, selected, onToggle, onToggleU
   );
 }
 
-function CollectionDispatchCard({ po, memberName, onToggleUrgent, onOpen, onClaim, onAdvance }: { po: CollectionPOView; memberName: (id: string | null | undefined) => string; onToggleUrgent: () => void; onOpen: () => void; onClaim: () => void; onAdvance: () => void }) {
+function CollectionDispatchCard({ po, memberName, selected, onToggle, onToggleUrgent, onOpen, onClaim, onAdvance }: { po: CollectionPOView; memberName: (id: string | null | undefined) => string; selected: boolean; onToggle: () => void; onToggleUrgent: () => void; onOpen: () => void; onClaim: () => void; onAdvance: () => void }) {
   const overdue = isOverdue(po.state?.scheduled_for || po.expectedDeliveryDate);
   const status = po.state?.status || "pending";
   return (
-    <article onClick={onOpen} className={cn("group cursor-pointer rounded-[22px] border border-border/55 bg-background/82 p-3.5 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-lg", po.state?.is_urgent && "border-l-4 border-l-destructive")}>
-      <div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="flex flex-wrap items-center gap-1.5"><h3 className="font-black text-primary">{po.purchaseOrderNumber}</h3>{po.state?.is_urgent && <Badge variant="destructive" className="h-5 text-[9px]">Urgent</Badge>}{overdue && <Badge variant="destructive" className="h-5 text-[9px]">Late</Badge>}</div><p className="mt-1 truncate text-sm font-semibold">{po.vendorName}</p><div className="mt-1 flex flex-wrap items-center gap-1.5"><p className="text-[10px] text-muted-foreground">PO {po.date || "date unknown"}</p><Badge variant="outline" className="h-5 px-1.5 text-[8px]">{po.state?.collection_method === "supplier-delivery" ? "Supplier delivery" : "Our pickup"}</Badge></div></div><ChevronRight className="mt-1 h-4 w-4 text-muted-foreground/25 transition-transform group-hover:translate-x-0.5 group-hover:text-primary" /></div>
+    <article onClick={onOpen} className={cn("group cursor-pointer rounded-[22px] border bg-background/82 p-3.5 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-lg", selected ? "border-violet-500/40 ring-2 ring-violet-500/10" : "border-border/55", po.state?.is_urgent && "border-l-4 border-l-destructive")}>
+      <div className="flex items-start gap-3"><span onClick={(event) => { event.stopPropagation(); onToggle(); }} className="pt-0.5"><Checkbox checked={selected} /></span><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-1.5"><h3 className="font-black text-primary">{po.purchaseOrderNumber}</h3><Badge variant="outline" className="h-5 border-violet-500/25 bg-violet-500/10 px-1.5 text-[8px] font-black uppercase text-violet-700">Collection</Badge>{po.state?.is_urgent && <Badge variant="destructive" className="h-5 text-[9px]">Urgent</Badge>}{overdue && <Badge variant="destructive" className="h-5 text-[9px]">Late</Badge>}</div><p className="mt-1 truncate text-sm font-semibold">{po.vendorName}</p><div className="mt-1 flex flex-wrap items-center gap-1.5"><p className="text-[10px] text-muted-foreground">PO {po.date || "date unknown"}</p><Badge variant="outline" className="h-5 px-1.5 text-[8px]">{po.state?.collection_method === "supplier-delivery" ? "Supplier delivery" : "Our pickup"}</Badge></div></div><ChevronRight className="mt-1 h-4 w-4 text-muted-foreground/25 transition-transform group-hover:translate-x-0.5 group-hover:text-primary" /></div>
       <div className="mt-3 flex items-end justify-between rounded-2xl bg-gradient-to-r from-violet-500/10 to-primary/5 p-3"><div><p className="text-2xl font-black">{po.remainingUnits}</p><p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">units left to collect</p></div><div className="text-right"><p className="text-xs font-bold">{formatMoneySafe(po.outstandingValue)}</p><p className="text-[9px] text-muted-foreground">open value</p></div></div>
       <div className="mt-3 space-y-1.5 text-[10px] text-muted-foreground"><p className="flex items-center gap-1.5"><UserRound className="h-3 w-3" /><span className={cn(!po.state?.assigned_to && "font-semibold text-amber-600")}>{memberName(po.state?.assigned_to)}</span></p><p className={cn("flex items-center gap-1.5", overdue && "font-semibold text-destructive")}><CalendarClock className="h-3 w-3" />{po.state?.scheduled_for ? `${overdue ? "Late · " : ""}${formatWhen(po.state.scheduled_for)}` : po.expectedDeliveryDate ? `Expected ${po.expectedDeliveryDate}` : "Not scheduled"}</p>{po.collectedUnits > 0 && <p className="flex items-center gap-1.5 font-semibold text-emerald-600"><Archive className="h-3 w-3" />{po.collectedUnits} units collected before</p>}</div>
       <div className="mt-3 flex gap-2 border-t border-border/50 pt-3"><Button variant="ghost" size="sm" aria-label={po.state?.is_urgent ? "Remove urgent priority" : "Mark urgent"} className={cn("h-8 rounded-xl px-2.5 text-[10px]", po.state?.is_urgent && "bg-destructive/10 text-destructive hover:bg-destructive/15 hover:text-destructive")} onClick={(event) => { event.stopPropagation(); onToggleUrgent(); }}><CircleAlert className="mr-1 h-3 w-3" />Urgent</Button>{!po.state?.assigned_to && <Button variant="outline" size="sm" className="h-8 rounded-xl px-2.5 text-[10px]" onClick={(event) => { event.stopPropagation(); onClaim(); }}><UserCheck className="mr-1 h-3 w-3" />Claim</Button>}<Button size="sm" className="ml-auto h-8 rounded-xl px-3 text-[10px]" onClick={(event) => { event.stopPropagation(); onAdvance(); }}>{status === "collecting" ? "Record quantities" : po.state?.collection_method === "supplier-delivery" ? "Receive delivery" : "Start pickup"}<ArrowRight className="ml-1 h-3 w-3" /></Button></div>
