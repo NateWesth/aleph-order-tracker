@@ -31,6 +31,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 import type { BuyingSheetRow, SuggestedRestockRow, ZohoStockData, SortField, SortDirection, PriorityFilter, ViewMode, ViewDensity, RecentlyOrderedItem } from "./buying-sheet/types";
+import ProcurementIntelligenceStrip from "./buying-sheet/ProcurementIntelligenceStrip";
 import { getPriorityLevel, NOTES_KEY, SNAPSHOT_KEY, loadNotes, saveNotes, loadPinned, savePinned, loadDensity, saveDensity, loadRecentlyOrdered, saveRecentlyOrdered } from "./buying-sheet/types";
 import { BuyingSheetSummary } from "./buying-sheet/BuyingSheetSummary";
 import { SupplierCardsView } from "./buying-sheet/SupplierCardsView";
@@ -1175,6 +1176,7 @@ export default function BuyingSheetPage() {
   return (
     <TooltipProvider>
       <div className={`procurement-page aleph-page-workspace aleph-buying-workspace app-no-x-scroll min-w-0 w-full max-w-full space-y-5 overflow-x-hidden ${isFullscreen ? "fixed inset-0 z-[100] h-[100dvh] bg-background p-3 sm:p-5 overflow-y-auto overflow-x-hidden overscroll-contain" : ""}`} ref={printRef}>
+        <ProcurementIntelligenceStrip rows={filteredRows} />
         {/* ── Sticky Header ── */}
         <div className="sticky top-0 z-20 -mx-1 px-1 pb-3 bg-background/88 backdrop-blur-xl supports-[backdrop-filter]:bg-background/72">
           <div className="procurement-command-center rounded-[24px] border border-border/60 bg-card/92 shadow-xl shadow-black/[0.04] overflow-hidden mb-3">
