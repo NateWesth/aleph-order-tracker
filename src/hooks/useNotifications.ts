@@ -12,6 +12,7 @@ export interface Notification {
   order_number: string | null;
   read: boolean;
   created_at: string;
+  metadata?: Record<string, any> | null;
 }
 
 export function useNotifications() {

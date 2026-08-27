@@ -147,6 +147,15 @@ export default function AIInsightsPanel() {
     }
   };
 
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const prompt = String((event as CustomEvent<string>).detail || "").trim();
+      if (prompt) void sendMessage(prompt);
+    };
+    window.addEventListener("aleph:ai-prompt", handler);
+    return () => window.removeEventListener("aleph:ai-prompt", handler);
+  }, [isLoading]);
+
   return (
     <div className="bg-card border border-border/70 rounded-2xl flex flex-col h-[min(540px,calc(100dvh-7rem))] sm:h-[min(620px,calc(100dvh-7rem))] overflow-hidden shadow-2xl">
       {/* Header */}

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from "@/components/ui/command";
-import { Package, History, Building2, Truck, FileText, Box, Users, BarChart3, Settings, Home, LogOut, Mic, ShoppingCart, Warehouse, Percent, Hash, Loader2 } from "lucide-react";
+import { Package, History, Building2, Truck, FileText, Box, Users, BarChart3, Settings, Home, LogOut, Mic, ShoppingCart, Warehouse, Percent, Hash, Loader2, UserRoundCheck, Radar } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 interface CommandPaletteProps {
@@ -12,7 +12,9 @@ interface CommandPaletteProps {
 }
 
 const NAVIGATION_ITEMS = [
-  { id: "home", label: "Home Dashboard", icon: Home, keywords: "home dashboard welcome" },
+  { id: "home", label: "Today · Operations Brief", icon: Home, keywords: "home today morning brief operations attention" },
+  { id: "my-work", label: "My Work", icon: UserRoundCheck, keywords: "assigned to me personal work tasks deliveries collections" },
+  { id: "control-tower", label: "Control Tower", icon: Radar, keywords: "control tower exceptions routes dispatch team map" },
   { id: "orders", label: "Orders Board", icon: Package, keywords: "orders board kanban active" },
   { id: "fulfillment", label: "Delivery & Collection", icon: Warehouse, keywords: "delivery collection fulfillment dispatch pickup" },
   { id: "history", label: "Order History", icon: History, keywords: "history completed delivered past" },

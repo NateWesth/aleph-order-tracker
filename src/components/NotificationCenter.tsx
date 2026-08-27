@@ -8,6 +8,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { useNotifications, Notification } from '@/hooks/useNotifications';
 import { formatDistanceToNow } from 'date-fns';
+import { supabase } from '@/integrations/supabase/client';
 
 interface NotificationCenterProps {
   onNavigateToOrder?: (orderId: string) => void;
@@ -18,6 +19,8 @@ const typeConfig: Record<string, { icon: typeof Package; color: string }> = {
   order_status_changed: { icon: ArrowRightLeft, color: 'text-blue-500' },
   order_update_message: { icon: MessageCircle, color: 'text-amber-500' },
   order_assigned: { icon: UserCog, color: 'text-primary' },
+  fulfillment_assigned: { icon: UserCog, color: 'text-cyan-500' },
+  fulfillment_unassigned: { icon: UserCog, color: 'text-muted-foreground' },
   item_comment: { icon: MessageCircle, color: 'text-blue-500' },
   entity_comment: { icon: MessageCircle, color: 'text-blue-500' },
   comment_reply: { icon: Reply, color: 'text-blue-500' },
@@ -39,12 +42,30 @@ function NotificationItem({
 
   const timeAgo = formatDistanceToNow(new Date(notification.created_at), { addSuffix: true });
 
+  const openTarget = () => {
+    if (!notification.read) onRead(notification.id);
+    if (notification.order_id && onNavigate) onNavigate(notification.order_id);
+    else if (notification.metadata?.kind === "collection") {
+      window.dispatchEvent(new CustomEvent("setActiveView", { detail: "fulfillment" }));
+      window.setTimeout(() => window.dispatchEvent(new CustomEvent("aleph:open-collection", { detail: notification.metadata?.purchase_order_id })), 60);
+    }
+  };
+
+  const releaseAssignment = async (event: React.MouseEvent) => {
+    event.stopPropagation();
+    if (notification.metadata?.kind === "delivery" && notification.order_id) {
+      await supabase.from("orders").update({ fulfillment_assigned_to: null } as any).eq("id", notification.order_id);
+    } else if (notification.metadata?.kind === "collection" && notification.metadata?.purchase_order_id) {
+      await (supabase as any).from("po_collection_state").update({ assigned_to: null }).eq("purchase_order_id", notification.metadata.purchase_order_id);
+    }
+    onRead(notification.id);
+  };
+
   return (
-    <button
-      onClick={() => {
-        if (!notification.read) onRead(notification.id);
-        if (notification.order_id && onNavigate) onNavigate(notification.order_id);
-      }}
+    <div
+      role="button" tabIndex={0}
+      onClick={openTarget}
+      onKeyDown={(e) => { if (e.key === "Enter") openTarget(); }}
       className={cn(
         "w-full flex items-start gap-3 p-3 text-left transition-colors rounded-lg",
         "hover:bg-muted/60",
@@ -68,8 +89,14 @@ function NotificationItem({
         </div>
         <p className="text-xs text-muted-foreground line-clamp-2">{notification.message}</p>
         <p className="text-[11px] text-muted-foreground/70">{timeAgo}</p>
+        {notification.type === "fulfillment_assigned" && (
+          <div className="mt-2 flex gap-2">
+            <Button size="sm" className="h-7 rounded-lg px-2 text-[10px]" onClick={(e) => { e.stopPropagation(); openTarget(); }}>Open</Button>
+            <Button size="sm" variant="outline" className="h-7 rounded-lg px-2 text-[10px]" onClick={releaseAssignment}>Release</Button>
+          </div>
+        )}
       </div>
-    </button>
+    </div>
   );
 }
 
