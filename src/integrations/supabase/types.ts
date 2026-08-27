@@ -871,6 +871,50 @@ export type Database = {
           },
         ]
       }
+      operational_rules: {
+        Row: {
+          action_type: string
+          configuration: Json
+          created_at: string
+          created_by: string | null
+          enabled: boolean
+          id: string
+          name: string
+          trigger_type: string
+          updated_at: string
+        }
+        Insert: {
+          action_type: string
+          configuration?: Json
+          created_at?: string
+          created_by?: string | null
+          enabled?: boolean
+          id?: string
+          name: string
+          trigger_type: string
+          updated_at?: string
+        }
+        Update: {
+          action_type?: string
+          configuration?: Json
+          created_at?: string
+          created_by?: string | null
+          enabled?: boolean
+          id?: string
+          name?: string
+          trigger_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "operational_rules_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       operational_saved_views: {
         Row: {
           configuration: Json
