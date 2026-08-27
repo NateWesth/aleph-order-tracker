@@ -3385,3 +3385,27 @@ html, body, .aleph-content-scroll { scrollbar-width: thin !important; }
     min-width: 0 !important;
   }
 }
+
+/* ─── Workspace density + operations polish ───────────────────────────── */
+html[data-density="compact"] .app-page-stage { --aleph-space-scale: .82; }
+html[data-density="compact"] .app-page-stage .p-6 { padding: 1rem; }
+html[data-density="compact"] .app-page-stage .p-5 { padding: .85rem; }
+html[data-density="compact"] .app-page-stage .gap-4 { gap: .75rem; }
+html[data-density="compact"] .app-page-stage .space-y-4 > :not([hidden]) ~ :not([hidden]) { margin-top: .75rem; }
+html[data-density="focus"] .aleph-workspace-rail,
+html[data-density="focus"] .activity-feed-sidebar { opacity: .18; transition: opacity .2s ease; }
+html[data-density="focus"] .aleph-workspace-rail:hover,
+html[data-density="focus"] .activity-feed-sidebar:hover { opacity: 1; }
+
+@keyframes aleph-complete-pop {
+  0% { transform: scale(.985); opacity: .75; }
+  55% { transform: scale(1.015); box-shadow: 0 0 0 8px hsl(var(--primary)/.07); }
+  100% { transform: scale(1); opacity: 1; box-shadow: none; }
+}
+.aleph-complete-pop { animation: aleph-complete-pop 520ms cubic-bezier(.22,1,.36,1); }
+
+@media (max-width: 640px) {
+  .app-page-stage { padding-left: .65rem !important; padding-right: .65rem !important; }
+  .app-page-stage .rounded-\[28px\] { border-radius: 1.25rem; }
+  .app-page-stage h1 { letter-spacing: -.025em; }
+}

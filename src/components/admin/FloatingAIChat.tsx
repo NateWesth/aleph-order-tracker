@@ -13,8 +13,14 @@ export default function FloatingAIChat() {
 
   useEffect(() => {
     const toggle = () => setOpen(value => !value);
+    const ask = (event: Event) => {
+      const prompt = String((event as CustomEvent<string>).detail || "").trim();
+      setOpen(true);
+      if (prompt) window.setTimeout(() => window.dispatchEvent(new CustomEvent("aleph:ai-prompt", { detail: prompt })), 80);
+    };
     window.addEventListener("aleph:toggle-ai", toggle);
-    return () => window.removeEventListener("aleph:toggle-ai", toggle);
+    window.addEventListener("aleph:ask-ai", ask);
+    return () => { window.removeEventListener("aleph:toggle-ai", toggle); window.removeEventListener("aleph:ask-ai", ask); };
   }, []);
 
   if (!mounted) return null;

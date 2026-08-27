@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Package, History, BarChart3, Settings, LogOut, Building2, Box, Users, Truck, FileText, Command, ShoppingCart, Percent, Sparkles, Bot, PanelLeftClose, PanelLeftOpen, Radar, Warehouse, MoreHorizontal, Home } from "lucide-react";
+import { Package, History, BarChart3, Settings, LogOut, Building2, Box, Users, Truck, FileText, Command, ShoppingCart, Percent, Sparkles, Bot, PanelLeftClose, PanelLeftOpen, Radar, Warehouse, MoreHorizontal, Home, ListFilter, UserRoundCheck } from "lucide-react";
 import ChangelogDialog, { hasUnreadChangelog } from "@/components/admin/ChangelogDialog";
 import KeyboardShortcutsDialog from "@/components/admin/KeyboardShortcutsDialog";
 import { playClick, playWhoosh } from "@/utils/ambientSounds";
@@ -25,6 +25,9 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useGlobalUnreadCount } from "@/hooks/useGlobalUnreadCount";
 import { cn } from "@/lib/utils";
 import { triggerHapticFeedback } from "@/utils/haptics";
+import OperationsHomePage from "@/components/admin/OperationsHomePage";
+import MyWorkPage from "@/components/admin/MyWorkPage";
+import { useWorkspaceDensity } from "@/hooks/useWorkspaceDensity";
 
 // Route-level splitting keeps the dashboard interactive while large workspaces
 // (buying, commission, analytics and AI) download only when opened.
@@ -75,7 +78,7 @@ const WORKSPACE_PREFETCHERS: Record<string, () => Promise<unknown>> = {
 
 const RAIL_STORAGE_KEY = "aleph:workspace-rail-expanded";
 const WORKSPACE_STORAGE_KEY = "aleph:last-workspace";
-const RESTORABLE_WORKSPACES = new Set(["home", "orders", "fulfillment", "history", "clients", "suppliers", "stats", "po-tracking", "buying-sheet", "items", "control-tower"]);
+const RESTORABLE_WORKSPACES = new Set(["home", "my-work", "orders", "fulfillment", "history", "clients", "suppliers", "stats", "po-tracking", "buying-sheet", "items", "control-tower"]);
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -100,6 +103,7 @@ const AdminDashboard = () => {
   });
   const [railQuery, setRailQuery] = useState("");
   const isMobile = useIsMobile();
+  const { density, cycleDensity } = useWorkspaceDensity();
   const headerRef = useRef<HTMLElement | null>(null);
   const contentScrollRef = useRef<HTMLElement | null>(null);
   const workspaceScrollPositions = useRef<Record<string, number>>({});
@@ -203,8 +207,10 @@ const AdminDashboard = () => {
       const view = String((event as CustomEvent<string>).detail || "").trim();
       if (view) setActiveView(view);
     };
+    const openCommand = () => setCommandOpen(true);
     window.addEventListener("setActiveView", handleSetActiveView);
-    return () => window.removeEventListener("setActiveView", handleSetActiveView);
+    window.addEventListener("aleph:open-command", openCommand);
+    return () => { window.removeEventListener("setActiveView", handleSetActiveView); window.removeEventListener("aleph:open-command", openCommand); };
   }, []);
 
   // Keyboard shortcuts: Cmd/Ctrl+K opens actions and Cmd/Ctrl+\ toggles the rail.
@@ -256,6 +262,8 @@ const AdminDashboard = () => {
   const canEditCommission = isAdmin || !!userProfile?.can_edit_commission;
 
   const navItems = [
+    { id: "home", label: "Today", icon: Home, badge: 0 },
+    { id: "my-work", label: "My Work", icon: UserRoundCheck, badge: 0 },
     { id: "orders", label: "Orders", icon: Package, badge: pendingOrdersCount },
     { id: "fulfillment", label: "Delivery & Collection", icon: Warehouse, badge: 0 },
     { id: "history", label: "History", icon: History, badge: unreadOrderUpdates },
@@ -272,7 +280,7 @@ const AdminDashboard = () => {
   const filteredNavItems = railQuery.trim()
     ? navItems.filter((item) => item.label.toLowerCase().includes(railQuery.trim().toLowerCase()))
     : navItems;
-  const mobilePrimaryIds = new Set(["orders", "fulfillment", "buying-sheet", "control-tower"]);
+  const mobilePrimaryIds = new Set(["home", "my-work", "orders", "fulfillment"]);
   const mobilePrimaryNav = navItems.filter((item) => mobilePrimaryIds.has(item.id));
   const mobileMoreNav = navItems.filter((item) => !mobilePrimaryIds.has(item.id));
 
@@ -326,6 +334,7 @@ const AdminDashboard = () => {
             {/* Right side actions */}
             <div className="flex items-center gap-1">
               <div className="hidden sm:block"><OnlinePresenceIndicator currentView={activeView} /></div>
+              <Button variant="ghost" size="icon" onClick={cycleDensity} className="hidden md:inline-flex rounded-xl" title={`Density: ${density}`}><ListFilter className="h-[18px] w-[18px]" /></Button>
               <VoiceCommandButton onCommand={handleVoiceCommand} className="hidden md:inline-flex" />
               <Button
                 variant="ghost"
@@ -512,12 +521,8 @@ const AdminDashboard = () => {
           >
             <Suspense fallback={<PageSkeleton variant="table" />}>
             <PageTransition viewKey={activeView}>
-              {activeView === "home" && (
-                <CustomizableDashboard
-                  userName={userProfile?.full_name}
-                  onNavigate={(view) => setActiveView(view)}
-                />
-              )}
+              {activeView === "home" && <OperationsHomePage onNavigate={(view) => setActiveView(view)} />}
+              {activeView === "my-work" && <MyWorkPage onNavigate={(view) => setActiveView(view)} />}
               {activeView === "orders" && <OrdersPage isAdmin={true} searchTerm={searchTerm} />}
               {activeView === "fulfillment" && <FulfillmentPage />}
               {activeView === "history" && <CompletedPage isAdmin={true} searchTerm={searchTerm} />}

@@ -530,7 +530,7 @@ function OrderStatusColumn({
 
             {/* Actions */}
 
-            <div className="flex items-center gap-1.5 border-t border-border/55 pt-3 sm:gap-2">
+            <div className="flex items-center gap-1.5 border-t border-border/55 pt-3 transition-all duration-200 sm:gap-2 sm:opacity-0 sm:translate-y-1 sm:group-hover/ticket:translate-y-0 sm:group-hover/ticket:opacity-100 sm:group-focus-within/ticket:translate-y-0 sm:group-focus-within/ticket:opacity-100">
               {config.prevStatus && (
                 <Button
                   size="sm"

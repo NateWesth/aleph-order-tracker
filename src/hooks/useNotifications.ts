@@ -12,6 +12,7 @@ export interface Notification {
   order_number: string | null;
   read: boolean;
   created_at: string;
+  metadata?: Record<string, any> | null;
 }
 
 export function useNotifications() {
@@ -32,7 +33,7 @@ export function useNotifications() {
 
       if (error) throw error;
 
-      setNotifications(data || []);
+      setNotifications((data || []) as unknown as Notification[]);
       setUnreadCount(data?.filter(n => !n.read).length || 0);
     } catch (err) {
       console.error('Error fetching notifications:', err);
