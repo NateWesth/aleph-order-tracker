@@ -869,18 +869,32 @@ export default function FulfillmentPage() {
       .slice(-3)
       .reverse()
       .join("|");
-    return [...selectedDispatchStops].sort((a, b) => {
-      const areaOrder = a.areaSortOrder - b.areaSortOrder;
-      if (areaOrder) return areaOrder;
-      const areaName = String(a.areaName || "zzzz").localeCompare(String(b.areaName || "zzzz"));
-      if (areaName) return areaName;
-      const proximity = proximityKey(a.address).localeCompare(proximityKey(b.address));
-      if (proximity) return proximity;
-      const urgency = Number(b.urgency === "urgent") - Number(a.urgency === "urgent");
-      if (urgency) return urgency;
-      return String(a.scheduledFor || "").localeCompare(String(b.scheduledFor || ""));
+    // Stops are only grouped together when the user has explicitly put them in the
+    // same dispatch area. Everything else keeps the order it was selected in.
+    const buckets: { key: string; stops: DispatchPlanningStop[] }[] = [];
+    const bucketIndex = new Map<string, number>();
+    selectedDispatchStops.forEach((stop, index) => {
+      const key = stop.areaId ? `area::${stop.areaId}` : `solo::${stop.key}::${index}`;
+      const existing = bucketIndex.get(key);
+      if (existing === undefined) {
+        bucketIndex.set(key, buckets.length);
+        buckets.push({ key, stops: [stop] });
+      } else {
+        buckets[existing].stops.push(stop);
+      }
+    });
+    return buckets.flatMap((bucket) => {
+      if (bucket.stops.length < 2) return bucket.stops;
+      return [...bucket.stops].sort((a, b) => {
+        const proximity = proximityKey(a.address).localeCompare(proximityKey(b.address));
+        if (proximity) return proximity;
+        const urgency = Number(b.urgency === "urgent") - Number(a.urgency === "urgent");
+        if (urgency) return urgency;
+        return String(a.scheduledFor || "").localeCompare(String(b.scheduledFor || ""));
+      });
     });
   }, [selectedDispatchStops]);
+
 
   const routeMapUrl = useMemo(() => {
     const addresses = routePlanStops.map((stop) => stop.address).filter(Boolean) as string[];
