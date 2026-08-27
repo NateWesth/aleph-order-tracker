@@ -15,7 +15,6 @@ const NAVIGATION_ITEMS = [
   { id: "home", label: "Today · Operations Brief", icon: Home, keywords: "home today morning brief operations attention" },
   { id: "my-work", label: "My Work", icon: UserRoundCheck, keywords: "assigned to me personal work tasks deliveries collections" },
   { id: "control-tower", label: "Control Tower", icon: Radar, keywords: "control tower exceptions routes dispatch team map" },
-  { id: "intelligence", label: "Operations Intelligence", icon: Sparkles, keywords: "intelligence risk stuck eta purchasing products margin leakage automation audit health score" },
   { id: "orders", label: "Orders Board", icon: Package, keywords: "orders board kanban active" },
   { id: "fulfillment", label: "Delivery & Collection", icon: Warehouse, keywords: "delivery collection fulfillment dispatch pickup" },
   { id: "history", label: "Order History", icon: History, keywords: "history completed delivered past" },
