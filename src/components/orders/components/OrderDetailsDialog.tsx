@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetFooter,
+} from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -424,11 +424,11 @@ export default function OrderDetailsDialog({
   const displayItems = isEditing ? editableItems : (fetchedItems.length > 0 ? fetchedItems : parseItemsFromDescription(order.description));
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[85vh] overflow-y-auto">
-        <DialogHeader>
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="w-full overflow-y-auto p-0 sm:max-w-2xl lg:max-w-3xl">\n        <div className="p-5 sm:p-6">
+        <SheetHeader className="text-left">
           <div className="flex items-center justify-between">
-            <DialogTitle>Order Details - {order.order_number}</DialogTitle>
+            <SheetTitle>Order Details - {order.order_number}</SheetTitle>
             {isAdmin && !isEditing && (
               <Button
                 variant="outline"
@@ -440,7 +440,7 @@ export default function OrderDetailsDialog({
               </Button>
             )}
           </div>
-        </DialogHeader>
+        </SheetHeader>
         
         <Tabs defaultValue={defaultTab} className="w-full">
           <TabsList className="w-full grid grid-cols-2 sm:grid-cols-4 h-auto">
@@ -762,7 +762,7 @@ export default function OrderDetailsDialog({
         </Tabs>
 
         {isEditing && (
-          <DialogFooter>
+          <SheetFooter>
             <Button
               variant="outline"
               onClick={handleCancel}
@@ -777,9 +777,10 @@ export default function OrderDetailsDialog({
             >
               {loading ? "Saving..." : "Save Changes"}
             </Button>
-          </DialogFooter>
+          </SheetFooter>
         )}
-      </DialogContent>
-    </Dialog>
+      </div>
+      </SheetContent>
+    </Sheet>
   );
 }

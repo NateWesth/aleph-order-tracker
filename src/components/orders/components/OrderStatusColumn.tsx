@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Trash2, ArrowRight, Package, PackageCheck, ChevronDown, Undo2, MessageCircle } from "lucide-react";
+import { Trash2, ArrowRight, Package, PackageCheck, ChevronDown, Undo2, MessageCircle, MoreHorizontal, Eye } from "lucide-react";
 
 import {
   AlertDialog,
@@ -17,6 +17,14 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 
@@ -528,65 +536,52 @@ function OrderStatusColumn({
               </button>
             )}
 
-            {/* Actions */}
-
-            <div className="flex items-center gap-1.5 border-t border-border/55 pt-3 transition-all duration-200 sm:gap-2 sm:opacity-0 sm:translate-y-1 sm:group-hover/ticket:translate-y-0 sm:group-hover/ticket:opacity-100 sm:group-focus-within/ticket:translate-y-0 sm:group-focus-within/ticket:opacity-100">
-              {config.prevStatus && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-7 sm:h-8 text-[10px] sm:text-xs font-medium rounded-lg px-2 sm:px-3"
-                  onClick={() => onMoveOrder(order, config.prevStatus!)}
-                >
-                  <Undo2 className="h-3 w-3 sm:h-3.5 sm:w-3.5 mr-1" />
-                  Back
+            {/* Contextual actions: one primary action, secondary actions stay out of the way. */}
+            <div className="flex items-center gap-2 border-t border-border/55 pt-3">
+              {config.nextStatus ? (
+                <Button size="sm" className="h-8 flex-1 rounded-xl text-xs font-semibold"
+                  onClick={(e) => { e.stopPropagation(); onMoveOrder(order, config.nextStatus!); }}>
+                  <span className="truncate">{config.nextLabel || "Next step"}</span>
+                  <ArrowRight className="ml-1.5 h-3.5 w-3.5 shrink-0" />
+                </Button>
+              ) : (
+                <Button size="sm" variant="outline" className="h-8 flex-1 rounded-xl text-xs font-semibold"
+                  onClick={(e) => { e.stopPropagation(); setDetailsTab("details"); setDetailsOrder(order); }}>
+                  <Eye className="mr-1.5 h-3.5 w-3.5" />View order
                 </Button>
               )}
-
-              {config.nextStatus && (
-                <Button
-                  size="sm"
-                  className="flex-1 h-7 sm:h-8 text-[10px] sm:text-xs font-medium rounded-lg"
-                  onClick={() => onMoveOrder(order, config.nextStatus!)}
-                >
-                  <span className="truncate">{config.nextLabel}</span>
-
-                  <ArrowRight className="h-3 w-3 sm:h-3.5 sm:w-3.5 ml-1 shrink-0" />
-                </Button>
-              )}
-
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 sm:h-8 sm:w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg shrink-0"
-                  >
-                    <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button type="button" variant="outline" size="icon" className="h-8 w-8 shrink-0 rounded-xl"
+                    onClick={(e) => e.stopPropagation()} aria-label="More order actions">
+                    <MoreHorizontal className="h-4 w-4" />
                   </Button>
-                </AlertDialogTrigger>
-
-                <AlertDialogContent className="rounded-2xl">
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Delete Order?</AlertDialogTitle>
-
-                    <AlertDialogDescription>
-                      This will permanently delete order {order.order_number}.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-
-                  <AlertDialogFooter>
-                    <AlertDialogCancel className="rounded-lg">Cancel</AlertDialogCancel>
-
-                    <AlertDialogAction
-                      onClick={() => onDeleteOrder(order)}
-                      className="rounded-lg bg-destructive hover:bg-destructive/90"
-                    >
-                      Delete
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-44">
+                  <DropdownMenuItem onClick={() => { setDetailsTab("details"); setDetailsOrder(order); }}>
+                    <Eye className="mr-2 h-4 w-4" />View details
+                  </DropdownMenuItem>
+                  {config.prevStatus && <DropdownMenuItem onClick={() => onMoveOrder(order, config.prevStatus!)}>
+                    <Undo2 className="mr-2 h-4 w-4" />Move back
+                  </DropdownMenuItem>}
+                  <DropdownMenuSeparator />
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={(e) => e.preventDefault()}>
+                        <Trash2 className="mr-2 h-4 w-4" />Delete order
+                      </DropdownMenuItem>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent className="rounded-2xl">
+                      <AlertDialogHeader><AlertDialogTitle>Delete Order?</AlertDialogTitle>
+                        <AlertDialogDescription>This will permanently delete order {order.order_number}.</AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter><AlertDialogCancel className="rounded-lg">Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => onDeleteOrder(order)} className="rounded-lg bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
         </CardContent>

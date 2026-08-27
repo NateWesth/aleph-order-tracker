@@ -895,7 +895,6 @@ export default function FulfillmentPage() {
     });
   }, [selectedDispatchStops]);
 
-
   const routeMapUrl = useMemo(() => {
     const addresses = routePlanStops.map((stop) => stop.address).filter(Boolean) as string[];
     if (!addresses.length) return null;
@@ -953,6 +952,7 @@ export default function FulfillmentPage() {
 
   const saveOptimizedRoute = async () => {
     if (!routePlanStops.length || !user?.id) return;
+    // Dispatch areas are optional — a run can be planned without linking any stop to an area.
 
     setRouteSaving(true);
     const scheduledAt = new Date(`${routeDate}T08:00:00`).toISOString();
@@ -1035,7 +1035,7 @@ export default function FulfillmentPage() {
       }
       setDeliveryOrders((current) => current.map((order) => deliverySelection.has(order.id) ? ({ ...order, fulfillment_status: "scheduled", fulfillment_scheduled_for: scheduledAt, ...(driverId ? { fulfillment_assigned_to: driverId } : {}) } as FulfillmentOrder) : order));
       setCollectionStates((current) => current.map((state) => collectionSelection.has(state.purchase_order_id) ? ({ ...state, status: "scheduled", scheduled_for: scheduledAt, ...(driverId ? { assigned_to: driverId } : {}) } as POCollectionState) : state));
-      toast({ title: navigator.onLine ? "Dispatch run saved" : "Dispatch run saved offline", description: `${deliveryStops.length} deliver${deliveryStops.length === 1 ? "y" : "ies"} and ${collectionStops.length} collection${collectionStops.length === 1 ? "" : "s"} planned for this run.` });
+      toast({ title: navigator.onLine ? "Dispatch run saved" : "Dispatch run saved offline", description: `${deliveryStops.length} deliver${deliveryStops.length === 1 ? "y" : "ies"} and ${collectionStops.length} collection${collectionStops.length === 1 ? "" : "s"} grouped by learned area.` });
       setRoutePlannerOpen(false);
       setDeliverySelection(new Set());
       setCollectionSelection(new Set());
@@ -1311,12 +1311,15 @@ export default function FulfillmentPage() {
     <div className="fulfillment-v3 fulfillment-workspace aleph-page-workspace min-w-0 space-y-4 pb-10 sm:space-y-5">
       <section className="fulfillment-command-header overflow-hidden rounded-[26px] border border-border/60 bg-card/90 shadow-sm backdrop-blur-xl">
         <div className="flex flex-col gap-4 p-4 sm:p-5 xl:flex-row xl:items-center">
-          <div className="flex min-w-0 items-center gap-3 xl:w-[330px]">
-            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-primary text-primary-foreground shadow-[0_14px_28px_-16px_hsl(var(--primary))]"><MapPinned className="h-5 w-5" /></span>
+          <div className="relative flex min-w-0 items-center gap-3 overflow-hidden rounded-2xl border border-primary/15 bg-gradient-to-br from-primary/[0.08] via-background/80 to-background/40 px-3 py-2.5 xl:w-[350px]">
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1 ribbon-bar opacity-80" aria-hidden />
+            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-background/90 p-1 shadow-sm ring-1 ring-border/60">
+              <img src="/lovable-uploads/e1088147-889e-43f6-bdf0-271189b88913.png" alt="Aleph" className="h-full w-full object-contain" />
+            </span>
             <div className="min-w-0">
-              <div className="flex items-center gap-2"><p className="text-[9px] font-black uppercase tracking-[0.2em] text-primary">Movement desk</p><span className="flex items-center gap-1 text-[9px] font-bold text-emerald-600"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />Live</span></div>
-              <h1 className="truncate text-xl font-black tracking-[-0.035em] sm:text-2xl">Delivery & collection</h1>
-              <p className="truncate text-[10px] text-muted-foreground">Open work stays here until it is completed</p>
+              <div className="flex items-center gap-2"><p className="text-[9px] font-black uppercase tracking-[0.2em] text-primary">Control tower</p><span className="flex items-center gap-1 text-[9px] font-bold text-emerald-600"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />Live</span></div>
+              <h1 className="truncate text-xl font-black tracking-[-0.035em] sm:text-2xl">Dispatch control</h1>
+              <p className="truncate text-[10px] text-muted-foreground">Deliveries, collections and route planning in one workspace</p>
             </div>
           </div>
 
@@ -1413,7 +1416,7 @@ export default function FulfillmentPage() {
               <div className="flex flex-wrap items-center gap-2"><Badge className="rounded-full"><WandSparkles className="mr-1 h-3 w-3" />Mixed dispatch planner</Badge><Badge variant="outline" className="rounded-full bg-cyan-500/10 text-cyan-700">Delivery</Badge><Badge variant="outline" className="rounded-full bg-violet-500/10 text-violet-700">Collection</Badge>{!navigator.onLine && <Badge variant="outline" className="rounded-full"><WifiOff className="mr-1 h-3 w-3" />Saves offline</Badge>}</div>
               <SheetTitle className="mt-3 text-left text-2xl font-black tracking-tight">Build one run from deliveries and collections</SheetTitle>
             </SheetHeader>
-            <p className="mt-2 max-w-2xl text-sm text-muted-foreground">Assigning a dispatch area is optional — stops are only grouped together when you put them in the same area, and that area is then remembered for that client or supplier next time.</p>
+            <p className="mt-2 max-w-2xl text-sm text-muted-foreground">The first time a client or supplier appears, link it to a dispatch area. That area is remembered permanently, so future deliveries and collections are grouped automatically before the route is built.</p>
           </div>
           <div className="space-y-6 p-5 sm:p-6">
             <section className="grid gap-3 sm:grid-cols-2">
@@ -1439,15 +1442,15 @@ export default function FulfillmentPage() {
             </section>
 
             <section className="rounded-3xl border border-border/60 bg-background p-4">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">2 · Group by area (optional)</p><p className="mt-1 text-xs text-muted-foreground">Only assign an area when you want those stops grouped together. Areas are saved against the client or supplier, not this order.</p></div><div className="flex min-w-0 gap-2 sm:w-[320px]"><Input value={newAreaName} onChange={(event) => setNewAreaName(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void createDispatchArea(); } }} placeholder="New area, e.g. Jet Park" className="h-9 rounded-xl" /><Button variant="outline" className="h-9 rounded-xl" disabled={!newAreaName.trim()} onClick={() => void createDispatchArea()}>Add</Button></div></div>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">2 · Teach the area once</p><p className="mt-1 text-xs text-muted-foreground">Area links are saved against the client or supplier, not this individual order.</p></div><div className="flex min-w-0 gap-2 sm:w-[320px]"><Input value={newAreaName} onChange={(event) => setNewAreaName(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void createDispatchArea(); } }} placeholder="New area, e.g. Jet Park" className="h-9 rounded-xl" /><Button variant="outline" className="h-9 rounded-xl" disabled={!newAreaName.trim()} onClick={() => void createDispatchArea()}>Add</Button></div></div>
               <div className="mt-4 space-y-2">
                 {selectedDispatchStops.map((stop) => <div key={`area-${stop.key}`} className={cn("grid gap-2 rounded-2xl border p-3 sm:grid-cols-[minmax(0,1fr)_180px_minmax(180px,1fr)] sm:items-center", stop.areaId ? "border-primary/25 bg-primary/[0.05]" : "border-border/55 bg-muted/20")}><div className="min-w-0"><div className="flex flex-wrap items-center gap-1.5"><Badge variant="outline" className={cn("h-5 text-[8px] uppercase", stop.type === "delivery" ? "border-cyan-500/30 text-cyan-700" : "border-violet-500/30 text-violet-700")}>{stop.type}</Badge><strong className="text-xs">{stop.reference}</strong></div><p className="mt-0.5 truncate text-[10px] text-muted-foreground">{stop.label}</p></div><Select value={stop.areaId || "unlinked"} onValueChange={(value) => value !== "unlinked" && void saveStopAreaLink(stop, value)} disabled={areaSavingKey === stop.key}><SelectTrigger className="h-9 rounded-xl bg-background"><SelectValue placeholder="Choose area" /></SelectTrigger><SelectContent><SelectItem value="unlinked" disabled>Choose area</SelectItem>{dispatchAreas.map((area) => <SelectItem key={area.id} value={area.id}>{area.name}</SelectItem>)}</SelectContent></Select><Input key={`${stop.key}-${stop.address || "empty"}`} defaultValue={stop.address || ""} disabled={!stop.areaId || areaSavingKey === stop.key} onBlur={(event) => stop.areaId && void saveStopAreaLink(stop, stop.areaId, event.target.value)} placeholder={stop.type === "collection" ? "Supplier pickup address" : "Navigation address override"} className="h-9 rounded-xl bg-background text-xs" /></div>)}
-                {!selectedDispatchStops.length && <p className="rounded-2xl bg-muted/30 px-4 py-6 text-center text-xs text-muted-foreground">Select stops above to optionally group them by area.</p>}
+                {!selectedDispatchStops.length && <p className="rounded-2xl bg-muted/30 px-4 py-6 text-center text-xs text-muted-foreground">Select stops above to link their areas.</p>}
               </div>
             </section>
 
             <section>
-              <div className="mb-3 flex flex-wrap items-end justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">3 · Suggested stop order</p><p className="mt-1 text-xs text-muted-foreground">{routePlanStops.length} selected stops · stops sharing an area are grouped together; the rest stay in the order you picked them.</p></div><div className="flex gap-2"><Badge variant="secondary" className="rounded-full">{routePlanStops.filter((stop) => !stop.areaId).length} ungrouped</Badge><Badge variant="secondary" className="rounded-full">{routePlanStops.filter((stop) => !stop.address).length} missing addresses</Badge></div></div>
+              <div className="mb-3 flex flex-wrap items-end justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">3 · Suggested stop order</p><p className="mt-1 text-xs text-muted-foreground">{routePlanStops.length} selected stops · grouped only where you assigned the same area, otherwise kept in selection order.</p></div><div className="flex gap-2"><Badge variant="secondary" className="rounded-full">{routePlanStops.filter((stop) => !stop.areaId).length} without an area</Badge><Badge variant="secondary" className="rounded-full">{routePlanStops.filter((stop) => !stop.address).length} missing addresses</Badge></div></div>
               <div className="space-y-2">{routePlanStops.map((stop, index) => <div key={stop.key} className="grid grid-cols-[38px_minmax(0,1fr)] gap-3 rounded-2xl border border-border/55 bg-muted/25 p-3"><span className="grid h-9 w-9 place-items-center rounded-xl bg-primary text-sm font-black text-primary-foreground">{index + 1}</span><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="font-black text-primary">{stop.reference}</p><Badge variant="outline" className={cn("h-5 text-[8px] font-black uppercase", stop.type === "delivery" ? "border-cyan-500/30 text-cyan-700" : "border-violet-500/30 text-violet-700")}>{stop.type}</Badge>{stop.areaName && <Badge variant="secondary" className="h-5 text-[8px]">{stop.areaName}</Badge>}{stop.urgency === "urgent" && <Badge variant="destructive" className="h-5 text-[9px]">Urgent</Badge>}</div><p className="truncate text-xs font-semibold">{stop.label}</p><p className={cn("mt-1 flex items-center gap-1 text-[10px]", stop.address ? "text-muted-foreground" : "font-bold text-amber-600")}><MapPin className="h-3 w-3 shrink-0" />{stop.address || "Add a navigation address above"}</p></div></div>)}</div>
             </section>
             <div className="flex flex-col gap-2 border-t border-border/60 pt-4 sm:flex-row">
