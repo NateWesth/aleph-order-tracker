@@ -28,7 +28,6 @@ import { triggerHapticFeedback } from "@/utils/haptics";
 import OperationsHomePage from "@/components/admin/OperationsHomePage";
 import MyWorkPage from "@/components/admin/MyWorkPage";
 import OperationsIntelligencePage from "@/components/admin/OperationsIntelligencePage";
-import OperationsPulseBar from "@/components/admin/OperationsPulseBar";
 import { useWorkspaceDensity } from "@/hooks/useWorkspaceDensity";
 
 // Route-level splitting keeps the dashboard interactive while large workspaces
@@ -80,7 +79,7 @@ const WORKSPACE_PREFETCHERS: Record<string, () => Promise<unknown>> = {
 
 const RAIL_STORAGE_KEY = "aleph:workspace-rail-expanded";
 const WORKSPACE_STORAGE_KEY = "aleph:last-workspace";
-const RESTORABLE_WORKSPACES = new Set(["home", "my-work", "orders", "fulfillment", "history", "clients", "suppliers", "stats", "po-tracking", "buying-sheet", "items", "control-tower", "intelligence"]);
+const RESTORABLE_WORKSPACES = new Set(["home", "my-work", "orders", "fulfillment", "history", "clients", "suppliers", "stats", "po-tracking", "buying-sheet", "items", "control-tower"]);
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -263,29 +262,30 @@ const AdminDashboard = () => {
   const isAdmin = userRole === 'admin';
   const canEditCommission = isAdmin || !!userProfile?.can_edit_commission;
 
-  const navItems = [
+  const allNavItems = [
     { id: "home", label: "Today", icon: Home, badge: 0 },
     { id: "my-work", label: "My Work", icon: UserRoundCheck, badge: 0 },
     { id: "orders", label: "Orders", icon: Package, badge: pendingOrdersCount },
     { id: "fulfillment", label: "Delivery & Collection", icon: Warehouse, badge: 0 },
+    { id: "buying-sheet", label: "Buying", icon: ShoppingCart, badge: 0 },
+    { id: "control-tower", label: "Control Tower", icon: Radar, badge: 0 },
     { id: "history", label: "History", icon: History, badge: unreadOrderUpdates },
     { id: "clients", label: "Clients", icon: Building2, badge: 0 },
     { id: "suppliers", label: "Suppliers", icon: Truck, badge: 0 },
-    { id: "stats", label: "Stats", icon: BarChart3, badge: 0 },
-    { id: "control-tower", label: "Control Tower", icon: Radar, badge: 0 },
-    { id: "intelligence", label: "Intelligence", icon: BrainCircuit, badge: 0 },
     { id: "po-tracking", label: "PO Tracking", icon: FileText, badge: 0 },
-    { id: "buying-sheet", label: "Buying", icon: ShoppingCart, badge: 0 },
     { id: "items", label: "Items", icon: Box, badge: 0 },
+    { id: "stats", label: "Stats", icon: BarChart3, badge: 0 },
     ...(canEditCommission ? [{ id: "commission", label: "Commission", icon: Percent, badge: 0 }] : []),
     ...(isAdmin ? [{ id: "users", label: "Users", icon: Users, badge: 0 }] : []),
   ];
+  const primaryIds = new Set(["home", "my-work", "orders", "fulfillment", "buying-sheet", "control-tower", "history"]);
+  const navItems = allNavItems.filter((item) => primaryIds.has(item.id));
   const filteredNavItems = railQuery.trim()
-    ? navItems.filter((item) => item.label.toLowerCase().includes(railQuery.trim().toLowerCase()))
+    ? allNavItems.filter((item) => item.label.toLowerCase().includes(railQuery.trim().toLowerCase()))
     : navItems;
   const mobilePrimaryIds = new Set(["home", "my-work", "orders", "fulfillment"]);
-  const mobilePrimaryNav = navItems.filter((item) => mobilePrimaryIds.has(item.id));
-  const mobileMoreNav = navItems.filter((item) => !mobilePrimaryIds.has(item.id));
+  const mobilePrimaryNav = allNavItems.filter((item) => mobilePrimaryIds.has(item.id));
+  const mobileMoreNav = allNavItems.filter((item) => !mobilePrimaryIds.has(item.id));
 
   if (loading) {
     return (
@@ -337,8 +337,6 @@ const AdminDashboard = () => {
             {/* Right side actions */}
             <div className="flex items-center gap-1">
               <div className="hidden sm:block"><OnlinePresenceIndicator currentView={activeView} /></div>
-              <Button variant="ghost" size="icon" onClick={cycleDensity} className="hidden md:inline-flex rounded-xl" title={`Density: ${density}`}><ListFilter className="h-[18px] w-[18px]" /></Button>
-              <VoiceCommandButton onCommand={handleVoiceCommand} className="hidden md:inline-flex" />
               <Button
                 variant="ghost"
                 size="icon"
@@ -358,18 +356,6 @@ const AdminDashboard = () => {
                 title="Command Palette (⌘K)"
               >
                 <Command className="h-[18px] w-[18px]" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => { setChangelogOpen(true); setHasNewChangelog(false); }}
-                className="relative hidden sm:inline-flex rounded-xl text-muted-foreground hover:text-foreground"
-                title="What's new"
-              >
-                <Sparkles className="h-[18px] w-[18px]" />
-                {hasNewChangelog && (
-                  <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-primary animate-pulse" />
-                )}
               </Button>
               <NotificationCenter
                 onNavigateToOrder={(orderId) => {
@@ -432,7 +418,6 @@ const AdminDashboard = () => {
               );
             })}
           </nav>
-          <OperationsPulseBar onNavigate={(view) => setActiveView(view)} />
         </div>
       </header>
 
@@ -507,6 +492,10 @@ const AdminDashboard = () => {
           </nav>
 
           <div className="mt-3 shrink-0 space-y-1 border-t border-border/55 pt-3">
+            <button type="button" onClick={() => setMobileMoreOpen(true)} title={railExpanded ? undefined : "More tools"} className="aleph-rail-footer-action flex w-full items-center gap-3 rounded-2xl px-1.5 py-2 text-sm font-bold text-muted-foreground hover:bg-primary/8 hover:text-foreground">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-muted/70"><MoreHorizontal className="h-[18px] w-[18px]" /></span>
+              <span className={cn("aleph-rail-label min-w-0 flex-1 text-left transition-opacity duration-200", railExpanded ? "opacity-100" : "opacity-0")}>More tools</span>
+            </button>
             <button type="button" onClick={() => navigate('/settings')} title={railExpanded ? undefined : "Preferences"} className="aleph-rail-footer-action flex w-full items-center gap-3 rounded-2xl px-1.5 py-2 text-sm font-bold text-muted-foreground hover:bg-primary/8 hover:text-foreground">
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-muted/70"><Settings className="h-[18px] w-[18px]" /></span>
               <span className={cn("aleph-rail-label min-w-0 flex-1 text-left transition-opacity duration-200", railExpanded ? "opacity-100" : "opacity-0")}>Preferences</span>
@@ -595,9 +584,9 @@ const AdminDashboard = () => {
       </nav>
 
       <Sheet open={mobileMoreOpen} onOpenChange={setMobileMoreOpen}>
-        <SheetContent side="bottom" className="max-h-[82dvh] overflow-y-auto rounded-t-[28px] border-t border-border/70 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-5 sm:hidden">
+        <SheetContent side="bottom" className="max-h-[82dvh] overflow-y-auto rounded-t-[28px] border-t border-border/70 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-5">
           <SheetHeader className="text-left">
-            <SheetTitle>More workspaces</SheetTitle>
+            <SheetTitle>More tools</SheetTitle>
           </SheetHeader>
           <div className="mt-4 grid grid-cols-3 gap-2">
             <button

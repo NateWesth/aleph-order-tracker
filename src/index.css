@@ -3409,3 +3409,13 @@ html[data-density="focus"] .activity-feed-sidebar:hover { opacity: 1; }
   .app-page-stage .rounded-\[28px\] { border-radius: 1.25rem; }
   .app-page-stage h1 { letter-spacing: -.025em; }
 }
+
+/* Calm workspace pass — default screens favour clarity over density. */
+.aleph-page-workspace > .border-primary\/15.bg-gradient-to-r,
+.aleph-page-workspace > .border-primary\/10.bg-primary\/[\.025\] {
+  box-shadow: none;
+}
+@media (max-width: 767px) {
+  .aleph-page-workspace { --aleph-card-gap: .75rem; }
+  .aleph-page-workspace .sticky { max-width: 100%; }
+}
