@@ -462,6 +462,89 @@ export type Database = {
         }
         Relationships: []
       }
+      dispatch_area_links: {
+        Row: {
+          address_override: string | null
+          area_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          source_id: string
+          source_type: string
+          updated_at: string
+        }
+        Insert: {
+          address_override?: string | null
+          area_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          source_id: string
+          source_type: string
+          updated_at?: string
+        }
+        Update: {
+          address_override?: string | null
+          area_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          source_id?: string
+          source_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dispatch_area_links_area_id_fkey"
+            columns: ["area_id"]
+            isOneToOne: false
+            referencedRelation: "dispatch_areas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dispatch_area_links_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dispatch_areas: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dispatch_areas_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       dispatch_routes: {
         Row: {
           completed_stops: number
