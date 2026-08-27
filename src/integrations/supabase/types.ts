@@ -462,343 +462,16 @@ export type Database = {
         }
         Relationships: []
       }
-      dispatch_area_links: {
-        Row: {
-          address_override: string | null
-          area_id: string
-          created_at: string
-          created_by: string | null
-          id: string
-          source_id: string
-          source_type: string
-          updated_at: string
-        }
-        Insert: {
-          address_override?: string | null
-          area_id: string
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          source_id: string
-          source_type: string
-          updated_at?: string
-        }
-        Update: {
-          address_override?: string | null
-          area_id?: string
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          source_id?: string
-          source_type?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "dispatch_area_links_area_id_fkey"
-            columns: ["area_id"]
-            isOneToOne: false
-            referencedRelation: "dispatch_areas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "dispatch_area_links_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      dispatch_areas: {
-        Row: {
-          created_at: string
-          created_by: string | null
-          id: string
-          name: string
-          sort_order: number
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          name: string
-          sort_order?: number
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          name?: string
-          sort_order?: number
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "dispatch_areas_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      dispatch_routes: {
-        Row: {
-          completed_stops: number
-          created_at: string
-          created_by: string
-          driver_id: string | null
-          id: string
-          map_url: string | null
-          name: string
-          notes: string | null
-          route_date: string
-          status: string
-          stops: Json
-          total_stops: number
-          updated_at: string
-        }
-        Insert: {
-          completed_stops?: number
-          created_at?: string
-          created_by?: string
-          driver_id?: string | null
-          id?: string
-          map_url?: string | null
-          name: string
-          notes?: string | null
-          route_date?: string
-          status?: string
-          stops?: Json
-          total_stops?: number
-          updated_at?: string
-        }
-        Update: {
-          completed_stops?: number
-          created_at?: string
-          created_by?: string
-          driver_id?: string | null
-          id?: string
-          map_url?: string | null
-          name?: string
-          notes?: string | null
-          route_date?: string
-          status?: string
-          stops?: Json
-          total_stops?: number
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "dispatch_routes_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "dispatch_routes_driver_id_fkey"
-            columns: ["driver_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      entity_comment_reactions: {
-        Row: {
-          comment_id: string
-          created_at: string
-          emoji: string
-          id: string
-          user_id: string
-        }
-        Insert: {
-          comment_id: string
-          created_at?: string
-          emoji: string
-          id?: string
-          user_id: string
-        }
-        Update: {
-          comment_id?: string
-          created_at?: string
-          emoji?: string
-          id?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "entity_comment_reactions_comment_id_fkey"
-            columns: ["comment_id"]
-            isOneToOne: false
-            referencedRelation: "entity_comments"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "entity_comment_reactions_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      entity_comments: {
-        Row: {
-          body: string
-          created_at: string
-          entity_id: string
-          entity_type: string
-          id: string
-          mentioned_user_ids: string[]
-          order_id: string | null
-          reply_to_id: string | null
-          user_id: string
-        }
-        Insert: {
-          body: string
-          created_at?: string
-          entity_id: string
-          entity_type: string
-          id?: string
-          mentioned_user_ids?: string[]
-          order_id?: string | null
-          reply_to_id?: string | null
-          user_id: string
-        }
-        Update: {
-          body?: string
-          created_at?: string
-          entity_id?: string
-          entity_type?: string
-          id?: string
-          mentioned_user_ids?: string[]
-          order_id?: string | null
-          reply_to_id?: string | null
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "entity_comments_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "entity_comments_reply_to_id_fkey"
-            columns: ["reply_to_id"]
-            isOneToOne: false
-            referencedRelation: "entity_comments"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "entity_comments_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      fulfillment_settings: {
-        Row: {
-          auto_assign_enabled: boolean
-          default_method: string
-          id: boolean
-          updated_at: string
-          updated_by: string | null
-        }
-        Insert: {
-          auto_assign_enabled?: boolean
-          default_method?: string
-          id?: boolean
-          updated_at?: string
-          updated_by?: string | null
-        }
-        Update: {
-          auto_assign_enabled?: boolean
-          default_method?: string
-          id?: boolean
-          updated_at?: string
-          updated_by?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "fulfillment_settings_updated_by_fkey"
-            columns: ["updated_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      fulfillment_timeline_events: {
-        Row: {
-          actor_id: string | null
-          created_at: string
-          description: string | null
-          entity_id: string
-          entity_type: string
-          event_type: string
-          id: string
-          metadata: Json
-          occurred_at: string
-          order_id: string | null
-          title: string
-        }
-        Insert: {
-          actor_id?: string | null
-          created_at?: string
-          description?: string | null
-          entity_id: string
-          entity_type: string
-          event_type: string
-          id?: string
-          metadata?: Json
-          occurred_at?: string
-          order_id?: string | null
-          title: string
-        }
-        Update: {
-          actor_id?: string | null
-          created_at?: string
-          description?: string | null
-          entity_id?: string
-          entity_type?: string
-          event_type?: string
-          id?: string
-          metadata?: Json
-          occurred_at?: string
-          order_id?: string | null
-          title?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "fulfillment_timeline_events_actor_id_fkey"
-            columns: ["actor_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "fulfillment_timeline_events_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       items: {
         Row: {
           code: string
           created_at: string
           description: string | null
+          fulfillment_assigned_to: string | null
+          fulfillment_method: string
+          fulfillment_notes: string | null
+          fulfillment_scheduled_for: string | null
+          fulfillment_status: string
           id: string
           name: string
           unit: string | null
@@ -808,6 +481,11 @@ export type Database = {
           code: string
           created_at?: string
           description?: string | null
+          fulfillment_assigned_to?: string | null
+          fulfillment_method?: string
+          fulfillment_notes?: string | null
+          fulfillment_scheduled_for?: string | null
+          fulfillment_status?: string
           id?: string
           name: string
           unit?: string | null
@@ -817,6 +495,11 @@ export type Database = {
           code?: string
           created_at?: string
           description?: string | null
+          fulfillment_assigned_to?: string | null
+          fulfillment_method?: string
+          fulfillment_notes?: string | null
+          fulfillment_scheduled_for?: string | null
+          fulfillment_status?: string
           id?: string
           name?: string
           unit?: string | null
@@ -864,126 +547,6 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "notifications_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      operational_saved_views: {
-        Row: {
-          configuration: Json
-          created_at: string
-          id: string
-          is_default: boolean
-          name: string
-          updated_at: string
-          user_id: string
-          workspace: string
-        }
-        Insert: {
-          configuration?: Json
-          created_at?: string
-          id?: string
-          is_default?: boolean
-          name: string
-          updated_at?: string
-          user_id?: string
-          workspace?: string
-        }
-        Update: {
-          configuration?: Json
-          created_at?: string
-          id?: string
-          is_default?: boolean
-          name?: string
-          updated_at?: string
-          user_id?: string
-          workspace?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "operational_saved_views_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      operations_exceptions: {
-        Row: {
-          assigned_to: string | null
-          category: string
-          created_at: string
-          created_by: string
-          description: string | null
-          due_at: string | null
-          entity_id: string | null
-          entity_type: string
-          id: string
-          order_id: string | null
-          resolution: string | null
-          resolved_at: string | null
-          severity: string
-          status: string
-          title: string
-          updated_at: string
-        }
-        Insert: {
-          assigned_to?: string | null
-          category: string
-          created_at?: string
-          created_by?: string
-          description?: string | null
-          due_at?: string | null
-          entity_id?: string | null
-          entity_type: string
-          id?: string
-          order_id?: string | null
-          resolution?: string | null
-          resolved_at?: string | null
-          severity?: string
-          status?: string
-          title: string
-          updated_at?: string
-        }
-        Update: {
-          assigned_to?: string | null
-          category?: string
-          created_at?: string
-          created_by?: string
-          description?: string | null
-          due_at?: string | null
-          entity_id?: string | null
-          entity_type?: string
-          id?: string
-          order_id?: string | null
-          resolution?: string | null
-          resolved_at?: string | null
-          severity?: string
-          status?: string
-          title?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "operations_exceptions_assigned_to_fkey"
-            columns: ["assigned_to"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "operations_exceptions_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "operations_exceptions_order_id_fkey"
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
@@ -1073,6 +636,89 @@ export type Database = {
           uploaded_by_user_id?: string
         }
         Relationships: []
+      }
+      entity_comments: {
+        Row: {
+          body: string
+          created_at: string
+          entity_id: string
+          entity_type: string
+          id: string
+          mentioned_user_ids: string[]
+          order_id: string | null
+          reply_to_id: string | null
+          user_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          entity_id: string
+          entity_type: string
+          id?: string
+          mentioned_user_ids?: string[]
+          order_id?: string | null
+          reply_to_id?: string | null
+          user_id: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          mentioned_user_ids?: string[]
+          order_id?: string | null
+          reply_to_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "entity_comments_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "entity_comments_reply_to_id_fkey"
+            columns: ["reply_to_id"]
+            isOneToOne: false
+            referencedRelation: "entity_comments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      entity_comment_reactions: {
+        Row: {
+          comment_id: string
+          created_at: string
+          emoji: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          comment_id: string
+          created_at?: string
+          emoji: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          comment_id?: string
+          created_at?: string
+          emoji?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "entity_comment_reactions_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: false
+            referencedRelation: "entity_comments"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       order_item_comment_reactions: {
         Row: {
@@ -1582,114 +1228,10 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "orders_fulfillment_assigned_to_fkey"
-            columns: ["fulfillment_assigned_to"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "orders_supplier_id_fkey"
             columns: ["supplier_id"]
             isOneToOne: false
             referencedRelation: "suppliers"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      po_collection_event_lines: {
-        Row: {
-          created_at: string
-          description: string | null
-          event_id: string
-          id: string
-          line_key: string
-          name: string
-          quantity_collected: number
-          sku: string | null
-          source_unbilled_quantity: number
-        }
-        Insert: {
-          created_at?: string
-          description?: string | null
-          event_id: string
-          id?: string
-          line_key: string
-          name: string
-          quantity_collected: number
-          sku?: string | null
-          source_unbilled_quantity?: number
-        }
-        Update: {
-          created_at?: string
-          description?: string | null
-          event_id?: string
-          id?: string
-          line_key?: string
-          name?: string
-          quantity_collected?: number
-          sku?: string | null
-          source_unbilled_quantity?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "po_collection_event_lines_event_id_fkey"
-            columns: ["event_id"]
-            isOneToOne: false
-            referencedRelation: "po_collection_events"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      po_collection_events: {
-        Row: {
-          collected_at: string
-          collected_by: string
-          created_at: string
-          fully_collected: boolean
-          id: string
-          notes: string | null
-          purchase_order_id: string
-          purchase_order_number: string
-          source_snapshot: Json
-          total_units: number
-          vendor_id: string | null
-          vendor_name: string
-        }
-        Insert: {
-          collected_at?: string
-          collected_by: string
-          created_at?: string
-          fully_collected?: boolean
-          id?: string
-          notes?: string | null
-          purchase_order_id: string
-          purchase_order_number: string
-          source_snapshot?: Json
-          total_units?: number
-          vendor_id?: string | null
-          vendor_name?: string
-        }
-        Update: {
-          collected_at?: string
-          collected_by?: string
-          created_at?: string
-          fully_collected?: boolean
-          id?: string
-          notes?: string | null
-          purchase_order_id?: string
-          purchase_order_number?: string
-          source_snapshot?: Json
-          total_units?: number
-          vendor_id?: string | null
-          vendor_name?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "po_collection_events_collected_by_fkey"
-            columns: ["collected_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -1753,6 +1295,103 @@ export type Database = {
           },
         ]
       }
+      po_collection_events: {
+        Row: {
+          collected_at: string
+          collected_by: string
+          created_at: string
+          fully_collected: boolean
+          id: string
+          notes: string | null
+          purchase_order_id: string
+          purchase_order_number: string
+          source_snapshot: Json
+          total_units: number
+          vendor_id: string | null
+          vendor_name: string
+        }
+        Insert: {
+          collected_at?: string
+          collected_by: string
+          created_at?: string
+          fully_collected?: boolean
+          id?: string
+          notes?: string | null
+          purchase_order_id: string
+          purchase_order_number: string
+          source_snapshot?: Json
+          total_units?: number
+          vendor_id?: string | null
+          vendor_name?: string
+        }
+        Update: {
+          collected_at?: string
+          collected_by?: string
+          created_at?: string
+          fully_collected?: boolean
+          id?: string
+          notes?: string | null
+          purchase_order_id?: string
+          purchase_order_number?: string
+          source_snapshot?: Json
+          total_units?: number
+          vendor_id?: string | null
+          vendor_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "po_collection_events_collected_by_fkey"
+            columns: ["collected_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      po_collection_event_lines: {
+        Row: {
+          created_at: string
+          description: string | null
+          event_id: string
+          id: string
+          line_key: string
+          name: string
+          quantity_collected: number
+          sku: string | null
+          source_unbilled_quantity: number
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          event_id: string
+          id?: string
+          line_key: string
+          name: string
+          quantity_collected: number
+          sku?: string | null
+          source_unbilled_quantity?: number
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          event_id?: string
+          id?: string
+          line_key?: string
+          name?: string
+          quantity_collected?: number
+          sku?: string | null
+          source_unbilled_quantity?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "po_collection_event_lines_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "po_collection_events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       po_tracking_cache: {
         Row: {
           created_at: string
@@ -1773,6 +1412,361 @@ export type Database = {
           payload?: Json
         }
         Relationships: []
+      }
+      dispatch_areas: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dispatch_areas_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dispatch_area_links: {
+        Row: {
+          address_override: string | null
+          area_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          source_id: string
+          source_type: string
+          updated_at: string
+        }
+        Insert: {
+          address_override?: string | null
+          area_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          source_id: string
+          source_type: string
+          updated_at?: string
+        }
+        Update: {
+          address_override?: string | null
+          area_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          source_id?: string
+          source_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dispatch_area_links_area_id_fkey"
+            columns: ["area_id"]
+            isOneToOne: false
+            referencedRelation: "dispatch_areas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dispatch_area_links_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dispatch_routes: {
+        Row: {
+          completed_stops: number
+          created_at: string
+          created_by: string
+          driver_id: string | null
+          id: string
+          map_url: string | null
+          name: string
+          notes: string | null
+          route_date: string
+          status: string
+          stops: Json
+          total_stops: number
+          updated_at: string
+        }
+        Insert: {
+          completed_stops?: number
+          created_at?: string
+          created_by?: string
+          driver_id?: string | null
+          id?: string
+          map_url?: string | null
+          name: string
+          notes?: string | null
+          route_date?: string
+          status?: string
+          stops?: Json
+          total_stops?: number
+          updated_at?: string
+        }
+        Update: {
+          completed_stops?: number
+          created_at?: string
+          created_by?: string
+          driver_id?: string | null
+          id?: string
+          map_url?: string | null
+          name?: string
+          notes?: string | null
+          route_date?: string
+          status?: string
+          stops?: Json
+          total_stops?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dispatch_routes_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dispatch_routes_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fulfillment_timeline_events: {
+        Row: {
+          actor_id: string | null
+          created_at: string
+          description: string | null
+          entity_id: string
+          entity_type: string
+          event_type: string
+          id: string
+          metadata: Json
+          occurred_at: string
+          order_id: string | null
+          title: string
+        }
+        Insert: {
+          actor_id?: string | null
+          created_at?: string
+          description?: string | null
+          entity_id: string
+          entity_type: string
+          event_type: string
+          id?: string
+          metadata?: Json
+          occurred_at?: string
+          order_id?: string | null
+          title: string
+        }
+        Update: {
+          actor_id?: string | null
+          created_at?: string
+          description?: string | null
+          entity_id?: string
+          entity_type?: string
+          event_type?: string
+          id?: string
+          metadata?: Json
+          occurred_at?: string
+          order_id?: string | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fulfillment_timeline_events_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fulfillment_timeline_events_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      operational_saved_views: {
+        Row: {
+          configuration: Json
+          created_at: string
+          id: string
+          is_default: boolean
+          name: string
+          updated_at: string
+          user_id: string
+          workspace: string
+        }
+        Insert: {
+          configuration?: Json
+          created_at?: string
+          id?: string
+          is_default?: boolean
+          name: string
+          updated_at?: string
+          user_id?: string
+          workspace?: string
+        }
+        Update: {
+          configuration?: Json
+          created_at?: string
+          id?: string
+          is_default?: boolean
+          name?: string
+          updated_at?: string
+          user_id?: string
+          workspace?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "operational_saved_views_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      operations_exceptions: {
+        Row: {
+          assigned_to: string | null
+          category: string
+          created_at: string
+          created_by: string
+          description: string | null
+          due_at: string | null
+          entity_id: string | null
+          entity_type: string
+          id: string
+          order_id: string | null
+          resolution: string | null
+          resolved_at: string | null
+          severity: string
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          category: string
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          due_at?: string | null
+          entity_id?: string | null
+          entity_type: string
+          id?: string
+          order_id?: string | null
+          resolution?: string | null
+          resolved_at?: string | null
+          severity?: string
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          category?: string
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          due_at?: string | null
+          entity_id?: string | null
+          entity_type?: string
+          id?: string
+          order_id?: string | null
+          resolution?: string | null
+          resolved_at?: string | null
+          severity?: string
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "operations_exceptions_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "operations_exceptions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "operations_exceptions_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fulfillment_settings: {
+        Row: {
+          auto_assign_enabled: boolean
+          default_method: string
+          id: boolean
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          auto_assign_enabled?: boolean
+          default_method?: string
+          id?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          auto_assign_enabled?: boolean
+          default_method?: string
+          id?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fulfillment_settings_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -2351,11 +2345,11 @@ export type Database = {
           p_collection_method?: string
           p_fully_collected: boolean
           p_lines: Json
-          p_notes?: string
+          p_notes?: string | null
           p_purchase_order_id: string
           p_purchase_order_number: string
           p_source_snapshot?: Json
-          p_vendor_id: string
+          p_vendor_id: string | null
           p_vendor_name: string
         }
         Returns: Json
