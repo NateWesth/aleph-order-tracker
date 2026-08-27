@@ -3412,7 +3412,7 @@ html[data-density="focus"] .activity-feed-sidebar:hover { opacity: 1; }
 
 /* Calm workspace pass — default screens favour clarity over density. */
 .aleph-page-workspace > .border-primary\/15.bg-gradient-to-r,
-.aleph-page-workspace > .border-primary\/10.bg-primary\/[\.025\] {
+.aleph-page-workspace > .border-primary\/10 {
   box-shadow: none;
 }
 @media (max-width: 767px) {
