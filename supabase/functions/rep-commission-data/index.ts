@@ -197,6 +197,25 @@ Deno.serve(async (req) => {
 
     const periodMonth = `${date_start.slice(0, 7)}-01`
     cacheFallback = { periodMonth, repId: rep_id }
+
+    // Protect Zoho from accidental refresh storms. Even an explicit refresh
+    // reuses a report generated in the last five minutes. The UI remains
+    // responsive and repeated clicks/reconnects cannot fan out into hundreds
+    // of invoice/bill requests.
+    if (force_refresh) {
+      const recentCache = await readCachedCommissionReport(supabase, periodMonth, rep_id)
+      const refreshedAt = recentCache?.refreshed_at ? new Date(recentCache.refreshed_at).getTime() : 0
+      if (recentCache && Number.isFinite(refreshedAt) && Date.now() - refreshedAt < 5 * 60 * 1000) {
+        const report = await applyLockedPayoutsToReport(supabase, recentCache.report, periodMonth)
+        return new Response(JSON.stringify({
+          ...report,
+          cached: true,
+          refresh_suppressed: true,
+          refreshed_at: recentCache.refreshed_at,
+        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+    }
+
     if (!force_refresh) {
       const cachedReport = await readCachedCommissionReport(supabase, periodMonth, rep_id)
       // Older cached reports were saved before the unresolved-cost detection
@@ -1048,56 +1067,55 @@ async function applyLockedPayoutsToReport(supabase: any, report: any, periodMont
 }
 
 async function fetchZohoInvoices(accessToken: string, orgId: string, dateStart: string, dateEnd: string) {
+  // One paginated invoice-list request is substantially cheaper than querying
+  // Zoho once per status. We fetch the period once and filter the handful of
+  // commission-eligible statuses locally.
   const allInvoices: any[] = []
-  const rateLimitErrors: string[] = []
-  for (const status of ZOHO_ALLOWED_INVOICE_STATUSES) {
-    let page = 1
-    let hasMore = true
+  const allowed = new Set<string>(ZOHO_ALLOWED_INVOICE_STATUSES)
+  let page = 1
+  let hasMore = true
 
-    while (hasMore && page <= 10) {
-      const params = new URLSearchParams({
-        organization_id: orgId,
-        date_start: dateStart,
-        date_end: dateEnd,
-        page: String(page),
-        per_page: '200',
-        status,
-      })
+  while (hasMore && page <= 10) {
+    const params = new URLSearchParams({
+      organization_id: orgId,
+      date_start: dateStart,
+      date_end: dateEnd,
+      page: String(page),
+      per_page: '200',
+      sort_column: 'date',
+      sort_order: 'D',
+    })
 
-      const resp = await fetch(`${ZOHO_API_URL}/books/v3/invoices?${params.toString()}`, {
-        headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` },
-      })
-      const data = await resp.json()
-      if (!resp.ok || data.code !== 0) {
-        console.error(`Zoho invoice fetch error for status ${status}:`, data.message)
-        if (String(data.message || '').toLowerCase().includes('rate limit') || String(data.message || '').includes('maximum call rate limit')) {
-          rateLimitErrors.push(`${status}: ${data.message}`)
-        }
-        break
+    const resp = await fetch(`${ZOHO_API_URL}/books/v3/invoices?${params.toString()}`, {
+      headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` },
+    })
+    const data = await resp.json()
+    if (!resp.ok || data.code !== 0) {
+      const message = String(data?.message || 'Failed to fetch Zoho invoices')
+      console.error('Zoho invoice fetch error:', message)
+      if (message.toLowerCase().includes('rate limit') || message.toLowerCase().includes('maximum call rate limit')) {
+        throw new Error('Zoho API rate limit reached. Please wait for the Zoho limit to reset, then refresh the commission report.')
       }
-
-      const invoices = data.invoices || []
-      if (!invoices.length) break
-
-      allInvoices.push(...invoices)
-      hasMore = data.page_context?.has_more_page ?? false
-      page++
+      throw new Error(message)
     }
-  }
 
-  if (rateLimitErrors.length > 0 && allInvoices.length === 0) {
-    throw new Error('Zoho API rate limit reached. Please wait for the Zoho limit to reset, then refresh the commission report.')
+    const invoices = data.invoices || []
+    if (!invoices.length) break
+    for (const invoice of invoices) {
+      const status = String(invoice.status || '').trim().toLowerCase()
+      if (allowed.has(status as any)) allInvoices.push(invoice)
+    }
+
+    hasMore = data.page_context?.has_more_page ?? false
+    page++
   }
 
   const uniqueInvoices = new Map<string, any>()
   for (const invoice of allInvoices) {
-    // Prefer the stable Zoho invoice_id; fall back to number only if missing.
     const invoiceId = invoice.invoice_id || invoice.invoice_number || invoice.number
     if (!invoiceId) continue
     const key = String(invoiceId).trim()
-    if (!key) continue
-    // First write wins — subsequent statuses for the same invoice are ignored.
-    if (!uniqueInvoices.has(key)) uniqueInvoices.set(key, invoice)
+    if (key && !uniqueInvoices.has(key)) uniqueInvoices.set(key, invoice)
   }
 
   return Array.from(uniqueInvoices.values())

@@ -781,7 +781,9 @@ const CommissionPage = () => {
         const cachedAt = format(new Date(response.data.refreshed_at), "PPp");
         setReportNotice(response.data.stale_due_to_rate_limit
           ? `Zoho API rate limit reached. Showing cached data from ${cachedAt}.`
-          : `Showing cached Zoho data from ${cachedAt}. Use Refresh from Zoho only when you need the latest invoices.`);
+          : response.data.refresh_suppressed
+            ? `Zoho was refreshed recently (${cachedAt}). Reusing that snapshot to avoid duplicate API calls.`
+            : `Showing cached Zoho data from ${cachedAt}. Use Refresh from Zoho only when you need the latest invoices.`);
       }
     } catch (e: any) {
       console.error("Commission report error:", e);
@@ -864,11 +866,21 @@ const CommissionPage = () => {
     }
   }, [activeTab, selectedMonth, fetchCommissionReport]);
 
-  // Realtime and focus/reconnect recovery replace scheduled report polling.
-  useLiveData(["orders", "order_items"], () => fetchCommissionReport(true), {
+  // Commission must not force a Zoho refresh when ordinary order activity happens.
+  // The report is cache-first; only the explicit "Refresh from Zoho" action
+  // is allowed to perform the expensive external sync. Internal commission
+  // changes simply re-read the cached report and re-apply local overrides.
+  useLiveData([
+    "commission_payouts",
+    "commission_payout_batches",
+    "reps",
+    "rep_company_assignments",
+    "rep_rate_history",
+    "rep_company_assignment_history",
+  ], () => fetchCommissionReport(false), {
     enabled: activeTab === "report",
     fallbackIntervalMs: 0,
-    debounceMs: 3000,
+    debounceMs: 2500,
   });
 
   // Lock all currently-unlocked invoices for a single rep into commission_payouts.
@@ -1219,7 +1231,7 @@ const CommissionPage = () => {
           {commissionData?.unresolved_cost_items && commissionData.unresolved_cost_items.length > 0 && (
             <UnresolvedCostsPanel
               items={commissionData.unresolved_cost_items}
-              onSaved={() => fetchCommissionReport(true)}
+              onSaved={() => fetchCommissionReport(false)}
             />
           )}
 
@@ -1229,8 +1241,19 @@ const CommissionPage = () => {
               type="month"
               value={selectedMonth}
               onChange={(e) => setSelectedMonth(e.target.value)}
-              className="w-48"
+              className="w-full sm:w-48"
             />
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => fetchCommissionReport(true)}
+              disabled={loadingReport}
+              className="w-full sm:w-auto"
+              title="Fetch a fresh Zoho snapshot. Normal page loads use the cached report to save API calls."
+            >
+              <RefreshCw className={cn("mr-1.5 h-4 w-4", loadingReport && "animate-spin")} />
+              Refresh from Zoho
+            </Button>
             {loadingReport && (
               <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" />Calculating...
@@ -1415,7 +1438,7 @@ const CommissionPage = () => {
                         missingCount={missing.length}
                         totalValue={totalValue}
                         onExport={downloadMissingCsv}
-                        onSaved={() => fetchCommissionReport(true)}
+                        onSaved={() => fetchCommissionReport(false)}
                         formatCurrency={formatCurrency}
                       />
                     </DialogContent>
