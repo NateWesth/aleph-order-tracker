@@ -953,11 +953,7 @@ export default function FulfillmentPage() {
 
   const saveOptimizedRoute = async () => {
     if (!routePlanStops.length || !user?.id) return;
-    const unlinked = routePlanStops.filter((stop) => !stop.areaId);
-    if (unlinked.length) {
-      toast({ title: "Link every stop to an area first", description: `${unlinked.length} selected stop${unlinked.length === 1 ? " still needs" : "s still need"} an area. Once linked, future work for the same client or supplier is automatic.`, variant: "destructive" });
-      return;
-    }
+
     setRouteSaving(true);
     const scheduledAt = new Date(`${routeDate}T08:00:00`).toISOString();
     const driverId = bulkAssignee !== "keep" && bulkAssignee !== "unassigned"
