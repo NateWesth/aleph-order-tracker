@@ -24,6 +24,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import CommissionRepManagementDialog from "./CommissionRepManagementDialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLiveData } from "@/hooks/useLiveData";
+import CommissionIntelligenceStrip from "./CommissionIntelligenceStrip";
 
 
 type CommissionMethod = "margin_scaled" | "half_markup_below_25";
@@ -1212,6 +1213,7 @@ const CommissionPage = () => {
 
         {/* Commission Report Tab */}
         <TabsContent value="report" className="space-y-5 min-w-0">
+          {commissionData && <CommissionIntelligenceStrip data={commissionData} />}
           {/* Info banner */}
           <div className="commission-info flex items-start gap-3 rounded-2xl border border-border/60 bg-card/70 p-4 text-sm text-muted-foreground shadow-sm">
             <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />

@@ -261,7 +261,7 @@ async function fetchOutstandingPurchaseOrders(accessToken: string, orgId: string
       const status = String(summary.status || '').trim().toLowerCase()
       const billedStatus = String(summary.billed_status || '').trim().toLowerCase()
       if (EXCLUDED_PO_STATUSES.includes(status)) continue
-      if (billedStatus === 'billed') continue
+      if (billedStatus === 'billed' || billedStatus === 'fully_billed') continue
       candidates.push(summary)
     }
 
@@ -293,7 +293,7 @@ async function fetchOutstandingPurchaseOrders(accessToken: string, orgId: string
       const status = String(po.status || summary.status || '').trim().toLowerCase()
       const detailBilled = String(po.billed_status || summary.billed_status || '').trim().toLowerCase()
       if (EXCLUDED_PO_STATUSES.includes(status)) continue
-      if (detailBilled === 'billed') continue
+      if (detailBilled === 'billed' || detailBilled === 'fully_billed') continue
 
       const rawLines = Array.isArray(po.line_items) ? po.line_items : []
       const lines: POLine[] = []

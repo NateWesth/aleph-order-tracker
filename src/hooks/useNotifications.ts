@@ -33,7 +33,7 @@ export function useNotifications() {
 
       if (error) throw error;
 
-      setNotifications((data || []) as unknown as Notification[]);
+      setNotifications(data || []);
       setUnreadCount(data?.filter(n => !n.read).length || 0);
     } catch (err) {
       console.error('Error fetching notifications:', err);

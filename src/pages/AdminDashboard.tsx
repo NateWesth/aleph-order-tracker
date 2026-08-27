@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Package, History, BarChart3, Settings, LogOut, Building2, Box, Users, Truck, FileText, Command, ShoppingCart, Percent, Sparkles, Bot, PanelLeftClose, PanelLeftOpen, Radar, Warehouse, MoreHorizontal, Home, ListFilter, UserRoundCheck } from "lucide-react";
+import { Package, History, BarChart3, Settings, LogOut, Building2, Box, Users, Truck, FileText, Command, ShoppingCart, Percent, Sparkles, Bot, PanelLeftClose, PanelLeftOpen, Radar, Warehouse, MoreHorizontal, Home, ListFilter, UserRoundCheck, BrainCircuit } from "lucide-react";
 import ChangelogDialog, { hasUnreadChangelog } from "@/components/admin/ChangelogDialog";
 import KeyboardShortcutsDialog from "@/components/admin/KeyboardShortcutsDialog";
 import { playClick, playWhoosh } from "@/utils/ambientSounds";
@@ -27,6 +27,8 @@ import { cn } from "@/lib/utils";
 import { triggerHapticFeedback } from "@/utils/haptics";
 import OperationsHomePage from "@/components/admin/OperationsHomePage";
 import MyWorkPage from "@/components/admin/MyWorkPage";
+import OperationsIntelligencePage from "@/components/admin/OperationsIntelligencePage";
+import OperationsPulseBar from "@/components/admin/OperationsPulseBar";
 import { useWorkspaceDensity } from "@/hooks/useWorkspaceDensity";
 
 // Route-level splitting keeps the dashboard interactive while large workspaces
@@ -78,7 +80,7 @@ const WORKSPACE_PREFETCHERS: Record<string, () => Promise<unknown>> = {
 
 const RAIL_STORAGE_KEY = "aleph:workspace-rail-expanded";
 const WORKSPACE_STORAGE_KEY = "aleph:last-workspace";
-const RESTORABLE_WORKSPACES = new Set(["home", "my-work", "orders", "fulfillment", "history", "clients", "suppliers", "stats", "po-tracking", "buying-sheet", "items", "control-tower"]);
+const RESTORABLE_WORKSPACES = new Set(["home", "my-work", "orders", "fulfillment", "history", "clients", "suppliers", "stats", "po-tracking", "buying-sheet", "items", "control-tower", "intelligence"]);
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -271,6 +273,7 @@ const AdminDashboard = () => {
     { id: "suppliers", label: "Suppliers", icon: Truck, badge: 0 },
     { id: "stats", label: "Stats", icon: BarChart3, badge: 0 },
     { id: "control-tower", label: "Control Tower", icon: Radar, badge: 0 },
+    { id: "intelligence", label: "Intelligence", icon: BrainCircuit, badge: 0 },
     { id: "po-tracking", label: "PO Tracking", icon: FileText, badge: 0 },
     { id: "buying-sheet", label: "Buying", icon: ShoppingCart, badge: 0 },
     { id: "items", label: "Items", icon: Box, badge: 0 },
@@ -429,6 +432,7 @@ const AdminDashboard = () => {
               );
             })}
           </nav>
+          <OperationsPulseBar onNavigate={(view) => setActiveView(view)} />
         </div>
       </header>
 
@@ -535,6 +539,7 @@ const AdminDashboard = () => {
               {activeView === "users" && isAdmin && <UsersManagementPage />}
               {activeView === "stats" && <StatsPage />}
               {activeView === "control-tower" && <OperationsControlTower />}
+              {activeView === "intelligence" && <OperationsIntelligencePage onNavigate={(view) => setActiveView(view)} />}
             </PageTransition>
             </Suspense>
           </div>

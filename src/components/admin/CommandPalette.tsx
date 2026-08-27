@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from "@/components/ui/command";
-import { Package, History, Building2, Truck, FileText, Box, Users, BarChart3, Settings, Home, LogOut, Mic, ShoppingCart, Warehouse, Percent, Hash, Loader2, UserRoundCheck, Radar } from "lucide-react";
+import { Package, History, Building2, Truck, FileText, Box, Users, BarChart3, Settings, Home, LogOut, Mic, ShoppingCart, Warehouse, Percent, Hash, Loader2, UserRoundCheck, Radar, Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 interface CommandPaletteProps {
@@ -15,6 +15,7 @@ const NAVIGATION_ITEMS = [
   { id: "home", label: "Today · Operations Brief", icon: Home, keywords: "home today morning brief operations attention" },
   { id: "my-work", label: "My Work", icon: UserRoundCheck, keywords: "assigned to me personal work tasks deliveries collections" },
   { id: "control-tower", label: "Control Tower", icon: Radar, keywords: "control tower exceptions routes dispatch team map" },
+  { id: "intelligence", label: "Operations Intelligence", icon: Sparkles, keywords: "intelligence risk stuck eta purchasing products margin leakage automation audit health score" },
   { id: "orders", label: "Orders Board", icon: Package, keywords: "orders board kanban active" },
   { id: "fulfillment", label: "Delivery & Collection", icon: Warehouse, keywords: "delivery collection fulfillment dispatch pickup" },
   { id: "history", label: "Order History", icon: History, keywords: "history completed delivered past" },
@@ -39,7 +40,7 @@ const ACTION_ITEMS = [
 ];
 
 interface SearchResult {
-  type: "order" | "client" | "supplier" | "item";
+  type: "order" | "client" | "supplier" | "item" | "po" | "invoice";
   id: string;
   label: string;
   hint?: string;
@@ -70,7 +71,7 @@ export default function CommandPalette({ open, onOpenChange, onNavigate, onActio
     const handle = setTimeout(async () => {
       try {
         const like = `%${q}%`;
-        const [ordersRes, companiesRes, suppliersRes, itemsRes] = await Promise.all([
+        const [ordersRes, companiesRes, suppliersRes, itemsRes, poRes, invoiceRes] = await Promise.all([
           supabase
             .from("orders")
             .select("id, order_number, description, status")
@@ -91,6 +92,16 @@ export default function CommandPalette({ open, onOpenChange, onNavigate, onActio
             .select("id, name, code")
             .or(`name.ilike.${like},code.ilike.${like}`)
             .limit(5),
+          supabase
+            .from("order_purchase_orders")
+            .select("id,purchase_order_number,order_id,supplier_id")
+            .ilike("purchase_order_number", like)
+            .limit(6),
+          supabase
+            .from("commission_payouts")
+            .select("id,invoice_id,invoice_number,customer_name,period_month")
+            .ilike("invoice_number", like)
+            .limit(6),
         ]);
 
         const merged: SearchResult[] = [
@@ -118,6 +129,18 @@ export default function CommandPalette({ open, onOpenChange, onNavigate, onActio
             label: i.name,
             hint: i.code,
           })),
+          ...(poRes.data || []).map((po: any) => ({
+            type: "po" as const,
+            id: po.id,
+            label: po.purchase_order_number,
+            hint: "Purchase order",
+          })),
+          ...(invoiceRes.data || []).map((inv: any) => ({
+            type: "invoice" as const,
+            id: inv.invoice_id || inv.id,
+            label: inv.invoice_number || inv.invoice_id,
+            hint: inv.customer_name || `Invoice · ${inv.period_month || ""}`,
+          })),
         ];
         setResults(merged);
       } catch (e) {
@@ -135,6 +158,8 @@ export default function CommandPalette({ open, onOpenChange, onNavigate, onActio
       client: results.filter(r => r.type === "client"),
       supplier: results.filter(r => r.type === "supplier"),
       item: results.filter(r => r.type === "item"),
+      po: results.filter(r => r.type === "po"),
+      invoice: results.filter(r => r.type === "invoice"),
     };
   }, [results]);
 
@@ -143,6 +168,8 @@ export default function CommandPalette({ open, onOpenChange, onNavigate, onActio
     else if (r.type === "client") onNavigate("clients", { highlightId: r.id });
     else if (r.type === "supplier") onNavigate("suppliers", { highlightId: r.id });
     else if (r.type === "item") onNavigate("items", { highlightId: r.id });
+    else if (r.type === "po") onNavigate("po-tracking", { highlightId: r.id });
+    else if (r.type === "invoice") onNavigate("commission", { highlightId: r.id });
     onOpenChange(false);
   };
 
@@ -150,6 +177,8 @@ export default function CommandPalette({ open, onOpenChange, onNavigate, onActio
     if (t === "order") return Hash;
     if (t === "client") return Building2;
     if (t === "supplier") return Truck;
+    if (t === "po") return FileText;
+    if (t === "invoice") return Percent;
     return Box;
   };
 
@@ -206,6 +235,26 @@ export default function CommandPalette({ open, onOpenChange, onNavigate, onActio
                 <Truck className="mr-2 h-4 w-4 text-violet-500" />
                 <span>{r.label}</span>
                 {r.hint && <span className="ml-2 text-xs text-muted-foreground">{r.hint}</span>}
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        )}
+
+        {groupedResults.po.length > 0 && (
+          <CommandGroup heading="Purchase Orders">
+            {groupedResults.po.map(r => (
+              <CommandItem key={`po-${r.id}`} value={`po ${r.label} ${r.hint}`} onSelect={() => handleResultSelect(r)}>
+                <FileText className="mr-2 h-4 w-4 text-cyan-500" /><span>{r.label}</span>{r.hint && <span className="ml-2 text-xs text-muted-foreground">{r.hint}</span>}
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        )}
+
+        {groupedResults.invoice.length > 0 && (
+          <CommandGroup heading="Invoices">
+            {groupedResults.invoice.map(r => (
+              <CommandItem key={`inv-${r.id}`} value={`invoice ${r.label} ${r.hint}`} onSelect={() => handleResultSelect(r)}>
+                <Percent className="mr-2 h-4 w-4 text-violet-500" /><span>{r.label}</span>{r.hint && <span className="ml-2 text-xs text-muted-foreground">{r.hint}</span>}
               </CommandItem>
             ))}
           </CommandGroup>
