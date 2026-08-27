@@ -321,6 +321,15 @@ async function handleInvoiceWebhook(
   }
 
   const invoice = invData.invoice
+  const invoiceStatus = String(invoice.status || '').trim().toLowerCase()
+  // Draft/void/cancelled invoices must never push quantities into the
+  // Ready-for-Delivery bucket. Only a real active/issued invoice may do so.
+  if (['draft', 'void', 'cancelled', 'canceled'].includes(invoiceStatus)) {
+    await cacheZohoDocument(supabase, orgId, 'invoice', String(invoiceId), invoice)
+    return new Response(JSON.stringify({ success: true, ignored: true, reason: `invoice_${invoiceStatus}`, invoice_id: invoiceId }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
+  }
   const invoiceCache = await cacheZohoDocument(supabase, orgId, 'invoice', String(invoiceId), invoice)
   if (invoiceCache.unchanged) {
     return new Response(JSON.stringify({ success: true, unchanged: true, invoice_id: invoiceId }), {
@@ -404,6 +413,7 @@ async function handleInvoiceWebhook(
       .from('orders')
       .select('id, order_number, status')
       .ilike('order_number', ref)
+      .or('status.is.null,status.neq.delivered')
     
     if (orders && orders.length > 0) {
       matchedOrders.push(...orders)
@@ -416,6 +426,7 @@ async function handleInvoiceWebhook(
       .from('orders')
       .select('id, order_number, status')
       .ilike('reference', soNum)
+      .or('status.is.null,status.neq.delivered')
     
     if (orders && orders.length > 0) {
       matchedOrders.push(...orders)
@@ -428,6 +439,7 @@ async function handleInvoiceWebhook(
       .from('orders')
       .select('id, order_number, status')
       .ilike('reference', ref)
+      .or('status.is.null,status.neq.delivered')
     
     if (orders && orders.length > 0) {
       matchedOrders.push(...orders)
@@ -628,12 +640,14 @@ async function handleScanAllInvoices(
         .from('orders')
         .select('id, order_number')
         .ilike('order_number', r)
+        .or('status.is.null,status.neq.delivered')
       if (byOrderNum?.length) orders.push(...byOrderNum)
 
       const { data: byRef } = await supabase
         .from('orders')
         .select('id, order_number')
         .ilike('reference', r)
+        .or('status.is.null,status.neq.delivered')
       if (byRef?.length) orders.push(...byRef)
     }
 

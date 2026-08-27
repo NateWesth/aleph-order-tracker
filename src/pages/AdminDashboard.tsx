@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Package, History, BarChart3, Settings, LogOut, Building2, Box, Users, Truck, FileText, Command, ShoppingCart, Percent, Sparkles, Bot, PanelLeftClose, PanelLeftOpen, Radar, Warehouse } from "lucide-react";
+import { Package, History, BarChart3, Settings, LogOut, Building2, Box, Users, Truck, FileText, Command, ShoppingCart, Percent, Sparkles, Bot, PanelLeftClose, PanelLeftOpen, Radar, Warehouse, MoreHorizontal, Home } from "lucide-react";
 import ChangelogDialog, { hasUnreadChangelog } from "@/components/admin/ChangelogDialog";
 import KeyboardShortcutsDialog from "@/components/admin/KeyboardShortcutsDialog";
 import { playClick, playWhoosh } from "@/utils/ambientSounds";
@@ -18,6 +18,7 @@ import SmartSearch from "@/components/admin/SmartSearch";
 import ActivityFeedSidebar from "@/components/admin/ActivityFeedSidebar";
 import OnlinePresenceIndicator from "@/components/admin/OnlinePresenceIndicator";
 import { Badge } from "@/components/ui/badge";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { AlephLoadingMark, PageSkeleton } from "@/components/ui/PageSkeleton";
 import ToolbarWatermark from "@/components/ui/ToolbarWatermark";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -90,6 +91,7 @@ const AdminDashboard = () => {
   const [userRole, setUserRole] = useState<'admin' | 'user'>('user');
   const [loading, setLoading] = useState(true);
   const [commandOpen, setCommandOpen] = useState(false);
+  const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
   const [changelogOpen, setChangelogOpen] = useState(false);
   const [hasNewChangelog, setHasNewChangelog] = useState(false);
   const [railExpanded, setRailExpanded] = useState(() => {
@@ -270,6 +272,9 @@ const AdminDashboard = () => {
   const filteredNavItems = railQuery.trim()
     ? navItems.filter((item) => item.label.toLowerCase().includes(railQuery.trim().toLowerCase()))
     : navItems;
+  const mobilePrimaryIds = new Set(["orders", "fulfillment", "buying-sheet", "control-tower"]);
+  const mobilePrimaryNav = navItems.filter((item) => mobilePrimaryIds.has(item.id));
+  const mobileMoreNav = navItems.filter((item) => !mobilePrimaryIds.has(item.id));
 
   if (loading) {
     return (
@@ -320,7 +325,7 @@ const AdminDashboard = () => {
 
             {/* Right side actions */}
             <div className="flex items-center gap-1">
-              <OnlinePresenceIndicator currentView={activeView} />
+              <div className="hidden sm:block"><OnlinePresenceIndicator currentView={activeView} /></div>
               <VoiceCommandButton onCommand={handleVoiceCommand} className="hidden md:inline-flex" />
               <Button
                 variant="ghost"
@@ -364,7 +369,7 @@ const AdminDashboard = () => {
                 variant="ghost"
                 size="icon"
                 onClick={() => navigate("/settings")}
-                className="rounded-xl text-muted-foreground hover:text-foreground"
+                className="hidden sm:inline-flex rounded-xl text-muted-foreground hover:text-foreground"
               >
                 <Settings className="h-[18px] w-[18px]" />
               </Button>
@@ -372,7 +377,7 @@ const AdminDashboard = () => {
                 variant="ghost"
                 size={isMobile ? "icon" : "default"}
                 onClick={handleLogout}
-                className="rounded-xl text-muted-foreground hover:text-foreground"
+                className="hidden sm:inline-flex rounded-xl text-muted-foreground hover:text-foreground"
               >
                 <LogOut className="h-[18px] w-[18px]" />
                 {!isMobile && <span className="ml-2 text-sm">Logout</span>}
@@ -496,12 +501,12 @@ const AdminDashboard = () => {
           </div>
           </div>
         </aside>
-        <main ref={contentScrollRef} className={cn("aleph-content-scroll h-full min-h-0 min-w-0 flex-1 w-full overflow-x-hidden overflow-y-auto pb-16 sm:pb-0", railExpanded ? "lg:ml-[248px]" : "lg:ml-[56px]")}>
+        <main ref={contentScrollRef} className={cn("aleph-content-scroll h-full min-h-0 min-w-0 flex-1 w-full overflow-x-hidden overflow-y-auto pb-24 sm:pb-0", railExpanded ? "lg:ml-[248px]" : "lg:ml-[56px]")}>
 
 
           <div
             className={cn(
-              "app-page-stage w-full px-3 sm:px-5 lg:px-6 py-4 sm:py-6",
+              "app-page-stage w-full px-2.5 sm:px-5 lg:px-6 py-3 sm:py-6",
               activeView === "orders" || activeView === "history" ? "max-w-none" : "max-w-[1480px] mx-auto"
             )}
           >
@@ -534,10 +539,11 @@ const AdminDashboard = () => {
         <ActivityFeedSidebar />
       </div>
 
-      {/* Mobile Bottom Navigation */}
+      {/* Mobile Bottom Navigation — four primary workspaces + a More sheet.
+          This avoids the old horizontally scrolling desktop-style nav on phones. */}
       <nav className="aleph-mobile-nav fixed bottom-0 left-0 right-0 z-50 border-t sm:hidden safe-area-bottom">
-        <div className="flex items-center justify-start gap-1 overflow-x-auto px-2 py-1 scrollbar-none snap-x">
-          {navItems.map((item) => {
+        <div className="grid grid-cols-5 items-stretch gap-1 px-2 py-1.5">
+          {mobilePrimaryNav.map((item) => {
             const isActive = activeView === item.id;
             return (
               <button
@@ -549,31 +555,77 @@ const AdminDashboard = () => {
                 }}
                 onPointerDown={() => prefetchWorkspace(item.id)}
                 className={cn(
-                  "flex flex-col items-center justify-center gap-0.5 py-2 px-3 rounded-xl transition-all duration-200 min-w-[64px] snap-start",
-                  isActive
-                    ? "text-primary bg-primary/10"
-                    : "text-muted-foreground active:bg-muted active:scale-95"
+                  "flex min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-2 transition-all duration-200",
+                  isActive ? "bg-primary/10 text-primary" : "text-muted-foreground active:scale-95 active:bg-muted"
                 )}
               >
                 <div className="relative">
                   <item.icon className={cn("h-5 w-5", isActive && "stroke-[2.5]")} />
                   {item.badge > 0 && (
-                    <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-[16px] flex items-center justify-center text-[9px] font-bold bg-primary text-primary-foreground rounded-full px-1">
+                    <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-bold text-primary-foreground">
                       {item.badge > 99 ? '99+' : item.badge}
                     </span>
                   )}
                 </div>
-                <span className={cn(
-                  "text-[10px] font-medium",
-                  isActive && "font-semibold"
-                )}>
-                  {item.label}
-                </span>
+                <span className="max-w-full truncate text-[9px] font-bold">{item.label === "Delivery & Collection" ? "Dispatch" : item.label}</span>
               </button>
             );
           })}
+          <button
+            onClick={() => { triggerHapticFeedback('light'); setMobileMoreOpen(true); }}
+            className={cn(
+              "flex min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-2 text-muted-foreground transition-all active:scale-95 active:bg-muted",
+              mobileMoreNav.some((item) => item.id === activeView) && "bg-primary/10 text-primary"
+            )}
+          >
+            <MoreHorizontal className="h-5 w-5" />
+            <span className="text-[9px] font-bold">More</span>
+          </button>
         </div>
       </nav>
+
+      <Sheet open={mobileMoreOpen} onOpenChange={setMobileMoreOpen}>
+        <SheetContent side="bottom" className="max-h-[82dvh] overflow-y-auto rounded-t-[28px] border-t border-border/70 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-5 sm:hidden">
+          <SheetHeader className="text-left">
+            <SheetTitle>More workspaces</SheetTitle>
+          </SheetHeader>
+          <div className="mt-4 grid grid-cols-3 gap-2">
+            <button
+              onClick={() => { setActiveView("home"); setMobileMoreOpen(false); }}
+              className="flex min-h-24 flex-col items-center justify-center gap-2 rounded-2xl border border-border/60 bg-muted/25 p-3 text-center font-bold text-foreground active:scale-[0.98]"
+            >
+              <Home className="h-5 w-5 text-primary" />
+              <span className="text-xs">Home</span>
+            </button>
+            {mobileMoreNav.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => {
+                  triggerHapticFeedback('light');
+                  playClick();
+                  setActiveView(item.id);
+                  setMobileMoreOpen(false);
+                }}
+                onPointerDown={() => prefetchWorkspace(item.id)}
+                className={cn(
+                  "relative flex min-h-24 flex-col items-center justify-center gap-2 rounded-2xl border p-3 text-center font-bold active:scale-[0.98]",
+                  activeView === item.id ? "border-primary/30 bg-primary/10 text-primary" : "border-border/60 bg-muted/25 text-foreground"
+                )}
+              >
+                <item.icon className="h-5 w-5" />
+                <span className="text-xs leading-tight">{item.label}</span>
+                {item.badge > 0 && <Badge className="absolute right-2 top-2 h-5 min-w-5 px-1 text-[9px]">{item.badge > 99 ? "99+" : item.badge}</Badge>}
+              </button>
+            ))}
+            <button onClick={() => { navigate('/settings'); setMobileMoreOpen(false); }} className="flex min-h-24 flex-col items-center justify-center gap-2 rounded-2xl border border-border/60 bg-muted/25 p-3 text-center font-bold active:scale-[0.98]">
+              <Settings className="h-5 w-5 text-primary" /><span className="text-xs">Preferences</span>
+            </button>
+            <button onClick={() => { void handleLogout(); setMobileMoreOpen(false); }} className="flex min-h-24 flex-col items-center justify-center gap-2 rounded-2xl border border-destructive/20 bg-destructive/5 p-3 text-center font-bold text-destructive active:scale-[0.98]">
+              <LogOut className="h-5 w-5" /><span className="text-xs">Log out</span>
+            </button>
+          </div>
+        </SheetContent>
+      </Sheet>
 
       {/* Command Palette */}
       <CommandPalette

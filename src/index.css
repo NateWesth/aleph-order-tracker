@@ -3282,3 +3282,106 @@ html, body, .aleph-content-scroll { scrollbar-width: thin !important; }
     bottom: calc(max(.8rem, env(safe-area-inset-bottom, 0px)) + 8rem) !important;
   }
 }
+
+/* ============================================================
+   ALEPH MOBILE-FIRST PASS — 2026-08
+   Shared rules only: no logo/brand colour changes.
+   ============================================================ */
+@media (max-width: 639px) {
+  .aleph-topbar > div:last-child {
+    padding-left: .5rem;
+    padding-right: .5rem;
+    padding-top: .45rem;
+    padding-bottom: .45rem;
+  }
+
+  .aleph-home-button {
+    width: 2.65rem !important;
+    height: 2.65rem !important;
+    padding: .25rem !important;
+  }
+
+  .aleph-smart-search {
+    min-width: 0;
+  }
+
+  .app-page-stage {
+    padding-left: .65rem !important;
+    padding-right: .65rem !important;
+    padding-top: .75rem !important;
+  }
+
+  .aleph-mobile-nav {
+    background: hsl(var(--card) / .94);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    box-shadow: 0 -16px 42px -30px hsl(var(--foreground) / .45);
+  }
+
+  /* Touch targets should feel native on phones. */
+  .app-page-stage button:not([role="checkbox"]):not([role="switch"]),
+  .app-page-stage [role="button"] {
+    touch-action: manipulation;
+  }
+
+  .app-page-stage input,
+  .app-page-stage textarea,
+  .app-page-stage select {
+    font-size: 16px; /* prevents iOS zoom-on-focus */
+  }
+
+  /* Cards become compact vertical work surfaces instead of desktop panels. */
+  .app-page-stage .glass-card,
+  .app-page-stage .card-elevated,
+  .app-page-stage .float-surface {
+    border-radius: 1.1rem;
+  }
+
+  .fulfillment-workspace,
+  .aleph-commission-workspace,
+  .aleph-buying-workspace,
+  .aleph-orders-workspace {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: clip;
+  }
+
+  .fulfillment-board-grid {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: .75rem !important;
+  }
+
+  /* Long desktop data rows wrap instead of widening the phone canvas. */
+  .app-page-stage table {
+    max-width: 100%;
+  }
+
+  .app-page-stage th,
+  .app-page-stage td {
+    overflow-wrap: anywhere;
+  }
+
+  [role="dialog"] {
+    max-width: calc(100vw - 1rem) !important;
+    max-height: calc(100dvh - 1rem) !important;
+  }
+
+  /* Radix bottom sheets should feel like mobile drawers. */
+  [data-radix-dialog-content][data-side="bottom"] {
+    border-radius: 1.75rem 1.75rem 0 0;
+  }
+
+  /* Commission: keep the essential first columns readable on phones and
+     suppress secondary spreadsheet detail that belongs in desktop/export. */
+  .commission-line-table th:nth-child(n+5):not(:last-child),
+  .commission-line-table td:nth-child(n+5):not(:last-child) {
+    display: none;
+  }
+
+  .commission-line-table input {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+}
