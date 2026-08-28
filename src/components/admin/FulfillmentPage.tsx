@@ -229,11 +229,13 @@ const poOperationalDate = (po: Pick<ZohoPO, "expectedDeliveryDate" | "date">) =>
 
 const CLOSED_PO_STATUSES = new Set(["cancelled", "closed", "rejected", "draft", "void", "billed"]);
 const CLOSED_BILLED_STATUSES = new Set(["billed", "fully_billed"]);
+const CLOSED_RECEIVED_STATUSES = new Set(["received", "fully_received"]);
 
 const isOpenCollectionPO = (po: ZohoPO) => {
   const status = String(po.status || "").trim().toLowerCase();
   const billedStatus = String(po.billedStatus || "").trim().toLowerCase();
-  if (!po.purchaseOrderId || CLOSED_PO_STATUSES.has(status) || CLOSED_BILLED_STATUSES.has(billedStatus)) return false;
+  const receivedStatus = String(po.receivedStatus || "").trim().toLowerCase();
+  if (!po.purchaseOrderId || CLOSED_PO_STATUSES.has(status) || CLOSED_BILLED_STATUSES.has(billedStatus) || CLOSED_RECEIVED_STATUSES.has(receivedStatus)) return false;
   return Array.isArray(po.lines) && po.lines.some((line) => Number(line.outstanding || 0) > 0);
 };
 
@@ -342,7 +344,7 @@ export default function FulfillmentPage() {
       const [ordersRes, deliveryHistoryRes, profilesRes, settingsRes, cacheRes, statesRes, eventsRes, areaRes, areaLinksRes, timelineRes] = await Promise.all([
         supabase
           .from("orders")
-          .select("id, order_number, reference, urgency, company_id, created_at, fulfillment_method, fulfillment_status, fulfillment_assigned_to, fulfillment_scheduled_for, fulfillment_notes, fulfillment_routed_at")
+          .select("id, order_number, reference, urgency, company_id, created_at, completed_date, status, fulfillment_method, fulfillment_status, fulfillment_assigned_to, fulfillment_scheduled_for, fulfillment_notes, fulfillment_routed_at")
           .or("status.is.null,status.in.(ordered,in-progress,in-stock,ready)")
           .order("created_at", { ascending: true }),
         supabase
@@ -422,9 +424,11 @@ export default function FulfillmentPage() {
 
       const readyDeliveries = activeBase
         .map(decorateOrder)
-        .filter((order) =>
+        .filter((order: any) =>
           order.fulfillment_method === "delivery"
-          && order.items.some((item) => readyUnits(item) > 0)
+          && String(order.status || "").toLowerCase() !== "delivered"
+          && !order.completed_date
+          && order.items.some((item: FulfillmentItem) => readyUnits(item) > 0)
           && order.fulfillment_status !== "completed"
         )
         .sort((a, b) => Number(b.urgency === "urgent") - Number(a.urgency === "urgent"));
@@ -548,7 +552,7 @@ export default function FulfillmentPage() {
         const collectedUnits = linesView.reduce((sum, line) => sum + line.collected, 0);
         return { ...po, state: stateMap.get(po.purchaseOrderId) || null, linesView, remainingUnits, collectedUnits };
       })
-      .filter((po) => po.remainingUnits > 0)
+      .filter((po) => po.remainingUnits > 0 && po.state?.status !== "collected" && !po.state?.completed_at)
       .sort((a, b) => {
         const urgencyDifference = Number(Boolean(b.state?.is_urgent)) - Number(Boolean(a.state?.is_urgent));
         return urgencyDifference || (a.expectedDeliveryDate || a.date || "").localeCompare(b.expectedDeliveryDate || b.date || "");
@@ -869,29 +873,16 @@ export default function FulfillmentPage() {
       .slice(-3)
       .reverse()
       .join("|");
-    // Stops are only grouped together when the user has explicitly put them in the
-    // same dispatch area. Everything else keeps the order it was selected in.
-    const buckets: { key: string; stops: DispatchPlanningStop[] }[] = [];
-    const bucketIndex = new Map<string, number>();
-    selectedDispatchStops.forEach((stop, index) => {
-      const key = stop.areaId ? `area::${stop.areaId}` : `solo::${stop.key}::${index}`;
-      const existing = bucketIndex.get(key);
-      if (existing === undefined) {
-        bucketIndex.set(key, buckets.length);
-        buckets.push({ key, stops: [stop] });
-      } else {
-        buckets[existing].stops.push(stop);
-      }
-    });
-    return buckets.flatMap((bucket) => {
-      if (bucket.stops.length < 2) return bucket.stops;
-      return [...bucket.stops].sort((a, b) => {
-        const proximity = proximityKey(a.address).localeCompare(proximityKey(b.address));
-        if (proximity) return proximity;
-        const urgency = Number(b.urgency === "urgent") - Number(a.urgency === "urgent");
-        if (urgency) return urgency;
-        return String(a.scheduledFor || "").localeCompare(String(b.scheduledFor || ""));
-      });
+    return [...selectedDispatchStops].sort((a, b) => {
+      const areaOrder = a.areaSortOrder - b.areaSortOrder;
+      if (areaOrder) return areaOrder;
+      const areaName = String(a.areaName || "zzzz").localeCompare(String(b.areaName || "zzzz"));
+      if (areaName) return areaName;
+      const proximity = proximityKey(a.address).localeCompare(proximityKey(b.address));
+      if (proximity) return proximity;
+      const urgency = Number(b.urgency === "urgent") - Number(a.urgency === "urgent");
+      if (urgency) return urgency;
+      return String(a.scheduledFor || "").localeCompare(String(b.scheduledFor || ""));
     });
   }, [selectedDispatchStops]);
 
@@ -952,8 +943,11 @@ export default function FulfillmentPage() {
 
   const saveOptimizedRoute = async () => {
     if (!routePlanStops.length || !user?.id) return;
-    // Dispatch areas are optional — a run can be planned without linking any stop to an area.
-
+    const unlinked = routePlanStops.filter((stop) => !stop.areaId);
+    if (unlinked.length) {
+      toast({ title: "Link every stop to an area first", description: `${unlinked.length} selected stop${unlinked.length === 1 ? " still needs" : "s still need"} an area. Once linked, future work for the same client or supplier is automatic.`, variant: "destructive" });
+      return;
+    }
     setRouteSaving(true);
     const scheduledAt = new Date(`${routeDate}T08:00:00`).toISOString();
     const driverId = bulkAssignee !== "keep" && bulkAssignee !== "unassigned"
@@ -1309,54 +1303,15 @@ export default function FulfillmentPage() {
 
   return (
     <div className="fulfillment-v3 fulfillment-workspace aleph-page-workspace min-w-0 space-y-4 pb-10 sm:space-y-5">
-      <section className="fulfillment-command-header overflow-hidden rounded-[26px] border border-border/60 bg-card/90 shadow-sm backdrop-blur-xl">
-        <div className="flex flex-col gap-4 p-4 sm:p-5 xl:flex-row xl:items-center">
-          <div className="relative flex min-w-0 items-center gap-3 overflow-hidden rounded-2xl border border-primary/15 bg-gradient-to-br from-primary/[0.08] via-background/80 to-background/40 px-3 py-2.5 xl:w-[350px]">
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1 ribbon-bar opacity-80" aria-hidden />
-            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-background/90 p-1 shadow-sm ring-1 ring-border/60">
-              <img src="/lovable-uploads/e1088147-889e-43f6-bdf0-271189b88913.png" alt="Aleph" className="h-full w-full object-contain" />
-            </span>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2"><p className="text-[9px] font-black uppercase tracking-[0.2em] text-primary">Control tower</p><span className="flex items-center gap-1 text-[9px] font-bold text-emerald-600"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />Live</span></div>
-              <h1 className="truncate text-xl font-black tracking-[-0.035em] sm:text-2xl">Dispatch control</h1>
-              <p className="truncate text-[10px] text-muted-foreground">Deliveries, collections and route planning in one workspace</p>
-            </div>
+      <section className="overflow-hidden rounded-[28px] border border-border/60 bg-card/90 shadow-sm backdrop-blur-xl">
+        <div className="h-1.5 w-full ribbon-bar" aria-hidden />
+        <div className="flex flex-col gap-4 p-4 sm:p-5 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-background p-1 shadow-sm ring-1 ring-border/60"><img src="/lovable-uploads/e1088147-889e-43f6-bdf0-271189b88913.png" alt="Aleph" className="h-full w-full object-contain" /></span>
+            <div className="min-w-0"><div className="flex items-center gap-2"><p className="text-[9px] font-black uppercase tracking-[0.2em] text-primary">Dispatch workspace</p><span className="flex items-center gap-1 text-[9px] font-bold text-emerald-600"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />Live</span></div><h1 className="truncate text-2xl font-black tracking-tight">Deliveries & Collections</h1><p className="mt-0.5 text-xs text-muted-foreground">Only active work appears here. Finished movements stay in History.</p></div>
           </div>
-
-          <div className="grid flex-1 grid-cols-2 gap-2 lg:grid-cols-4">
-            <button type="button" onClick={() => setActiveMode("delivery")} className={cn("group flex items-center gap-3 rounded-2xl border px-3 py-2.5 text-left transition-all", activeMode === "delivery" ? "border-cyan-500/30 bg-cyan-500/10 shadow-sm" : "border-border/50 bg-muted/25 hover:bg-muted/50")}>
-              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-cyan-500/15 text-cyan-600"><Truck className="h-4 w-4" /></span><span className="min-w-0 flex-1"><span className="block text-[9px] font-black uppercase tracking-wider text-muted-foreground">Deliveries</span><span className="block text-lg font-black leading-5">{counts.delivery}</span></span><span className="text-[10px] font-bold text-cyan-600">{counts.readyUnits} units</span>
-            </button>
-            <button type="button" onClick={() => setActiveMode("collection")} className={cn("group flex items-center gap-3 rounded-2xl border px-3 py-2.5 text-left transition-all", activeMode === "collection" ? "border-violet-500/30 bg-violet-500/10 shadow-sm" : "border-border/50 bg-muted/25 hover:bg-muted/50")}>
-              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-violet-500/15 text-violet-600"><Warehouse className="h-4 w-4" /></span><span className="min-w-0 flex-1"><span className="block text-[9px] font-black uppercase tracking-wider text-muted-foreground">Collections</span><span className="block text-lg font-black leading-5">{counts.collection}</span></span><span className="text-[10px] font-bold text-violet-600">{counts.collectionUnits} units</span>
-            </button>
-            <button type="button" onClick={() => { setFocusFilter("today"); if (activeMode === "history") setActiveMode("delivery"); }} className="flex items-center gap-3 rounded-2xl border border-border/50 bg-muted/25 px-3 py-2.5 text-left transition-all hover:border-emerald-500/25 hover:bg-emerald-500/[0.07]">
-              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-emerald-500/15 text-emerald-600"><CalendarClock className="h-4 w-4" /></span><span className="min-w-0 flex-1"><span className="block text-[9px] font-black uppercase tracking-wider text-muted-foreground">Today</span><span className="block text-lg font-black leading-5">{counts.scheduledToday}</span></span><ChevronRight className="h-4 w-4 text-muted-foreground/40" />
-            </button>
-            <button type="button" onClick={() => { setFocusFilter("late"); if (activeMode === "history") setActiveMode("delivery"); }} className={cn("flex items-center gap-3 rounded-2xl border px-3 py-2.5 text-left transition-all", counts.late ? "border-destructive/25 bg-destructive/[0.07] hover:bg-destructive/10" : "border-border/50 bg-muted/25 hover:bg-muted/50")}>
-              <span className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-xl", counts.late ? "bg-destructive/15 text-destructive" : "bg-emerald-500/15 text-emerald-600")}><Timer className="h-4 w-4" /></span><span className="min-w-0 flex-1"><span className="block text-[9px] font-black uppercase tracking-wider text-muted-foreground">Late</span><span className="block text-lg font-black leading-5">{counts.late}</span></span><ChevronRight className="h-4 w-4 text-muted-foreground/40" />
-            </button>
-          </div>
-
-          <div className="flex shrink-0 items-center gap-2 xl:border-l xl:border-border/60 xl:pl-4">
-            <Button variant="outline" size="sm" className="h-10 flex-1 rounded-xl xl:flex-none" onClick={printDispatchManifest}><Printer className="mr-1.5 h-3.5 w-3.5" />Manifest</Button>
-            <Button variant="outline" size="icon" className="h-10 w-10 shrink-0 rounded-xl" aria-label="Refresh live fulfillment data" onClick={() => void refreshNow()} disabled={refreshing}><RefreshCw className={cn("h-4 w-4", refreshing && "animate-spin")} /></Button>
-          </div>
+          <div className="flex flex-wrap items-center gap-2"><div className="flex items-center gap-2 rounded-xl border border-cyan-500/20 bg-cyan-500/[0.06] px-3 py-2"><Truck className="h-4 w-4 text-cyan-600"/><span className="text-sm font-black">{counts.delivery}</span><span className="text-[10px] font-semibold text-muted-foreground">deliveries</span></div><div className="flex items-center gap-2 rounded-xl border border-violet-500/20 bg-violet-500/[0.06] px-3 py-2"><Warehouse className="h-4 w-4 text-violet-600"/><span className="text-sm font-black">{counts.collection}</span><span className="text-[10px] font-semibold text-muted-foreground">collections</span></div><Button variant="outline" size="icon" className="h-10 w-10 rounded-xl" aria-label="Refresh fulfillment" onClick={() => void refreshNow()} disabled={refreshing}><RefreshCw className={cn("h-4 w-4", refreshing && "animate-spin")} /></Button><Button className="h-10 rounded-xl" onClick={() => setRoutePlannerOpen(true)}><Route className="mr-1.5 h-4 w-4" />Plan run</Button></div>
         </div>
-        <div className="grid border-t border-border/55 bg-muted/25 text-[9px] font-bold text-muted-foreground sm:grid-cols-3">
-          <div className="flex items-center gap-2 px-4 py-2"><Users className="h-3.5 w-3.5 text-amber-500" /><span>{counts.unassignedDeliveries + counts.unassignedCollections} movements need an owner</span></div>
-          <div className="flex items-center gap-2 border-t border-border/45 px-4 py-2 sm:border-l sm:border-t-0"><CalendarDays className="h-3.5 w-3.5 text-primary" /><span>Open work has no age cut-off · History keeps the recent 14-day view</span></div>
-          <button type="button" onClick={() => setActiveMode("history")} className="flex items-center gap-2 border-t border-border/45 px-4 py-2 text-left transition-colors hover:bg-muted/50 sm:border-l sm:border-t-0"><History className="h-3.5 w-3.5 text-emerald-600" /><span>{counts.deliveryHistory + counts.collectionHistory} recent completed movements</span><ArrowRight className="ml-auto h-3 w-3" /></button>
-        </div>
-      </section>
-
-      <section className="grid grid-cols-2 gap-2 sm:gap-3 xl:grid-cols-4">
-        {[
-          { label: "Needs delivery owner", value: counts.unassignedDeliveries, detail: "customer orders", icon: Truck, tone: "bg-cyan-500/10 text-cyan-600", action: () => { setActiveMode("delivery"); setFocusFilter("all"); } },
-          { label: "Needs collection owner", value: counts.unassignedCollections, detail: "supplier POs", icon: Warehouse, tone: "bg-violet-500/10 text-violet-600", action: () => { setActiveMode("collection"); setFocusFilter("all"); } },
-          { label: "Completed deliveries", value: counts.deliveryHistory, detail: "recent archive", icon: CheckCircle2, tone: "bg-emerald-500/10 text-emerald-600", action: () => { setHistoryMode("delivery"); setActiveMode("history"); } },
-          { label: "Collection trips", value: counts.collectionHistory, detail: "immutable events", icon: Archive, tone: "bg-orange-500/10 text-orange-600", action: () => { setHistoryMode("collection"); setActiveMode("history"); } },
-        ].map((metric) => <button key={metric.label} onClick={metric.action} className="group flex items-center gap-3 rounded-[22px] border border-border/60 bg-card/85 p-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-lg"><span className={cn("grid h-11 w-11 shrink-0 place-items-center rounded-2xl", metric.tone)}><metric.icon className="h-4.5 w-4.5" /></span><span className="min-w-0 flex-1"><span className="block text-[9px] font-black uppercase tracking-[0.14em] text-muted-foreground">{metric.label}</span><span className="mt-0.5 block text-2xl font-black">{metric.value}</span><span className="block text-[10px] text-muted-foreground">{metric.detail}</span></span><ChevronRight className="h-4 w-4 text-muted-foreground/25 transition-transform group-hover:translate-x-0.5 group-hover:text-primary" /></button>)}
       </section>
 
       <section className="sticky top-0 z-20 rounded-[24px] border border-border/60 bg-card/90 p-3 shadow-lg backdrop-blur-xl">
@@ -1372,7 +1327,7 @@ export default function FulfillmentPage() {
             <div className="grid grid-cols-4 gap-1 rounded-xl bg-muted/45 p-1">{(["all", "mine", "today", "late"] as FocusFilter[]).map((filter) => <button key={filter} onClick={() => setFocusFilter(filter)} className={cn("rounded-lg px-2.5 py-2 text-[10px] font-bold capitalize", focusFilter === filter ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>{filter}</button>)}</div>
             <div className="flex items-center gap-2 rounded-xl border border-border/60 px-3 py-1.5"><Switch checked={settings.auto_assign_enabled} onCheckedChange={(checked) => void saveSettings({ auto_assign_enabled: checked })} /><div className="whitespace-nowrap"><p className="text-[10px] font-bold">Auto assign</p><p className="text-[9px] text-muted-foreground">Balance new work</p></div></div>
             {activeMode === "collection" && <Button variant="outline" className="h-10 rounded-xl" onClick={() => void autoAssignCollections()} disabled={assigning || !collectionQueue.length}><Sparkles className="mr-1.5 h-3.5 w-3.5" />{assigning ? "Assigning…" : "Balance"}</Button>}
-            <Button className="h-10 rounded-xl" onClick={() => setRoutePlannerOpen(true)}><Route className="mr-1.5 h-3.5 w-3.5" />Plan dispatch run</Button>
+
           </div>}
         </div>
       </section>
@@ -1444,13 +1399,13 @@ export default function FulfillmentPage() {
             <section className="rounded-3xl border border-border/60 bg-background p-4">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">2 · Teach the area once</p><p className="mt-1 text-xs text-muted-foreground">Area links are saved against the client or supplier, not this individual order.</p></div><div className="flex min-w-0 gap-2 sm:w-[320px]"><Input value={newAreaName} onChange={(event) => setNewAreaName(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void createDispatchArea(); } }} placeholder="New area, e.g. Jet Park" className="h-9 rounded-xl" /><Button variant="outline" className="h-9 rounded-xl" disabled={!newAreaName.trim()} onClick={() => void createDispatchArea()}>Add</Button></div></div>
               <div className="mt-4 space-y-2">
-                {selectedDispatchStops.map((stop) => <div key={`area-${stop.key}`} className={cn("grid gap-2 rounded-2xl border p-3 sm:grid-cols-[minmax(0,1fr)_180px_minmax(180px,1fr)] sm:items-center", stop.areaId ? "border-primary/25 bg-primary/[0.05]" : "border-border/55 bg-muted/20")}><div className="min-w-0"><div className="flex flex-wrap items-center gap-1.5"><Badge variant="outline" className={cn("h-5 text-[8px] uppercase", stop.type === "delivery" ? "border-cyan-500/30 text-cyan-700" : "border-violet-500/30 text-violet-700")}>{stop.type}</Badge><strong className="text-xs">{stop.reference}</strong></div><p className="mt-0.5 truncate text-[10px] text-muted-foreground">{stop.label}</p></div><Select value={stop.areaId || "unlinked"} onValueChange={(value) => value !== "unlinked" && void saveStopAreaLink(stop, value)} disabled={areaSavingKey === stop.key}><SelectTrigger className="h-9 rounded-xl bg-background"><SelectValue placeholder="Choose area" /></SelectTrigger><SelectContent><SelectItem value="unlinked" disabled>Choose area</SelectItem>{dispatchAreas.map((area) => <SelectItem key={area.id} value={area.id}>{area.name}</SelectItem>)}</SelectContent></Select><Input key={`${stop.key}-${stop.address || "empty"}`} defaultValue={stop.address || ""} disabled={!stop.areaId || areaSavingKey === stop.key} onBlur={(event) => stop.areaId && void saveStopAreaLink(stop, stop.areaId, event.target.value)} placeholder={stop.type === "collection" ? "Supplier pickup address" : "Navigation address override"} className="h-9 rounded-xl bg-background text-xs" /></div>)}
+                {selectedDispatchStops.map((stop) => <div key={`area-${stop.key}`} className={cn("grid gap-2 rounded-2xl border p-3 sm:grid-cols-[minmax(0,1fr)_180px_minmax(180px,1fr)] sm:items-center", stop.areaId ? "border-border/55 bg-muted/20" : "border-amber-500/30 bg-amber-500/[0.06]")}><div className="min-w-0"><div className="flex flex-wrap items-center gap-1.5"><Badge variant="outline" className={cn("h-5 text-[8px] uppercase", stop.type === "delivery" ? "border-cyan-500/30 text-cyan-700" : "border-violet-500/30 text-violet-700")}>{stop.type}</Badge><strong className="text-xs">{stop.reference}</strong>{!stop.areaId && <Badge variant="destructive" className="h-5 text-[8px]">Area required</Badge>}</div><p className="mt-0.5 truncate text-[10px] text-muted-foreground">{stop.label}</p></div><Select value={stop.areaId || "unlinked"} onValueChange={(value) => value !== "unlinked" && void saveStopAreaLink(stop, value)} disabled={areaSavingKey === stop.key}><SelectTrigger className="h-9 rounded-xl bg-background"><SelectValue placeholder="Choose area" /></SelectTrigger><SelectContent><SelectItem value="unlinked" disabled>Choose area</SelectItem>{dispatchAreas.map((area) => <SelectItem key={area.id} value={area.id}>{area.name}</SelectItem>)}</SelectContent></Select><Input key={`${stop.key}-${stop.address || "empty"}`} defaultValue={stop.address || ""} disabled={!stop.areaId || areaSavingKey === stop.key} onBlur={(event) => stop.areaId && void saveStopAreaLink(stop, stop.areaId, event.target.value)} placeholder={stop.type === "collection" ? "Supplier pickup address" : "Navigation address override"} className="h-9 rounded-xl bg-background text-xs" /></div>)}
                 {!selectedDispatchStops.length && <p className="rounded-2xl bg-muted/30 px-4 py-6 text-center text-xs text-muted-foreground">Select stops above to link their areas.</p>}
               </div>
             </section>
 
             <section>
-              <div className="mb-3 flex flex-wrap items-end justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">3 · Suggested stop order</p><p className="mt-1 text-xs text-muted-foreground">{routePlanStops.length} selected stops · grouped only where you assigned the same area, otherwise kept in selection order.</p></div><div className="flex gap-2"><Badge variant="secondary" className="rounded-full">{routePlanStops.filter((stop) => !stop.areaId).length} without an area</Badge><Badge variant="secondary" className="rounded-full">{routePlanStops.filter((stop) => !stop.address).length} missing addresses</Badge></div></div>
+              <div className="mb-3 flex flex-wrap items-end justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">3 · Suggested stop order</p><p className="mt-1 text-xs text-muted-foreground">{routePlanStops.length} selected stops · grouped by learned area, then nearby address text and urgency.</p></div><div className="flex gap-2"><Badge variant={routePlanStops.some((stop) => !stop.areaId) ? "destructive" : "secondary"} className="rounded-full">{routePlanStops.filter((stop) => !stop.areaId).length} unlinked</Badge><Badge variant="secondary" className="rounded-full">{routePlanStops.filter((stop) => !stop.address).length} missing addresses</Badge></div></div>
               <div className="space-y-2">{routePlanStops.map((stop, index) => <div key={stop.key} className="grid grid-cols-[38px_minmax(0,1fr)] gap-3 rounded-2xl border border-border/55 bg-muted/25 p-3"><span className="grid h-9 w-9 place-items-center rounded-xl bg-primary text-sm font-black text-primary-foreground">{index + 1}</span><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="font-black text-primary">{stop.reference}</p><Badge variant="outline" className={cn("h-5 text-[8px] font-black uppercase", stop.type === "delivery" ? "border-cyan-500/30 text-cyan-700" : "border-violet-500/30 text-violet-700")}>{stop.type}</Badge>{stop.areaName && <Badge variant="secondary" className="h-5 text-[8px]">{stop.areaName}</Badge>}{stop.urgency === "urgent" && <Badge variant="destructive" className="h-5 text-[9px]">Urgent</Badge>}</div><p className="truncate text-xs font-semibold">{stop.label}</p><p className={cn("mt-1 flex items-center gap-1 text-[10px]", stop.address ? "text-muted-foreground" : "font-bold text-amber-600")}><MapPin className="h-3 w-3 shrink-0" />{stop.address || "Add a navigation address above"}</p></div></div>)}</div>
             </section>
             <div className="flex flex-col gap-2 border-t border-border/60 pt-4 sm:flex-row">
@@ -1484,9 +1439,9 @@ export default function FulfillmentPage() {
         <DialogContent className="w-[calc(100%-24px)] max-w-2xl overflow-y-auto max-h-[85vh] p-0 gap-0 rounded-3xl border-2 border-primary/15 bg-background/95 backdrop-blur-2xl shadow-[0_24px_80px_-28px_hsl(var(--foreground)/0.38)]">
           <div className="ribbon-bar" aria-hidden />
           {selectedCollection && <>
-            <div className="fulfillment-inspector-hero border-b border-border/60 p-5 pt-6 sm:p-6 sm:pt-6"><DialogHeader><div className="flex flex-wrap items-center gap-2"><Badge variant="outline" className="bg-background/70"><Warehouse className="mr-1 h-3 w-3" />Supplier stock arrival</Badge><Badge variant="secondary">{selectedCollection.remainingUnits} units left</Badge>{selectedCollection.state?.is_urgent && <Badge variant="destructive">Urgent</Badge>}</div><DialogTitle className="mt-3 text-left text-2xl font-black tracking-tight">{selectedCollection.purchaseOrderNumber}</DialogTitle></DialogHeader><p className="mt-1 text-sm font-semibold">{selectedCollection.vendorName}</p><p className="mt-1 text-xs text-muted-foreground">Expected {selectedCollection.expectedDeliveryDate || "not specified"} · {formatMoneySafe(selectedCollection.outstandingValue)} outstanding</p></div>
+            <div className="fulfillment-inspector-hero border-b border-border/60 p-5 pt-6 sm:p-6 sm:pt-6"><DialogHeader><div className="flex flex-wrap items-center gap-2"><Badge variant="outline" className="bg-background/70"><Warehouse className="mr-1 h-3 w-3" />Supplier collection</Badge><Badge variant="secondary">{selectedCollection.remainingUnits} units left</Badge>{selectedCollection.state?.is_urgent && <Badge variant="destructive">Urgent</Badge>}</div><DialogTitle className="mt-3 text-left text-2xl font-black tracking-tight">{selectedCollection.purchaseOrderNumber}</DialogTitle></DialogHeader><p className="mt-1 text-sm font-semibold">{selectedCollection.vendorName}</p><p className="mt-1 text-xs text-muted-foreground">Expected {selectedCollection.expectedDeliveryDate || "not specified"} · {formatMoneySafe(selectedCollection.outstandingValue)} outstanding</p></div>
             <div className="space-y-6 p-5 sm:p-6">
-              <section><p className="mb-3 text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">Stock arrival progress</p><div className="grid grid-cols-3 gap-2">{[{ id: "pending", label: "Ready", icon: Warehouse }, { id: "scheduled", label: "Planned", icon: CalendarClock }, { id: "collecting", label: selectedCollection.state?.collection_method === "supplier-delivery" ? "Receiving" : "Collecting", icon: PackageCheck }].map((step) => <button key={step.id} onClick={() => void updateCollectionState(selectedCollection, { status: step.id as POCollectionState["status"], ...(step.id === "pending" ? { scheduled_for: null } : {}) })} className={cn("rounded-2xl border p-3 text-center transition-all", (selectedCollection.state?.status || "pending") === step.id ? "border-primary/30 bg-primary/10 text-primary" : "border-border/60 bg-muted/25 text-muted-foreground hover:bg-muted/50")}><step.icon className="mx-auto h-4 w-4" /><span className="mt-1.5 block text-[10px] font-bold">{step.label}</span></button>)}</div></section>
+              <section><p className="mb-3 text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">Collection progress</p><div className="grid grid-cols-3 gap-2">{[{ id: "pending", label: "Ready", icon: Warehouse }, { id: "scheduled", label: "Planned", icon: CalendarClock }, { id: "collecting", label: selectedCollection.state?.collection_method === "supplier-delivery" ? "Receiving" : "Collecting", icon: PackageCheck }].map((step) => <button key={step.id} onClick={() => void updateCollectionState(selectedCollection, { status: step.id as POCollectionState["status"], ...(step.id === "pending" ? { scheduled_for: null } : {}) })} className={cn("rounded-2xl border p-3 text-center transition-all", (selectedCollection.state?.status || "pending") === step.id ? "border-primary/30 bg-primary/10 text-primary" : "border-border/60 bg-muted/25 text-muted-foreground hover:bg-muted/50")}><step.icon className="mx-auto h-4 w-4" /><span className="mt-1.5 block text-[10px] font-bold">{step.label}</span></button>)}</div></section>
               <section className="grid gap-3 sm:grid-cols-2"><Field label="Stock movement" icon={Truck}><Select value={selectedCollection.state?.collection_method || "pickup"} onValueChange={(value: POCollectionState["collection_method"]) => void updateCollectionState(selectedCollection, { collection_method: value })}><SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="pickup">We collect from supplier</SelectItem><SelectItem value="supplier-delivery">Supplier delivers to us</SelectItem></SelectContent></Select></Field><button type="button" onClick={() => void updateCollectionState(selectedCollection, { is_urgent: !selectedCollection.state?.is_urgent })} className={cn("flex items-center justify-between rounded-2xl border p-3 text-left transition-colors", selectedCollection.state?.is_urgent ? "border-destructive/30 bg-destructive/10 text-destructive" : "border-border/55 bg-muted/25 hover:bg-muted/50")}><span><span className="block text-xs font-black">Urgent stock</span><span className="mt-0.5 block text-[10px] opacity-70">Moves this PO to the front.</span></span><CircleAlert className="h-5 w-5" /></button></section>
               <section className="grid gap-3 sm:grid-cols-2"><Field label={selectedCollection.state?.collection_method === "supplier-delivery" ? "Receiver / assignee" : "Collector / assignee"} icon={UserRound}><Select value={selectedCollection.state?.assigned_to || "unassigned"} onValueChange={(value) => void updateCollectionState(selectedCollection, { assigned_to: value === "unassigned" ? null : value })}><SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="unassigned">Unassigned</SelectItem>{team.map((member) => <SelectItem key={member.id} value={member.id}>{member.full_name || member.email || "Team member"}</SelectItem>)}</SelectContent></Select></Field><Field label={selectedCollection.state?.collection_method === "supplier-delivery" ? "Expected delivery time" : "Pickup time"} icon={CalendarClock}><Input type="datetime-local" className="rounded-xl" value={toLocalDateTimeInput(selectedCollection.state?.scheduled_for)} onChange={(event) => void updateCollectionState(selectedCollection, { scheduled_for: event.target.value ? new Date(event.target.value).toISOString() : null, status: event.target.value ? "scheduled" : "pending" })} /></Field></section>
               <section><div className="mb-3 flex items-center justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">What arrived now?</p><p className="mt-1 text-xs text-muted-foreground">Enter actual quantities. Partial receipts remain on the board.</p></div><Button variant="outline" size="sm" className="rounded-xl" onClick={() => collectAllRemaining(selectedCollection)}>Fill remaining</Button></div><div className="space-y-2">{selectedCollection.linesView.filter((line) => line.remaining > 0).map((line) => <div key={line.key} className="grid gap-3 rounded-2xl border border-border/45 bg-muted/30 p-3 sm:grid-cols-[minmax(0,1fr)_120px] sm:items-center"><div className="min-w-0"><p className="text-sm font-semibold">{line.name || line.description}</p>{line.sku && <p className="mt-0.5 font-mono text-[10px] text-muted-foreground">{line.sku}</p>}<div className="mt-1.5 flex flex-wrap gap-2 text-[10px] text-muted-foreground">{line.collected > 0 && <span className="font-semibold text-emerald-600">{line.collected} received before</span>}<span className="font-bold text-primary">{line.remaining} remaining</span></div></div><div><label className="mb-1 block text-[9px] font-black uppercase tracking-wider text-muted-foreground">Received now</label><Input type="number" min={0} max={line.remaining} step="any" value={collectionDraft[selectedCollection.purchaseOrderId]?.[line.key] ?? ""} onChange={(event) => setDraftQty(selectedCollection.purchaseOrderId, line.key, Number(event.target.value), line.remaining)} placeholder="0" className="rounded-xl bg-background" /></div></div>)}</div></section>

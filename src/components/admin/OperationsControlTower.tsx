@@ -50,6 +50,8 @@ export default function OperationsControlTower() {
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [savedViews, setSavedViews] = useState<SavedView[]>([]);
   const [issues, setIssues] = useState<ReconciliationIssue[]>([]);
+  const [readyDeliveryCount, setReadyDeliveryCount] = useState(0);
+  const [readyCollectionCount, setReadyCollectionCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [offlineCount, setOfflineCount] = useState(pendingOfflineOperationCount());
@@ -77,31 +79,73 @@ export default function OperationsControlTower() {
   const fetchData = useCallback(async (quiet = false) => {
     if (quiet) setRefreshing(true); else setLoading(true);
     const result = await Promise.all([
-      supabase.from("dispatch_routes").select("*").order("route_date", { ascending: false }).limit(100),
-      supabase.from("operations_exceptions").select("*").order("created_at", { ascending: false }).limit(250),
-      supabase.from("fulfillment_timeline_events").select("id,entity_type,entity_id,event_type,title,description,actor_id,occurred_at").order("occurred_at", { ascending: false }).limit(250),
-      supabase.from("order_activity_log").select("id,order_id,activity_type,title,description,user_id,created_at").order("created_at", { ascending: false }).limit(150),
-      supabase.from("team_action_items").select("id,title,priority,status,assigned_to,due_at,workspace").neq("status", "done").order("created_at", { ascending: false }).limit(100),
-      supabase.from("profiles").select("id,full_name,email").order("full_name"),
-      supabase.from("operational_saved_views").select("id,name,configuration,is_default").eq("workspace", "control-tower").order("name"),
-      supabase.from("order_items").select("id,order_id,name,code,quantity,qty_on_po,qty_received,qty_invoiced,qty_completed").limit(5000),
-      supabase.from("order_item_po_allocations").select("order_item_id,quantity_ordered,quantity_received").limit(10000),
-      supabase.from("orders").select("id,order_number").limit(5000),
+      supabase.from("dispatch_routes").select("*").order("route_date", { ascending: false }).limit(60),
+      supabase.from("operations_exceptions").select("*").order("created_at", { ascending: false }).limit(150),
+      supabase.from("fulfillment_timeline_events").select("id,entity_type,entity_id,event_type,title,description,actor_id,occurred_at").order("occurred_at", { ascending: false }).limit(180),
+      supabase.from("order_activity_log").select("id,order_id,activity_type,title,description,user_id,created_at").order("created_at", { ascending: false }).limit(120),
+      supabase.from("team_action_items").select("id,title,priority,status,assigned_to,due_at,workspace").neq("status", "done").order("created_at", { ascending: false }).limit(80),
+      supabase.from("profiles").select("id,full_name,email").eq("approved", true).order("full_name"),
+      supabase.from("orders").select("id,status,completed_date,fulfillment_method,fulfillment_status").or("status.is.null,status.in.(ordered,in-progress,in-stock,ready)").limit(5000),
+      supabase.from("po_tracking_cache").select("payload").eq("id", "00000000-0000-0000-0000-000000000003").maybeSingle(),
+      supabase.from("po_collection_state").select("purchase_order_id,status,completed_at"),
     ]);
-    const [routeRes, exceptionRes, timelineRes, activityRes, taskRes, memberRes, viewRes, itemRes, allocationRes, orderRes] = result;
+    const [routeRes, exceptionRes, timelineRes, activityRes, taskRes, memberRes, activeOrderRes, poCacheRes, poStateRes] = result;
     const firstError = result.find((entry) => entry.error)?.error;
-    if (firstError) toast({ title: "Some live operations data could not load", description: firstError.message, variant: "destructive" });
-    setRoutes((routeRes.data || []) as RouteRun[]); setExceptions((exceptionRes.data || []) as OperationsException[]);
-    setTimeline((timelineRes.data || []) as TimelineEvent[]); setOrderActivity((activityRes.data || []) as ActivityEvent[]);
-    setTasks((taskRes.data || []) as ActionItem[]); setMembers((memberRes.data || []) as TeamMember[]); setSavedViews((viewRes.data || []) as SavedView[]);
-    setIssues(buildReconciliationIssues((itemRes.data || []) as OrderItemRow[], (allocationRes.data || []) as AllocationRow[], (orderRes.data || []) as OrderRef[]));
+    if (firstError) toast({ title: "Some dispatch data could not load", description: firstError.message, variant: "destructive" });
+
+    setRoutes((routeRes.data || []) as RouteRun[]);
+    setExceptions((exceptionRes.data || []) as OperationsException[]);
+    setTimeline((timelineRes.data || []) as TimelineEvent[]);
+    setOrderActivity((activityRes.data || []) as ActivityEvent[]);
+    setTasks((taskRes.data || []) as ActionItem[]);
+    setMembers((memberRes.data || []) as TeamMember[]);
+    setIssues([]);
+
+    const activeOrders = (activeOrderRes.data || []).filter((order: any) =>
+      String(order.status || "").toLowerCase() !== "delivered" &&
+      !order.completed_date &&
+      order.fulfillment_method !== "collection" &&
+      order.fulfillment_status !== "completed"
+    );
+    if (activeOrders.length) {
+      const itemRes = await supabase.from("order_items").select("order_id,quantity,qty_invoiced,qty_completed").in("order_id", activeOrders.map((order: any) => order.id));
+      const readyIds = new Set<string>();
+      (itemRes.data || []).forEach((item: any) => {
+        const quantity = Number(item.quantity || 0);
+        const ready = Math.max(0, Math.min(Number(item.qty_invoiced || 0), quantity) - Math.min(Number(item.qty_completed || 0), quantity));
+        if (ready > 0) readyIds.add(item.order_id);
+      });
+      setReadyDeliveryCount(readyIds.size);
+    } else setReadyDeliveryCount(0);
+
+    const completedPOs = new Set((poStateRes.data || []).filter((row: any) => row.status === "collected" || row.completed_at).map((row: any) => row.purchase_order_id));
+    const poPayload = Array.isArray(poCacheRes.data?.payload) ? poCacheRes.data.payload as any[] : [];
+    const closedStatus = new Set(["cancelled","closed","rejected","draft","void","billed"]);
+    const closedBilled = new Set(["billed","fully_billed"]);
+    const closedReceived = new Set(["received","fully_received"]);
+    const activePOs = poPayload.filter((po: any) => {
+      if (!po?.purchaseOrderId || completedPOs.has(po.purchaseOrderId)) return false;
+      if (closedStatus.has(String(po.status || "").toLowerCase())) return false;
+      if (closedBilled.has(String(po.billedStatus || "").toLowerCase())) return false;
+      if (closedReceived.has(String(po.receivedStatus || "").toLowerCase())) return false;
+      return Array.isArray(po.lines) && po.lines.some((line: any) => Number(line.outstanding || 0) > 0);
+    });
+    setReadyCollectionCount(activePOs.length);
     setLoading(false); setRefreshing(false);
   }, [toast]);
 
   useEffect(() => { void fetchData(); return subscribeOfflineQueue(() => setOfflineCount(pendingOfflineOperationCount())); }, [fetchData]);
   useLiveData(["dispatch_routes", "operations_exceptions", "fulfillment_timeline_events", "order_activity_log", "team_action_items", "order_items", "order_item_po_allocations", "operational_saved_views"], () => void fetchData(true), { channelName: "operations-command-centre" });
 
-  const activeRoutes = useMemo(() => routes.filter((route) => !["completed", "cancelled"].includes(route.status)), [routes]);
+  const activeRoutes = useMemo(() => {
+    const yesterday = new Date(); yesterday.setHours(0,0,0,0); yesterday.setDate(yesterday.getDate() - 1);
+    return routes.filter((route) => {
+      if (["completed", "cancelled"].includes(route.status)) return false;
+      if (route.status === "in_progress") return true;
+      const routeDate = new Date(`${route.route_date}T12:00:00`);
+      return !Number.isNaN(routeDate.getTime()) && routeDate >= yesterday;
+    });
+  }, [routes]);
   const openExceptions = useMemo(() => exceptions.filter((item) => item.status !== "resolved"), [exceptions]);
   const filteredExceptions = useMemo(() => openExceptions.filter((item) => (severityFilter === "all" || item.severity === severityFilter) && `${item.title} ${item.description || ""} ${item.entity_id || ""}`.toLowerCase().includes(search.toLowerCase())), [openExceptions, search, severityFilter]);
   const filteredIssues = useMemo(() => issues.filter((item) => `${item.orderNumber} ${item.itemName} ${item.code || ""} ${item.kind}`.toLowerCase().includes(search.toLowerCase())), [issues, search]);
@@ -132,13 +176,13 @@ export default function OperationsControlTower() {
 
   return (
     <div className="space-y-4 pb-8">
-      <section className="overflow-hidden rounded-[30px] border border-border/60 bg-card shadow-xl">
-        <div className="relative grid gap-6 overflow-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-primary/80 p-5 text-white sm:p-7 lg:grid-cols-[minmax(0,1.2fr)_minmax(300px,.8fr)] lg:items-end">
-          <div className="absolute -right-20 -top-24 h-64 w-64 rounded-full bg-cyan-400/15 blur-3xl" />
-          <div className="relative"><div className="mb-4 flex flex-wrap items-center gap-2"><Badge className="border-white/15 bg-white/10 text-white"><Radar className="mr-1 h-3 w-3" />Operations command centre</Badge>{offlineCount > 0 && <Badge className="border-amber-300/25 bg-amber-300/15 text-amber-100"><CloudOff className="mr-1 h-3 w-3" />{offlineCount} queued</Badge>}</div><h1 className="max-w-2xl text-3xl font-black tracking-[-0.045em] sm:text-4xl">See friction before it becomes a fire.</h1><p className="mt-2 max-w-2xl text-sm leading-relaxed text-white/65">Routes, mismatches, exceptions and team movement are reconciled into one live operational picture.</p></div>
-          <div className="relative grid grid-cols-3 gap-2 rounded-[24px] border border-white/10 bg-white/[0.07] p-3 backdrop-blur">{[[activeRoutes.length, "Active routes"], [openExceptions.length, "Open exceptions"], [mine, "Assigned to me"]].map(([value, label]) => <div key={String(label)} className="rounded-xl bg-black/15 p-3 text-center"><p className="text-2xl font-black">{value}</p><p className="text-[9px] font-bold text-white/55">{label}</p></div>)}</div>
+      <section className="overflow-hidden rounded-[28px] border border-border/60 bg-card shadow-sm">
+        <div className="h-1.5 w-full bg-gradient-to-r from-[hsl(var(--ribbon-1))] via-[hsl(var(--ribbon-3))] to-[hsl(var(--ribbon-5))]" />
+        <div className="flex flex-col gap-4 p-5 sm:p-6 lg:flex-row lg:items-end lg:justify-between">
+          <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><Badge variant="outline" className="rounded-full border-primary/20 bg-primary/5 text-primary"><Radar className="mr-1 h-3 w-3" />Dispatch Control</Badge>{offlineCount > 0 && <Badge variant="outline" className="rounded-full border-amber-500/25 bg-amber-500/10 text-amber-700"><CloudOff className="mr-1 h-3 w-3" />{offlineCount} queued</Badge>}</div><h1 className="mt-3 text-3xl font-black tracking-tight">Today’s dispatch picture</h1><p className="mt-1 max-w-2xl text-sm text-muted-foreground">Only current deliveries, collections, routes and blockers. Completed and stale work stays out of the way.</p></div>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:min-w-[460px]">{[[readyDeliveryCount,"Ready deliveries"],[readyCollectionCount,"Ready collections"],[activeRoutes.length,"Active routes"],[openExceptions.length,"Blockers"]].map(([value,label]) => <div key={String(label)} className="rounded-2xl border border-border/55 bg-muted/25 p-3"><p className="text-2xl font-black">{value}</p><p className="text-[9px] font-bold uppercase tracking-wide text-muted-foreground">{label}</p></div>)}</div>
         </div>
-        <div className="flex flex-col gap-3 border-t border-border/50 bg-muted/20 p-3 xl:flex-row xl:items-center"><div className="grid flex-1 grid-cols-4 gap-1 rounded-2xl bg-muted/55 p-1">{TABS.map((item) => <button key={item.id} onClick={() => setTab(item.id)} className={cn("flex min-w-0 items-center justify-center gap-1.5 rounded-xl px-2 py-2.5 text-[10px] font-black transition-all sm:text-xs", tab === item.id ? "bg-background text-primary shadow-sm" : "text-muted-foreground hover:text-foreground")}><item.icon className="h-3.5 w-3.5 shrink-0" /><span className="hidden truncate sm:block">{item.label}</span></button>)}</div><Button variant="outline" size="icon" className="h-10 w-10 rounded-xl" onClick={() => void fetchData(true)} disabled={refreshing} title="Refresh"><RefreshCw className={cn("h-4 w-4", refreshing && "animate-spin")} /></Button></div>
+        <div className="flex flex-col gap-3 border-t border-border/50 bg-muted/20 p-3 xl:flex-row xl:items-center"><div className="grid flex-1 grid-cols-4 gap-1 rounded-2xl bg-muted/55 p-1">{TABS.map((item) => <button key={item.id} onClick={() => setTab(item.id)} className={cn("flex min-w-0 items-center justify-center gap-1.5 rounded-xl px-2 py-2.5 text-[10px] font-black transition-all sm:text-xs", tab === item.id ? "bg-background text-primary shadow-sm" : "text-muted-foreground hover:text-foreground")}><item.icon className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{item.label}</span></button>)}</div><Button variant="outline" size="icon" className="h-10 w-10 rounded-xl" onClick={() => void fetchData(true)} disabled={refreshing} title="Refresh"><RefreshCw className={cn("h-4 w-4", refreshing && "animate-spin")} /></Button></div>
       </section>
 
       {tab === "exceptions" && <section className="flex flex-col gap-2 rounded-[22px] border border-border/60 bg-card/85 p-3 shadow-sm lg:flex-row lg:items-center">
@@ -147,15 +191,19 @@ export default function OperationsControlTower() {
         <Select value={severityFilter} onValueChange={setSeverityFilter}><SelectTrigger className="h-10 rounded-xl lg:w-36"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All severity</SelectItem>{(["critical", "high", "medium", "low"] as Severity[]).map((item) => <SelectItem key={item} value={item} className="capitalize">{item}</SelectItem>)}</SelectContent></Select>
       </section>}
 
-      {loading ? <div className="grid min-h-[420px] place-items-center rounded-[28px] bg-muted/25"><div className="text-center"><Loader2 className="mx-auto h-7 w-7 animate-spin text-primary" /><p className="mt-3 text-xs font-bold text-muted-foreground">Reconciling live operations…</p></div></div> : tab === "overview" ? <OverviewPanel routes={activeRoutes} exceptions={openExceptions} issues={issues} tasks={tasks} memberName={memberName} onTab={setTab} onOpenWorkspace={openWorkspace} /> : tab === "routes" ? <RoutesPanel routes={routes} memberName={memberName} onUpdate={updateRoute} onPlan={openDispatchPlanner} /> : tab === "team" ? <TeamPanel members={members} routes={activeRoutes} tasks={tasks} exceptions={openExceptions} memberName={memberName} /> : tab === "map" ? <MapPanel routes={activeRoutes} /> : tab === "exceptions" ? <ExceptionsPanel items={filteredExceptions} members={members} memberName={memberName} composerOpen={composerOpen} setComposerOpen={setComposerOpen} form={{ title, description, category, severity, entityType, entityId, assignee, dueAt }} setters={{ setTitle, setDescription, setCategory, setSeverity, setEntityType, setEntityId, setAssignee, setDueAt }} saving={savingException} onCreate={createException} onUpdate={updateException} /> : tab === "reconciliation" ? <ReconciliationPanel issues={filteredIssues} onRaise={raiseIssue} onOpenOrder={() => openWorkspace("orders")} /> : <ActivityPanel events={mergedActivity} memberName={memberName} />}
+      {loading ? <div className="grid min-h-[420px] place-items-center rounded-[28px] bg-muted/25"><div className="text-center"><Loader2 className="mx-auto h-7 w-7 animate-spin text-primary" /><p className="mt-3 text-xs font-bold text-muted-foreground">Reconciling live operations…</p></div></div> : tab === "overview" ? <OverviewPanel readyDeliveries={readyDeliveryCount} readyCollections={readyCollectionCount} routes={activeRoutes} exceptions={openExceptions} tasks={tasks} memberName={memberName} onTab={setTab} onOpenWorkspace={openWorkspace} /> : tab === "routes" ? <RoutesPanel routes={activeRoutes} memberName={memberName} onUpdate={updateRoute} onPlan={openDispatchPlanner} /> : tab === "team" ? <TeamPanel members={members} routes={activeRoutes} tasks={tasks} exceptions={openExceptions} memberName={memberName} /> : tab === "map" ? <MapPanel routes={activeRoutes} /> : tab === "exceptions" ? <ExceptionsPanel items={filteredExceptions} members={members} memberName={memberName} composerOpen={composerOpen} setComposerOpen={setComposerOpen} form={{ title, description, category, severity, entityType, entityId, assignee, dueAt }} setters={{ setTitle, setDescription, setCategory, setSeverity, setEntityType, setEntityId, setAssignee, setDueAt }} saving={savingException} onCreate={createException} onUpdate={updateException} /> : tab === "reconciliation" ? <ReconciliationPanel issues={filteredIssues} onRaise={raiseIssue} onOpenOrder={() => openWorkspace("orders")} /> : <ActivityPanel events={mergedActivity} memberName={memberName} />}
 
     </div>
   );
 }
 
-function OverviewPanel({ routes, exceptions, issues, tasks, memberName, onTab, onOpenWorkspace }: { routes: RouteRun[]; exceptions: OperationsException[]; issues: ReconciliationIssue[]; tasks: ActionItem[]; memberName: (id: string | null) => string; onTab: (tab: TowerTab) => void; onOpenWorkspace: (view: string) => void; }) {
-  const lanes = [{ title: "Routes moving", value: routes.length, detail: `${routes.reduce((sum, route) => sum + route.total_stops, 0)} stops planned`, icon: Truck, tone: "bg-cyan-500/12 text-cyan-600", tab: "routes" as TowerTab }, { title: "Team exceptions", value: exceptions.length, detail: `${exceptions.filter((item) => item.severity === "critical").length} critical`, icon: ShieldAlert, tone: "bg-destructive/10 text-destructive", tab: "exceptions" as TowerTab }, { title: "Quantity integrity", value: issues.length, detail: "PO to receipt to invoice", icon: ClipboardCheck, tone: "bg-violet-500/12 text-violet-600", tab: "reconciliation" as TowerTab }];
-  return <div className="grid gap-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(320px,.7fr)]"><div className="space-y-4"><div className="grid gap-3 sm:grid-cols-3">{lanes.map((lane) => <button key={lane.title} onClick={() => onTab(lane.tab)} className="group rounded-[24px] border border-border/60 bg-card p-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-lg"><span className={cn("grid h-11 w-11 place-items-center rounded-2xl", lane.tone)}><lane.icon className="h-5 w-5" /></span><p className="mt-4 text-3xl font-black">{lane.value}</p><div className="mt-1 flex items-center justify-between gap-2"><div><p className="text-xs font-black">{lane.title}</p><p className="text-[10px] text-muted-foreground">{lane.detail}</p></div><ChevronRight className="h-4 w-4 text-muted-foreground/30 group-hover:text-primary" /></div></button>)}</div><Card className="overflow-hidden rounded-[26px] border-border/60"><PanelTitle title="Pressure radar" body="Highest-impact work surfaced automatically." icon={Sparkles} /><div className="divide-y divide-border/50">{exceptions.slice(0, 5).map((item) => <button key={item.id} onClick={() => onTab("exceptions")} className="flex w-full items-center gap-3 p-3.5 text-left hover:bg-muted/35"><span className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-xl", item.severity === "critical" ? "bg-destructive/10 text-destructive" : "bg-amber-500/10 text-amber-600")}><CircleAlert className="h-4 w-4" /></span><span className="min-w-0 flex-1"><span className="block truncate text-xs font-black">{item.title}</span><span className="block truncate text-[10px] text-muted-foreground">{memberName(item.assigned_to)} · {item.status}</span></span><Badge variant="outline" className={cn("capitalize", SEVERITY_STYLE[item.severity])}>{item.severity}</Badge></button>)}{!exceptions.length && <Empty icon={CheckCircle2} title="No active exceptions" body="Operations are clear right now." />}</div></Card></div><Card className="overflow-hidden rounded-[26px] border-border/60"><PanelTitle title="Team focus" body="Shared action items already in motion." icon={Users} /><div className="divide-y divide-border/50">{tasks.slice(0, 10).map((task) => <button key={task.id} onClick={() => onOpenWorkspace(task.workspace)} className="flex w-full items-center gap-3 p-3.5 text-left hover:bg-muted/35"><span className={cn("h-2 w-2 shrink-0 rounded-full", task.priority === "critical" ? "bg-destructive" : task.priority === "high" ? "bg-orange-500" : "bg-primary/60")} /><span className="min-w-0 flex-1"><span className="block truncate text-xs font-bold">{task.title}</span><span className="block text-[10px] text-muted-foreground">{memberName(task.assigned_to)}</span></span><ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground/40" /></button>)}{!tasks.length && <Empty icon={ListChecks} title="Team queue is clear" body="New action items will appear here." />}</div></Card></div>;
+function OverviewPanel({ readyDeliveries, readyCollections, routes, exceptions, tasks, memberName, onTab, onOpenWorkspace }: { readyDeliveries: number; readyCollections: number; routes: RouteRun[]; exceptions: OperationsException[]; tasks: ActionItem[]; memberName: (id: string | null) => string; onTab: (tab: TowerTab) => void; onOpenWorkspace: (view: string) => void; }) {
+  const lanes = [
+    { title: "Deliveries ready", value: readyDeliveries, detail: "Customer work waiting for dispatch", icon: Truck, tone: "bg-cyan-500/12 text-cyan-600", action: () => onOpenWorkspace("fulfillment") },
+    { title: "Collections ready", value: readyCollections, detail: "Supplier pickups still outstanding", icon: Package, tone: "bg-violet-500/12 text-violet-600", action: () => onOpenWorkspace("fulfillment") },
+    { title: "Routes moving", value: routes.length, detail: `${routes.reduce((sum, route) => sum + Math.max(0, route.total_stops - route.completed_stops), 0)} stops remaining`, icon: Route, tone: "bg-primary/10 text-primary", action: () => onTab("routes") },
+  ];
+  return <div className="grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(300px,.75fr)]"><div className="space-y-4"><div className="grid gap-3 sm:grid-cols-3">{lanes.map((lane) => <button key={lane.title} onClick={lane.action} className="group rounded-[22px] border border-border/60 bg-card p-4 text-left shadow-sm transition hover:border-primary/25 hover:bg-muted/15"><span className={cn("grid h-10 w-10 place-items-center rounded-2xl", lane.tone)}><lane.icon className="h-4 w-4" /></span><p className="mt-3 text-3xl font-black">{lane.value}</p><p className="text-xs font-black">{lane.title}</p><p className="mt-0.5 text-[10px] text-muted-foreground">{lane.detail}</p></button>)}</div><Card className="overflow-hidden rounded-[24px] border-border/60"><PanelTitle title="Blockers" body="Only unresolved dispatch problems." icon={ShieldAlert} /><div className="divide-y divide-border/50">{exceptions.slice(0,5).map((item)=><button key={item.id} onClick={()=>onTab("exceptions")} className="flex w-full items-center gap-3 p-3.5 text-left hover:bg-muted/35"><span className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-xl", item.severity === "critical" ? "bg-destructive/10 text-destructive" : "bg-amber-500/10 text-amber-600")}><CircleAlert className="h-4 w-4" /></span><span className="min-w-0 flex-1"><span className="block truncate text-xs font-black">{item.title}</span><span className="block truncate text-[10px] text-muted-foreground">{memberName(item.assigned_to)} · {item.status}</span></span><Badge variant="outline" className={cn("capitalize",SEVERITY_STYLE[item.severity])}>{item.severity}</Badge></button>)}{!exceptions.length && <Empty icon={CheckCircle2} title="No dispatch blockers" body="Current dispatch work is clear." />}</div></Card></div><Card className="overflow-hidden rounded-[24px] border-border/60"><PanelTitle title="My team queue" body="Assigned work that is still open." icon={Users} /><div className="divide-y divide-border/50">{tasks.slice(0,8).map((task)=><button key={task.id} onClick={()=>onOpenWorkspace(task.workspace)} className="flex w-full items-center gap-3 p-3.5 text-left hover:bg-muted/35"><span className={cn("h-2 w-2 shrink-0 rounded-full", task.priority === "critical" ? "bg-destructive" : task.priority === "high" ? "bg-orange-500" : "bg-primary/60")} /><span className="min-w-0 flex-1"><span className="block truncate text-xs font-bold">{task.title}</span><span className="block text-[10px] text-muted-foreground">{memberName(task.assigned_to)}</span></span><ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground/40" /></button>)}{!tasks.length && <Empty icon={ListChecks} title="Queue is clear" body="No open team action items." />}</div></Card></div>;
 }
 
 function RoutesPanel({ routes, memberName, onUpdate, onPlan }: { routes: RouteRun[]; memberName: (id: string | null) => string; onUpdate: (route: RouteRun, status: string) => void; onPlan: () => void; }) {

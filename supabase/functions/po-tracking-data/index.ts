@@ -10,10 +10,11 @@ const ZOHO_API_URL = 'https://www.zohoapis.com'
 
 // Statuses we consider "still outstanding" (fully billed / cancelled / closed / draft drop off)
 const EXCLUDED_PO_STATUSES = ['cancelled', 'closed', 'rejected', 'draft', 'void', 'billed']
-// Ignore anything older than this - stale POs are effectively dead
-const MAX_PO_AGE_DAYS = 180
-const MAX_PO_DETAILS = 250
+// Correctness first: open POs must not disappear merely because they are old.
+// The list call is cheap; details are fetched only for summaries that still look active.
+const MAX_PO_DETAILS = 500
 const DETAIL_CONCURRENCY = 8
+const EXCLUDED_RECEIVED_STATUSES = ['received', 'fully_received']
 const CACHE_ID = '00000000-0000-0000-0000-000000000003'
 const SYNC_LOCK_KEY = 'po-tracking-bootstrap'
 
@@ -236,10 +237,7 @@ async function fetchOutstandingPurchaseOrders(accessToken: string, orgId: string
   const candidates: any[] = []
   let page = 1
   let hasMore = true
-  let reachedCutoff = false
-  const cutoff = new Date(Date.now() - MAX_PO_AGE_DAYS * 24 * 60 * 60 * 1000)
-
-  while (hasMore && !reachedCutoff && candidates.length < MAX_PO_DETAILS) {
+  while (hasMore && candidates.length < MAX_PO_DETAILS) {
     const data = await fetchZohoPage(
       accessToken,
       `${ZOHO_API_URL}/books/v3/purchaseorders?organization_id=${orgId}&page=${page}&per_page=200&sort_column=date&sort_order=D`
@@ -251,17 +249,13 @@ async function fetchOutstandingPurchaseOrders(accessToken: string, orgId: string
     for (const summary of summaries) {
       if (candidates.length >= MAX_PO_DETAILS) break
 
-      // list is sorted newest-first, so once we cross the cutoff we can stop entirely
-      const poDate = summary.date ? new Date(summary.date) : null
-      if (poDate && !isNaN(poDate.getTime()) && poDate < cutoff) {
-        reachedCutoff = true
-        break
-      }
 
       const status = String(summary.status || '').trim().toLowerCase()
       const billedStatus = String(summary.billed_status || '').trim().toLowerCase()
+      const receivedStatus = String(summary.received_status || '').trim().toLowerCase()
       if (EXCLUDED_PO_STATUSES.includes(status)) continue
       if (billedStatus === 'billed' || billedStatus === 'fully_billed') continue
+      if (EXCLUDED_RECEIVED_STATUSES.includes(receivedStatus)) continue
       candidates.push(summary)
     }
 
@@ -292,8 +286,10 @@ async function fetchOutstandingPurchaseOrders(accessToken: string, orgId: string
       const { summary, po } = entry
       const status = String(po.status || summary.status || '').trim().toLowerCase()
       const detailBilled = String(po.billed_status || summary.billed_status || '').trim().toLowerCase()
+      const detailReceived = String(po.received_status || summary.received_status || '').trim().toLowerCase()
       if (EXCLUDED_PO_STATUSES.includes(status)) continue
       if (detailBilled === 'billed' || detailBilled === 'fully_billed') continue
+      if (EXCLUDED_RECEIVED_STATUSES.includes(detailReceived)) continue
 
       const rawLines = Array.isArray(po.line_items) ? po.line_items : []
       const lines: POLine[] = []
@@ -311,8 +307,12 @@ async function fetchOutstandingPurchaseOrders(accessToken: string, orgId: string
         const zohoBilled = Number(line.quantity_billed ?? 0)
         const billBilled = billedMap.get(lineKey(sku, line.name, line.description)) ?? 0
         const quantityBilled = Math.max(zohoBilled, billBilled)
-        const outstanding = Math.max(0, quantity - Math.max(quantityBilled, 0))
-        // Item already has a vendor bill covering it -> not outstanding
+        // A collection is only actionable while stock has neither been received nor
+        // covered by a supplier bill. This prevents old, already-received POs from
+        // resurfacing simply because a bill was posted late or not at all.
+        const accountedFor = Math.max(quantityBilled, quantityReceived, 0)
+        const outstanding = Math.max(0, quantity - accountedFor)
+        // Fully received or billed line -> not outstanding
         if (outstanding <= 0) continue
 
         lines.push({
