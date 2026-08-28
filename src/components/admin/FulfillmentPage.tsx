@@ -337,6 +337,19 @@ export default function FulfillmentPage() {
     [team],
   );
 
+  const refreshFulfillmentSources = useCallback(async () => {
+    const [poResult, invoiceResult] = await Promise.allSettled([
+      supabase.functions.invoke("po-tracking-data", { body: { refresh: true } }),
+      supabase.functions.invoke("zoho-webhook", { body: { action: "sync_fulfillment_invoices", since_days: 7 } }),
+    ]);
+    if (poResult.status === "rejected" || poResult.value.error) {
+      console.warn("PO source refresh failed; continuing with current cache", poResult.status === "rejected" ? poResult.reason : poResult.value.error);
+    }
+    if (invoiceResult.status === "rejected" || invoiceResult.value.error) {
+      console.warn("Invoice catch-up failed; continuing with local quantity flow", invoiceResult.status === "rejected" ? invoiceResult.reason : invoiceResult.value.error);
+    }
+  }, []);
+
   const fetchData = useCallback(async () => {
     if (!loadedRef.current) setLoading(true);
     try {
@@ -345,7 +358,7 @@ export default function FulfillmentPage() {
         supabase
           .from("orders")
           .select("id, order_number, reference, urgency, company_id, created_at, completed_date, status, fulfillment_method, fulfillment_status, fulfillment_assigned_to, fulfillment_scheduled_for, fulfillment_notes, fulfillment_routed_at")
-          .or("status.is.null,status.in.(ordered,in-progress,in-stock,ready)")
+          .is("completed_date", null)
           .order("created_at", { ascending: true }),
         supabase
           .from("orders")
@@ -500,13 +513,22 @@ export default function FulfillmentPage() {
   }, [toast]);
 
   useEffect(() => {
-    void fetchData();
-  }, [fetchData]);
+    let cancelled = false;
+    const boot = async () => {
+      await refreshFulfillmentSources();
+      if (!cancelled) await fetchData();
+    };
+    void boot();
+    const timer = window.setInterval(() => {
+      void refreshFulfillmentSources().then(() => fetchData());
+    }, 5 * 60_000);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, [fetchData, refreshFulfillmentSources]);
 
   useLiveData(["orders", "order_items", "po_tracking_cache", "po_collection_state", "po_collection_events", "po_collection_event_lines", "fulfillment_timeline_events", "dispatch_routes", "dispatch_areas", "dispatch_area_links"], fetchData, {
     debounceMs: 900,
     fallbackIntervalMs: 0,
-    channelName: "fulfillment-workspace-v3-live",
+    channelName: "fulfillment-workspace-v4-live",
   });
 
   const collectedByLine = useMemo(() => {
@@ -784,6 +806,7 @@ export default function FulfillmentPage() {
 
   const refreshNow = async () => {
     setRefreshing(true);
+    await refreshFulfillmentSources();
     await fetchData();
     setRefreshing(false);
   };

@@ -109,10 +109,12 @@ Deno.serve(async (req) => {
     }
 
     let force = false
+    let refresh = false
     if (req.method === 'POST') {
       try {
         const body = await req.json()
         force = body?.force === true
+        refresh = body?.refresh === true
       } catch (_e) { /* no body */ }
     }
 
@@ -122,9 +124,12 @@ Deno.serve(async (req) => {
       .eq('id', CACHE_ID)
       .maybeSingle()
 
-    // Event-driven mode: normal page loads never contact Zoho. A webhook reads
-    // the changed PO once, updates this cache row, and Realtime fans it out.
-    if (!force && cached?.payload) {
+    // Normal app reads remain cache-first. Fulfillment may request a throttled
+    // source refresh so a missed/delayed webhook cannot hide a brand-new PO.
+    // A cache younger than two minutes is already fresh enough and costs no API call.
+    const cacheAgeMs = cached?.fetched_at ? Date.now() - new Date(cached.fetched_at).getTime() : Number.POSITIVE_INFINITY
+    const cacheIsFresh = Number.isFinite(cacheAgeMs) && cacheAgeMs < 2 * 60_000
+    if (!force && cached?.payload && (!refresh || cacheIsFresh)) {
       const purchaseOrders = cached.payload as POEntry[]
       return new Response(JSON.stringify({
         success: true,
@@ -133,6 +138,7 @@ Deno.serve(async (req) => {
         fetchedAt: cached.fetched_at,
         cached: true,
         eventDriven: true,
+        fresh: cacheIsFresh,
       }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 

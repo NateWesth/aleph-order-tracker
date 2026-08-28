@@ -11,7 +11,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Activity, AlertTriangle, ArrowUpRight, Bookmark, CheckCircle2, ChevronRight, CircleAlert, ClipboardCheck, CloudOff, Gauge, ListChecks, Loader2, MapPinned, Plus, Radar, RefreshCw, Route, Save, Search, ShieldAlert, Sparkles, Truck, UserRound, Users, Wrench, X } from "lucide-react";
+import { Activity, AlertTriangle, ArrowUpRight, Bookmark, CheckCircle2, ChevronRight, CircleAlert, ClipboardCheck, CloudOff, Gauge, ListChecks, Loader2, MapPinned, Package, Plus, Radar, RefreshCw, Route, Save, Search, ShieldAlert, Sparkles, Truck, UserRound, Users, Wrench, X } from "lucide-react";
 
 type TowerTab = "overview" | "routes" | "team" | "map" | "exceptions" | "reconciliation" | "activity";
 type Severity = "critical" | "high" | "medium" | "low";
@@ -85,7 +85,7 @@ export default function OperationsControlTower() {
       supabase.from("order_activity_log").select("id,order_id,activity_type,title,description,user_id,created_at").order("created_at", { ascending: false }).limit(120),
       supabase.from("team_action_items").select("id,title,priority,status,assigned_to,due_at,workspace").neq("status", "done").order("created_at", { ascending: false }).limit(80),
       supabase.from("profiles").select("id,full_name,email").eq("approved", true).order("full_name"),
-      supabase.from("orders").select("id,status,completed_date,fulfillment_method,fulfillment_status").or("status.is.null,status.in.(ordered,in-progress,in-stock,ready)").limit(5000),
+      supabase.from("orders").select("id,status,completed_date,fulfillment_method,fulfillment_status").is("completed_date", null).limit(5000),
       supabase.from("po_tracking_cache").select("payload").eq("id", "00000000-0000-0000-0000-000000000003").maybeSingle(),
       supabase.from("po_collection_state").select("purchase_order_id,status,completed_at"),
     ]);
