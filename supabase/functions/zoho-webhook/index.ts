@@ -106,6 +106,12 @@ Deno.serve(async (req) => {
       return await handleScanAllInvoices(supabase, clientId, clientSecret)
     }
 
+    // Lightweight fulfillment catch-up. It lists recent invoices but only
+    // fetches detail for invoices that are new or changed versus our document cache.
+    if (payload.action === 'sync_fulfillment_invoices') {
+      return await handleSyncFulfillmentInvoices(supabase, clientId, clientSecret, Number(payload.since_days) || 7)
+    }
+
     // Full rebuild of item quantities from Zoho POs, bills and invoices
     if (payload.action === 'reconcile_quantities') {
       return await handleReconcileQuantities(supabase, clientId, clientSecret, Number(payload.since_days) || 90)
@@ -348,8 +354,12 @@ async function handleInvoiceWebhook(
   if (invoice.purchase_order) possibleMatches.push(invoice.purchase_order)
   if (invoice.purchaseorder_number) possibleMatches.push(invoice.purchaseorder_number)
   
-  // Also check linked salesorder reference numbers AND salesorder numbers
+  // Also check linked sales-order reference numbers AND sales-order numbers.
+  // Some Zoho invoice payloads expose the SO only as top-level fields rather
+  // than in `salesorders`, so account for both representations.
   const linkedSoNumbers: string[] = []
+  if (invoice.salesorder_number) linkedSoNumbers.push(String(invoice.salesorder_number))
+  if (invoice.sales_order_number) linkedSoNumbers.push(String(invoice.sales_order_number))
   if (invoice.salesorders && invoice.salesorders.length > 0) {
     for (const so of invoice.salesorders) {
       if (so.reference_number) possibleMatches.push(so.reference_number)
@@ -387,6 +397,35 @@ async function handleInvoiceWebhook(
           console.error('Failed to fetch linked SO:', e)
         }
       }
+    }
+  }
+
+  const topLevelSalesOrderId = invoice.salesorder_id || invoice.sales_order_id
+  if (topLevelSalesOrderId) {
+    try {
+      const { data: cachedSo } = await supabase
+        .from('zoho_document_cache')
+        .select('payload')
+        .eq('organization_id', orgId)
+        .eq('document_type', 'sales_order')
+        .eq('document_id', String(topLevelSalesOrderId))
+        .maybeSingle()
+      let linkedSalesOrder = cachedSo?.payload
+      if (!linkedSalesOrder) {
+        const soResp = await fetch(
+          `${ZOHO_API_URL}/books/v3/salesorders/${topLevelSalesOrderId}?organization_id=${orgId}`,
+          { headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` } }
+        )
+        const soData = await soResp.json()
+        linkedSalesOrder = soData.salesorder
+        if (linkedSalesOrder) {
+          await cacheZohoDocument(supabase, orgId, 'sales_order', String(topLevelSalesOrderId), linkedSalesOrder)
+        }
+      }
+      if (linkedSalesOrder?.reference_number) possibleMatches.push(linkedSalesOrder.reference_number)
+      if (linkedSalesOrder?.salesorder_number) linkedSoNumbers.push(linkedSalesOrder.salesorder_number)
+    } catch (e) {
+      console.error('Failed to resolve top-level invoice sales order:', e)
     }
   }
 
@@ -596,6 +635,75 @@ async function handleCheckInvoicesForOrder(
 }
 
 // ─── SCAN ALL RECENT INVOICES ──────────────────────────────────────────────────
+
+async function handleSyncFulfillmentInvoices(
+  supabase: any, clientId: string, clientSecret: string, sinceDays: number
+) {
+  const accessToken = await getValidAccessToken(supabase, clientId, clientSecret)
+  const orgId = await getOrgId(supabase)
+  const days = Math.max(1, Math.min(14, sinceDays || 7))
+  const dateAfter = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+
+  const response = await fetch(
+    `${ZOHO_API_URL}/books/v3/invoices?organization_id=${orgId}&date_after=${dateAfter}&per_page=200&sort_column=date&sort_order=D`,
+    { headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` } }
+  )
+  const data = await response.json()
+  if (data.code !== 0 || !Array.isArray(data.invoices)) {
+    throw new Error(`Failed to list recent invoices: ${data.message || 'Unknown Zoho error'}`)
+  }
+
+  const summaries = data.invoices.filter((invoice: any) => {
+    const status = String(invoice.status || '').trim().toLowerCase()
+    return !['draft', 'void', 'cancelled', 'canceled'].includes(status)
+  })
+  const ids = summaries.map((invoice: any) => String(invoice.invoice_id || '')).filter(Boolean)
+  const cacheMap = new Map<string, string | null>()
+  if (ids.length) {
+    const { data: cachedRows } = await supabase
+      .from('zoho_document_cache')
+      .select('document_id,source_modified_at')
+      .eq('organization_id', orgId)
+      .eq('document_type', 'invoice')
+      .in('document_id', ids)
+    for (const row of cachedRows || []) cacheMap.set(String(row.document_id), row.source_modified_at || null)
+  }
+
+  let processed = 0
+  let skipped = 0
+  const results: any[] = []
+  for (const summary of summaries) {
+    const id = String(summary.invoice_id || '')
+    if (!id) continue
+    const sourceModified = summary.last_modified_time || summary.updated_time || summary.modified_time || null
+    const cachedModified = cacheMap.get(id)
+    // If the list gives us a modification version and it matches cache, this
+    // invoice is already reflected in quantity flow and needs no detail API call.
+    if (cachedModified && sourceModified && String(cachedModified) === String(sourceModified)) {
+      skipped += 1
+      continue
+    }
+    // When Zoho omits a modification timestamp, an existing cache entry is our
+    // best low-API signal that this invoice has already been processed.
+    if (cacheMap.has(id) && !sourceModified) {
+      skipped += 1
+      continue
+    }
+    const result = await handleInvoiceWebhook(supabase, {}, id, clientId, clientSecret)
+    const body = await result.json()
+    results.push(body)
+    processed += 1
+  }
+
+  return new Response(JSON.stringify({
+    success: true,
+    invoices_seen: summaries.length,
+    invoices_processed: processed,
+    invoices_unchanged: skipped,
+    since_days: days,
+    results,
+  }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+}
 
 async function handleScanAllInvoices(
   supabase: any, clientId: string, clientSecret: string

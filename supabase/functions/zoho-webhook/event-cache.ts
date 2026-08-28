@@ -1,6 +1,7 @@
 const BUYING_CACHE_ID = 'buying-sheet'
 const PO_CACHE_ID = '00000000-0000-0000-0000-000000000003'
 const EXCLUDED_PO_STATUSES = new Set(['cancelled', 'closed', 'rejected', 'draft', 'void', 'billed'])
+const EXCLUDED_RECEIVED_STATUSES = new Set(['received', 'fully_received'])
 const CACHE_MUTATION_LOCK = 'zoho-event-cache-mutation'
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
@@ -175,6 +176,12 @@ function excludedSku(sku: string): boolean {
   return !sku || sku.startsWith('SH-') || sku.startsWith('ZSH')
 }
 
+// Collection POs may legitimately contain descriptive lines with no SKU.
+// Only shipping/service SKUs are excluded from the collection queue.
+function excludedCollectionSku(sku: string): boolean {
+  return sku.startsWith('SH-') || sku.startsWith('ZSH')
+}
+
 function poOutstandingBySku(po: any): Map<string, number> {
   const result = new Map<string, number>()
   const status = String(po?.status || '').toLowerCase()
@@ -193,28 +200,37 @@ function poOutstandingBySku(po: any): Map<string, number> {
 }
 
 function normalizePurchaseOrder(po: any) {
-  const status = String(po.status || '').toLowerCase()
-  const billedStatus = String(po.billed_status || '').toLowerCase()
+  const status = String(po.status || '').trim().toLowerCase()
+  const billedStatus = String(po.billed_status || '').trim().toLowerCase()
+  const receivedStatus = String(po.received_status || '').trim().toLowerCase()
   const lines = (Array.isArray(po.line_items) ? po.line_items : [])
     .map((line: any) => {
       const sku = skuOf(line)
       const quantity = Number(line.quantity || 0)
-      const quantityReceived = Number(line.quantity_received || 0)
-      const quantityBilled = Number(line.quantity_billed || 0)
+      const quantityReceived = Number(line.quantity_received ?? line.received_quantity ?? 0)
+      const quantityBilled = Number(line.quantity_billed ?? line.billed_quantity ?? 0)
+      const accountedFor = Math.max(quantityReceived, quantityBilled, 0)
       return {
         sku,
-        name: String(line.name || ''),
+        name: String(line.name || line.item_name || ''),
         description: String(line.description || ''),
         quantity,
         quantityReceived,
         quantityBilled,
-        outstanding: Math.max(0, quantity - quantityBilled),
+        outstanding: Math.max(0, quantity - accountedFor),
         rate: Number(line.rate || 0),
       }
     })
-    .filter((line: any) => !excludedSku(line.sku) && line.outstanding > 0)
+    .filter((line: any) => !excludedCollectionSku(line.sku) && line.outstanding > 0)
 
-  if (EXCLUDED_PO_STATUSES.has(status) || billedStatus === 'billed' || lines.length === 0) return null
+  if (
+    !String(po.purchaseorder_id || '') ||
+    EXCLUDED_PO_STATUSES.has(status) ||
+    billedStatus === 'billed' || billedStatus === 'fully_billed' ||
+    EXCLUDED_RECEIVED_STATUSES.has(receivedStatus) ||
+    lines.length === 0
+  ) return null
+
   return {
     purchaseOrderId: String(po.purchaseorder_id || ''),
     purchaseOrderNumber: String(po.purchaseorder_number || ''),
@@ -222,9 +238,9 @@ function normalizePurchaseOrder(po: any) {
     vendorName: String(po.vendor_name || 'Unknown supplier'),
     vendorEmail: String(po.vendor_email || ''),
     date: String(po.date || po.purchaseorder_date || ''),
-    expectedDeliveryDate: po.delivery_date || null,
+    expectedDeliveryDate: po.delivery_date || po.expected_delivery_date || null,
     status,
-    receivedStatus: String(po.received_status || ''),
+    receivedStatus,
     billedStatus,
     total: Number(po.total || 0),
     outstandingValue: Math.round(lines.reduce((sum: number, line: any) => sum + line.outstanding * line.rate, 0) * 100) / 100,
