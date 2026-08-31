@@ -1264,8 +1264,8 @@ export type Database = {
           code: string | null
           completed_at: string | null
           completed_by: string | null
-          created_at: string
           description: string | null
+          created_at: string
           id: string
           name: string
           notes: string | null
@@ -1283,8 +1283,8 @@ export type Database = {
           code?: string | null
           completed_at?: string | null
           completed_by?: string | null
-          created_at?: string
           description?: string | null
+          created_at?: string
           id?: string
           name: string
           notes?: string | null
@@ -1302,8 +1302,8 @@ export type Database = {
           code?: string | null
           completed_at?: string | null
           completed_by?: string | null
-          created_at?: string
           description?: string | null
+          created_at?: string
           id?: string
           name?: string
           notes?: string | null
