@@ -33,6 +33,7 @@ import {
   ListFilter,
   MapPinned,
   MapPin,
+  MessageSquareText,
   Navigation,
   PackageCheck,
   Printer,
@@ -227,16 +228,19 @@ const isInFulfillmentWindow = (value: string | null | undefined) => {
 const poOperationalDate = (po: Pick<ZohoPO, "expectedDeliveryDate" | "date">) =>
   po.expectedDeliveryDate || po.date;
 
-const CLOSED_PO_STATUSES = new Set(["cancelled", "closed", "rejected", "draft", "void", "billed"]);
-const CLOSED_BILLED_STATUSES = new Set(["billed", "fully_billed"]);
+const CLOSED_PO_STATUSES = new Set(["cancelled", "closed", "rejected", "draft", "void"]);
 const CLOSED_RECEIVED_STATUSES = new Set(["received", "fully_received"]);
 
 const isOpenCollectionPO = (po: ZohoPO) => {
   const status = String(po.status || "").trim().toLowerCase();
-  const billedStatus = String(po.billedStatus || "").trim().toLowerCase();
   const receivedStatus = String(po.receivedStatus || "").trim().toLowerCase();
-  if (!po.purchaseOrderId || CLOSED_PO_STATUSES.has(status) || CLOSED_BILLED_STATUSES.has(billedStatus) || CLOSED_RECEIVED_STATUSES.has(receivedStatus)) return false;
-  return Array.isArray(po.lines) && po.lines.some((line) => Number(line.outstanding || 0) > 0);
+  if (!po.purchaseOrderId || CLOSED_PO_STATUSES.has(status) || CLOSED_RECEIVED_STATUSES.has(receivedStatus)) return false;
+  // A supplier bill is financial evidence, not proof that stock physically
+  // arrived. Collections remain active until Zoho receipt quantities (or our
+  // own collection ledger) prove that every line was received.
+  return Array.isArray(po.lines) && po.lines.some((line) =>
+    Math.max(0, Number(line.quantity || 0) - Number(line.quantityReceived || 0)) > 0,
+  );
 };
 
 const readyUnits = (item: FulfillmentItem) =>
@@ -327,6 +331,7 @@ export default function FulfillmentPage() {
   const [routeSaving, setRouteSaving] = useState(false);
   const autoAssignLock = useRef(false);
   const loadedRef = useRef(false);
+  const detailBubbleRef = useRef<HTMLDivElement>(null);
 
   const memberName = useCallback(
     (id: string | null | undefined) => {
@@ -525,6 +530,56 @@ export default function FulfillmentPage() {
     return () => { cancelled = true; window.clearInterval(timer); };
   }, [fetchData, refreshFulfillmentSources]);
 
+  useEffect(() => {
+    if (!selectedDeliveryId && !selectedCollectionId) return;
+    const frame = window.requestAnimationFrame(() => {
+      detailBubbleRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [selectedDeliveryId, selectedCollectionId]);
+
+  useEffect(() => {
+    const openDelivery = (event: Event) => {
+      const id = String((event as CustomEvent<string>).detail || "");
+      if (!id) return;
+      setActiveMode("delivery");
+      setSelectedCollectionId(null);
+      setSelectedDeliveryId(id);
+    };
+    const openCollection = (event: Event) => {
+      const id = String((event as CustomEvent<string>).detail || "");
+      if (!id) return;
+      setActiveMode("collection");
+      setSelectedDeliveryId(null);
+      setSelectedCollectionId(id);
+    };
+    const pendingDelivery = window.sessionStorage.getItem("aleph:open-delivery");
+    const pendingCollection = window.sessionStorage.getItem("aleph:open-collection");
+    if (pendingDelivery) {
+      window.sessionStorage.removeItem("aleph:open-delivery");
+      openDelivery(new CustomEvent("aleph:open-delivery", { detail: pendingDelivery }));
+    } else if (pendingCollection) {
+      window.sessionStorage.removeItem("aleph:open-collection");
+      openCollection(new CustomEvent("aleph:open-collection", { detail: pendingCollection }));
+    }
+    window.addEventListener("aleph:open-delivery", openDelivery);
+    window.addEventListener("aleph:open-collection", openCollection);
+    return () => {
+      window.removeEventListener("aleph:open-delivery", openDelivery);
+      window.removeEventListener("aleph:open-collection", openCollection);
+    };
+  }, []);
+
+  useEffect(() => {
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setSelectedDeliveryId(null);
+      setSelectedCollectionId(null);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, []);
+
   useLiveData(["orders", "order_items", "po_tracking_cache", "po_collection_state", "po_collection_events", "po_collection_event_lines", "fulfillment_timeline_events", "dispatch_routes", "dispatch_areas", "dispatch_area_links"], fetchData, {
     debounceMs: 900,
     fallbackIntervalMs: 0,
@@ -557,29 +612,59 @@ export default function FulfillmentPage() {
 
   const collectionQueue = useMemo<CollectionPOView[]>(() => {
     const stateMap = new Map(collectionStates.map((state) => [state.purchase_order_id, state]));
+    const fullyCollectedPOs = new Set(
+      collectionEvents.filter((event) => event.fully_collected).map((event) => event.purchase_order_id),
+    );
     return purchaseOrders
       .map((po) => {
-        const linesView = (po.lines || []).map((line) => {
+        // Zoho can return the same SKU on more than one PO row. Collapse those
+        // rows before applying collection events so duplicate keys cannot make
+        // a finished line reappear or cause two inputs to edit the same draft.
+        const groupedLines = new Map<string, POLine>();
+        (po.lines || []).forEach((line) => {
           const key = poLineKey(line);
+          const current = groupedLines.get(key);
+          if (!current) {
+            groupedLines.set(key, { ...line });
+            return;
+          }
+          groupedLines.set(key, {
+            ...current,
+            quantity: Number(current.quantity || 0) + Number(line.quantity || 0),
+            quantityReceived: Number(current.quantityReceived || 0) + Number(line.quantityReceived || 0),
+            quantityBilled: Number(current.quantityBilled || 0) + Number(line.quantityBilled || 0),
+            outstanding: Number(current.outstanding || 0) + Number(line.outstanding || 0),
+            rate: Number(current.rate || line.rate || 0),
+          });
+        });
+        const linesView = [...groupedLines.entries()].map(([key, line]) => {
           const collected = collectedByLine.get(`${po.purchaseOrderId}::${key}`) || 0;
-          const currentUnbilled = Math.max(0, Number(line.outstanding || 0));
-          // A later supplier bill reduces currentUnbilled. Subtracting the
-          // collection event again would make the remaining quantity too low.
-          // Retain the largest source snapshot and cap by Zoho's current value.
-          const sourceQuantity = Math.max(currentUnbilled, sourceQuantityByLine.get(`${po.purchaseOrderId}::${key}`) || 0);
-          const remaining = Math.min(currentUnbilled, Math.max(0, sourceQuantity - collected));
+          const currentPhysicalOutstanding = Math.max(
+            0,
+            Number(line.quantity || 0) - Number(line.quantityReceived || 0),
+          );
+          // When a receipt later reaches Zoho it overlaps our immutable local
+          // collection event. Capping by Zoho's physical outstanding prevents
+          // subtracting that same movement twice.
+          const sourceQuantity = Math.max(currentPhysicalOutstanding, sourceQuantityByLine.get(`${po.purchaseOrderId}::${key}`) || 0);
+          const remaining = Math.min(currentPhysicalOutstanding, Math.max(0, sourceQuantity - collected));
           return { ...line, key, collected, remaining };
         });
         const remainingUnits = linesView.reduce((sum, line) => sum + line.remaining, 0);
         const collectedUnits = linesView.reduce((sum, line) => sum + line.collected, 0);
         return { ...po, state: stateMap.get(po.purchaseOrderId) || null, linesView, remainingUnits, collectedUnits };
       })
-      .filter((po) => po.remainingUnits > 0 && po.state?.status !== "collected" && !po.state?.completed_at)
+      .filter((po) =>
+        po.remainingUnits > 0
+        && po.state?.status !== "collected"
+        && !po.state?.completed_at
+        && !fullyCollectedPOs.has(po.purchaseOrderId),
+      )
       .sort((a, b) => {
         const urgencyDifference = Number(Boolean(b.state?.is_urgent)) - Number(Boolean(a.state?.is_urgent));
         return urgencyDifference || (a.expectedDeliveryDate || a.date || "").localeCompare(b.expectedDeliveryDate || b.date || "");
       });
-  }, [purchaseOrders, collectionStates, collectedByLine, sourceQuantityByLine]);
+  }, [purchaseOrders, collectionStates, collectionEvents, collectedByLine, sourceQuantityByLine]);
 
   const updateDelivery = async (orderId: string, patch: Record<string, unknown>) => {
     const previous = deliveryOrders;
@@ -1194,6 +1279,52 @@ export default function FulfillmentPage() {
     [deliveryOrders, collectionQueue, deliveryHistory, recentCollectionEvents],
   );
 
+  const fulfillmentBubble = selectedDelivery ? (
+    <FulfillmentBubbleShell
+      bubbleRef={detailBubbleRef}
+      eyebrow="Customer delivery"
+      title={selectedDelivery.order_number}
+      subtitle={selectedDelivery.companyName}
+      icon={Truck}
+      badges={<>{selectedDelivery.urgency === "urgent" && <Badge variant="destructive">Urgent</Badge>}<Badge variant="secondary">{selectedDelivery.items.filter((item) => readyUnits(item) > 0).reduce((sum, item) => sum + readyUnits(item), 0)} units ready</Badge></>}
+      onClose={() => setSelectedDeliveryId(null)}
+    >
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(320px,.85fr)]">
+        <div className="space-y-5">
+          <section><p className="mb-3 text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">Route progress</p><div className="grid grid-cols-3 gap-2">{[{ id: "pending", label: "Ready", icon: PackageCheck }, { id: "scheduled", label: "Planned", icon: CalendarClock }, { id: "out-for-delivery", label: "On route", icon: Navigation }].map((step) => <button key={step.id} onClick={() => void updateDelivery(selectedDelivery.id, { fulfillment_status: step.id, ...(step.id === "pending" ? { fulfillment_scheduled_for: null } : {}) })} className={cn("rounded-2xl border p-3 text-center transition-all", selectedDelivery.fulfillment_status === step.id ? "border-primary/30 bg-primary/10 text-primary shadow-sm" : "border-border/60 bg-muted/25 text-muted-foreground hover:bg-muted/50")}><step.icon className="mx-auto h-4 w-4" /><span className="mt-1.5 block text-[10px] font-bold">{step.label}</span></button>)}</div></section>
+          <section className="grid gap-3 sm:grid-cols-2"><Field label="Driver / assignee" icon={UserRound}><Select value={selectedDelivery.fulfillment_assigned_to || "unassigned"} onValueChange={(value) => void updateDelivery(selectedDelivery.id, { fulfillment_assigned_to: value === "unassigned" ? null : value })}><SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="unassigned">Unassigned</SelectItem>{team.map((member) => <SelectItem key={member.id} value={member.id}>{member.full_name || member.email || "Team member"}</SelectItem>)}</SelectContent></Select></Field><Field label="Dispatch time" icon={CalendarClock}><Input type="datetime-local" className="rounded-xl" value={toLocalDateTimeInput(selectedDelivery.fulfillment_scheduled_for)} onChange={(event) => void updateDelivery(selectedDelivery.id, { fulfillment_scheduled_for: event.target.value ? new Date(event.target.value).toISOString() : null, fulfillment_status: event.target.value ? "scheduled" : "pending" })} /></Field></section>
+          <button type="button" onClick={() => void updateDelivery(selectedDelivery.id, { urgency: selectedDelivery.urgency === "urgent" ? "normal" : "urgent" })} className={cn("flex w-full items-center justify-between rounded-2xl border p-3 text-left transition-colors", selectedDelivery.urgency === "urgent" ? "border-destructive/30 bg-destructive/10 text-destructive" : "border-border/55 bg-muted/25 hover:bg-muted/50")}><span><span className="block text-xs font-black">Urgent delivery</span><span className="mt-0.5 block text-[10px] opacity-70">Pins this order ahead of standard work.</span></span><CircleAlert className="h-5 w-5" /></button>
+          <section><p className="mb-3 text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">Packages ready now</p><div className="grid gap-2 sm:grid-cols-2">{selectedDelivery.items.filter((item) => readyUnits(item) > 0).map((item) => <div key={item.id} className="flex items-start gap-3 rounded-2xl border border-border/45 bg-muted/30 p-3"><span className="grid min-w-10 place-items-center rounded-xl bg-primary/10 px-2 py-1.5 text-sm font-black text-primary">×{readyUnits(item)}</span><div className="min-w-0"><p className="text-sm font-semibold">{item.name}</p>{item.code && <p className="mt-0.5 font-mono text-[10px] text-muted-foreground">{item.code}</p>}</div></div>)}</div></section>
+          <section><label className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">Handover instructions</label><Textarea defaultValue={selectedDelivery.fulfillment_notes || ""} placeholder="Access details, contact person, delivery instructions…" className="min-h-24 resize-none rounded-2xl" onBlur={(event) => { if (event.target.value !== (selectedDelivery.fulfillment_notes || "")) void updateDelivery(selectedDelivery.id, { fulfillment_notes: event.target.value || null }); }} /></section>
+        </div>
+        <aside className="space-y-4 rounded-[24px] border border-primary/10 bg-primary/[0.025] p-3 sm:p-4"><EntityComments entityType="delivery" entityId={selectedDelivery.id} orderId={selectedDelivery.id} defaultOpen /><EntityTimeline events={selectedDeliveryTimeline} memberName={memberName} /></aside>
+      </div>
+      <div className="mt-5 flex flex-col gap-2 border-t border-border/60 pt-4 sm:flex-row"><Button variant="outline" className="rounded-xl" onClick={() => printDispatchManifest()}><Printer className="mr-1.5 h-4 w-4" />Print manifest</Button><Button className="flex-1 rounded-xl" onClick={() => setConfirmDeliveryId(selectedDelivery.id)} disabled={completingDeliveryId === selectedDelivery.id}><CheckCircle2 className="mr-1.5 h-4 w-4" />Complete handover</Button></div>
+    </FulfillmentBubbleShell>
+  ) : selectedCollection ? (
+    <FulfillmentBubbleShell
+      bubbleRef={detailBubbleRef}
+      eyebrow={selectedCollection.state?.collection_method === "supplier-delivery" ? "Supplier delivery" : "Supplier collection"}
+      title={selectedCollection.purchaseOrderNumber}
+      subtitle={selectedCollection.vendorName}
+      icon={Warehouse}
+      badges={<><Badge variant="secondary">{selectedCollection.remainingUnits} units left</Badge>{selectedCollection.state?.is_urgent && <Badge variant="destructive">Urgent</Badge>}</>}
+      onClose={() => setSelectedCollectionId(null)}
+    >
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(320px,.85fr)]">
+        <div className="space-y-5">
+          <section><p className="mb-3 text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">Collection progress</p><div className="grid grid-cols-3 gap-2">{[{ id: "pending", label: "Ready", icon: Warehouse }, { id: "scheduled", label: "Planned", icon: CalendarClock }, { id: "collecting", label: selectedCollection.state?.collection_method === "supplier-delivery" ? "Receiving" : "Collecting", icon: PackageCheck }].map((step) => <button key={step.id} onClick={() => void updateCollectionState(selectedCollection, { status: step.id as POCollectionState["status"], ...(step.id === "pending" ? { scheduled_for: null } : {}) })} className={cn("rounded-2xl border p-3 text-center transition-all", (selectedCollection.state?.status || "pending") === step.id ? "border-primary/30 bg-primary/10 text-primary shadow-sm" : "border-border/60 bg-muted/25 text-muted-foreground hover:bg-muted/50")}><step.icon className="mx-auto h-4 w-4" /><span className="mt-1.5 block text-[10px] font-bold">{step.label}</span></button>)}</div></section>
+          <section className="grid gap-3 sm:grid-cols-2"><Field label="Stock movement" icon={Truck}><Select value={selectedCollection.state?.collection_method || "pickup"} onValueChange={(value: POCollectionState["collection_method"]) => void updateCollectionState(selectedCollection, { collection_method: value })}><SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="pickup">We collect from supplier</SelectItem><SelectItem value="supplier-delivery">Supplier delivers to us</SelectItem></SelectContent></Select></Field><button type="button" onClick={() => void updateCollectionState(selectedCollection, { is_urgent: !selectedCollection.state?.is_urgent })} className={cn("flex items-center justify-between rounded-2xl border p-3 text-left transition-colors", selectedCollection.state?.is_urgent ? "border-destructive/30 bg-destructive/10 text-destructive" : "border-border/55 bg-muted/25 hover:bg-muted/50")}><span><span className="block text-xs font-black">Urgent stock</span><span className="mt-0.5 block text-[10px] opacity-70">Moves this PO to the front.</span></span><CircleAlert className="h-5 w-5" /></button></section>
+          <section className="grid gap-3 sm:grid-cols-2"><Field label={selectedCollection.state?.collection_method === "supplier-delivery" ? "Receiver / assignee" : "Collector / assignee"} icon={UserRound}><Select value={selectedCollection.state?.assigned_to || "unassigned"} onValueChange={(value) => void updateCollectionState(selectedCollection, { assigned_to: value === "unassigned" ? null : value })}><SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="unassigned">Unassigned</SelectItem>{team.map((member) => <SelectItem key={member.id} value={member.id}>{member.full_name || member.email || "Team member"}</SelectItem>)}</SelectContent></Select></Field><Field label={selectedCollection.state?.collection_method === "supplier-delivery" ? "Expected delivery time" : "Pickup time"} icon={CalendarClock}><Input type="datetime-local" className="rounded-xl" value={toLocalDateTimeInput(selectedCollection.state?.scheduled_for)} onChange={(event) => void updateCollectionState(selectedCollection, { scheduled_for: event.target.value ? new Date(event.target.value).toISOString() : null, status: event.target.value ? "scheduled" : "pending" })} /></Field></section>
+          <section><div className="mb-3 flex items-center justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">What arrived now?</p><p className="mt-1 text-xs text-muted-foreground">Enter actual quantities. Partial receipts remain active.</p></div><Button variant="outline" size="sm" className="rounded-xl" onClick={() => collectAllRemaining(selectedCollection)}>Fill remaining</Button></div><div className="space-y-2">{selectedCollection.linesView.filter((line) => line.remaining > 0).map((line) => <div key={line.key} className="grid gap-3 rounded-2xl border border-border/45 bg-muted/30 p-3 sm:grid-cols-[minmax(0,1fr)_120px] sm:items-center"><div className="min-w-0"><p className="text-sm font-semibold">{line.name || line.description}</p>{line.sku && <p className="mt-0.5 font-mono text-[10px] text-muted-foreground">{line.sku}</p>}<div className="mt-1.5 flex flex-wrap gap-2 text-[10px] text-muted-foreground">{line.collected > 0 && <span className="font-semibold text-emerald-600">{line.collected} received before</span>}<span className="font-bold text-primary">{line.remaining} remaining</span></div></div><div><label className="mb-1 block text-[9px] font-black uppercase tracking-wider text-muted-foreground">Received now</label><Input type="number" min={0} max={line.remaining} step="any" value={collectionDraft[selectedCollection.purchaseOrderId]?.[line.key] ?? ""} onChange={(event) => setDraftQty(selectedCollection.purchaseOrderId, line.key, Number(event.target.value), line.remaining)} placeholder="0" className="rounded-xl bg-background" /></div></div>)}</div></section>
+          <section className="grid gap-3 sm:grid-cols-2"><div><label className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">Persistent movement instructions</label><Textarea defaultValue={selectedCollection.state?.notes || ""} placeholder="Supplier contact, gate instructions…" className="min-h-24 resize-none rounded-2xl" onBlur={(event) => { if (event.target.value !== (selectedCollection.state?.notes || "")) void updateCollectionState(selectedCollection, { notes: event.target.value || null }); }} /></div><div><label className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">Note for this receipt</label><Textarea value={collectionNotes[selectedCollection.purchaseOrderId] ?? ""} onChange={(event) => setCollectionNotes((current) => ({ ...current, [selectedCollection.purchaseOrderId]: event.target.value }))} placeholder="Short boxes, back-order, damaged carton…" className="min-h-24 resize-none rounded-2xl" /></div></section>
+        </div>
+        <aside className="space-y-4 rounded-[24px] border border-primary/10 bg-primary/[0.025] p-3 sm:p-4"><EntityComments entityType="collection" entityId={selectedCollection.purchaseOrderId} defaultOpen /><EntityTimeline events={selectedCollectionTimeline} memberName={memberName} /></aside>
+      </div>
+      <div className="mt-5 flex flex-col gap-3 rounded-2xl border border-primary/15 bg-primary/[0.045] p-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-2xl font-black text-primary">{selectedCollectionDraftTotal}</p><p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">units received now</p></div><Button className="rounded-xl" disabled={collectingId === selectedCollection.purchaseOrderId || selectedCollectionDraftTotal <= 0} onClick={() => void markCollected(selectedCollection)}><PackageCheck className="mr-1.5 h-4 w-4" />{collectingId === selectedCollection.purchaseOrderId ? "Saving atomically…" : selectedCollection.state?.collection_method === "supplier-delivery" ? "Mark supplier delivery received" : "Record collection"}</Button></div>
+    </FulfillmentBubbleShell>
+  ) : null;
+
   const LegacyWorkspace = () => (
     <div className="aleph-page-workspace space-y-5">
       <section className="overflow-hidden rounded-[28px] border border-border/60 bg-card/85 shadow-sm backdrop-blur-xl">
@@ -1373,6 +1504,8 @@ export default function FulfillmentPage() {
         </section>
       )}
 
+      {fulfillmentBubble}
+
       {loading ? (
         <div className="grid gap-4 xl:grid-cols-3">{[0, 1, 2].map((number) => <div key={number} className="h-[520px] animate-pulse rounded-[28px] bg-muted/50" />)}</div>
       ) : activeMode === "history" ? (
@@ -1447,7 +1580,7 @@ export default function FulfillmentPage() {
         </SheetContent>
       </Sheet>
 
-      <Dialog open={Boolean(selectedDelivery)} onOpenChange={(open) => !open && setSelectedDeliveryId(null)}>
+      <Dialog open={false} onOpenChange={() => undefined}>
         <DialogContent className="w-[calc(100%-24px)] max-w-2xl overflow-y-auto max-h-[85vh] p-0 gap-0 rounded-3xl border-2 border-primary/15 bg-background/95 backdrop-blur-2xl shadow-[0_24px_80px_-28px_hsl(var(--foreground)/0.38)]">
           <div className="ribbon-bar" aria-hidden />
           {selectedDelivery && <>
@@ -1466,7 +1599,7 @@ export default function FulfillmentPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={Boolean(selectedCollection)} onOpenChange={(open) => !open && setSelectedCollectionId(null)}>
+      <Dialog open={false} onOpenChange={() => undefined}>
         <DialogContent className="w-[calc(100%-24px)] max-w-2xl overflow-y-auto max-h-[85vh] p-0 gap-0 rounded-3xl border-2 border-primary/15 bg-background/95 backdrop-blur-2xl shadow-[0_24px_80px_-28px_hsl(var(--foreground)/0.38)]">
           <div className="ribbon-bar" aria-hidden />
           {selectedCollection && <>
@@ -1489,6 +1622,54 @@ export default function FulfillmentPage() {
         <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Confirm customer handover</AlertDialogTitle><AlertDialogDescription>This will complete every currently invoiced quantity on {deliveryOrders.find((order) => order.id === confirmDeliveryId)?.order_number || "this order"}. The operation is saved as one transaction and will appear in Delivery History.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Not yet</AlertDialogCancel><AlertDialogAction disabled={Boolean(completingDeliveryId)} onClick={(event) => { event.preventDefault(); const order = deliveryOrders.find((candidate) => candidate.id === confirmDeliveryId); if (order) void completeDelivery(order); }}>{completingDeliveryId ? "Completing…" : "Confirm delivered"}</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
       </AlertDialog>
     </div>
+  );
+}
+
+function FulfillmentBubbleShell({
+  bubbleRef,
+  eyebrow,
+  title,
+  subtitle,
+  icon: Icon,
+  badges,
+  onClose,
+  children,
+}: {
+  bubbleRef: React.RefObject<HTMLDivElement>;
+  eyebrow: string;
+  title: string;
+  subtitle: string;
+  icon: any;
+  badges: React.ReactNode;
+  onClose: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <section
+      ref={bubbleRef}
+      className="animate-order-floating-bubble scroll-mt-24 overflow-hidden rounded-[30px] border-2 border-primary/15 bg-background/92 shadow-[0_26px_90px_-32px_hsl(var(--foreground)/0.42)] ring-1 ring-white/10 backdrop-blur-2xl"
+      role="dialog"
+      aria-label={`${eyebrow} ${title}`}
+    >
+      <div className="ribbon-bar h-1.5" aria-hidden />
+      <div className="relative border-b border-border/55 p-4 sm:p-5">
+        <div className="pointer-events-none absolute inset-x-12 -top-10 h-24 rounded-full bg-primary/15 blur-3xl" />
+        <div className="relative flex items-start gap-3">
+          <span className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-2xl bg-background p-1 shadow-sm ring-1 ring-border/60">
+            <img src="/lovable-uploads/e1088147-889e-43f6-bdf0-271189b88913.png" alt="" className="h-full w-full object-contain" />
+          </span>
+          <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-primary/10 text-primary"><Icon className="h-5 w-5" /></span>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary">{eyebrow}</p>{badges}</div>
+            <h2 className="mt-1 truncate font-display text-xl font-black tracking-tight sm:text-2xl">{title}</h2>
+            <p className="mt-0.5 truncate text-sm font-semibold text-muted-foreground">{subtitle}</p>
+          </div>
+          <button type="button" onClick={onClose} className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-muted/70 text-muted-foreground transition-all hover:scale-105 hover:bg-destructive/10 hover:text-destructive" aria-label="Close details"><X className="h-4 w-4" /></button>
+        </div>
+        <div className="relative mt-3 flex items-center gap-2 rounded-xl bg-primary/[0.055] px-3 py-2 text-[11px] text-muted-foreground"><MessageSquareText className="h-3.5 w-3.5 text-primary" /><span>Live team thread, actions and movement history stay together here.</span><span className="ml-auto hidden font-semibold sm:inline">Esc to close</span></div>
+      </div>
+      <div className="p-4 sm:p-5 lg:p-6">{children}</div>
+    </section>
   );
 }
 
@@ -1522,11 +1703,12 @@ function DeliveryDispatchCard({ order, memberName, selected, onToggle, onToggleU
   const overdue = isOverdue(order.fulfillment_scheduled_for);
   const actionLabel = order.fulfillment_status === "scheduled" ? "Send on route" : order.fulfillment_status === "out-for-delivery" ? "Complete" : "Plan route";
   return (
-    <article onClick={onOpen} className={cn("group cursor-pointer rounded-[22px] border bg-background/82 p-3.5 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-lg", selected ? "border-primary/35 ring-2 ring-primary/10" : "border-border/55", order.urgency === "urgent" && "border-l-4 border-l-destructive")}>
+    <article onClick={onOpen} className={cn("group relative cursor-pointer overflow-hidden rounded-[22px] border bg-background/82 p-3.5 pt-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-lg", selected ? "border-primary/35 ring-2 ring-primary/10" : "border-border/55", order.urgency === "urgent" && "border-l-4 border-l-destructive")}>
+      <div className="ribbon-bar absolute inset-x-0 top-0 h-1 opacity-85" aria-hidden />
       <div className="flex items-start gap-3"><span onClick={(event) => { event.stopPropagation(); onToggle(); }} className="pt-0.5"><Checkbox checked={selected} /></span><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-1.5"><h3 className="font-black text-primary">{order.order_number}</h3>{order.urgency === "urgent" && <Badge variant="destructive" className="h-5 text-[9px]">Urgent</Badge>}</div><p className="mt-1 truncate text-sm font-semibold">{order.companyName}</p>{order.reference && <p className="mt-0.5 truncate text-[10px] text-muted-foreground">SO {order.reference}</p>}</div><ChevronRight className="mt-1 h-4 w-4 text-muted-foreground/25 transition-transform group-hover:translate-x-0.5 group-hover:text-primary" /></div>
       <div className="mt-3 grid grid-cols-2 gap-2"><div className="rounded-xl bg-muted/40 px-3 py-2"><p className="text-lg font-black">{units}</p><p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">units ready</p></div><div className="rounded-xl bg-muted/40 px-3 py-2"><p className="text-lg font-black">{visibleItems.length}</p><p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">package lines</p></div></div>
       <div className="mt-3 space-y-1.5 text-[10px] text-muted-foreground"><p className="flex items-center gap-1.5"><UserRound className="h-3 w-3" /><span className={cn(!order.fulfillment_assigned_to && "font-semibold text-amber-600")}>{memberName(order.fulfillment_assigned_to)}</span></p><p className={cn("flex items-center gap-1.5", overdue && "font-semibold text-destructive")}><CalendarClock className="h-3 w-3" />{order.fulfillment_scheduled_for ? `${overdue ? "Late · " : ""}${formatWhen(order.fulfillment_scheduled_for)}` : `Waiting ${ageInDays(order.created_at)}d · not scheduled`}</p></div>
-      <div className="mt-3 flex gap-2 border-t border-border/50 pt-3"><Button variant="ghost" size="sm" aria-label={order.urgency === "urgent" ? "Remove urgent priority" : "Mark urgent"} className={cn("h-8 rounded-xl px-2.5 text-[10px]", order.urgency === "urgent" && "bg-destructive/10 text-destructive hover:bg-destructive/15 hover:text-destructive")} onClick={(event) => { event.stopPropagation(); onToggleUrgent(); }}><CircleAlert className="mr-1 h-3 w-3" />Urgent</Button>{!order.fulfillment_assigned_to && <Button variant="outline" size="sm" className="h-8 rounded-xl px-2.5 text-[10px]" onClick={(event) => { event.stopPropagation(); onClaim(); }}><UserCheck className="mr-1 h-3 w-3" />Claim</Button>}<Button size="sm" className="ml-auto h-8 rounded-xl px-3 text-[10px]" onClick={(event) => { event.stopPropagation(); onAdvance(); }}>{actionLabel}<ArrowRight className="ml-1 h-3 w-3" /></Button></div>
+      <div className="mt-3 flex flex-wrap gap-2 border-t border-border/50 pt-3"><Button variant="ghost" size="sm" aria-label={order.urgency === "urgent" ? "Remove urgent priority" : "Mark urgent"} className={cn("h-8 rounded-xl px-2.5 text-[10px]", order.urgency === "urgent" && "bg-destructive/10 text-destructive hover:bg-destructive/15 hover:text-destructive")} onClick={(event) => { event.stopPropagation(); onToggleUrgent(); }}><CircleAlert className="mr-1 h-3 w-3" />Urgent</Button><Button variant="ghost" size="sm" className="h-8 rounded-xl px-2.5 text-[10px] text-primary" onClick={(event) => { event.stopPropagation(); onOpen(); }}><MessageSquareText className="mr-1 h-3 w-3" />Team thread</Button>{!order.fulfillment_assigned_to && <Button variant="outline" size="sm" className="h-8 rounded-xl px-2.5 text-[10px]" onClick={(event) => { event.stopPropagation(); onClaim(); }}><UserCheck className="mr-1 h-3 w-3" />Claim</Button>}<Button size="sm" className="ml-auto h-8 rounded-xl px-3 text-[10px]" onClick={(event) => { event.stopPropagation(); onAdvance(); }}>{actionLabel}<ArrowRight className="ml-1 h-3 w-3" /></Button></div>
     </article>
   );
 }
@@ -1535,11 +1717,12 @@ function CollectionDispatchCard({ po, memberName, selected, onToggle, onToggleUr
   const overdue = isOverdue(po.state?.scheduled_for || po.expectedDeliveryDate);
   const status = po.state?.status || "pending";
   return (
-    <article onClick={onOpen} className={cn("group cursor-pointer rounded-[22px] border bg-background/82 p-3.5 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-lg", selected ? "border-violet-500/40 ring-2 ring-violet-500/10" : "border-border/55", po.state?.is_urgent && "border-l-4 border-l-destructive")}>
-      <div className="flex items-start gap-3"><span onClick={(event) => { event.stopPropagation(); onToggle(); }} className="pt-0.5"><Checkbox checked={selected} /></span><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-1.5"><h3 className="font-black text-primary">{po.purchaseOrderNumber}</h3><Badge variant="outline" className="h-5 border-violet-500/25 bg-violet-500/10 px-1.5 text-[8px] font-black uppercase text-violet-700">Collection</Badge>{po.state?.is_urgent && <Badge variant="destructive" className="h-5 text-[9px]">Urgent</Badge>}{overdue && <Badge variant="destructive" className="h-5 text-[9px]">Late</Badge>}</div><p className="mt-1 truncate text-sm font-semibold">{po.vendorName}</p><div className="mt-1 flex flex-wrap items-center gap-1.5"><p className="text-[10px] text-muted-foreground">PO {po.date || "date unknown"}</p><Badge variant="outline" className="h-5 px-1.5 text-[8px]">{po.state?.collection_method === "supplier-delivery" ? "Supplier delivery" : "Our pickup"}</Badge></div></div><ChevronRight className="mt-1 h-4 w-4 text-muted-foreground/25 transition-transform group-hover:translate-x-0.5 group-hover:text-primary" /></div>
-      <div className="mt-3 flex items-end justify-between rounded-2xl bg-gradient-to-r from-violet-500/10 to-primary/5 p-3"><div><p className="text-2xl font-black">{po.remainingUnits}</p><p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">units left to collect</p></div><div className="text-right"><p className="text-xs font-bold">{formatMoneySafe(po.outstandingValue)}</p><p className="text-[9px] text-muted-foreground">open value</p></div></div>
+    <article onClick={onOpen} className={cn("group relative cursor-pointer overflow-hidden rounded-[22px] border bg-background/82 p-3.5 pt-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-lg", selected ? "border-primary/40 ring-2 ring-primary/10" : "border-border/55", po.state?.is_urgent && "border-l-4 border-l-destructive")}>
+      <div className="ribbon-bar absolute inset-x-0 top-0 h-1 opacity-85" aria-hidden />
+      <div className="flex items-start gap-3"><span onClick={(event) => { event.stopPropagation(); onToggle(); }} className="pt-0.5"><Checkbox checked={selected} /></span><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-1.5"><h3 className="font-black text-primary">{po.purchaseOrderNumber}</h3><Badge variant="outline" className="h-5 border-primary/25 bg-primary/10 px-1.5 text-[8px] font-black uppercase text-primary">Collection</Badge>{po.state?.is_urgent && <Badge variant="destructive" className="h-5 text-[9px]">Urgent</Badge>}{overdue && <Badge variant="destructive" className="h-5 text-[9px]">Late</Badge>}</div><p className="mt-1 truncate text-sm font-semibold">{po.vendorName}</p><div className="mt-1 flex flex-wrap items-center gap-1.5"><p className="text-[10px] text-muted-foreground">PO {po.date || "date unknown"}</p><Badge variant="outline" className="h-5 px-1.5 text-[8px]">{po.state?.collection_method === "supplier-delivery" ? "Supplier delivery" : "Our pickup"}</Badge></div></div><ChevronRight className="mt-1 h-4 w-4 text-muted-foreground/25 transition-transform group-hover:translate-x-0.5 group-hover:text-primary" /></div>
+      <div className="mt-3 flex items-end justify-between rounded-2xl bg-gradient-to-r from-primary/10 via-[hsl(var(--ribbon-3))]/10 to-[hsl(var(--ribbon-5))]/10 p-3"><div><p className="text-2xl font-black">{po.remainingUnits}</p><p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">units left to collect</p></div><div className="text-right"><p className="text-xs font-bold">{formatMoneySafe(po.outstandingValue)}</p><p className="text-[9px] text-muted-foreground">open value</p></div></div>
       <div className="mt-3 space-y-1.5 text-[10px] text-muted-foreground"><p className="flex items-center gap-1.5"><UserRound className="h-3 w-3" /><span className={cn(!po.state?.assigned_to && "font-semibold text-amber-600")}>{memberName(po.state?.assigned_to)}</span></p><p className={cn("flex items-center gap-1.5", overdue && "font-semibold text-destructive")}><CalendarClock className="h-3 w-3" />{po.state?.scheduled_for ? `${overdue ? "Late · " : ""}${formatWhen(po.state.scheduled_for)}` : po.expectedDeliveryDate ? `Expected ${po.expectedDeliveryDate}` : "Not scheduled"}</p>{po.collectedUnits > 0 && <p className="flex items-center gap-1.5 font-semibold text-emerald-600"><Archive className="h-3 w-3" />{po.collectedUnits} units collected before</p>}</div>
-      <div className="mt-3 flex gap-2 border-t border-border/50 pt-3"><Button variant="ghost" size="sm" aria-label={po.state?.is_urgent ? "Remove urgent priority" : "Mark urgent"} className={cn("h-8 rounded-xl px-2.5 text-[10px]", po.state?.is_urgent && "bg-destructive/10 text-destructive hover:bg-destructive/15 hover:text-destructive")} onClick={(event) => { event.stopPropagation(); onToggleUrgent(); }}><CircleAlert className="mr-1 h-3 w-3" />Urgent</Button>{!po.state?.assigned_to && <Button variant="outline" size="sm" className="h-8 rounded-xl px-2.5 text-[10px]" onClick={(event) => { event.stopPropagation(); onClaim(); }}><UserCheck className="mr-1 h-3 w-3" />Claim</Button>}<Button size="sm" className="ml-auto h-8 rounded-xl px-3 text-[10px]" onClick={(event) => { event.stopPropagation(); onAdvance(); }}>{status === "collecting" ? "Record quantities" : po.state?.collection_method === "supplier-delivery" ? "Receive delivery" : "Start pickup"}<ArrowRight className="ml-1 h-3 w-3" /></Button></div>
+      <div className="mt-3 flex flex-wrap gap-2 border-t border-border/50 pt-3"><Button variant="ghost" size="sm" aria-label={po.state?.is_urgent ? "Remove urgent priority" : "Mark urgent"} className={cn("h-8 rounded-xl px-2.5 text-[10px]", po.state?.is_urgent && "bg-destructive/10 text-destructive hover:bg-destructive/15 hover:text-destructive")} onClick={(event) => { event.stopPropagation(); onToggleUrgent(); }}><CircleAlert className="mr-1 h-3 w-3" />Urgent</Button><Button variant="ghost" size="sm" className="h-8 rounded-xl px-2.5 text-[10px] text-primary" onClick={(event) => { event.stopPropagation(); onOpen(); }}><MessageSquareText className="mr-1 h-3 w-3" />Team thread</Button>{!po.state?.assigned_to && <Button variant="outline" size="sm" className="h-8 rounded-xl px-2.5 text-[10px]" onClick={(event) => { event.stopPropagation(); onClaim(); }}><UserCheck className="mr-1 h-3 w-3" />Claim</Button>}<Button size="sm" className="ml-auto h-8 rounded-xl px-3 text-[10px]" onClick={(event) => { event.stopPropagation(); onAdvance(); }}>{status === "collecting" ? "Record quantities" : po.state?.collection_method === "supplier-delivery" ? "Receive delivery" : "Start pickup"}<ArrowRight className="ml-1 h-3 w-3" /></Button></div>
     </article>
   );
 }

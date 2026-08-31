@@ -37,6 +37,7 @@ interface EntityCommentsProps {
   entityId: string;
   orderId?: string | null;
   className?: string;
+  defaultOpen?: boolean;
 }
 
 function formatTime(value: string) {
@@ -45,13 +46,13 @@ function formatTime(value: string) {
   return date.toLocaleString("en-ZA", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
 }
 
-export default function EntityComments({ entityType, entityId, orderId, className }: EntityCommentsProps) {
+export default function EntityComments({ entityType, entityId, orderId, className, defaultOpen = false }: EntityCommentsProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const [comments, setComments] = useState<EntityComment[]>([]);
   const [reactions, setReactions] = useState<ReactionRow[]>([]);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [body, setBody] = useState("");

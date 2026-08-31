@@ -8,8 +8,9 @@ const corsHeaders = {
 const ZOHO_AUTH_URL = 'https://accounts.zoho.com/oauth/v2'
 const ZOHO_API_URL = 'https://www.zohoapis.com'
 
-// Statuses we consider "still outstanding" (fully billed / cancelled / closed / draft drop off)
-const EXCLUDED_PO_STATUSES = ['cancelled', 'closed', 'rejected', 'draft', 'void', 'billed']
+// Financial billing and physical receipt are different workflows. A PO can be
+// fully billed while the cartons are still waiting at the supplier.
+const EXCLUDED_PO_STATUSES = ['cancelled', 'closed', 'rejected', 'draft', 'void']
 // Correctness first: open POs must not disappear merely because they are old.
 // The list call is cheap; details are fetched only for summaries that still look active.
 const MAX_PO_DETAILS = 500
@@ -260,7 +261,6 @@ async function fetchOutstandingPurchaseOrders(accessToken: string, orgId: string
       const billedStatus = String(summary.billed_status || '').trim().toLowerCase()
       const receivedStatus = String(summary.received_status || '').trim().toLowerCase()
       if (EXCLUDED_PO_STATUSES.includes(status)) continue
-      if (billedStatus === 'billed' || billedStatus === 'fully_billed') continue
       if (EXCLUDED_RECEIVED_STATUSES.includes(receivedStatus)) continue
       candidates.push(summary)
     }
@@ -272,8 +272,6 @@ async function fetchOutstandingPurchaseOrders(accessToken: string, orgId: string
 
   // 2. Fetch detail records in parallel batches instead of one-by-one
   const results: POEntry[] = []
-  const billCache = new Map<string, any>()
-
   for (let i = 0; i < candidates.length; i += DETAIL_CONCURRENCY) {
     const batch = candidates.slice(i, i + DETAIL_CONCURRENCY)
     const details = await Promise.all(
@@ -294,15 +292,10 @@ async function fetchOutstandingPurchaseOrders(accessToken: string, orgId: string
       const detailBilled = String(po.billed_status || summary.billed_status || '').trim().toLowerCase()
       const detailReceived = String(po.received_status || summary.received_status || '').trim().toLowerCase()
       if (EXCLUDED_PO_STATUSES.includes(status)) continue
-      if (detailBilled === 'billed' || detailBilled === 'fully_billed') continue
       if (EXCLUDED_RECEIVED_STATUSES.includes(detailReceived)) continue
 
       const rawLines = Array.isArray(po.line_items) ? po.line_items : []
       const lines: POLine[] = []
-
-      // Zoho doesn't always populate quantity_billed on PO lines, so reconcile
-      // against the actual vendor bills linked to this PO.
-      const billedMap = await fetchBilledQuantities(accessToken, orgId, po, billCache)
 
       for (const line of rawLines) {
         const sku = String(line.sku || '').trim()
@@ -311,14 +304,12 @@ async function fetchOutstandingPurchaseOrders(accessToken: string, orgId: string
         const quantity = Number(line.quantity || 0)
         const quantityReceived = Number(line.quantity_received ?? 0)
         const zohoBilled = Number(line.quantity_billed ?? 0)
-        const billBilled = billedMap.get(lineKey(sku, line.name, line.description)) ?? 0
-        const quantityBilled = Math.max(zohoBilled, billBilled)
-        // A collection is only actionable while stock has neither been received nor
-        // covered by a supplier bill. This prevents old, already-received POs from
-        // resurfacing simply because a bill was posted late or not at all.
-        const accountedFor = Math.max(quantityBilled, quantityReceived, 0)
-        const outstanding = Math.max(0, quantity - accountedFor)
-        // Fully received or billed line -> not outstanding
+        const quantityBilled = zohoBilled
+        // Collection is a physical-stock workflow. Only received quantities
+        // close it; bill detail is intentionally not fetched, reducing Zoho API
+        // calls and preventing prepaid/unreceived stock from disappearing.
+        const outstanding = Math.max(0, quantity - quantityReceived)
+        // Fully received line -> not outstanding
         if (outstanding <= 0) continue
 
         lines.push({

@@ -1,6 +1,6 @@
 const BUYING_CACHE_ID = 'buying-sheet'
 const PO_CACHE_ID = '00000000-0000-0000-0000-000000000003'
-const EXCLUDED_PO_STATUSES = new Set(['cancelled', 'closed', 'rejected', 'draft', 'void', 'billed'])
+const EXCLUDED_PO_STATUSES = new Set(['cancelled', 'closed', 'rejected', 'draft', 'void'])
 const EXCLUDED_RECEIVED_STATUSES = new Set(['received', 'fully_received'])
 const CACHE_MUTATION_LOCK = 'zoho-event-cache-mutation'
 
@@ -209,7 +209,6 @@ function normalizePurchaseOrder(po: any) {
       const quantity = Number(line.quantity || 0)
       const quantityReceived = Number(line.quantity_received ?? line.received_quantity ?? 0)
       const quantityBilled = Number(line.quantity_billed ?? line.billed_quantity ?? 0)
-      const accountedFor = Math.max(quantityReceived, quantityBilled, 0)
       return {
         sku,
         name: String(line.name || line.item_name || ''),
@@ -217,7 +216,9 @@ function normalizePurchaseOrder(po: any) {
         quantity,
         quantityReceived,
         quantityBilled,
-        outstanding: Math.max(0, quantity - accountedFor),
+        // The fulfillment collection cache tracks physical stock, not whether
+        // accounts payable has processed the supplier invoice.
+        outstanding: Math.max(0, quantity - quantityReceived),
         rate: Number(line.rate || 0),
       }
     })
@@ -226,7 +227,6 @@ function normalizePurchaseOrder(po: any) {
   if (
     !String(po.purchaseorder_id || '') ||
     EXCLUDED_PO_STATUSES.has(status) ||
-    billedStatus === 'billed' || billedStatus === 'fully_billed' ||
     EXCLUDED_RECEIVED_STATUSES.has(receivedStatus) ||
     lines.length === 0
   ) return null
