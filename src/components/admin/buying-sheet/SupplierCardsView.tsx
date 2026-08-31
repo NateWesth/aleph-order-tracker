@@ -102,7 +102,7 @@ export function SupplierCardsView({ rows, notes, onGenerateEmail, onCopyEmail }:
                   {/* Items grid */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-0">
                     {items.sort((a, b) => b.priorityScore - a.priorityScore).map(item => (
-                      <div key={item.sku} className={`p-3 border-b border-r border-border/50 last:border-b-0 ${item.hasUrgent ? "bg-destructive/5" : ""}`}>
+                      <div key={item.rowKey} className={`p-3 border-b border-r border-border/50 last:border-b-0 ${item.hasUrgent ? "bg-destructive/5" : ""}`}>
                         <div className="flex items-start justify-between mb-1.5">
                           <div>
                             <p className="font-mono text-[10px] text-muted-foreground">{item.sku}</p>
@@ -138,8 +138,8 @@ export function SupplierCardsView({ rows, notes, onGenerateEmail, onCopyEmail }:
                             <Timer className="h-2.5 w-2.5" />{item.stockoutRiskDays}d until stockout
                           </div>
                         )}
-                        {notes[item.sku] && (
-                          <p className="mt-1.5 text-[10px] text-muted-foreground italic border-l-2 border-primary/30 pl-1.5">{notes[item.sku]}</p>
+                        {notes[item.rowKey] && (
+                          <p className="mt-1.5 text-[10px] text-muted-foreground italic border-l-2 border-primary/30 pl-1.5">{notes[item.rowKey]}</p>
                         )}
                         <p className="text-[10px] text-muted-foreground mt-1">
                           {item.orders.map(o => o.orderNumber).join(", ")} • {item.daysWaiting}d waiting

@@ -6,7 +6,7 @@ const DEBOUNCE_MS = 500;
 export interface OrderDraft {
   companyId: string;
   urgency: string;
-  items: Array<{ id: string; name: string; code: string; quantity: number }>;
+  items: Array<{ id: string; name: string; code: string; description?: string; quantity: number }>;
   purchaseOrders: Array<{ id: string; supplierId: string; purchaseOrderNumber: string }>;
   savedAt: number;
 }

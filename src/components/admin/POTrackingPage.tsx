@@ -33,6 +33,7 @@ import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import { OrderWithCompany } from "@/components/orders/types/orderTypes";
 import OrderDetailsDialog from "@/components/orders/components/OrderDetailsDialog";
 import PageHeader from "@/components/ui/PageHeader";
+import { getItemDisplayName } from "@/lib/itemDisplay";
 import { cn } from "@/lib/utils";
 
 interface POLine {
@@ -352,7 +353,8 @@ export default function POTrackingPage() {
 
   const toggle = (set: Set<string>, key: string, setter: (s: Set<string>) => void) => {
     const next = new Set(set);
-    next.has(key) ? next.delete(key) : next.add(key);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
     setter(next);
   };
 
@@ -562,7 +564,7 @@ export default function POTrackingPage() {
                                 <div className="space-y-2">
                                   {po.lines.map((line, idx) => (
                                     <div key={`${po.purchaseOrderId}-${idx}`} className="p-2 rounded-md bg-background border space-y-1">
-                                      <p className="text-sm font-medium">{line.name || line.description}</p>
+                                      <p className="text-sm font-medium">{getItemDisplayName({ sku: line.sku, name: line.name, description: line.description })}</p>
                                       <p className="text-xs font-mono text-muted-foreground">{line.sku || "-"}</p>
                                       <div className="grid grid-cols-4 gap-1 text-xs">
                                         <div><span className="text-muted-foreground block">Ord</span>{line.quantity}</div>
@@ -591,7 +593,7 @@ export default function POTrackingPage() {
                                       <TableRow key={`${po.purchaseOrderId}-${idx}`}>
                                         <TableCell className="font-mono text-xs">{line.sku || "-"}</TableCell>
                                         <TableCell className="max-w-[320px] truncate">
-                                          {line.name || line.description}
+                                          {getItemDisplayName({ sku: line.sku, name: line.name, description: line.description })}
                                         </TableCell>
                                         <TableCell className="text-right">{line.quantity}</TableCell>
                                         <TableCell className="text-right">{line.quantityReceived}</TableCell>

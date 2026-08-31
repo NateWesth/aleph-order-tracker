@@ -27,26 +27,26 @@ export function QuickOrderView({ rows, onBulkMarkOrdered, onGenerateEmail }: Qui
     groups.set(key, existing);
   }
 
-  const toggleSku = (sku: string) => {
+  const toggleSku = (rowKey: string) => {
     setSelectedSkus(prev => {
       const next = new Set(prev);
-      if (next.has(sku)) next.delete(sku); else next.add(sku);
+      if (next.has(rowKey)) next.delete(rowKey); else next.add(rowKey);
       return next;
     });
   };
 
   const selectAll = () => {
     if (selectedSkus.size === needsOrder.length) setSelectedSkus(new Set());
-    else setSelectedSkus(new Set(needsOrder.map(r => r.sku)));
+    else setSelectedSkus(new Set(needsOrder.map(r => r.rowKey)));
   };
 
   const selectSupplier = (items: BuyingSheetRow[]) => {
-    const skus = items.map(r => r.sku);
-    const allSelected = skus.every(s => selectedSkus.has(s));
+    const rowKeys = items.map(r => r.rowKey);
+    const allSelected = rowKeys.every(key => selectedSkus.has(key));
     setSelectedSkus(prev => {
       const next = new Set(prev);
-      if (allSelected) skus.forEach(s => next.delete(s));
-      else skus.forEach(s => next.add(s));
+      if (allSelected) rowKeys.forEach(key => next.delete(key));
+      else rowKeys.forEach(key => next.add(key));
       return next;
     });
   };
@@ -94,7 +94,7 @@ export function QuickOrderView({ rows, onBulkMarkOrdered, onGenerateEmail }: Qui
 
       {Array.from(groups.entries()).map(([supplier, items]) => {
         const supplierTotal = items.reduce((s, r) => s + r.toOrder, 0);
-        const allSelected = items.every(r => selectedSkus.has(r.sku));
+        const allSelected = items.every(r => selectedSkus.has(r.rowKey));
 
         return (
           <Card key={supplier}>
@@ -115,8 +115,8 @@ export function QuickOrderView({ rows, onBulkMarkOrdered, onGenerateEmail }: Qui
               {items.sort((a, b) => b.priorityScore - a.priorityScore).map(item => {
                 const priority = getPriorityLevel(item.priorityScore);
                 return (
-                  <div key={item.sku} className={`flex items-center gap-3 p-3 hover:bg-muted/20 transition-colors ${selectedSkus.has(item.sku) ? "bg-primary/5" : ""}`}>
-                    <Checkbox checked={selectedSkus.has(item.sku)} onCheckedChange={() => toggleSku(item.sku)} />
+                  <div key={item.rowKey} className={`flex items-center gap-3 p-3 hover:bg-muted/20 transition-colors ${selectedSkus.has(item.rowKey) ? "bg-primary/5" : ""}`}>
+                    <Checkbox checked={selectedSkus.has(item.rowKey)} onCheckedChange={() => toggleSku(item.rowKey)} />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="font-medium text-sm text-foreground truncate">{item.itemName}</span>
