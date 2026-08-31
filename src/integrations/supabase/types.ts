@@ -1264,6 +1264,7 @@ export type Database = {
           code: string | null
           completed_at: string | null
           completed_by: string | null
+          description: string | null
           created_at: string
           id: string
           name: string
@@ -1282,6 +1283,7 @@ export type Database = {
           code?: string | null
           completed_at?: string | null
           completed_by?: string | null
+          description?: string | null
           created_at?: string
           id?: string
           name: string
@@ -1300,6 +1302,7 @@ export type Database = {
           code?: string | null
           completed_at?: string | null
           completed_by?: string | null
+          description?: string | null
           created_at?: string
           id?: string
           name?: string
