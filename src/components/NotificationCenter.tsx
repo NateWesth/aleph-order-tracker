@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 
-import { Bell, CheckCheck, Trash2, Package, ArrowRightLeft, MessageCircle, X, Inbox, Reply, AtSign, SmilePlus, UserCog } from 'lucide-react';
+import { Bell, BellRing, CheckCheck, Trash2, Package, ArrowRightLeft, MessageCircle, X, Inbox, Reply, AtSign, SmilePlus, UserCog, Search, Truck, Warehouse, MailOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { useNotifications, Notification } from '@/hooks/useNotifications';
@@ -21,6 +22,8 @@ const typeConfig: Record<string, { icon: typeof Package; color: string }> = {
   order_assigned: { icon: UserCog, color: 'text-primary' },
   fulfillment_assigned: { icon: UserCog, color: 'text-cyan-500' },
   fulfillment_unassigned: { icon: UserCog, color: 'text-muted-foreground' },
+  fulfillment_delivery: { icon: Truck, color: 'text-primary' },
+  fulfillment_collection: { icon: Warehouse, color: 'text-primary' },
   item_comment: { icon: MessageCircle, color: 'text-blue-500' },
   entity_comment: { icon: MessageCircle, color: 'text-blue-500' },
   comment_reply: { icon: Reply, color: 'text-blue-500' },
@@ -32,10 +35,16 @@ function NotificationItem({
   notification,
   onRead,
   onNavigate,
+  onUnread,
+  onDismiss,
+  onOpened,
 }: {
   notification: Notification;
   onRead: (id: string) => void;
   onNavigate?: (orderId: string) => void;
+  onUnread: (id: string) => void;
+  onDismiss: (id: string) => void;
+  onOpened: () => void;
 }) {
   const config = typeConfig[notification.type] || typeConfig.order_created;
   const Icon = config.icon;
@@ -44,11 +53,18 @@ function NotificationItem({
 
   const openTarget = () => {
     if (!notification.read) onRead(notification.id);
-    if (notification.order_id && onNavigate) onNavigate(notification.order_id);
-    else if (notification.metadata?.kind === "collection") {
+    const entityType = notification.metadata?.entity_type || notification.metadata?.kind;
+    const entityId = notification.metadata?.entity_id || notification.metadata?.purchase_order_id;
+    if (entityType === "delivery" || entityType === "collection") {
+      const storageKey = entityType === "delivery" ? "aleph:open-delivery" : "aleph:open-collection";
+      if (entityId || notification.order_id) window.sessionStorage.setItem(storageKey, String(entityId || notification.order_id));
       window.dispatchEvent(new CustomEvent("setActiveView", { detail: "fulfillment" }));
-      window.setTimeout(() => window.dispatchEvent(new CustomEvent("aleph:open-collection", { detail: notification.metadata?.purchase_order_id })), 60);
+      window.setTimeout(() => window.dispatchEvent(new CustomEvent(`aleph:open-${entityType}`, { detail: entityId || notification.order_id })), 80);
+    } else if (notification.order_id && onNavigate) {
+      window.sessionStorage.setItem("aleph:open-order", notification.order_id);
+      onNavigate(notification.order_id);
     }
+    onOpened();
   };
 
   const releaseAssignment = async (event: React.MouseEvent) => {
@@ -67,7 +83,7 @@ function NotificationItem({
       onClick={openTarget}
       onKeyDown={(e) => { if (e.key === "Enter") openTarget(); }}
       className={cn(
-        "w-full flex items-start gap-3 p-3 text-left transition-colors rounded-lg",
+        "group w-full flex items-start gap-3 p-3 text-left transition-colors rounded-xl",
         "hover:bg-muted/60",
         !notification.read && "bg-primary/5",
         notification.type === 'item_comment' && !notification.read && "border border-blue-500/15 bg-blue-500/[0.07] shadow-[0_10px_28px_-24px_rgba(59,130,246,.75)]",
@@ -88,7 +104,7 @@ function NotificationItem({
           )}
         </div>
         <p className="text-xs text-muted-foreground line-clamp-2">{notification.message}</p>
-        <p className="text-[11px] text-muted-foreground/70">{timeAgo}</p>
+        <div className="flex items-center justify-between gap-2"><p className="text-[11px] text-muted-foreground/70">{timeAgo}</p><div className="flex opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100"><Button variant="ghost" size="icon" className="h-6 w-6" title={notification.read ? "Mark unread" : "Mark read"} onClick={(event) => { event.stopPropagation(); notification.read ? onUnread(notification.id) : onRead(notification.id); }}>{notification.read ? <MailOpen className="h-3 w-3" /> : <CheckCheck className="h-3 w-3" />}</Button><Button variant="ghost" size="icon" className="h-6 w-6 hover:text-destructive" title="Dismiss" onClick={(event) => { event.stopPropagation(); onDismiss(notification.id); }}><Trash2 className="h-3 w-3" /></Button></div></div>
         {notification.type === "fulfillment_assigned" && (
           <div className="mt-2 flex gap-2">
             <Button size="sm" className="h-7 rounded-lg px-2 text-[10px]" onClick={(e) => { e.stopPropagation(); openTarget(); }}>Open</Button>
@@ -101,24 +117,31 @@ function NotificationItem({
 }
 
 export default function NotificationCenter({ onNavigateToOrder }: NotificationCenterProps) {
-  const { notifications, unreadCount, loading, markAsRead, markAllAsRead, clearAll } = useNotifications();
+  const { notifications, unreadCount, loading, markAsRead, markAsUnread, markAllAsRead, dismiss, clearAll } = useNotifications();
   const [isOpen, setIsOpen] = useState(false);
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
-  const [category, setCategory] = useState<'orders' | 'comments'>('orders');
+  const [category, setCategory] = useState<'all' | 'workflow' | 'comments'>('all');
+  const [query, setQuery] = useState('');
   const panelRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [coords, setCoords] = useState({ top: 0, right: 8 });
 
   const commentTypes = ['order_update_message', 'item_comment', 'entity_comment', 'comment_reply', 'comment_mention', 'comment_reaction'];
+  const workflowTypes = ['fulfillment_assigned', 'fulfillment_unassigned', 'fulfillment_delivery', 'fulfillment_collection'];
   const isComment = (n: Notification) => commentTypes.includes(n.type);
-  const orderNotifications = notifications.filter(n => !isComment(n));
+  const isWorkflow = (n: Notification) => workflowTypes.includes(n.type) || ['delivery', 'collection'].includes(String(n.metadata?.entity_type || n.metadata?.kind || ''));
+  const workflowNotifications = notifications.filter(isWorkflow);
   const commentNotifications = notifications.filter(isComment);
-  const categoryNotifications = category === 'comments' ? commentNotifications : orderNotifications;
+  const categoryNotifications = category === 'comments' ? commentNotifications : category === 'workflow' ? workflowNotifications : notifications;
   const categoryUnread = categoryNotifications.filter(n => !n.read).length;
-  const visibleNotifications = filter === 'unread'
+  const filteredByRead = filter === 'unread'
     ? categoryNotifications.filter(item => !item.read)
     : categoryNotifications;
+  const normalizedQuery = query.trim().toLowerCase();
+  const visibleNotifications = normalizedQuery
+    ? filteredByRead.filter(item => `${item.title} ${item.message} ${item.order_number || ''}`.toLowerCase().includes(normalizedQuery))
+    : filteredByRead;
 
 
   // Position the portalled panel under the bell button
@@ -179,13 +202,13 @@ export default function NotificationCenter({ onNavigateToOrder }: NotificationCe
         <div
           ref={dropdownRef}
           style={{ top: coords.top, right: coords.right }}
-          className="fixed w-[min(360px,calc(100vw-1rem))] max-w-[calc(100vw-1rem)] bg-card border border-border rounded-xl shadow-2xl z-[2147483000] animate-in slide-in-from-top-2 fade-in-0 duration-200"
+          className="fixed w-[min(430px,calc(100vw-1rem))] max-w-[calc(100vw-1rem)] overflow-hidden bg-card/95 border border-border rounded-2xl shadow-2xl backdrop-blur-2xl z-[2147483000] animate-in slide-in-from-top-2 fade-in-0 duration-200"
         >
 
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-border">
             <div className="flex items-center gap-2">
-              <h3 className="text-sm font-semibold">Notifications</h3>
+              <span className="grid h-8 w-8 place-items-center rounded-xl bg-primary/10 text-primary"><BellRing className="h-4 w-4" /></span><div><h3 className="text-sm font-bold">Team inbox</h3><p className="text-[10px] text-muted-foreground">Orders, fulfillment and conversations</p></div>
               {unreadCount > 0 && (
                 <Badge variant="secondary" className="text-xs px-1.5 py-0">
                   {unreadCount} new
@@ -226,10 +249,11 @@ export default function NotificationCenter({ onNavigateToOrder }: NotificationCe
           </div>
 
           {/* Category tabs */}
-          <div className="grid grid-cols-2 border-b border-border">
+          <div className="grid grid-cols-3 border-b border-border">
             {([
-              { value: 'orders' as const, label: 'Order updates', items: orderNotifications },
-              { value: 'comments' as const, label: 'Comments & notes', items: commentNotifications },
+              { value: 'all' as const, label: 'All activity', items: notifications },
+              { value: 'workflow' as const, label: 'Fulfillment', items: workflowNotifications },
+              { value: 'comments' as const, label: 'Conversations', items: commentNotifications },
             ]).map(tab => {
               const tabUnread = tab.items.filter(n => !n.read).length;
               return (
@@ -255,7 +279,8 @@ export default function NotificationCenter({ onNavigateToOrder }: NotificationCe
             })}
           </div>
 
-          <div className="flex items-center gap-1 border-b border-border px-3 py-2">
+          <div className="flex items-center gap-2 border-b border-border px-3 py-2">
+            <div className="relative min-w-0 flex-1"><Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" /><Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search activity…" className="h-8 rounded-xl bg-muted/40 pl-8 text-xs" /></div>
             {(['all', 'unread'] as const).map(value => (
               <button
                 key={value}
@@ -263,7 +288,7 @@ export default function NotificationCenter({ onNavigateToOrder }: NotificationCe
                 onClick={() => setFilter(value)}
                 className={cn(
                   "rounded-full px-3 py-1 text-xs font-semibold transition-colors",
-                  filter === value ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
+                  filter === value ? "bg-primary text-primary-foreground" : "bg-muted/45 text-muted-foreground hover:bg-muted"
                 )}
               >
                 {value === 'all' ? `All ${categoryNotifications.length}` : `Unread ${categoryUnread}`}
@@ -284,8 +309,10 @@ export default function NotificationCenter({ onNavigateToOrder }: NotificationCe
                   {filter === 'unread'
                     ? 'You’re all caught up'
                     : category === 'comments'
-                      ? 'No comments or notes yet'
-                      : 'No order updates yet'}
+                      ? 'No conversations yet'
+                      : category === 'workflow'
+                        ? 'No fulfillment alerts yet'
+                        : 'No activity yet'}
                 </p>
               </div>
 
@@ -296,6 +323,9 @@ export default function NotificationCenter({ onNavigateToOrder }: NotificationCe
                     key={notification.id}
                     notification={notification}
                     onRead={markAsRead}
+                    onUnread={markAsUnread}
+                    onDismiss={dismiss}
+                    onOpened={() => setIsOpen(false)}
                     onNavigate={(orderId) => {
                       setIsOpen(false);
                       onNavigateToOrder?.(orderId);

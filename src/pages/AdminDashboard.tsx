@@ -360,6 +360,8 @@ const AdminDashboard = () => {
               <NotificationCenter
                 onNavigateToOrder={(orderId) => {
                   setActiveView("orders");
+                  window.sessionStorage.setItem("aleph:open-order", orderId);
+                  window.setTimeout(() => window.dispatchEvent(new CustomEvent("aleph:open-order", { detail: orderId })), 80);
                 }}
                 data-tour="notifications"
               />

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useLiveData } from "@/hooks/useLiveData";
 import { supabase } from "@/integrations/supabase/client";
 import { PullToRefresh } from "@/components/ui/PullToRefresh";
@@ -248,8 +248,37 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
     orderId: string;
     columnKey: string;
   } | null>(null);
+  const pendingNotificationOrderRef = useRef<string | null>(
+    window.sessionStorage.getItem("aleph:open-order"),
+  );
 
   const [expandedColumns, setExpandedColumns] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const orderId = String((event as CustomEvent<string>).detail || "");
+      if (!orderId) return;
+      pendingNotificationOrderRef.current = orderId;
+      const order = orders.find((candidate) => candidate.id === orderId);
+      if (order) {
+        setItemsBubble({ orderId, columnKey: order.boardStage || "new" });
+        window.sessionStorage.removeItem("aleph:open-order");
+        pendingNotificationOrderRef.current = null;
+      }
+    };
+    window.addEventListener("aleph:open-order", handler);
+    return () => window.removeEventListener("aleph:open-order", handler);
+  }, [orders]);
+
+  useEffect(() => {
+    const orderId = pendingNotificationOrderRef.current;
+    if (!orderId || !orders.length) return;
+    const order = orders.find((candidate) => candidate.id === orderId);
+    if (!order) return;
+    setItemsBubble({ orderId, columnKey: order.boardStage || "new" });
+    window.sessionStorage.removeItem("aleph:open-order");
+    pendingNotificationOrderRef.current = null;
+  }, [orders]);
 
   const { toast } = useToast();
   const { user } = useAuth();

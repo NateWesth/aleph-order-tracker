@@ -24,17 +24,25 @@ export function useNotifications() {
   const fetchNotifications = useCallback(async () => {
     if (!user?.id) return;
     try {
-      const { data, error } = await supabase
-        .from('notifications')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(50);
+      const [{ data, error }, { count, error: countError }] = await Promise.all([
+        supabase
+          .from('notifications')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(100),
+        supabase
+          .from('notifications')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+          .eq('read', false),
+      ]);
 
       if (error) throw error;
+      if (countError) throw countError;
 
       setNotifications((data || []) as unknown as Notification[]);
-      setUnreadCount(data?.filter(n => !n.read).length || 0);
+      setUnreadCount(count || 0);
     } catch (err) {
       console.error('Error fetching notifications:', err);
     } finally {
@@ -69,6 +77,27 @@ export function useNotifications() {
       setUnreadCount(0);
     }
   }, [user?.id]);
+
+  const markAsUnread = useCallback(async (notificationId: string) => {
+    const { error } = await supabase
+      .from('notifications')
+      .update({ read: false })
+      .eq('id', notificationId);
+
+    if (!error) {
+      setNotifications(prev => prev.map(n => n.id === notificationId ? { ...n, read: false } : n));
+      setUnreadCount(prev => prev + 1);
+    }
+  }, []);
+
+  const dismiss = useCallback(async (notificationId: string) => {
+    const existing = notifications.find(item => item.id === notificationId);
+    const { error } = await supabase.from('notifications').delete().eq('id', notificationId);
+    if (!error) {
+      setNotifications(prev => prev.filter(item => item.id !== notificationId));
+      if (existing && !existing.read) setUnreadCount(prev => Math.max(0, prev - 1));
+    }
+  }, [notifications]);
 
   const clearAll = useCallback(async () => {
     if (!user?.id) return;
@@ -105,7 +134,7 @@ export function useNotifications() {
         },
         (payload) => {
           const newNotif = payload.new as Notification;
-          setNotifications(prev => [newNotif, ...prev].slice(0, 50));
+          setNotifications(prev => [newNotif, ...prev.filter(item => item.id !== newNotif.id)].slice(0, 100));
           setUnreadCount(prev => prev + 1);
         }
       )
@@ -119,10 +148,12 @@ export function useNotifications() {
         },
         (payload) => {
           const updated = payload.new as Notification;
-          setNotifications(previous => previous.map(item => item.id === updated.id ? updated : item));
-          setUnreadCount(previous => {
-            const wasUnread = !(payload.old as Partial<Notification>)?.read;
-            return wasUnread && updated.read ? Math.max(0, previous - 1) : previous;
+          setNotifications(previous => {
+            const existing = previous.find(item => item.id === updated.id);
+            if (existing && existing.read !== updated.read) {
+              setUnreadCount(count => updated.read ? Math.max(0, count - 1) : count + 1);
+            }
+            return previous.map(item => item.id === updated.id ? updated : item);
           });
         }
       )
@@ -138,7 +169,9 @@ export function useNotifications() {
     unreadCount,
     loading,
     markAsRead,
+    markAsUnread,
     markAllAsRead,
+    dismiss,
     clearAll,
     refetch: fetchNotifications,
   };
