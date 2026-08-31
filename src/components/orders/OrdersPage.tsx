@@ -37,6 +37,7 @@ import OrderItemsFloatingBubble from "./components/OrderItemsFloatingBubble";
 import BulkActionsBar from "./components/BulkActionsBar";
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import { cn } from "@/lib/utils";
+import { getItemDisplayName, getItemSecondaryDescription } from "@/lib/itemDisplay";
 
 interface OrdersPageProps {
   isAdmin?: boolean;
@@ -47,6 +48,8 @@ interface OrderItem {
   id: string;
   name: string;
   code: string | null;
+  description?: string | null;
+  notes?: string | null;
   quantity: number;
   stock_status: string;
   qty_on_po?: number;
@@ -370,7 +373,7 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
         orderIds.length > 0
           ? supabase
               .from("order_items")
-              .select("id, order_id, name, code, quantity, stock_status, qty_on_po, qty_received, qty_invoiced, qty_completed")
+              .select("id, order_id, name, code, description, notes, quantity, stock_status, qty_on_po, qty_received, qty_invoiced, qty_completed")
               .in("order_id", orderIds)
           : Promise.resolve({ data: [], error: null }),
         orderIds.length > 0
@@ -433,6 +436,8 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
               id: item.id,
               name: item.name,
               code: item.code,
+              description: item.description,
+              notes: item.notes,
               quantity: item.quantity,
               totalQuantity: item.quantity,
               stock_status: item.stock_status,
@@ -576,7 +581,11 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
     try {
       const itemsDescription = orderData.items
         .filter((item) => item.name && item.quantity > 0)
-        .map((item) => `${item.name} (Qty: ${item.quantity})${item.notes ? ` - ${item.notes}` : ""}`)
+        .map((item) => {
+          const displayName = getItemDisplayName(item);
+          const secondary = getItemSecondaryDescription(item);
+          return `${displayName} (Qty: ${item.quantity})${secondary ? ` - ${secondary}` : ""}`;
+        })
         .join("\n");
 
       const { data: newOrder, error } = await supabase
@@ -604,6 +613,7 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
           order_id: newOrder.id,
           name: item.name,
           code: item.code || null,
+          description: item.description?.trim() || null,
           quantity: item.quantity,
           stock_status: "awaiting",
         }));

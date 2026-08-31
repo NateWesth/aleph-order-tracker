@@ -291,6 +291,10 @@ async function getActiveBuyingSheetSkus(supabase: any): Promise<{ skus: Set<stri
     if (Math.max(0, (row.quantity || 0) - (row.qty_on_po || 0)) <= 0) continue
     const sku = normalizeSku(row.code)
     if (!sku) continue
+    // M-MISC is a shared placeholder rather than a stock identity. Querying it
+    // once and applying that result to every custom line produces false stock,
+    // PO and vendor totals, while also wasting Zoho requests.
+    if (isSharedMiscSku(sku)) continue
     skus.add(sku)
     const key = normalizeName(row.name)
     if (key && !nameToSku.has(key)) nameToSku.set(key, sku)
@@ -600,6 +604,11 @@ async function fetchZohoPage(accessToken: string, url: string) {
 
 function normalizeSku(value: unknown): string {
   return String(value || '').trim().toUpperCase()
+}
+
+function isSharedMiscSku(value: unknown): boolean {
+  const sku = normalizeSku(value).replace(/\s+/g, '-')
+  return sku === 'M-MISCELLANEOUS' || sku === 'M-MISC' || sku === 'MISCELLANEOUS' || sku === 'MISC'
 }
 
 function normalizeName(value: unknown): string {

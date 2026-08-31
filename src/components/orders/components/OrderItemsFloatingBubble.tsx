@@ -1,12 +1,15 @@
 import { useEffect, useState } from "react";
 import { Package, PackageCheck, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { getItemDisplayName, getItemSecondaryDescription, isMiscellaneousItem } from "@/lib/itemDisplay";
 import OrderItemComments from "./OrderItemComments";
 
 interface OrderItem {
   id: string;
   name: string;
   code: string | null;
+  description?: string | null;
+  notes?: string | null;
   quantity: number;
   stock_status: string;
   totalQuantity?: number;
@@ -195,6 +198,8 @@ export default function OrderItemsFloatingBubble({ order, onClose }: OrderItemsF
               const total = item.totalQuantity ?? item.quantity;
               const isPartial = total > item.quantity;
               const stockStyle = getStockStatusStyle(item.stock_status);
+              const displayName = getItemDisplayName(item);
+              const secondaryDescription = getItemSecondaryDescription(item);
 
               return (
                 <div
@@ -207,7 +212,8 @@ export default function OrderItemsFloatingBubble({ order, onClose }: OrderItemsF
                   </div>
 
                   <div className="min-w-0 flex-1">
-                    <div className="break-words text-xs font-semibold text-foreground">{item.name}</div>
+                    <div className="break-words text-xs font-semibold text-foreground">{displayName}</div>
+                    {secondaryDescription && <div className="mt-0.5 break-words text-[10px] leading-relaxed text-muted-foreground">{secondaryDescription}</div>}
 
                     <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground">
                       {item.stock_status && (
@@ -218,6 +224,7 @@ export default function OrderItemsFloatingBubble({ order, onClose }: OrderItemsF
                       )}
                       {isPartial && <span>{item.quantity} of {total}</span>}
                       {item.code && <span className="font-mono">[{item.code}]</span>}
+                      {(isMiscellaneousItem(item.code) || isMiscellaneousItem(item.name)) && <span className="rounded-full bg-primary/10 px-1.5 py-0.5 font-semibold text-primary">custom line</span>}
                     </div>
                   </div>
 

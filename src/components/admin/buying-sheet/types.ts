@@ -1,6 +1,10 @@
 export interface BuyingSheetRow {
+  /** Stable UI/workflow identity. Differs from sku for shared M-MISC lines. */
+  rowKey: string;
   sku: string;
   itemName: string;
+  isMiscellaneous: boolean;
+  orderItemIds: string[];
   totalNeeded: number;
   stockOnHand: number;
   /** Quantity allocated by PO webhooks to the exact awaiting order lines in this row. */

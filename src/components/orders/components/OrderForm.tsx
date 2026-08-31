@@ -19,11 +19,13 @@ import {
 } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useAutoSaveDraft } from "@/hooks/useAutoSaveDraft";
+import { isMiscellaneousItem } from "@/lib/itemDisplay";
 
 interface OrderItem {
   id: string;
   name: string;
   code: string;
+  description: string;
   quantity: number;
 }
 
@@ -31,6 +33,7 @@ interface CatalogItem {
   id: string;
   code: string;
   name: string;
+  description: string | null;
   unit: string;
 }
 
@@ -56,7 +59,7 @@ interface TemplatePrefill {
   companyId: string | null;
   urgency: string;
   notes: string;
-  items: { name: string; code: string; quantity: number }[];
+  items: { name: string; code: string; description?: string; quantity: number }[];
 }
 
 interface OrderFormProps {
@@ -79,7 +82,7 @@ const OrderForm = ({ onSubmit, loading = false, templatePrefill }: OrderFormProp
   const [urgency, setUrgency] = useState("normal");
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrderEntry[]>([]);
   const [items, setItems] = useState<OrderItem[]>([
-    { id: crypto.randomUUID(), name: "", code: "", quantity: 1 },
+    { id: crypto.randomUUID(), name: "", code: "", description: "", quantity: 1 },
   ]);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -99,7 +102,7 @@ const OrderForm = ({ onSubmit, loading = false, templatePrefill }: OrderFormProp
     if (draft) {
       setCompanyId(draft.companyId || "");
       setUrgency(draft.urgency || "normal");
-      if (draft.items?.length > 0) setItems(draft.items);
+      if (draft.items?.length > 0) setItems(draft.items.map((item: OrderItem) => ({ ...item, description: item.description || "" })));
       if (draft.purchaseOrders?.length > 0) setPurchaseOrders(draft.purchaseOrders);
       setDraftRestored(true);
     }
@@ -115,6 +118,7 @@ const OrderForm = ({ onSubmit, loading = false, templatePrefill }: OrderFormProp
           id: crypto.randomUUID(),
           name: i.name,
           code: i.code || "",
+          description: i.description || "",
           quantity: i.quantity || 1,
         })));
       }
@@ -167,7 +171,7 @@ const OrderForm = ({ onSubmit, loading = false, templatePrefill }: OrderFormProp
       // Search by code (exact prefix match) OR name/description (contains)
       const { data, error } = await supabase
         .from("items")
-        .select("id, code, name, unit")
+        .select("id, code, name, description, unit")
         .or(`code.ilike.${searchTerm}%,name.ilike.%${searchTerm}%`)
         .limit(50)
         .order("code");
@@ -201,7 +205,7 @@ const OrderForm = ({ onSubmit, loading = false, templatePrefill }: OrderFormProp
   const addItem = () => {
     setItems([
       ...items,
-      { id: crypto.randomUUID(), name: "", code: "", quantity: 1 },
+      { id: crypto.randomUUID(), name: "", code: "", description: "", quantity: 1 },
     ]);
   };
 
@@ -232,7 +236,7 @@ const OrderForm = ({ onSubmit, loading = false, templatePrefill }: OrderFormProp
     setItems(
       items.map((item) =>
         item.id === itemId
-          ? { ...item, name: catalogItem.name, code: catalogItem.code }
+          ? { ...item, name: catalogItem.name, code: catalogItem.code, description: isMiscellaneousItem(catalogItem.code) ? "" : (catalogItem.description || "") }
           : item
       )
     );
@@ -273,6 +277,10 @@ const OrderForm = ({ onSubmit, loading = false, templatePrefill }: OrderFormProp
     );
 
     if (validItems.length === 0) {
+      return;
+    }
+
+    if (validItems.some((item) => (isMiscellaneousItem(item.code) || isMiscellaneousItem(item.name)) && !item.description.trim())) {
       return;
     }
 
@@ -320,7 +328,7 @@ const OrderForm = ({ onSubmit, loading = false, templatePrefill }: OrderFormProp
               setDraftRestored(false);
               setCompanyId("");
               setUrgency("normal");
-              setItems([{ id: crypto.randomUUID(), name: "", code: "", quantity: 1 }]);
+              setItems([{ id: crypto.randomUUID(), name: "", code: "", description: "", quantity: 1 }]);
               setPurchaseOrders([]);
             }}
             className="text-xs text-muted-foreground hover:text-destructive"
@@ -460,7 +468,7 @@ const OrderForm = ({ onSubmit, loading = false, templatePrefill }: OrderFormProp
           {items.map((item, index) => (
             <div
               key={item.id}
-              className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg"
+              className="flex flex-wrap items-center gap-2 rounded-xl bg-muted/50 p-3"
             >
               <span className="text-sm text-muted-foreground w-6">
                 {index + 1}.
@@ -587,6 +595,19 @@ const OrderForm = ({ onSubmit, loading = false, templatePrefill }: OrderFormProp
                   <Trash2 className="h-4 w-4 text-destructive" />
                 </Button>
               )}
+
+              <div className="ml-8 w-[calc(100%-2rem)]">
+                <Label className="mb-1.5 block text-xs text-muted-foreground">
+                  {(isMiscellaneousItem(item.code) || isMiscellaneousItem(item.name)) ? "Item description *" : "Item description"}
+                </Label>
+                <Input
+                  value={item.description}
+                  onChange={(event) => updateItem(item.id, "description", event.target.value)}
+                  placeholder={(isMiscellaneousItem(item.code) || isMiscellaneousItem(item.name)) ? "Describe exactly what this M-MISC line is" : "Optional model, specification or line description"}
+                  className={(isMiscellaneousItem(item.code) || isMiscellaneousItem(item.name)) && !item.description.trim() ? "border-amber-500/60 bg-amber-500/5" : ""}
+                />
+                {(isMiscellaneousItem(item.code) || isMiscellaneousItem(item.name)) && !item.description.trim() && <p className="mt-1 text-[11px] font-medium text-amber-600">M-MISC is shared by many products, so its unique description is required.</p>}
+              </div>
             </div>
           ))}
         </div>
@@ -606,7 +627,7 @@ const OrderForm = ({ onSubmit, loading = false, templatePrefill }: OrderFormProp
       <Button
         type="submit"
         className="w-full"
-        disabled={loading || !companyId || items.every((i) => !i.name.trim())}
+        disabled={loading || !companyId || items.every((i) => !i.name.trim()) || items.some((item) => (isMiscellaneousItem(item.code) || isMiscellaneousItem(item.name)) && !item.description.trim())}
       >
         {loading ? "Creating..." : "Create Order"}
       </Button>

@@ -197,8 +197,23 @@ async function handleSalesOrderByNumber(
 ) {
   console.log('Looking up sales order by number:', soNumber)
 
-  const accessToken = await getValidAccessToken(supabase, clientId, clientSecret)
-  const orgId = await getOrgId(supabase)
+  const { data: cachedDocuments } = await supabase
+    .from('zoho_document_cache')
+    .select('payload')
+    .eq('document_type', 'sales_order')
+  const cachedByNumber = new Map<string, any>()
+  for (const row of cachedDocuments || []) {
+    const cached = row.payload as any
+    const number = String(cached?.salesorder_number || cached?.sales_order_number || '').trim().toUpperCase()
+    if (number && Array.isArray(cached?.line_items)) cachedByNumber.set(number, cached)
+  }
+
+  let accessToken = ''
+  let orgId = ''
+  const ensureZohoAccess = async () => {
+    if (!accessToken) accessToken = await getValidAccessToken(supabase, clientId, clientSecret)
+    if (!orgId) orgId = await getOrgId(supabase)
+  }
 
   // Search for the sales order by number
   const searchResp = await fetch(
@@ -225,15 +240,32 @@ async function handleSalesOrderByNumber(
 async function handleBulkResyncItems(
   supabase: any, clientId: string, clientSecret: string
 ) {
-  console.log('Starting bulk resync of all order item descriptions from Zoho')
+  console.log('Starting targeted resync of unresolved miscellaneous item descriptions')
 
-  const accessToken = await getValidAccessToken(supabase, clientId, clientSecret)
-  const orgId = await getOrgId(supabase)
+  // Only contact Zoho for orders that actually contain an unresolved shared
+  // M-MISC line. This repair is intentionally targeted so a one-time backfill
+  // cannot consume calls by rereading every historic sales order.
+  const { data: unresolvedItems, error: unresolvedErr } = await supabase
+    .from('order_items')
+    .select('order_id, code, name, description')
+    .ilike('code', 'm-misc%')
 
-  // Get all orders that have a Zoho SO reference
+  if (unresolvedErr) throw unresolvedErr
+  const unresolvedOrderIds = [...new Set((unresolvedItems || [])
+    .filter((item: any) => !String(item.description || '').trim() || isMiscItem(item.description))
+    .map((item: any) => String(item.order_id || ''))
+    .filter(Boolean))]
+
+  if (unresolvedOrderIds.length === 0) {
+    return new Response(JSON.stringify({ message: 'No unresolved miscellaneous lines', count: 0 }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
+  }
+
   const { data: orders, error: ordersErr } = await supabase
     .from('orders')
     .select('id, order_number, reference')
+    .in('id', unresolvedOrderIds)
     .not('reference', 'is', null)
     .like('reference', 'SO-%')
 
@@ -244,11 +276,24 @@ async function handleBulkResyncItems(
     })
   }
 
+  const accessToken = await getValidAccessToken(supabase, clientId, clientSecret)
+  const orgId = await getOrgId(supabase)
+
   let totalUpdated = 0
   let ordersProcessed = 0
 
   for (const order of orders) {
     try {
+      const cached = cachedByNumber.get(String(order.reference || '').trim().toUpperCase())
+      if (cached) {
+        const itemsSynced = await syncOrderItems(supabase, order.id, cached.line_items || [])
+        totalUpdated += itemsSynced
+        ordersProcessed++
+        console.log(`Repaired ${order.reference} from the existing document cache`)
+        continue
+      }
+
+      await ensureZohoAccess()
       // Look up the sales order in Zoho by its SO number (stored in reference)
       const searchResp = await fetch(
         `${ZOHO_API_URL}/books/v3/salesorders?organization_id=${orgId}&salesorder_number=${encodeURIComponent(order.reference)}`,
@@ -966,14 +1011,35 @@ async function handleSalesOrderWebhook(
 
 // ─── SYNC ORDER ITEMS ──────────────────────────────────────────────────────────
 
+const MISC_ITEM_TOKENS = new Set(['m-miscellaneous', 'm-misc', 'miscellaneous', 'misc'])
+
+function isMiscItem(value: unknown): boolean {
+  const normalized = String(value || '').trim().toLowerCase()
+  return Boolean(normalized) && (MISC_ITEM_TOKENS.has(normalized) || normalized.startsWith('m-misc'))
+}
+
+function salesLineDescription(lineItem: any): string {
+  for (const candidate of [
+    lineItem.description,
+    lineItem.sales_description,
+    lineItem.item_description,
+    lineItem.purchase_description,
+  ]) {
+    const value = String(candidate || '').trim()
+    if (value && !isMiscItem(value)) return value
+  }
+  return ''
+}
+
 async function syncOrderItems(supabase: any, orderId: string, lineItems: any[]): Promise<number> {
   // Get existing order items
   const { data: existingItems } = await supabase
     .from('order_items')
-    .select('id, name, code, quantity')
+    .select('id, name, code, description, quantity')
     .eq('order_id', orderId)
 
   const existing = existingItems || []
+  const matchedExistingIds = new Set<string>()
   let itemsCreated = 0
 
   for (const lineItem of lineItems) {
@@ -984,25 +1050,38 @@ async function syncOrderItems(supabase: any, orderId: string, lineItems: any[]):
       console.log(`Excluded SKU skipped: ${itemCode}`)
       continue
     }
-    // Always prefer Zoho line item description over catalog item name
-    const itemName = lineItem.description || lineItem.name || lineItem.item_name || 'Unknown Item'
+    const itemDescription = salesLineDescription(lineItem)
+    const catalogName = String(lineItem.name || lineItem.item_name || '').trim()
+    // Generic M-MISC identifiers are not a useful customer-facing name. The
+    // unique line description is the actual product and must survive sync.
+    const itemName = (isMiscItem(itemCode) || isMiscItem(catalogName)) && itemDescription
+      ? itemDescription
+      : catalogName || itemDescription || 'Unknown Item'
     const qty = lineItem.quantity || 1
 
     // Check if this item already exists in the order (by code + qty match)
     const matchedExisting = existing.find((ei: any) => {
+      if (matchedExistingIds.has(ei.id)) return false
       if (itemCode && ei.code) {
-        return ei.code.toLowerCase() === itemCode.toLowerCase() && ei.quantity === qty
+        const sameCodeAndQty = ei.code.toLowerCase() === itemCode.toLowerCase() && ei.quantity === qty
+        if (!sameCodeAndQty) return false
+        if (!isMiscItem(itemCode)) return true
+        const existingDescription = String(ei.description || ei.name || '').trim().toLowerCase()
+        return !itemDescription || isMiscItem(existingDescription) || existingDescription === itemDescription.toLowerCase()
       }
       return ei.name.toLowerCase() === itemName.toLowerCase() && ei.quantity === qty
     })
 
     if (matchedExisting) {
-      // Update the name if it differs (e.g. M-MISCELLANEOUS items with generic names)
-      if (matchedExisting.name !== itemName) {
-        console.log(`Updating item name: "${matchedExisting.name}" -> "${itemName}" (code: ${itemCode})`)
+      matchedExistingIds.add(matchedExisting.id)
+      const patch: Record<string, unknown> = {}
+      if (matchedExisting.name !== itemName) patch.name = itemName
+      if (itemDescription && matchedExisting.description !== itemDescription) patch.description = itemDescription
+      if (Object.keys(patch).length) {
+        console.log(`Refreshing item display data for ${itemCode || itemName}`)
         await supabase
           .from('order_items')
-          .update({ name: itemName, updated_at: new Date().toISOString() })
+          .update({ ...patch, updated_at: new Date().toISOString() })
           .eq('id', matchedExisting.id)
       } else {
         console.log(`Item already exists: ${itemName} (Qty: ${qty}) - skipping`)
@@ -1030,10 +1109,11 @@ async function syncOrderItems(supabase: any, orderId: string, lineItems: any[]):
         order_id: orderId,
         name: itemName,
         code: matchedCode,
+        description: itemDescription || null,
         quantity: qty,
         stock_status: 'awaiting',
         progress_stage: 'awaiting-stock',
-        notes: lineItem.description !== itemName ? lineItem.description : null,
+        notes: null,
       })
 
     if (itemError) {
