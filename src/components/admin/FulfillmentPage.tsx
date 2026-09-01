@@ -320,7 +320,7 @@ export default function FulfillmentPage() {
   const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
   const [confirmDeliveryId, setConfirmDeliveryId] = useState<string | null>(null);
   const [deliverySelection, setDeliverySelection] = useState<Set<string>>(new Set());
-  const [collectionSelection, setCollectionSelection] = useState<Set<string>>(new Set());
+  const [bulkRemoveOpen, setBulkRemoveOpen] = useState(false);
   const [dispatchAreas, setDispatchAreas] = useState<DispatchArea[]>([]);
   const [dispatchAreaLinks, setDispatchAreaLinks] = useState<DispatchAreaLink[]>([]);
   const [newAreaName, setNewAreaName] = useState("");
