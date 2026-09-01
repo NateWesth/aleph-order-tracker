@@ -1195,6 +1195,67 @@ export default function FulfillmentPage() {
     setBulkSchedule("");
   };
 
+  const moveSelectedDeliveries = async (status: string) => {
+    const ids = [...deliverySelection];
+    if (!ids.length) return;
+    const patch: Record<string, unknown> = { fulfillment_status: status, ...(status === "pending" ? { fulfillment_scheduled_for: null } : {}) };
+    setBulkSaving(true);
+    const previous = deliveryOrders;
+    setDeliveryOrders((current) => current.map((order) => (deliverySelection.has(order.id) ? ({ ...order, ...patch } as FulfillmentOrder) : order)));
+    const { error } = await supabase.from("orders").update(patch as any).in("id", ids);
+    setBulkSaving(false);
+    if (error) {
+      setDeliveryOrders(previous);
+      toast({ title: "Move failed", description: error.message, variant: "destructive" });
+      return;
+    }
+    toast({ title: "Deliveries moved", description: `${ids.length} deliver${ids.length === 1 ? "y" : "ies"} moved.` });
+    setDeliverySelection(new Set());
+  };
+
+  const moveSelectedCollections = async (status: string) => {
+    const targets = collectionQueue.filter((po) => collectionSelection.has(po.purchaseOrderId));
+    if (!targets.length) return;
+    setBulkSaving(true);
+    try {
+      for (const po of targets) {
+        await updateCollectionState(po, { status: status as POCollectionState["status"], ...(status === "pending" ? { scheduled_for: null } : {}) });
+      }
+      toast({ title: "Collections moved", description: `${targets.length} collection${targets.length === 1 ? "" : "s"} moved.` });
+      setCollectionSelection(new Set());
+    } finally {
+      setBulkSaving(false);
+    }
+  };
+
+  const removeSelectedStops = async () => {
+    const orderIds = [...deliverySelection];
+    const poIds = [...collectionSelection];
+    setBulkSaving(true);
+    try {
+      if (orderIds.length) {
+        const patch = { fulfillment_status: "pending", fulfillment_scheduled_for: null, fulfillment_assigned_to: null };
+        const { error } = await supabase.from("orders").update(patch as any).in("id", orderIds);
+        if (error) throw error;
+        setDeliveryOrders((current) => current.map((order) => (deliverySelection.has(order.id) ? ({ ...order, ...patch } as FulfillmentOrder) : order)));
+      }
+      if (poIds.length) {
+        const { error } = await supabase.from("po_collection_state").delete().in("purchase_order_id", poIds);
+        if (error) throw error;
+        setCollectionStates((current) => current.filter((state) => !collectionSelection.has(state.purchase_order_id)));
+      }
+      toast({ title: "Removed from dispatch board", description: `${orderIds.length + poIds.length} stop${orderIds.length + poIds.length === 1 ? "" : "s"} cleared of planning data.` });
+      setDeliverySelection(new Set());
+      setCollectionSelection(new Set());
+      setBulkRemoveOpen(false);
+    } catch (error: any) {
+      toast({ title: "Remove failed", description: error.message, variant: "destructive" });
+    } finally {
+      setBulkSaving(false);
+    }
+  };
+
+
   const printDispatchManifest = () => {
     const selected = deliverySelection.size
       ? deliveryOrders.filter((order) => deliverySelection.has(order.id))
