@@ -1567,7 +1567,7 @@ export default function FulfillmentPage() {
           <div className="flex flex-wrap items-center gap-2 px-1"><Checkbox checked /><span className="text-sm font-bold">{deliverySelection.size + collectionSelection.size} dispatch stops selected</span>{deliverySelection.size > 0 && <Badge variant="outline" className="rounded-full bg-cyan-500/10 text-cyan-700">{deliverySelection.size} delivery</Badge>}{collectionSelection.size > 0 && <Badge variant="outline" className="rounded-full bg-violet-500/10 text-violet-700">{collectionSelection.size} collection</Badge>}<button className="rounded-lg p-1 text-muted-foreground hover:bg-muted" onClick={() => { setDeliverySelection(new Set()); setCollectionSelection(new Set()); }}><X className="h-3.5 w-3.5" /></button></div>
           <div className="flex flex-1 flex-wrap justify-end gap-2">
             {activeMode === "delivery" && deliverySelection.size > 0 && (
-              <Select value="" onValueChange={(value) => void moveSelectedDeliveries(value)} disabled={bulkSaving}>
+              <Select onValueChange={(value) => void moveSelectedDeliveries(value)} disabled={bulkSaving}>
                 <SelectTrigger className="h-10 w-[190px] rounded-xl"><SelectValue placeholder="Move to lane…" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="pending">Ready</SelectItem>
@@ -1577,7 +1577,7 @@ export default function FulfillmentPage() {
               </Select>
             )}
             {activeMode === "collection" && collectionSelection.size > 0 && (
-              <Select value="" onValueChange={(value) => void moveSelectedCollections(value)} disabled={bulkSaving}>
+              <Select onValueChange={(value) => void moveSelectedCollections(value)} disabled={bulkSaving}>
                 <SelectTrigger className="h-10 w-[190px] rounded-xl"><SelectValue placeholder="Move to lane…" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="pending">Ready</SelectItem>
@@ -1593,6 +1593,21 @@ export default function FulfillmentPage() {
 
         </section>
       )}
+
+      <AlertDialog open={bulkRemoveOpen} onOpenChange={setBulkRemoveOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove {deliverySelection.size + collectionSelection.size} stop{deliverySelection.size + collectionSelection.size === 1 ? "" : "s"} from the board?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Selected deliveries are unassigned and their schedule cleared, and selected collections lose their planning record. The underlying orders and purchase orders are not deleted and can be planned again.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={bulkSaving}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={(event) => { event.preventDefault(); void removeSelectedStops(); }} disabled={bulkSaving}>Remove</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {fulfillmentBubble}
 
