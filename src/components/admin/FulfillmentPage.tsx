@@ -44,6 +44,7 @@ import {
   SlidersHorizontal,
   Sparkles,
   Timer,
+  Trash2,
   Truck,
   UserCheck,
   UserRound,
@@ -320,6 +321,7 @@ export default function FulfillmentPage() {
   const [confirmDeliveryId, setConfirmDeliveryId] = useState<string | null>(null);
   const [deliverySelection, setDeliverySelection] = useState<Set<string>>(new Set());
   const [collectionSelection, setCollectionSelection] = useState<Set<string>>(new Set());
+  const [bulkRemoveOpen, setBulkRemoveOpen] = useState(false);
   const [dispatchAreas, setDispatchAreas] = useState<DispatchArea[]>([]);
   const [dispatchAreaLinks, setDispatchAreaLinks] = useState<DispatchAreaLink[]>([]);
   const [newAreaName, setNewAreaName] = useState("");
@@ -1194,6 +1196,67 @@ export default function FulfillmentPage() {
     setBulkSchedule("");
   };
 
+  const moveSelectedDeliveries = async (status: string) => {
+    const ids = [...deliverySelection];
+    if (!ids.length) return;
+    const patch: Record<string, unknown> = { fulfillment_status: status, ...(status === "pending" ? { fulfillment_scheduled_for: null } : {}) };
+    setBulkSaving(true);
+    const previous = deliveryOrders;
+    setDeliveryOrders((current) => current.map((order) => (deliverySelection.has(order.id) ? ({ ...order, ...patch } as FulfillmentOrder) : order)));
+    const { error } = await supabase.from("orders").update(patch as any).in("id", ids);
+    setBulkSaving(false);
+    if (error) {
+      setDeliveryOrders(previous);
+      toast({ title: "Move failed", description: error.message, variant: "destructive" });
+      return;
+    }
+    toast({ title: "Deliveries moved", description: `${ids.length} deliver${ids.length === 1 ? "y" : "ies"} moved.` });
+    setDeliverySelection(new Set());
+  };
+
+  const moveSelectedCollections = async (status: string) => {
+    const targets = collectionQueue.filter((po) => collectionSelection.has(po.purchaseOrderId));
+    if (!targets.length) return;
+    setBulkSaving(true);
+    try {
+      for (const po of targets) {
+        await updateCollectionState(po, { status: status as POCollectionState["status"], ...(status === "pending" ? { scheduled_for: null } : {}) });
+      }
+      toast({ title: "Collections moved", description: `${targets.length} collection${targets.length === 1 ? "" : "s"} moved.` });
+      setCollectionSelection(new Set());
+    } finally {
+      setBulkSaving(false);
+    }
+  };
+
+  const removeSelectedStops = async () => {
+    const orderIds = [...deliverySelection];
+    const poIds = [...collectionSelection];
+    setBulkSaving(true);
+    try {
+      if (orderIds.length) {
+        const patch = { fulfillment_status: "pending", fulfillment_scheduled_for: null, fulfillment_assigned_to: null };
+        const { error } = await supabase.from("orders").update(patch as any).in("id", orderIds);
+        if (error) throw error;
+        setDeliveryOrders((current) => current.map((order) => (deliverySelection.has(order.id) ? ({ ...order, ...patch } as FulfillmentOrder) : order)));
+      }
+      if (poIds.length) {
+        const { error } = await supabase.from("po_collection_state").delete().in("purchase_order_id", poIds);
+        if (error) throw error;
+        setCollectionStates((current) => current.filter((state) => !collectionSelection.has(state.purchase_order_id)));
+      }
+      toast({ title: "Removed from dispatch board", description: `${orderIds.length + poIds.length} stop${orderIds.length + poIds.length === 1 ? "" : "s"} cleared of planning data.` });
+      setDeliverySelection(new Set());
+      setCollectionSelection(new Set());
+      setBulkRemoveOpen(false);
+    } catch (error: any) {
+      toast({ title: "Remove failed", description: error.message, variant: "destructive" });
+    } finally {
+      setBulkSaving(false);
+    }
+  };
+
+
   const printDispatchManifest = () => {
     const selected = deliverySelection.size
       ? deliveryOrders.filter((order) => deliverySelection.has(order.id))
@@ -1503,11 +1566,48 @@ export default function FulfillmentPage() {
         <section className="flex flex-col gap-3 rounded-[24px] border border-primary/20 bg-primary/[0.045] p-3 shadow-sm lg:flex-row lg:items-center">
           <div className="flex flex-wrap items-center gap-2 px-1"><Checkbox checked /><span className="text-sm font-bold">{deliverySelection.size + collectionSelection.size} dispatch stops selected</span>{deliverySelection.size > 0 && <Badge variant="outline" className="rounded-full bg-cyan-500/10 text-cyan-700">{deliverySelection.size} delivery</Badge>}{collectionSelection.size > 0 && <Badge variant="outline" className="rounded-full bg-violet-500/10 text-violet-700">{collectionSelection.size} collection</Badge>}<button className="rounded-lg p-1 text-muted-foreground hover:bg-muted" onClick={() => { setDeliverySelection(new Set()); setCollectionSelection(new Set()); }}><X className="h-3.5 w-3.5" /></button></div>
           <div className="flex flex-1 flex-wrap justify-end gap-2">
+            {activeMode === "delivery" && deliverySelection.size > 0 && (
+              <Select onValueChange={(value) => void moveSelectedDeliveries(value)} disabled={bulkSaving}>
+                <SelectTrigger className="h-10 w-[190px] rounded-xl"><SelectValue placeholder="Move to lane…" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pending">Ready</SelectItem>
+                  <SelectItem value="scheduled">Route planned</SelectItem>
+                  <SelectItem value="out-for-delivery">Out on route</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
+            {activeMode === "collection" && collectionSelection.size > 0 && (
+              <Select onValueChange={(value) => void moveSelectedCollections(value)} disabled={bulkSaving}>
+                <SelectTrigger className="h-10 w-[190px] rounded-xl"><SelectValue placeholder="Move to lane…" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pending">Ready</SelectItem>
+                  <SelectItem value="scheduled">Planned</SelectItem>
+                  <SelectItem value="collecting">Collecting</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
             {activeMode === "delivery" && deliverySelection.size > 0 && <Button variant="outline" className="h-10 rounded-xl" onClick={() => void applyBulkDeliveryPlan()} disabled={bulkSaving || (bulkAssignee === "keep" && !bulkSchedule)}><Route className="mr-1.5 h-4 w-4" />Quick schedule deliveries</Button>}
+            <Button variant="outline" className="h-10 rounded-xl text-destructive hover:text-destructive" onClick={() => setBulkRemoveOpen(true)} disabled={bulkSaving}><Trash2 className="mr-1.5 h-4 w-4" />Remove</Button>
             <Button className="h-10 rounded-xl" onClick={() => setRoutePlannerOpen(true)}><WandSparkles className="mr-1.5 h-4 w-4" />Plan mixed dispatch run</Button>
           </div>
+
         </section>
       )}
+
+      <AlertDialog open={bulkRemoveOpen} onOpenChange={setBulkRemoveOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove {deliverySelection.size + collectionSelection.size} stop{deliverySelection.size + collectionSelection.size === 1 ? "" : "s"} from the board?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Selected deliveries are unassigned and their schedule cleared, and selected collections lose their planning record. The underlying orders and purchase orders are not deleted and can be planned again.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={bulkSaving}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={(event) => { event.preventDefault(); void removeSelectedStops(); }} disabled={bulkSaving}>Remove</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {fulfillmentBubble}
 
