@@ -1563,34 +1563,35 @@ export default function FulfillmentPage() {
       </section>
 
       {(deliverySelection.size + collectionSelection.size) > 0 && (
-        <section className="flex flex-col gap-3 rounded-[24px] border border-primary/20 bg-primary/[0.045] p-3 shadow-sm lg:flex-row lg:items-center">
-          <div className="flex flex-wrap items-center gap-2 px-1"><Checkbox checked /><span className="text-sm font-bold">{deliverySelection.size + collectionSelection.size} dispatch stops selected</span>{deliverySelection.size > 0 && <Badge variant="outline" className="rounded-full bg-cyan-500/10 text-cyan-700">{deliverySelection.size} delivery</Badge>}{collectionSelection.size > 0 && <Badge variant="outline" className="rounded-full bg-violet-500/10 text-violet-700">{collectionSelection.size} collection</Badge>}<button className="rounded-lg p-1 text-muted-foreground hover:bg-muted" onClick={() => { setDeliverySelection(new Set()); setCollectionSelection(new Set()); }}><X className="h-3.5 w-3.5" /></button></div>
-          <div className="flex flex-1 flex-wrap justify-end gap-2">
-            {activeMode === "delivery" && deliverySelection.size > 0 && (
-              <Select onValueChange={(value) => void moveSelectedDeliveries(value)} disabled={bulkSaving}>
-                <SelectTrigger className="h-10 w-[190px] rounded-xl"><SelectValue placeholder="Move to lane…" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pending">Ready</SelectItem>
-                  <SelectItem value="scheduled">Route planned</SelectItem>
-                  <SelectItem value="out-for-delivery">Out on route</SelectItem>
-                </SelectContent>
-              </Select>
-            )}
-            {activeMode === "collection" && collectionSelection.size > 0 && (
-              <Select onValueChange={(value) => void moveSelectedCollections(value)} disabled={bulkSaving}>
-                <SelectTrigger className="h-10 w-[190px] rounded-xl"><SelectValue placeholder="Move to lane…" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pending">Ready</SelectItem>
-                  <SelectItem value="scheduled">Planned</SelectItem>
-                  <SelectItem value="collecting">Collecting</SelectItem>
-                </SelectContent>
-              </Select>
-            )}
-            {activeMode === "delivery" && deliverySelection.size > 0 && <Button variant="outline" className="h-10 rounded-xl" onClick={() => void applyBulkDeliveryPlan()} disabled={bulkSaving || (bulkAssignee === "keep" && !bulkSchedule)}><Route className="mr-1.5 h-4 w-4" />Quick schedule deliveries</Button>}
-            <Button variant="outline" className="h-10 rounded-xl text-destructive hover:text-destructive" onClick={() => setBulkRemoveOpen(true)} disabled={bulkSaving}><Trash2 className="mr-1.5 h-4 w-4" />Remove</Button>
-            <Button className="h-10 rounded-xl" onClick={() => setRoutePlannerOpen(true)}><WandSparkles className="mr-1.5 h-4 w-4" />Plan mixed dispatch run</Button>
+        <section className="fixed bottom-6 left-1/2 z-50 w-[calc(100%-2rem)] max-w-5xl -translate-x-1/2 rounded-[24px] border border-primary/20 bg-card/95 p-3 shadow-2xl backdrop-blur-xl lg:flex-row lg:items-center">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-wrap items-center gap-2 px-1"><Checkbox checked /><span className="text-sm font-bold">{deliverySelection.size + collectionSelection.size} dispatch stops selected</span>{deliverySelection.size > 0 && <Badge variant="outline" className="rounded-full bg-cyan-500/10 text-cyan-700">{deliverySelection.size} delivery</Badge>}{collectionSelection.size > 0 && <Badge variant="outline" className="rounded-full bg-violet-500/10 text-violet-700">{collectionSelection.size} collection</Badge>}<button className="rounded-lg p-1 text-muted-foreground hover:bg-muted" onClick={() => { setDeliverySelection(new Set()); setCollectionSelection(new Set()); }}><X className="h-3.5 w-3.5" /></button></div>
+            <div className="flex flex-1 flex-wrap justify-start gap-2 lg:justify-end">
+              {activeMode === "delivery" && deliverySelection.size > 0 && (
+                <Select onValueChange={(value) => void moveSelectedDeliveries(value)} disabled={bulkSaving}>
+                  <SelectTrigger className="h-10 w-[190px] rounded-xl"><SelectValue placeholder="Move to lane…" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pending">Ready</SelectItem>
+                    <SelectItem value="scheduled">Route planned</SelectItem>
+                    <SelectItem value="out-for-delivery">Out on route</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
+              {activeMode === "collection" && collectionSelection.size > 0 && (
+                <Select onValueChange={(value) => void moveSelectedCollections(value)} disabled={bulkSaving}>
+                  <SelectTrigger className="h-10 w-[190px] rounded-xl"><SelectValue placeholder="Move to lane…" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pending">Ready</SelectItem>
+                    <SelectItem value="scheduled">Planned</SelectItem>
+                    <SelectItem value="collecting">Collecting</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
+              {activeMode === "delivery" && deliverySelection.size > 0 && <Button variant="outline" className="h-10 rounded-xl" onClick={() => void applyBulkDeliveryPlan()} disabled={bulkSaving || (bulkAssignee === "keep" && !bulkSchedule)}><Route className="mr-1.5 h-4 w-4" />Quick schedule deliveries</Button>}
+              <Button variant="outline" className="h-10 rounded-xl text-destructive hover:text-destructive" onClick={() => setBulkRemoveOpen(true)} disabled={bulkSaving}><Trash2 className="mr-1.5 h-4 w-4" />Remove</Button>
+              <Button className="h-10 rounded-xl" onClick={() => setRoutePlannerOpen(true)}><WandSparkles className="mr-1.5 h-4 w-4" />Plan mixed dispatch run</Button>
+            </div>
           </div>
-
         </section>
       )}
 
