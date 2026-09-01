@@ -44,6 +44,7 @@ import {
   SlidersHorizontal,
   Sparkles,
   Timer,
+  Trash2,
   Truck,
   UserCheck,
   UserRound,
