@@ -3,8 +3,17 @@ const PO_CACHE_ID = '00000000-0000-0000-0000-000000000003'
 const EXCLUDED_PO_STATUSES = new Set(['cancelled', 'closed', 'rejected', 'draft', 'void'])
 const EXCLUDED_RECEIVED_STATUSES = new Set(['received', 'fully_received'])
 const CACHE_MUTATION_LOCK = 'zoho-event-cache-mutation'
+const COLLECTION_RETENTION_DAYS = 21
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+function isWithinCollectionRetention(value: unknown): boolean {
+  const timestamp = new Date(String(value || '')).getTime()
+  const cutoff = new Date()
+  cutoff.setUTCHours(0, 0, 0, 0)
+  cutoff.setUTCDate(cutoff.getUTCDate() - COLLECTION_RETENTION_DAYS)
+  return Number.isFinite(timestamp) && timestamp >= cutoff.getTime()
+}
 
 async function withCacheMutationLock<T>(supabase: any, mutate: () => Promise<T>): Promise<T> {
   let acquired = false
@@ -203,6 +212,7 @@ function normalizePurchaseOrder(po: any) {
   const status = String(po.status || '').trim().toLowerCase()
   const billedStatus = String(po.billed_status || '').trim().toLowerCase()
   const receivedStatus = String(po.received_status || '').trim().toLowerCase()
+  const purchaseOrderDate = po.date || po.purchaseorder_date
   const lines = (Array.isArray(po.line_items) ? po.line_items : [])
     .map((line: any) => {
       const sku = skuOf(line)
@@ -226,6 +236,7 @@ function normalizePurchaseOrder(po: any) {
 
   if (
     !String(po.purchaseorder_id || '') ||
+    !isWithinCollectionRetention(purchaseOrderDate) ||
     EXCLUDED_PO_STATUSES.has(status) ||
     EXCLUDED_RECEIVED_STATUSES.has(receivedStatus) ||
     lines.length === 0
@@ -237,7 +248,7 @@ function normalizePurchaseOrder(po: any) {
     vendorId: String(po.vendor_id || ''),
     vendorName: String(po.vendor_name || 'Unknown supplier'),
     vendorEmail: String(po.vendor_email || ''),
-    date: String(po.date || po.purchaseorder_date || ''),
+    date: String(purchaseOrderDate || ''),
     expectedDeliveryDate: po.delivery_date || po.expected_delivery_date || null,
     status,
     receivedStatus,
@@ -285,7 +296,9 @@ async function updateCachesFromPurchaseOrderUnlocked(supabase: any, previous: an
     .select('payload')
     .eq('id', PO_CACHE_ID)
     .maybeSingle()
-  const purchaseOrders = Array.isArray(poRow?.payload) ? [...poRow.payload] : []
+  const purchaseOrders = Array.isArray(poRow?.payload)
+    ? [...poRow.payload].filter((po: any) => isWithinCollectionRetention(po.date))
+    : []
   const id = String(purchaseOrder.purchaseorder_id || '')
   const withoutCurrent = purchaseOrders.filter((po: any) => String(po.purchaseOrderId) !== id)
   const normalized = normalizePurchaseOrder(purchaseOrder)

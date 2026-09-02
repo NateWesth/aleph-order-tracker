@@ -11,9 +11,8 @@ const ZOHO_API_URL = 'https://www.zohoapis.com'
 // Financial billing and physical receipt are different workflows. A PO can be
 // fully billed while the cartons are still waiting at the supplier.
 const EXCLUDED_PO_STATUSES = ['cancelled', 'closed', 'rejected', 'draft', 'void']
-// Correctness first: open POs must not disappear merely because they are old.
-// The list call is cheap; details are fetched only for summaries that still look active.
-const MAX_PO_SUMMARIES = 5000
+const COLLECTION_RETENTION_DAYS = 21
+const MAX_PO_SUMMARIES = 1000
 const DETAIL_CONCURRENCY = 8
 const EXCLUDED_RECEIVED_STATUSES = ['received', 'fully_received']
 const CACHE_ID = '00000000-0000-0000-0000-000000000003'
@@ -56,6 +55,22 @@ function isExcludedSku(sku: string): boolean {
   return s.startsWith('SH-') || s.startsWith('ZSH')
 }
 
+function collectionCutoffMs(): number {
+  const cutoff = new Date()
+  cutoff.setUTCHours(0, 0, 0, 0)
+  cutoff.setUTCDate(cutoff.getUTCDate() - COLLECTION_RETENTION_DAYS)
+  return cutoff.getTime()
+}
+
+function isWithinCollectionRetention(date: unknown): boolean {
+  const timestamp = new Date(String(date || '')).getTime()
+  return Number.isFinite(timestamp) && timestamp >= collectionCutoffMs()
+}
+
+function currentPurchaseOrders(entries: POEntry[]): POEntry[] {
+  return entries.filter((entry) => isWithinCollectionRetention(entry.date))
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -78,7 +93,7 @@ Deno.serve(async (req) => {
       .maybeSingle()
 
     if (cached?.payload) {
-      const purchaseOrders = cached.payload as POEntry[]
+      const purchaseOrders = currentPurchaseOrders(cached.payload as POEntry[])
       return new Response(JSON.stringify({
         success: true,
         purchaseOrders,
@@ -137,7 +152,7 @@ Deno.serve(async (req) => {
     const cacheAgeMs = cached?.fetched_at ? Date.now() - new Date(cached.fetched_at).getTime() : Number.POSITIVE_INFINITY
     const cacheIsFresh = Number.isFinite(cacheAgeMs) && cacheAgeMs < 10 * 60_000
     if (!force && cached?.payload && (!refresh || cacheIsFresh)) {
-      const purchaseOrders = cached.payload as POEntry[]
+      const purchaseOrders = currentPurchaseOrders(cached.payload as POEntry[])
       return new Response(JSON.stringify({
         success: true,
         purchaseOrders,
@@ -170,7 +185,7 @@ Deno.serve(async (req) => {
     recoveryLockAcquired = acquired === true
     if (!recoveryLockAcquired) {
       if (cached?.payload) {
-        const purchaseOrders = cached.payload as POEntry[]
+        const purchaseOrders = currentPurchaseOrders(cached.payload as POEntry[])
         return new Response(JSON.stringify({
           success: true,
           purchaseOrders,
@@ -224,7 +239,7 @@ Deno.serve(async (req) => {
       .maybeSingle()
 
     if (cached?.payload) {
-      const purchaseOrders = cached.payload as POEntry[]
+      const purchaseOrders = currentPurchaseOrders(cached.payload as POEntry[])
       return new Response(JSON.stringify({
         success: true,
         purchaseOrders,
@@ -250,12 +265,13 @@ Deno.serve(async (req) => {
 })
 
 async function fetchOutstandingPurchaseOrders(accessToken: string, orgId: string, cachedEntries: POEntry[]): Promise<POEntry[]> {
-  // Scan lightweight summaries far enough to remove stale completed POs. Detail
-  // calls are reserved for newly-created or modified active records.
+  // Zoho sorts newest first, so stop as soon as the rolling three-week window
+  // ends. This both enforces the operational rule and avoids historic API reads.
   const candidates: any[] = []
   let inspectedSummaries = 0
   let page = 1
   let hasMore = true
+  let reachedRetentionCutoff = false
   while (hasMore && inspectedSummaries < MAX_PO_SUMMARIES) {
     const data = await fetchZohoPage(
       accessToken,
@@ -269,6 +285,12 @@ async function fetchOutstandingPurchaseOrders(accessToken: string, orgId: string
       inspectedSummaries++
       if (inspectedSummaries > MAX_PO_SUMMARIES) break
 
+      const summaryDate = summary.date || summary.purchaseorder_date
+      if (!isWithinCollectionRetention(summaryDate)) {
+        if (Number.isFinite(new Date(String(summaryDate || '')).getTime())) reachedRetentionCutoff = true
+        continue
+      }
+
       const status = String(summary.status || '').trim().toLowerCase()
       const billedStatus = String(summary.billed_status || '').trim().toLowerCase()
       const receivedStatus = String(summary.received_status || '').trim().toLowerCase()
@@ -277,7 +299,7 @@ async function fetchOutstandingPurchaseOrders(accessToken: string, orgId: string
       candidates.push(summary)
     }
 
-    hasMore = data.page_context?.has_more_page ?? false
+    hasMore = !reachedRetentionCutoff && (data.page_context?.has_more_page ?? false)
     page++
   }
 
