@@ -24,6 +24,8 @@ const typeConfig: Record<string, { icon: typeof Package; color: string }> = {
   fulfillment_unassigned: { icon: UserCog, color: 'text-muted-foreground' },
   fulfillment_delivery: { icon: Truck, color: 'text-primary' },
   fulfillment_collection: { icon: Warehouse, color: 'text-primary' },
+  route_changed: { icon: Truck, color: 'text-violet-500' },
+  overdue_fulfillment: { icon: Warehouse, color: 'text-destructive' },
   item_comment: { icon: MessageCircle, color: 'text-blue-500' },
   entity_comment: { icon: MessageCircle, color: 'text-blue-500' },
   comment_reply: { icon: Reply, color: 'text-blue-500' },
@@ -128,7 +130,7 @@ export default function NotificationCenter({ onNavigateToOrder }: NotificationCe
   const [coords, setCoords] = useState({ top: 0, right: 8 });
 
   const commentTypes = ['order_update_message', 'item_comment', 'entity_comment', 'comment_reply', 'comment_mention', 'comment_reaction'];
-  const workflowTypes = ['fulfillment_assigned', 'fulfillment_unassigned', 'fulfillment_delivery', 'fulfillment_collection'];
+  const workflowTypes = ['fulfillment_assigned', 'fulfillment_unassigned', 'fulfillment_delivery', 'fulfillment_collection', 'route_changed', 'overdue_fulfillment'];
   const isComment = (n: Notification) => commentTypes.includes(n.type);
   const isWorkflow = (n: Notification) => workflowTypes.includes(n.type) || ['delivery', 'collection'].includes(String(n.metadata?.entity_type || n.metadata?.kind || ''));
   const workflowNotifications = notifications.filter(isWorkflow);

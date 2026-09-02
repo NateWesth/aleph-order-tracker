@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Trash2, ArrowRight, Package, PackageCheck, ChevronDown, Undo2, MessageCircle, MoreHorizontal, Eye } from "lucide-react";
+import { Trash2, ArrowRight, Package, ChevronDown, Undo2, MessageCircle, MoreHorizontal, Eye, CheckSquare } from "lucide-react";
 
 import {
   AlertDialog,
@@ -26,15 +26,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
-
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import SwipeableCard from "@/components/ui/SwipeableCard";
-import OrderQuickPeek from "./OrderQuickPeek";
-import OrderTags from "./OrderTags";
 import OrderDetailsDialog from "./OrderDetailsDialog";
-import CircularProgress from "@/components/ui/CircularProgress";
 
 interface OrderItem {
   id: string;
@@ -396,8 +391,9 @@ function OrderStatusColumn({
 
     const cardContent = (
       <Card
+        onClick={() => hasItems ? onOpenItemsBubble?.(order.id) : (setDetailsTab("details"), setDetailsOrder(order))}
         className={cn(
-          "order-ticket group/ticket overflow-hidden border-border/65 bg-card/95",
+          "order-ticket group/ticket cursor-pointer overflow-hidden border-border/65 bg-card/95 transition-all duration-200 active:scale-[.99]",
           "animate-fade-in",
           isSelected && "ring-2 ring-primary bg-primary/5",
           isBubbleOpen && "relative z-40",
@@ -411,130 +407,15 @@ function OrderStatusColumn({
             {/* Order Header */}
 
             <div className="flex items-start justify-between gap-2">
-              {onToggleOrderSelection && (
-                <Checkbox
-                  checked={isSelected}
-                  onCheckedChange={() => onToggleOrderSelection(order.id)}
-                  className="h-4 w-4 mt-0.5 shrink-0"
-                  onClick={(e) => e.stopPropagation()}
-                />
-              )}
-
-              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary/10 text-xs font-black text-primary">
-                {(order.companyName || "?").charAt(0).toUpperCase()}
-              </span>
-
               <div className="flex-1 min-w-0">
-                <HoverCard openDelay={400} closeDelay={100}>
-                  <HoverCardTrigger asChild>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-
-                        setDetailsTab("pos");
-                        setDetailsOrder(order);
-                      }}
-                      className="flex cursor-pointer items-center gap-1 truncate text-left text-sm font-black text-foreground hover:text-primary"
-                    >
-                      {order.order_number}
-
-                      {order.reference && (
-                        <span className="inline-flex items-center rounded bg-muted px-1 py-0.5 text-[9px] font-medium text-muted-foreground whitespace-nowrap">
-                          SO: {order.reference}
-                        </span>
-                      )}
-                    </button>
-                  </HoverCardTrigger>
-
-                  <HoverCardContent side="right" align="start" className="p-0 w-auto">
-                    <OrderQuickPeek
-                      orderId={order.id}
-                      orderNumber={order.order_number}
-                      companyName={order.companyName}
-                      status={order.status}
-                      urgency={order.urgency}
-                      createdAt={order.created_at}
-                    />
-                  </HoverCardContent>
-                </HoverCard>
-
+                <div className="flex items-center gap-1.5"><span className="truncate text-sm font-black text-foreground">{order.order_number}</span>{(order.commentCount || 0) > 0 && <span className="relative inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-blue-500/12 px-1.5 text-[9px] font-black text-blue-600"><MessageCircle className="mr-0.5 h-2.5 w-2.5" />{order.commentCount}<span className="absolute -right-0.5 -top-0.5 h-1.5 w-1.5 animate-pulse rounded-full bg-blue-500" /></span>}</div>
                 <span className="mt-0.5 block truncate text-[11px] font-medium text-muted-foreground">
                   {order.companyName}
                 </span>
-
-                <span className="mt-1 block text-[9px] font-bold uppercase tracking-wide text-muted-foreground/60">
-                  {order.created_at
-                    ? new Date(order.created_at).toLocaleDateString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                      })
-                    : ""}{" "}
-                  ·{" "}
-                  {order.created_at
-                    ? new Date(order.created_at).toLocaleTimeString("en-US", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })
-                    : ""}
-                  {order.creatorName && <> · {order.creatorName}</>}
-                </span>
               </div>
-
-              <CircularProgress value={getOrderProgress(order)} size={24} strokeWidth={2.5} />
-
               {getUrgencyBadge(order.urgency)}
             </div>
-
-            {/* Order Tags */}
-
-            {allTags.length > 0 && onTagsChanged && (
-              <OrderTags
-                orderId={order.id}
-                assignedTagIds={tagAssignments?.get(order.id) || []}
-                allTags={allTags}
-                onTagsChanged={onTagsChanged}
-                compact
-              />
-            )}
-
-            {/* Items trigger */}
-            {hasItems && (
-              <button
-                type="button"
-                className={cn(
-                  "flex w-full items-center justify-between rounded-2xl border border-border/50 bg-muted/45 px-3 py-2.5 text-[10px] transition-all duration-200 hover:border-primary/25 hover:bg-primary/5 sm:text-xs",
-                  isBubbleOpen && "ring-2 ring-primary/40 bg-primary/10",
-                )}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onOpenItemsBubble?.(order.id);
-                }}
-              >
-                <span className="flex items-center gap-1 sm:gap-1.5 text-muted-foreground font-medium">
-                  <Package className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
-                  {order.items?.length} item
-                  {order.items?.length !== 1 ? "s" : ""}
-                </span>
-
-                {stockSummary && (
-                  <span className="flex items-center gap-2">
-                    {(order.commentCount || 0) > 0 && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/12 px-2 py-1 font-black text-blue-600 shadow-[0_0_18px_rgba(59,130,246,.18)] dark:text-blue-300">
-                        <MessageCircle className="h-3 w-3 fill-current/10" />
-                        {order.commentCount}
-                        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-blue-500" />
-                      </span>
-                    )}
-                    <span className="flex items-center gap-1 font-medium text-muted-foreground">
-                      <PackageCheck className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
-                      {stockSummary.units} unit
-                      {stockSummary.units !== 1 ? "s" : ""}
-                    </span>
-                  </span>
-                )}
-              </button>
-            )}
+            <OrderProgressRail value={getOrderProgress(order)} />
 
             {/* Contextual actions: one primary action, secondary actions stay out of the way. */}
             <div className="flex items-center gap-2 border-t border-border/55 pt-3">
@@ -558,9 +439,11 @@ function OrderStatusColumn({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-44">
+                  {hasItems && <DropdownMenuItem onClick={() => onOpenItemsBubble?.(order.id)}><Package className="mr-2 h-4 w-4" />Items, notes & history</DropdownMenuItem>}
                   <DropdownMenuItem onClick={() => { setDetailsTab("details"); setDetailsOrder(order); }}>
                     <Eye className="mr-2 h-4 w-4" />View details
                   </DropdownMenuItem>
+                  {onToggleOrderSelection && <DropdownMenuItem onClick={() => onToggleOrderSelection(order.id)}><CheckSquare className="mr-2 h-4 w-4" />{isSelected ? "Remove selection" : "Select for bulk action"}</DropdownMenuItem>}
                   {config.prevStatus && <DropdownMenuItem onClick={() => onMoveOrder(order, config.prevStatus!)}>
                     <Undo2 className="mr-2 h-4 w-4" />Move back
                   </DropdownMenuItem>}
@@ -612,6 +495,12 @@ function OrderStatusColumn({
       </div>
     );
   }
+}
+
+function OrderProgressRail({ value }: { value: number }) {
+  const labels = ["Ordered", "Purchasing", "Stock", "Ready", "Dispatch", "Complete"];
+  const active = Math.min(labels.length - 1, Math.max(0, Math.round((value / 100) * (labels.length - 1))));
+  return <div className="grid grid-cols-6 gap-1" aria-label={`Order progress ${value}%`}>{labels.map((label, index) => <div key={label} className="min-w-0"><div className={cn("h-1.5 rounded-full transition-colors duration-300", index <= active ? "bg-primary" : "bg-muted")} /><span className={cn("mt-1 block truncate text-[7px] font-bold", index === active ? "text-primary" : "text-muted-foreground/60")}>{label}</span></div>)}</div>;
 }
 
 export default memo(OrderStatusColumn);

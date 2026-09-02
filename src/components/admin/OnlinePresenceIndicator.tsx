@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -20,6 +20,8 @@ interface OnlinePresenceIndicatorProps {
 export default function OnlinePresenceIndicator({ currentView }: OnlinePresenceIndicatorProps) {
   const { user } = useAuth();
   const [onlineUsers, setOnlineUsers] = useState<PresenceUser[]>([]);
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const identityRef = useRef<{ name: string; initials: string } | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -27,6 +29,7 @@ export default function OnlinePresenceIndicator({ currentView }: OnlinePresenceI
     const channel = supabase.channel("online-users", {
       config: { presence: { key: user.id } },
     });
+    channelRef.current = channel;
 
     // Fetch user's name for presence
     const fetchAndTrack = async () => {
@@ -43,6 +46,7 @@ export default function OnlinePresenceIndicator({ currentView }: OnlinePresenceI
         .join("")
         .toUpperCase()
         .slice(0, 2);
+      identityRef.current = { name, initials };
 
       channel
         .on("presence", { event: "sync" }, () => {
@@ -78,6 +82,8 @@ export default function OnlinePresenceIndicator({ currentView }: OnlinePresenceI
     fetchAndTrack();
 
     return () => {
+      channelRef.current = null;
+      identityRef.current = null;
       supabase.removeChannel(channel);
     };
   }, [user]);
@@ -85,20 +91,13 @@ export default function OnlinePresenceIndicator({ currentView }: OnlinePresenceI
   // Update presence when view changes
   useEffect(() => {
     if (!user) return;
-    const channel = supabase.channel("online-users");
-    // Re-track with updated view
+    const channel = channelRef.current;
+    const identity = identityRef.current;
+    if (!channel || !identity) return;
     const updatePresence = async () => {
       try {
-        const { data } = await supabase
-          .from("profiles")
-          .select("full_name")
-          .eq("id", user.id)
-          .maybeSingle();
-        const name = data?.full_name || user.email?.split("@")[0] || "User";
-        const initials = name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2);
         await channel.track({
-          name,
-          initials,
+          ...identity,
           activeView: currentView,
           online_at: new Date().toISOString(),
         });
@@ -106,7 +105,7 @@ export default function OnlinePresenceIndicator({ currentView }: OnlinePresenceI
         // Channel may not be ready yet
       }
     };
-    updatePresence();
+    void updatePresence();
   }, [currentView, user]);
 
   if (onlineUsers.length === 0) return null;
