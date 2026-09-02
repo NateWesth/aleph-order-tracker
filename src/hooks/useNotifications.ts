@@ -24,6 +24,9 @@ export function useNotifications() {
   const fetchNotifications = useCallback(async () => {
     if (!user?.id) return;
     try {
+      // Materialize time-based alerts on demand; the RPC deduplicates each
+      // overdue delivery/collection for 24 hours.
+      await (supabase as any).rpc('generate_my_overdue_fulfillment_notifications');
       const [{ data, error }, { count, error: countError }] = await Promise.all([
         supabase
           .from('notifications')

@@ -14,6 +14,7 @@ import { useUserData } from "@/hooks/useUserData";
 import { useLiveData } from "@/hooks/useLiveData";
 import { useIsMobile } from "@/hooks/use-mobile";
 import OrderItemComments from "./components/OrderItemComments";
+import { getItemDisplayName, getItemSecondaryDescription } from "@/lib/itemDisplay";
 import {
   DndContext,
   DragOverlay,
@@ -35,6 +36,7 @@ interface OrderItem {
   name: string;
   quantity: number;
   code: string | null;
+  description: string | null;
   notes: string | null;
   qty_on_po: number;
   qty_received: number;
@@ -168,7 +170,7 @@ function DraggableItem({
           {...listeners}
         >
           <GripVertical className="h-4 w-4 text-muted-foreground shrink-0" />
-          <span className="font-medium truncate">{item.name}</span>
+          <span className="font-medium truncate">{getItemDisplayName(item)}</span>
         </div>
         <div className="flex shrink-0 items-center gap-1">
           <OrderItemComments orderItemId={item.id} className="h-7 w-7 border border-blue-500/15 bg-blue-500/5" />
@@ -180,6 +182,7 @@ function DraggableItem({
       {item.code && (
         <p className="text-muted-foreground text-[10px] pl-5 font-mono">{item.code}</p>
       )}
+      {getItemSecondaryDescription(item) && <p className="truncate pl-5 text-[10px] text-muted-foreground">{getItemSecondaryDescription(item)}</p>}
       {qty > 1 && (
         <div className="flex items-center gap-1.5 pl-5">
           <span className="text-[10px] text-muted-foreground">Move qty</span>
@@ -205,7 +208,7 @@ function DragOverlayItem({ card, order, qty }: { card: BoardCard; order: Order; 
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-1.5 min-w-0">
           <GripVertical className="h-3.5 w-3.5 text-primary shrink-0" />
-          <span className="font-medium truncate">{card.item.name}</span>
+          <span className="font-medium truncate">{getItemDisplayName(card.item)}</span>
         </div>
         <Badge variant="secondary" className="text-[10px] shrink-0">
           x{qty}
@@ -339,6 +342,7 @@ export default function ItemProgressBoard({ isAdmin }: ItemProgressBoardProps) {
             id: item.id,
             order_id: item.order_id,
             name: item.name,
+            description: item.description,
             quantity: item.quantity,
             code: item.code,
             notes: item.notes,
@@ -664,7 +668,7 @@ export default function ItemProgressBoard({ isAdmin }: ItemProgressBoardProps) {
                                 return (
                                   <div key={card.item.id} className="p-3 bg-muted/50 rounded space-y-2">
                                     <div className="flex items-start justify-between gap-2">
-                                      <span className="font-medium text-sm">{card.item.name}</span>
+                                      <span className="font-medium text-sm">{getItemDisplayName(card.item)}</span>
                                       <div className="flex shrink-0 items-center gap-1">
                                         <OrderItemComments orderItemId={card.item.id} className="h-8 w-8 border border-blue-500/15 bg-blue-500/5" />
                                         <Badge variant="secondary" className="text-xs shrink-0">
@@ -672,6 +676,7 @@ export default function ItemProgressBoard({ isAdmin }: ItemProgressBoardProps) {
                                         </Badge>
                                       </div>
                                     </div>
+                                    {getItemSecondaryDescription(card.item) && <p className="text-xs text-muted-foreground">{getItemSecondaryDescription(card.item)}</p>}
                                     {card.qty > 1 && (
                                       <div className="flex items-center gap-2">
                                         <span className="text-[11px] text-muted-foreground">Move qty</span>

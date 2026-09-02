@@ -12,8 +12,8 @@ export default function MyWorkPage({ onNavigate }: MyWorkPageProps) {
   const { user } = useAuth();
   const [deliveries,setDeliveries]=useState<any[]>([]); const [collections,setCollections]=useState<any[]>([]); const [tasks,setTasks]=useState<any[]>([]); const [exceptions,setExceptions]=useState<any[]>([]); const [routes,setRoutes]=useState<any[]>([]); const [loading,setLoading]=useState(true);
   const load=useCallback(async()=>{ if(!user?.id)return; const s=supabase as any; const [d,c,t,e,r]=await Promise.all([
-    s.from("orders").select("id,order_number,company_id,fulfillment_status,fulfillment_scheduled_for,companies(name,address)").eq("fulfillment_assigned_to",user.id).neq("status","delivered"),
-    s.from("po_collection_state").select("purchase_order_id,purchase_order_number,vendor_name,status,scheduled_for,notes").eq("assigned_to",user.id).neq("status","collected"),
+    s.from("orders").select("id,order_number,company_id,fulfillment_status,fulfillment_scheduled_for,companies(name,address)").eq("fulfillment_assigned_to",user.id).is("completed_date",null).neq("status","delivered").neq("fulfillment_status","completed"),
+    s.from("po_collection_state").select("purchase_order_id,purchase_order_number,vendor_name,status,scheduled_for,notes").eq("assigned_to",user.id).is("completed_at",null).neq("status","collected"),
     s.from("team_action_items").select("*").eq("assigned_to",user.id).neq("status","done").order("due_at",{ascending:true}),
     s.from("operations_exceptions").select("*").eq("assigned_to",user.id).neq("status","resolved").order("created_at",{ascending:false}),
     s.from("dispatch_routes").select("*").eq("driver_id",user.id).not("status","in","(completed,cancelled)").order("route_date",{ascending:true}),
@@ -26,8 +26,8 @@ export default function MyWorkPage({ onNavigate }: MyWorkPageProps) {
     ...tasks.filter((item:any) => item.priority === "urgent" || (item.due_at && new Date(item.due_at) <= new Date())).map((item:any) => ({ id:`t-${item.id}`, kind:"Task", title:item.title, subtitle:item.workspace||"Operations", meta:item.due_at ? `Due ${new Date(item.due_at).toLocaleDateString()}` : item.priority, view:"control-tower" })),
   ];
   const nextItems = [
-    ...deliveries.map((item:any) => ({ id:`d-${item.id}`, kind:"Delivery", title:item.order_number, subtitle:item.companies?.name||"Customer", meta:item.fulfillment_scheduled_for ? new Date(item.fulfillment_scheduled_for).toLocaleString() : "Ready to plan", view:"fulfillment" })),
-    ...collections.map((item:any) => ({ id:`c-${item.purchase_order_id}`, kind:"Collection", title:item.purchase_order_number, subtitle:item.vendor_name||"Supplier", meta:item.scheduled_for ? new Date(item.scheduled_for).toLocaleString() : "Ready to plan", view:"fulfillment" })),
+    ...deliveries.map((item:any) => ({ id:`d-${item.id}`, kind:"Delivery", title:item.order_number, subtitle:item.companies?.name||"Customer", meta:item.fulfillment_scheduled_for ? new Date(item.fulfillment_scheduled_for).toLocaleString() : "Ready to plan", view:"fulfillment", entityType:"delivery", entityId:item.id })),
+    ...collections.map((item:any) => ({ id:`c-${item.purchase_order_id}`, kind:"Collection", title:item.purchase_order_number, subtitle:item.vendor_name||"Supplier", meta:item.scheduled_for ? new Date(item.scheduled_for).toLocaleString() : "Ready to plan", view:"fulfillment", entityType:"collection", entityId:item.purchase_order_id })),
   ];
   const urgentTaskIds = new Set(nowItems.filter((item:any)=>item.id.startsWith("t-")).map((item:any)=>item.id.slice(2)));
   const waitingItems = tasks.filter((item:any)=>!urgentTaskIds.has(item.id)).map((item:any)=>({ id:`w-${item.id}`, kind:"Task", title:item.title, subtitle:item.workspace||"Operations", meta:item.due_at ? `Due ${new Date(item.due_at).toLocaleDateString()}` : (item.priority||"Waiting"), view:"control-tower" }));
@@ -41,7 +41,7 @@ export default function MyWorkPage({ onNavigate }: MyWorkPageProps) {
     <div className="grid gap-4 lg:grid-cols-[1.15fr_.85fr]">
       <WorkLane title="Now" description="Overdue, urgent or blocked" count={nowItems.length} emphasis>{nowItems.map((item:any)=><FocusRow key={item.id} {...item} onOpen={()=>onNavigate(item.view)}/>)}</WorkLane>
       <div className="space-y-4">
-        <WorkLane title="Next" description="Ready for you to action" count={nextItems.length}>{nextItems.slice(0,8).map((item:any)=><FocusRow key={item.id} {...item} onOpen={()=>onNavigate(item.view)}/>)}</WorkLane>
+        <WorkLane title="Next" description="Ready for you to action" count={nextItems.length}>{nextItems.slice(0,8).map((item:any)=><FocusRow key={item.id} {...item} onOpen={()=>{ if(item.entityType&&item.entityId) window.sessionStorage.setItem(`aleph:open-${item.entityType}`,item.entityId); onNavigate(item.view); window.setTimeout(()=>window.dispatchEvent(new CustomEvent(`aleph:open-${item.entityType}`,{detail:item.entityId})),80); }}/>)}</WorkLane>
         <WorkLane title="Waiting" description="Assigned, but not urgent yet" count={waitingItems.length}>{waitingItems.slice(0,6).map((item:any)=><FocusRow key={item.id} {...item} onOpen={()=>onNavigate(item.view)}/>)}</WorkLane>
       </div>
     </div>

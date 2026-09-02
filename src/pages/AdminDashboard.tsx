@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Package, History, BarChart3, Settings, LogOut, Building2, Box, Users, Truck, FileText, Command, ShoppingCart, Percent, Sparkles, Bot, PanelLeftClose, PanelLeftOpen, Radar, Warehouse, MoreHorizontal, Home, ListFilter, UserRoundCheck, BrainCircuit } from "lucide-react";
+import { Package, History, BarChart3, Settings, LogOut, Building2, Box, Users, Truck, FileText, Command, ShoppingCart, Percent, Sparkles, Bot, PanelLeftClose, PanelLeftOpen, Radar, Warehouse, MoreHorizontal, Home, ListFilter, UserRoundCheck, BrainCircuit, Rows3 } from "lucide-react";
 import ChangelogDialog, { hasUnreadChangelog } from "@/components/admin/ChangelogDialog";
 import KeyboardShortcutsDialog from "@/components/admin/KeyboardShortcutsDialog";
 import { playClick, playWhoosh } from "@/utils/ambientSounds";
@@ -365,6 +365,7 @@ const AdminDashboard = () => {
                 }}
                 data-tour="notifications"
               />
+              <Button variant="ghost" size="icon" onClick={cycleDensity} className="hidden sm:inline-flex rounded-xl text-muted-foreground hover:text-foreground" title={`Density: ${density}. Click for the next mode.`} aria-label={`Workspace density ${density}`}><Rows3 className="h-[18px] w-[18px]" /></Button>
               <Button
                 variant="ghost"
                 size="icon"

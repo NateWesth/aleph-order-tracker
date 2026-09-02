@@ -13,7 +13,7 @@ const ZOHO_API_URL = 'https://www.zohoapis.com'
 const EXCLUDED_PO_STATUSES = ['cancelled', 'closed', 'rejected', 'draft', 'void']
 // Correctness first: open POs must not disappear merely because they are old.
 // The list call is cheap; details are fetched only for summaries that still look active.
-const MAX_PO_DETAILS = 500
+const MAX_PO_SUMMARIES = 5000
 const DETAIL_CONCURRENCY = 8
 const EXCLUDED_RECEIVED_STATUSES = ['received', 'fully_received']
 const CACHE_ID = '00000000-0000-0000-0000-000000000003'
@@ -44,6 +44,11 @@ type POEntry = {
   total: number
   outstandingValue: number
   lines: POLine[]
+  sourceModifiedAt?: string
+}
+
+function sourceModifiedAt(record: any): string {
+  return String(record?.last_modified_time || record?.updated_time || record?.modified_time || '')
 }
 
 function isExcludedSku(sku: string): boolean {
@@ -127,9 +132,10 @@ Deno.serve(async (req) => {
 
     // Normal app reads remain cache-first. Fulfillment may request a throttled
     // source refresh so a missed/delayed webhook cannot hide a brand-new PO.
-    // A cache younger than two minutes is already fresh enough and costs no API call.
+    // Webhooks are primary. A roomy recovery cache prevents multiple users from
+    // spending the same Zoho calls when they open this workspace together.
     const cacheAgeMs = cached?.fetched_at ? Date.now() - new Date(cached.fetched_at).getTime() : Number.POSITIVE_INFINITY
-    const cacheIsFresh = Number.isFinite(cacheAgeMs) && cacheAgeMs < 2 * 60_000
+    const cacheIsFresh = Number.isFinite(cacheAgeMs) && cacheAgeMs < 10 * 60_000
     if (!force && cached?.payload && (!refresh || cacheIsFresh)) {
       const purchaseOrders = cached.payload as POEntry[]
       return new Response(JSON.stringify({
@@ -186,7 +192,11 @@ Deno.serve(async (req) => {
       getOrgId(supabase),
     ])
 
-    const purchaseOrders = await fetchOutstandingPurchaseOrders(accessToken, orgId)
+    const purchaseOrders = await fetchOutstandingPurchaseOrders(
+      accessToken,
+      orgId,
+      Array.isArray(cached?.payload) ? cached.payload as POEntry[] : [],
+    )
     const fetchedAt = new Date().toISOString()
 
     await supabase.from('po_tracking_cache').upsert({
@@ -239,12 +249,14 @@ Deno.serve(async (req) => {
   }
 })
 
-async function fetchOutstandingPurchaseOrders(accessToken: string, orgId: string): Promise<POEntry[]> {
-  // 1. Page through the lightweight list endpoint and pre-filter candidates
+async function fetchOutstandingPurchaseOrders(accessToken: string, orgId: string, cachedEntries: POEntry[]): Promise<POEntry[]> {
+  // Scan lightweight summaries far enough to remove stale completed POs. Detail
+  // calls are reserved for newly-created or modified active records.
   const candidates: any[] = []
+  let inspectedSummaries = 0
   let page = 1
   let hasMore = true
-  while (hasMore && candidates.length < MAX_PO_DETAILS) {
+  while (hasMore && inspectedSummaries < MAX_PO_SUMMARIES) {
     const data = await fetchZohoPage(
       accessToken,
       `${ZOHO_API_URL}/books/v3/purchaseorders?organization_id=${orgId}&page=${page}&per_page=200&sort_column=date&sort_order=D`
@@ -254,8 +266,8 @@ async function fetchOutstandingPurchaseOrders(accessToken: string, orgId: string
     if (!summaries.length) break
 
     for (const summary of summaries) {
-      if (candidates.length >= MAX_PO_DETAILS) break
-
+      inspectedSummaries++
+      if (inspectedSummaries > MAX_PO_SUMMARIES) break
 
       const status = String(summary.status || '').trim().toLowerCase()
       const billedStatus = String(summary.billed_status || '').trim().toLowerCase()
@@ -270,24 +282,38 @@ async function fetchOutstandingPurchaseOrders(accessToken: string, orgId: string
   }
 
 
-  // 2. Fetch detail records in parallel batches instead of one-by-one
+  const cachedById = new Map(cachedEntries.map((entry) => [entry.purchaseOrderId, entry]))
+
+  // Reuse unchanged details. A recovery sync therefore costs list pages plus
+  // detail calls only for records whose Zoho modified timestamp changed.
   const results: POEntry[] = []
   for (let i = 0; i < candidates.length; i += DETAIL_CONCURRENCY) {
     const batch = candidates.slice(i, i + DETAIL_CONCURRENCY)
     const details = await Promise.all(
       batch.map(async (summary) => {
+        const id = String(summary.purchaseorder_id || '')
+        const cached = cachedById.get(id)
+        const modifiedAt = sourceModifiedAt(summary)
+        if (cached && modifiedAt && cached.sourceModifiedAt === modifiedAt) {
+          return { summary, cached }
+        }
         try {
-          return { summary, po: await fetchPurchaseOrderDetail(accessToken, orgId, summary.purchaseorder_id) }
+          return { summary, po: await fetchPurchaseOrderDetail(accessToken, orgId, id) }
         } catch (e) {
           console.error(`Failed to fetch PO ${summary.purchaseorder_id}:`, e)
-          return null
+          return cached ? { summary, cached } : null
         }
       })
     )
 
     for (const entry of details) {
       if (!entry) continue
-      const { summary, po } = entry
+      const { summary } = entry
+      if ('cached' in entry && entry.cached) {
+        results.push({ ...entry.cached, sourceModifiedAt: sourceModifiedAt(summary) || entry.cached.sourceModifiedAt })
+        continue
+      }
+      const po = entry.po
       const status = String(po.status || summary.status || '').trim().toLowerCase()
       const detailBilled = String(po.billed_status || summary.billed_status || '').trim().toLowerCase()
       const detailReceived = String(po.received_status || summary.received_status || '').trim().toLowerCase()
@@ -343,11 +369,12 @@ async function fetchOutstandingPurchaseOrders(accessToken: string, orgId: string
         total: Number(po.total ?? summary.total ?? 0),
         outstandingValue: Math.round(outstandingValue * 100) / 100,
         lines,
+        sourceModifiedAt: sourceModifiedAt(po) || sourceModifiedAt(summary),
       })
     }
   }
 
-  console.log(`Inspected ${candidates.length} purchase orders, ${results.length} still outstanding`)
+  console.log(`Inspected ${inspectedSummaries} PO summaries, ${candidates.length} active candidates, ${results.length} still outstanding`)
   return results
 }
 
@@ -361,8 +388,10 @@ async function fetchPurchaseOrderDetail(accessToken: string, orgId: string, purc
 
 function lineKey(sku: unknown, name: unknown, description: unknown): string {
   const s = String(sku || '').trim().toLowerCase()
-  if (s) return `sku:${s}`
-  return `nm:${String(name || '').trim().toLowerCase()}|${String(description || '').trim().toLowerCase()}`
+  const n = String(name || '').trim().toLowerCase()
+  const d = String(description || '').trim().toLowerCase()
+  if (s) return `sku:${s}|item:${d || n}`
+  return `nm:${n}|${d}`
 }
 
 // Sum quantities already covered by vendor bills linked to this PO

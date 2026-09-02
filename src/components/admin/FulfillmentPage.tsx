@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -15,6 +16,7 @@ import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import EntityComments from "@/components/admin/EntityComments";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { queueOfflineOperation } from "@/services/offlineOperations";
@@ -35,6 +37,7 @@ import {
   MapPinned,
   MapPin,
   MessageSquareText,
+  MoreHorizontal,
   Navigation,
   PackageCheck,
   Printer,
@@ -255,8 +258,13 @@ const readyUnits = (item: FulfillmentItem) =>
 
 const poLineKey = (line: Pick<POLine, "sku" | "name" | "description">) => {
   const sku = String(line.sku || "").trim().toLowerCase();
-  if (sku) return `sku:${sku}`;
-  return `nm:${String(line.name || "").trim().toLowerCase()}|${String(line.description || "").trim().toLowerCase()}`;
+  const name = String(line.name || "").trim().toLowerCase();
+  const description = String(line.description || "").trim().toLowerCase();
+  // SKU alone is not a line identity. Zoho commonly uses M-MISC for unrelated
+  // products, so collapsing on SKU silently applies one receipt to every
+  // miscellaneous line. Keep the real item text in the key as well.
+  if (sku) return `sku:${sku}|item:${description || name}`;
+  return `nm:${name}|${description}`;
 };
 
 const formatWhen = (value: string | null | undefined) => {
@@ -525,7 +533,17 @@ export default function FulfillmentPage() {
   useEffect(() => {
     let cancelled = false;
     const boot = async () => {
-      if (!cancelled) await fetchData();
+      if (cancelled) return;
+      await fetchData();
+      // Webhooks remain primary. Once per session, ask the globally throttled
+      // recovery endpoints to catch a missed event, then reread local truth.
+      const key = "aleph:fulfillment-source-recovery";
+      const last = Number(window.sessionStorage.getItem(key) || 0);
+      if (Date.now() - last > 10 * 60_000) {
+        window.sessionStorage.setItem(key, String(Date.now()));
+        await refreshFulfillmentSources();
+        if (!cancelled) await fetchData();
+      }
     };
     void boot();
     // Webhooks and realtime subscriptions are the primary update path. This
@@ -535,7 +553,7 @@ export default function FulfillmentPage() {
       void fetchData();
     }, 10 * 60_000);
     return () => { cancelled = true; window.clearInterval(timer); };
-  }, [fetchData]);
+  }, [fetchData, refreshFulfillmentSources]);
 
   useEffect(() => {
     if (!selectedDeliveryId && !selectedCollectionId) return;
@@ -599,7 +617,8 @@ export default function FulfillmentPage() {
     collectionEventLines.forEach((line) => {
       const poId = eventToPO.get(line.event_id);
       if (!poId) return;
-      const key = `${poId}::${line.line_key}`;
+      // Rebuild from stored facts instead of trusting legacy SKU-only keys.
+      const key = `${poId}::${poLineKey({ sku: line.sku || "", name: line.name, description: line.description || "" })}`;
       totals.set(key, (totals.get(key) || 0) + Number(line.quantity_collected || 0));
     });
     return totals;
@@ -611,7 +630,7 @@ export default function FulfillmentPage() {
     collectionEventLines.forEach((line) => {
       const poId = eventToPO.get(line.event_id);
       if (!poId) return;
-      const key = `${poId}::${line.line_key}`;
+      const key = `${poId}::${poLineKey({ sku: line.sku || "", name: line.name, description: line.description || "" })}`;
       maximums.set(key, Math.max(maximums.get(key) || 0, Number(line.source_unbilled_quantity || 0)));
     });
     return maximums;
@@ -1622,7 +1641,7 @@ export default function FulfillmentPage() {
             {deliveryLanes.map((lane) => (
               <DispatchLane key={lane.id} label={lane.label} hint={lane.hint} icon={lane.icon} count={lane.items.length} tone={lane.id === "route" ? "route" : lane.id === "scheduled" ? "planned" : "ready"}>
                 {lane.items.map((order) => (
-                  <DeliveryDispatchCard key={order.id} order={order} memberName={memberName} selected={deliverySelection.has(order.id)} onToggle={() => toggleDeliverySelection(order.id)} onToggleUrgent={() => void updateDelivery(order.id, { urgency: order.urgency === "urgent" ? "normal" : "urgent" })} onOpen={() => setSelectedDeliveryId(order.id)} onClaim={() => void updateDelivery(order.id, { fulfillment_assigned_to: user?.id || null })} onAdvance={() => order.fulfillment_status === "scheduled" ? void updateDelivery(order.id, { fulfillment_status: "out-for-delivery" }) : order.fulfillment_status === "out-for-delivery" ? setConfirmDeliveryId(order.id) : setSelectedDeliveryId(order.id)} />
+                  <DeliveryDispatchCard key={order.id} order={order} selected={deliverySelection.has(order.id)} onToggle={() => toggleDeliverySelection(order.id)} onToggleUrgent={() => void updateDelivery(order.id, { urgency: order.urgency === "urgent" ? "normal" : "urgent" })} onOpen={() => setSelectedDeliveryId(order.id)} onClaim={() => void updateDelivery(order.id, { fulfillment_assigned_to: user?.id || null })} onAdvance={() => order.fulfillment_status === "scheduled" ? void updateDelivery(order.id, { fulfillment_status: "out-for-delivery" }) : order.fulfillment_status === "out-for-delivery" ? setConfirmDeliveryId(order.id) : setSelectedDeliveryId(order.id)} />
                 ))}
               </DispatchLane>
             ))}
@@ -1630,7 +1649,7 @@ export default function FulfillmentPage() {
         )
       ) : collectionFiltered.length === 0 ? <EmptyState icon={Warehouse} title="No collections match this view" body="Open Zoho purchase orders appear automatically. Try All if a focus filter is active." /> : (
         <div className="fulfillment-board-grid grid min-w-0 gap-4 xl:grid-cols-3">
-          {collectionLanes.map((lane) => <DispatchLane key={lane.id} label={lane.label} hint={lane.hint} icon={lane.icon} count={lane.items.length} tone={lane.id === "collecting" ? "route" : lane.id === "scheduled" ? "planned" : "ready"}>{lane.items.map((po) => <CollectionDispatchCard key={po.purchaseOrderId} po={po} memberName={memberName} selected={collectionSelection.has(po.purchaseOrderId)} onToggle={() => toggleCollectionSelection(po.purchaseOrderId)} onToggleUrgent={() => void updateCollectionState(po, { is_urgent: !po.state?.is_urgent })} onOpen={() => setSelectedCollectionId(po.purchaseOrderId)} onClaim={() => void updateCollectionState(po, { assigned_to: user?.id || null })} onAdvance={() => po.state?.status === "scheduled" || po.state?.status === "pending" ? void updateCollectionState(po, { status: "collecting" }) : setSelectedCollectionId(po.purchaseOrderId)} />)}</DispatchLane>)}
+          {collectionLanes.map((lane) => <DispatchLane key={lane.id} label={lane.label} hint={lane.hint} icon={lane.icon} count={lane.items.length} tone={lane.id === "collecting" ? "route" : lane.id === "scheduled" ? "planned" : "ready"}>{lane.items.map((po) => <CollectionDispatchCard key={po.purchaseOrderId} po={po} selected={collectionSelection.has(po.purchaseOrderId)} onToggle={() => toggleCollectionSelection(po.purchaseOrderId)} onToggleUrgent={() => void updateCollectionState(po, { is_urgent: !po.state?.is_urgent })} onOpen={() => setSelectedCollectionId(po.purchaseOrderId)} onClaim={() => void updateCollectionState(po, { assigned_to: user?.id || null })} onAdvance={() => po.state?.status === "scheduled" || po.state?.status === "pending" ? void updateCollectionState(po, { status: "collecting" }) : setSelectedCollectionId(po.purchaseOrderId)} />)}</DispatchLane>)}
         </div>
       )}
 
@@ -1750,11 +1769,15 @@ function FulfillmentBubbleShell({
   onClose: () => void;
   children: React.ReactNode;
 }) {
-  return (
-    <section
+  if (typeof document === "undefined") return null;
+  return createPortal(
+    <div className="fixed inset-0 z-[120] flex justify-end" role="presentation">
+      <button type="button" className="absolute inset-0 bg-foreground/25 backdrop-blur-[2px]" onClick={onClose} aria-label="Close details" />
+      <section
       ref={bubbleRef}
-      className="animate-order-floating-bubble scroll-mt-24 overflow-hidden rounded-[30px] border-2 border-primary/15 bg-background/92 shadow-[0_26px_90px_-32px_hsl(var(--foreground)/0.42)] ring-1 ring-white/10 backdrop-blur-2xl"
+      className="animate-order-floating-bubble relative h-full w-full overflow-y-auto border-l border-primary/15 bg-background/97 shadow-[-24px_0_80px_-32px_hsl(var(--foreground)/0.5)] backdrop-blur-2xl sm:max-w-2xl lg:max-w-3xl"
       role="dialog"
+      aria-modal="true"
       aria-label={`${eyebrow} ${title}`}
     >
       <div className="ribbon-bar h-1.5" aria-hidden />
@@ -1775,7 +1798,9 @@ function FulfillmentBubbleShell({
         <div className="relative mt-3 flex items-center gap-2 rounded-xl bg-primary/[0.055] px-3 py-2 text-[11px] text-muted-foreground"><MessageSquareText className="h-3.5 w-3.5 text-primary" /><span>Live team thread, actions and movement history stay together here.</span><span className="ml-auto hidden font-semibold sm:inline">Esc to close</span></div>
       </div>
       <div className="p-4 sm:p-5 lg:p-6">{children}</div>
-    </section>
+      </section>
+    </div>,
+    document.body,
   );
 }
 
@@ -1803,34 +1828,43 @@ function DispatchLane({ label, hint, icon: Icon, count, tone, children }: { labe
   );
 }
 
-function DeliveryDispatchCard({ order, memberName, selected, onToggle, onToggleUrgent, onOpen, onClaim, onAdvance }: { order: FulfillmentOrder; memberName: (id: string | null | undefined) => string; selected: boolean; onToggle: () => void; onToggleUrgent: () => void; onOpen: () => void; onClaim: () => void; onAdvance: () => void }) {
+function DeliveryDispatchCard({ order, selected, onToggle, onToggleUrgent, onOpen, onClaim, onAdvance }: { order: FulfillmentOrder; selected: boolean; onToggle: () => void; onToggleUrgent: () => void; onOpen: () => void; onClaim: () => void; onAdvance: () => void }) {
   const visibleItems = order.items.filter((item) => readyUnits(item) > 0);
   const units = visibleItems.reduce((sum, item) => sum + readyUnits(item), 0);
   const overdue = isOverdue(order.fulfillment_scheduled_for);
   const actionLabel = order.fulfillment_status === "scheduled" ? "Send on route" : order.fulfillment_status === "out-for-delivery" ? "Complete" : "Plan route";
+  const progress = order.fulfillment_status === "out-for-delivery" ? 2 : order.fulfillment_status === "scheduled" ? 1 : 0;
   return (
     <article onClick={onOpen} className={cn("group relative cursor-pointer overflow-hidden rounded-[22px] border bg-background/82 p-3.5 pt-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-lg", selected ? "border-primary/35 ring-2 ring-primary/10" : "border-border/55", order.urgency === "urgent" && "border-l-4 border-l-destructive")}>
       <div className="ribbon-bar absolute inset-x-0 top-0 h-1 opacity-85" aria-hidden />
-      <div className="flex items-start gap-3"><span onClick={(event) => { event.stopPropagation(); onToggle(); }} className="pt-0.5"><Checkbox checked={selected} /></span><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-1.5"><h3 className="font-black text-primary">{order.order_number}</h3>{order.urgency === "urgent" && <Badge variant="destructive" className="h-5 text-[9px]">Urgent</Badge>}</div><p className="mt-1 truncate text-sm font-semibold">{order.companyName}</p>{order.reference && <p className="mt-0.5 truncate text-[10px] text-muted-foreground">SO {order.reference}</p>}</div><ChevronRight className="mt-1 h-4 w-4 text-muted-foreground/25 transition-transform group-hover:translate-x-0.5 group-hover:text-primary" /></div>
-      <div className="mt-3 grid grid-cols-2 gap-2"><div className="rounded-xl bg-muted/40 px-3 py-2"><p className="text-lg font-black">{units}</p><p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">units ready</p></div><div className="rounded-xl bg-muted/40 px-3 py-2"><p className="text-lg font-black">{visibleItems.length}</p><p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">package lines</p></div></div>
-      <div className="mt-3 space-y-1.5 text-[10px] text-muted-foreground"><p className="flex items-center gap-1.5"><UserRound className="h-3 w-3" /><span className={cn(!order.fulfillment_assigned_to && "font-semibold text-amber-600")}>{memberName(order.fulfillment_assigned_to)}</span></p><p className={cn("flex items-center gap-1.5", overdue && "font-semibold text-destructive")}><CalendarClock className="h-3 w-3" />{order.fulfillment_scheduled_for ? `${overdue ? "Late · " : ""}${formatWhen(order.fulfillment_scheduled_for)}` : `Waiting ${ageInDays(order.created_at)}d · not scheduled`}</p></div>
-      <div className="mt-3 flex flex-wrap gap-2 border-t border-border/50 pt-3"><Button variant="ghost" size="sm" aria-label={order.urgency === "urgent" ? "Remove urgent priority" : "Mark urgent"} className={cn("h-8 rounded-xl px-2.5 text-[10px]", order.urgency === "urgent" && "bg-destructive/10 text-destructive hover:bg-destructive/15 hover:text-destructive")} onClick={(event) => { event.stopPropagation(); onToggleUrgent(); }}><CircleAlert className="mr-1 h-3 w-3" />Urgent</Button><Button variant="ghost" size="sm" className="h-8 rounded-xl px-2.5 text-[10px] text-primary" onClick={(event) => { event.stopPropagation(); onOpen(); }}><MessageSquareText className="mr-1 h-3 w-3" />Team thread</Button>{!order.fulfillment_assigned_to && <Button variant="outline" size="sm" className="h-8 rounded-xl px-2.5 text-[10px]" onClick={(event) => { event.stopPropagation(); onClaim(); }}><UserCheck className="mr-1 h-3 w-3" />Claim</Button>}<Button size="sm" className="ml-auto h-8 rounded-xl px-3 text-[10px]" onClick={(event) => { event.stopPropagation(); onAdvance(); }}>{actionLabel}<ArrowRight className="ml-1 h-3 w-3" /></Button></div>
+      <div className="flex items-start gap-3"><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-1.5"><h3 className="font-black text-primary">{order.order_number}</h3>{order.urgency === "urgent" && <Badge variant="destructive" className="h-5 text-[9px]">Urgent</Badge>}{overdue && <Badge variant="destructive" className="h-5 text-[9px]">Late</Badge>}</div><p className="mt-1 truncate text-sm font-semibold">{order.companyName}</p></div><ChevronRight className="mt-1 h-4 w-4 text-muted-foreground/25 transition-transform group-hover:translate-x-0.5 group-hover:text-primary" /></div>
+      <DispatchProgress labels={[`${units} ready`, "Assigned", "On route"]} active={progress} />
+      <div className="mt-4 flex gap-2 border-t border-border/50 pt-3"><Button size="sm" className="h-10 flex-1 rounded-xl text-xs" onClick={(event) => { event.stopPropagation(); onAdvance(); }}>{actionLabel}<ArrowRight className="ml-1.5 h-3.5 w-3.5" /></Button><DispatchCardMenu selected={selected} urgent={order.urgency === "urgent"} unassigned={!order.fulfillment_assigned_to} onToggle={onToggle} onToggleUrgent={onToggleUrgent} onOpen={onOpen} onClaim={onClaim} /></div>
     </article>
   );
 }
 
-function CollectionDispatchCard({ po, memberName, selected, onToggle, onToggleUrgent, onOpen, onClaim, onAdvance }: { po: CollectionPOView; memberName: (id: string | null | undefined) => string; selected: boolean; onToggle: () => void; onToggleUrgent: () => void; onOpen: () => void; onClaim: () => void; onAdvance: () => void }) {
+function CollectionDispatchCard({ po, selected, onToggle, onToggleUrgent, onOpen, onClaim, onAdvance }: { po: CollectionPOView; selected: boolean; onToggle: () => void; onToggleUrgent: () => void; onOpen: () => void; onClaim: () => void; onAdvance: () => void }) {
   const overdue = isOverdue(po.state?.scheduled_for || po.expectedDeliveryDate);
   const status = po.state?.status || "pending";
+  const progress = status === "collecting" ? 2 : status === "scheduled" ? 1 : 0;
+  const actionLabel = status === "collecting" ? "Record quantities" : po.state?.collection_method === "supplier-delivery" ? "Receive delivery" : "Start pickup";
   return (
     <article onClick={onOpen} className={cn("group relative cursor-pointer overflow-hidden rounded-[22px] border bg-background/82 p-3.5 pt-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-lg", selected ? "border-primary/40 ring-2 ring-primary/10" : "border-border/55", po.state?.is_urgent && "border-l-4 border-l-destructive")}>
       <div className="ribbon-bar absolute inset-x-0 top-0 h-1 opacity-85" aria-hidden />
-      <div className="flex items-start gap-3"><span onClick={(event) => { event.stopPropagation(); onToggle(); }} className="pt-0.5"><Checkbox checked={selected} /></span><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-1.5"><h3 className="font-black text-primary">{po.purchaseOrderNumber}</h3><Badge variant="outline" className="h-5 border-primary/25 bg-primary/10 px-1.5 text-[8px] font-black uppercase text-primary">Collection</Badge>{po.state?.is_urgent && <Badge variant="destructive" className="h-5 text-[9px]">Urgent</Badge>}{overdue && <Badge variant="destructive" className="h-5 text-[9px]">Late</Badge>}</div><p className="mt-1 truncate text-sm font-semibold">{po.vendorName}</p><div className="mt-1 flex flex-wrap items-center gap-1.5"><p className="text-[10px] text-muted-foreground">PO {po.date || "date unknown"}</p><Badge variant="outline" className="h-5 px-1.5 text-[8px]">{po.state?.collection_method === "supplier-delivery" ? "Supplier delivery" : "Our pickup"}</Badge></div></div><ChevronRight className="mt-1 h-4 w-4 text-muted-foreground/25 transition-transform group-hover:translate-x-0.5 group-hover:text-primary" /></div>
-      <div className="mt-3 flex items-end justify-between rounded-2xl bg-gradient-to-r from-primary/10 via-[hsl(var(--ribbon-3))]/10 to-[hsl(var(--ribbon-5))]/10 p-3"><div><p className="text-2xl font-black">{po.remainingUnits}</p><p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">units left to collect</p></div><div className="text-right"><p className="text-xs font-bold">{formatMoneySafe(po.outstandingValue)}</p><p className="text-[9px] text-muted-foreground">open value</p></div></div>
-      <div className="mt-3 space-y-1.5 text-[10px] text-muted-foreground"><p className="flex items-center gap-1.5"><UserRound className="h-3 w-3" /><span className={cn(!po.state?.assigned_to && "font-semibold text-amber-600")}>{memberName(po.state?.assigned_to)}</span></p><p className={cn("flex items-center gap-1.5", overdue && "font-semibold text-destructive")}><CalendarClock className="h-3 w-3" />{po.state?.scheduled_for ? `${overdue ? "Late · " : ""}${formatWhen(po.state.scheduled_for)}` : po.expectedDeliveryDate ? `Expected ${po.expectedDeliveryDate}` : "Not scheduled"}</p>{po.collectedUnits > 0 && <p className="flex items-center gap-1.5 font-semibold text-emerald-600"><Archive className="h-3 w-3" />{po.collectedUnits} units collected before</p>}</div>
-      <div className="mt-3 flex flex-wrap gap-2 border-t border-border/50 pt-3"><Button variant="ghost" size="sm" aria-label={po.state?.is_urgent ? "Remove urgent priority" : "Mark urgent"} className={cn("h-8 rounded-xl px-2.5 text-[10px]", po.state?.is_urgent && "bg-destructive/10 text-destructive hover:bg-destructive/15 hover:text-destructive")} onClick={(event) => { event.stopPropagation(); onToggleUrgent(); }}><CircleAlert className="mr-1 h-3 w-3" />Urgent</Button><Button variant="ghost" size="sm" className="h-8 rounded-xl px-2.5 text-[10px] text-primary" onClick={(event) => { event.stopPropagation(); onOpen(); }}><MessageSquareText className="mr-1 h-3 w-3" />Team thread</Button>{!po.state?.assigned_to && <Button variant="outline" size="sm" className="h-8 rounded-xl px-2.5 text-[10px]" onClick={(event) => { event.stopPropagation(); onClaim(); }}><UserCheck className="mr-1 h-3 w-3" />Claim</Button>}<Button size="sm" className="ml-auto h-8 rounded-xl px-3 text-[10px]" onClick={(event) => { event.stopPropagation(); onAdvance(); }}>{status === "collecting" ? "Record quantities" : po.state?.collection_method === "supplier-delivery" ? "Receive delivery" : "Start pickup"}<ArrowRight className="ml-1 h-3 w-3" /></Button></div>
+      <div className="flex items-start gap-3"><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-1.5"><h3 className="font-black text-primary">{po.purchaseOrderNumber}</h3>{po.state?.is_urgent && <Badge variant="destructive" className="h-5 text-[9px]">Urgent</Badge>}{overdue && <Badge variant="destructive" className="h-5 text-[9px]">Late</Badge>}</div><p className="mt-1 truncate text-sm font-semibold">{po.vendorName}</p></div><ChevronRight className="mt-1 h-4 w-4 text-muted-foreground/25 transition-transform group-hover:translate-x-0.5 group-hover:text-primary" /></div>
+      <DispatchProgress labels={[`${po.remainingUnits} remaining`, "Scheduled", "Collecting"]} active={progress} />
+      <div className="mt-4 flex gap-2 border-t border-border/50 pt-3"><Button size="sm" className="h-10 flex-1 rounded-xl text-xs" onClick={(event) => { event.stopPropagation(); onAdvance(); }}>{actionLabel}<ArrowRight className="ml-1.5 h-3.5 w-3.5" /></Button><DispatchCardMenu selected={selected} urgent={Boolean(po.state?.is_urgent)} unassigned={!po.state?.assigned_to} onToggle={onToggle} onToggleUrgent={onToggleUrgent} onOpen={onOpen} onClaim={onClaim} /></div>
     </article>
   );
+}
+
+function DispatchProgress({ labels, active }: { labels: string[]; active: number }) {
+  return <div className="mt-4 grid grid-cols-3 gap-1" aria-label={`Progress: ${labels[active]}`}>{labels.map((label, index) => <div key={label} className="min-w-0"><div className={cn("h-1.5 rounded-full transition-colors duration-300", index <= active ? "bg-primary" : "bg-muted")} /><p className={cn("mt-1.5 truncate text-[9px] font-bold", index === active ? "text-primary" : "text-muted-foreground")}>{label}</p></div>)}</div>;
+}
+
+function DispatchCardMenu({ selected, urgent, unassigned, onToggle, onToggleUrgent, onOpen, onClaim }: { selected: boolean; urgent: boolean; unassigned: boolean; onToggle: () => void; onToggleUrgent: () => void; onOpen: () => void; onClaim: () => void }) {
+  return <DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" size="icon" className="h-10 w-10 shrink-0 rounded-xl" onClick={(event) => event.stopPropagation()} aria-label="More actions"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-52" onClick={(event) => event.stopPropagation()}><DropdownMenuItem onSelect={onOpen}><MessageSquareText className="mr-2 h-4 w-4" />Open details & comments</DropdownMenuItem>{unassigned && <DropdownMenuItem onSelect={onClaim}><UserCheck className="mr-2 h-4 w-4" />Claim this work</DropdownMenuItem>}<DropdownMenuItem onSelect={onToggleUrgent}><CircleAlert className="mr-2 h-4 w-4" />{urgent ? "Remove urgent flag" : "Mark as urgent"}</DropdownMenuItem><DropdownMenuSeparator /><DropdownMenuItem onSelect={onToggle}><Checkbox checked={selected} className="mr-2 h-4 w-4" />{selected ? "Remove from route selection" : "Add to route selection"}</DropdownMenuItem></DropdownMenuContent></DropdownMenu>;
 }
 
 function Field({ label, icon: Icon, children }: { label: string; icon: any; children: React.ReactNode }) {
