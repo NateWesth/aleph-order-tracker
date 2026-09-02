@@ -1746,6 +1746,8 @@ export type Database = {
           assigned_to: string | null
           collection_method: string
           completed_at: string | null
+          dismissed_at: string | null
+          dismissed_by: string | null
           created_at: string
           is_urgent: boolean
           last_seen_at: string
@@ -1762,6 +1764,8 @@ export type Database = {
           assigned_to?: string | null
           collection_method?: string
           completed_at?: string | null
+          dismissed_at?: string | null
+          dismissed_by?: string | null
           created_at?: string
           is_urgent?: boolean
           last_seen_at?: string
@@ -1778,6 +1782,8 @@ export type Database = {
           assigned_to?: string | null
           collection_method?: string
           completed_at?: string | null
+          dismissed_at?: string | null
+          dismissed_by?: string | null
           created_at?: string
           is_urgent?: boolean
           last_seen_at?: string
