@@ -2348,6 +2348,10 @@ export type Database = {
         Args: { p_order_id: string }
         Returns: Json
       }
+      generate_my_overdue_fulfillment_notifications: {
+        Args: never
+        Returns: number
+      }
       get_current_user_role: {
         Args: never
         Returns: Database["public"]["Enums"]["app_role"]
