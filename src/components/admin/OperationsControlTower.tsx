@@ -89,7 +89,7 @@ export default function OperationsControlTower() {
       supabase.from("profiles").select("id,full_name,email").eq("approved", true).order("full_name"),
       supabase.from("orders").select("id,order_number,status,completed_date,fulfillment_method,fulfillment_status,fulfillment_assigned_to,fulfillment_scheduled_for").is("completed_date", null).limit(5000),
       supabase.from("po_tracking_cache").select("payload").eq("id", "00000000-0000-0000-0000-000000000003").maybeSingle(),
-      supabase.from("po_collection_state").select("purchase_order_id,status,completed_at,assigned_to,scheduled_for"),
+      supabase.from("po_collection_state").select("purchase_order_id,status,completed_at,assigned_to,scheduled_for,dismissed_at"),
     ]);
     const [routeRes, exceptionRes, timelineRes, activityRes, taskRes, memberRes, activeOrderRes, poCacheRes, poStateRes] = result;
     const firstError = result.find((entry) => entry.error)?.error;
@@ -129,12 +129,14 @@ export default function OperationsControlTower() {
       setIssues([]);
     }
 
-    const completedPOs = new Set((poStateRes.data || []).filter((row: any) => row.status === "collected" || row.completed_at).map((row: any) => row.purchase_order_id));
+    const completedPOs = new Set((poStateRes.data || []).filter((row: any) => row.status === "collected" || row.completed_at || row.dismissed_at).map((row: any) => row.purchase_order_id));
     const poPayload = Array.isArray(poCacheRes.data?.payload) ? poCacheRes.data.payload as any[] : [];
     const closedStatus = new Set(["cancelled","closed","rejected","draft","void"]);
     const closedReceived = new Set(["received","fully_received"]);
     const activePOs = poPayload.filter((po: any) => {
       if (!po?.purchaseOrderId || completedPOs.has(po.purchaseOrderId)) return false;
+      const poDate = new Date(po.date).getTime();
+      if (!Number.isFinite(poDate) || poDate < Date.now() - 21 * 86_400_000) return false;
       if (closedStatus.has(String(po.status || "").toLowerCase())) return false;
       if (closedReceived.has(String(po.receivedStatus || "").toLowerCase())) return false;
       return Array.isArray(po.lines) && po.lines.some((line: any) => Number(line.outstanding || 0) > 0);

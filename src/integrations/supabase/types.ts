@@ -1747,6 +1747,8 @@ export type Database = {
           collection_method: string
           completed_at: string | null
           created_at: string
+          dismissed_at: string | null
+          dismissed_by: string | null
           is_urgent: boolean
           last_seen_at: string
           notes: string | null
@@ -1763,6 +1765,8 @@ export type Database = {
           collection_method?: string
           completed_at?: string | null
           created_at?: string
+          dismissed_at?: string | null
+          dismissed_by?: string | null
           is_urgent?: boolean
           last_seen_at?: string
           notes?: string | null
@@ -1779,6 +1783,8 @@ export type Database = {
           collection_method?: string
           completed_at?: string | null
           created_at?: string
+          dismissed_at?: string | null
+          dismissed_by?: string | null
           is_urgent?: boolean
           last_seen_at?: string
           notes?: string | null
@@ -1794,6 +1800,13 @@ export type Database = {
           {
             foreignKeyName: "po_collection_state_assigned_to_fkey"
             columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "po_collection_state_dismissed_by_fkey"
+            columns: ["dismissed_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -2347,10 +2360,6 @@ export type Database = {
       complete_fulfillment_delivery: {
         Args: { p_order_id: string }
         Returns: Json
-      }
-      generate_my_overdue_fulfillment_notifications: {
-        Args: never
-        Returns: number
       }
       get_current_user_role: {
         Args: never

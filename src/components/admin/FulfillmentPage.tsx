@@ -150,6 +150,8 @@ interface POCollectionState {
   scheduled_for: string | null;
   notes: string | null;
   completed_at: string | null;
+  dismissed_at: string | null;
+  dismissed_by: string | null;
   last_seen_at: string;
 }
 
@@ -221,7 +223,7 @@ interface DispatchPlanningStop {
 }
 
 const PO_CACHE_ID = "00000000-0000-0000-0000-000000000003";
-const FULFILLMENT_WINDOW_DAYS = 14;
+const FULFILLMENT_WINDOW_DAYS = 21;
 const FULFILLMENT_WINDOW_MS = FULFILLMENT_WINDOW_DAYS * 86_400_000;
 
 const isInFulfillmentWindow = (value: string | null | undefined) => {
@@ -234,6 +236,15 @@ const isInFulfillmentWindow = (value: string | null | undefined) => {
 
 const poOperationalDate = (po: Pick<ZohoPO, "expectedDeliveryDate" | "date">) =>
   po.expectedDeliveryDate || po.date;
+
+// Collections are deliberately limited by the PO creation date. An old PO
+// with a recently edited delivery date must not re-enter the current queue.
+const isCurrentCollectionPO = (po: Pick<ZohoPO, "date">) => {
+  const timestamp = new Date(po.date).getTime();
+  if (!Number.isFinite(timestamp)) return false;
+  const now = Date.now();
+  return timestamp >= now - FULFILLMENT_WINDOW_MS && timestamp <= now + 86_400_000;
+};
 
 const CLOSED_PO_STATUSES = new Set(["cancelled", "closed", "rejected", "draft", "void"]);
 const CLOSED_RECEIVED_STATUSES = new Set(["received", "fully_received"]);
@@ -389,7 +400,7 @@ export default function FulfillmentPage() {
         supabase.from("profiles").select("id, full_name, email, position").eq("approved", true).order("full_name"),
         supabase.from("fulfillment_settings").select("auto_assign_enabled, default_method").eq("id", true).maybeSingle(),
         supabase.from("po_tracking_cache").select("payload, fetched_at").eq("id", PO_CACHE_ID).maybeSingle(),
-        supabase.from("po_collection_state").select("purchase_order_id, purchase_order_number, vendor_id, vendor_name, assigned_to, status, collection_method, is_urgent, scheduled_for, notes, completed_at, last_seen_at"),
+        supabase.from("po_collection_state").select("purchase_order_id, purchase_order_number, vendor_id, vendor_name, assigned_to, status, collection_method, is_urgent, scheduled_for, notes, completed_at, dismissed_at, dismissed_by, last_seen_at"),
         supabase
           .from("po_collection_events")
           .select("id, purchase_order_id, purchase_order_number, vendor_id, vendor_name, collected_by, collected_at, total_units, fully_collected, notes")
@@ -466,12 +477,15 @@ export default function FulfillmentPage() {
 
       const historyDeliveries = historicBase.map(decorateOrder);
       const poPayload = Array.isArray(cacheRes.data?.payload) ? (cacheRes.data?.payload as unknown as ZohoPO[]) : [];
-      // Collections are driven by every genuinely OPEN, unbilled PO in the
-      // cache. Do not age open POs off the board; a six-week-old outstanding PO
-      // is more important, not less.
-      const focusedPOPayload = poPayload.filter(isOpenCollectionPO);
-      // The archive is intentionally capped, but active PO calculations must
-      // include every older partial pickup for those current purchase orders.
+      const stateRows = (statesRes.data || []) as POCollectionState[];
+      const stateByPO = new Map(stateRows.map((row) => [row.purchase_order_id, row]));
+      // Operational collections are a strict rolling three-week queue. A
+      // dismissed PO remains hidden even if a cache refresh sees it again.
+      const focusedPOPayload = poPayload.filter((po) =>
+        isOpenCollectionPO(po)
+        && isCurrentCollectionPO(po)
+        && !stateByPO.get(po.purchaseOrderId)?.dismissed_at
+      );
       const activePOIds = focusedPOPayload.map((po) => po.purchaseOrderId).filter(Boolean);
       const activeEventsRes = activePOIds.length
         ? await supabase
@@ -495,7 +509,7 @@ export default function FulfillmentPage() {
       setDeliveryOrders(readyDeliveries);
       setDeliveryHistory(historyDeliveries);
       setPurchaseOrders(focusedPOPayload);
-      setCollectionStates((statesRes.data || []) as POCollectionState[]);
+      setCollectionStates(stateRows);
       setCollectionEvents(eventRows);
       setCollectionEventLines((linesRes.data || []) as CollectionEventLine[]);
       setTimelineEvents((timelineRes.data || []) as FulfillmentTimelineEvent[]);
@@ -723,6 +737,8 @@ export default function FulfillmentPage() {
       scheduled_for: null,
       notes: null,
       completed_at: null,
+      dismissed_at: null,
+      dismissed_by: null,
       last_seen_at: new Date().toISOString(),
       ...(po.state || {}),
       ...patch,
@@ -1260,11 +1276,18 @@ export default function FulfillmentPage() {
         setDeliveryOrders((current) => current.map((order) => (deliverySelection.has(order.id) ? ({ ...order, ...patch } as FulfillmentOrder) : order)));
       }
       if (poIds.length) {
-        const { error } = await supabase.from("po_collection_state").delete().in("purchase_order_id", poIds);
+        const dismissedAt = new Date().toISOString();
+        const { error } = await supabase
+          .from("po_collection_state")
+          .update({ dismissed_at: dismissedAt, dismissed_by: user?.id || null, updated_at: dismissedAt } as any)
+          .in("purchase_order_id", poIds);
         if (error) throw error;
-        setCollectionStates((current) => current.filter((state) => !collectionSelection.has(state.purchase_order_id)));
+        setPurchaseOrders((current) => current.filter((po) => !collectionSelection.has(po.purchaseOrderId)));
+        setCollectionStates((current) => current.map((state) => collectionSelection.has(state.purchase_order_id)
+          ? { ...state, dismissed_at: dismissedAt, dismissed_by: user?.id || null }
+          : state));
       }
-      toast({ title: "Removed from dispatch board", description: `${orderIds.length + poIds.length} stop${orderIds.length + poIds.length === 1 ? "" : "s"} cleared of planning data.` });
+      toast({ title: "Removed from dispatch board", description: `${orderIds.length + poIds.length} stop${orderIds.length + poIds.length === 1 ? "" : "s"} removed. Collections will stay hidden after refresh.` });
       setDeliverySelection(new Set());
       setCollectionSelection(new Set());
       setBulkRemoveOpen(false);

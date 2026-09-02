@@ -13,7 +13,7 @@ export default function MyWorkPage({ onNavigate }: MyWorkPageProps) {
   const [deliveries,setDeliveries]=useState<any[]>([]); const [collections,setCollections]=useState<any[]>([]); const [tasks,setTasks]=useState<any[]>([]); const [exceptions,setExceptions]=useState<any[]>([]); const [routes,setRoutes]=useState<any[]>([]); const [loading,setLoading]=useState(true);
   const load=useCallback(async()=>{ if(!user?.id)return; const s=supabase as any; const [d,c,t,e,r]=await Promise.all([
     s.from("orders").select("id,order_number,company_id,fulfillment_status,fulfillment_scheduled_for,companies(name,address)").eq("fulfillment_assigned_to",user.id).is("completed_date",null).neq("status","delivered").neq("fulfillment_status","completed"),
-    s.from("po_collection_state").select("purchase_order_id,purchase_order_number,vendor_name,status,scheduled_for,notes").eq("assigned_to",user.id).is("completed_at",null).neq("status","collected"),
+    s.from("po_collection_state").select("purchase_order_id,purchase_order_number,vendor_name,status,scheduled_for,notes").eq("assigned_to",user.id).is("completed_at",null).is("dismissed_at",null).neq("status","collected"),
     s.from("team_action_items").select("*").eq("assigned_to",user.id).neq("status","done").order("due_at",{ascending:true}),
     s.from("operations_exceptions").select("*").eq("assigned_to",user.id).neq("status","resolved").order("created_at",{ascending:false}),
     s.from("dispatch_routes").select("*").eq("driver_id",user.id).not("status","in","(completed,cancelled)").order("route_date",{ascending:true}),
