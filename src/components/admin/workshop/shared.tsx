@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { AlertTriangle, CalendarDays, CheckCircle2, Clock3, Search, UserRound } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 
 export const SERVICE_STATUSES = [
@@ -102,28 +103,60 @@ export function MonthDivider({ label, count, noun }: { label: string; count: num
   </div>;
 }
 
-/** Dense, scannable record row used by both workshop queues. */
-export function WorkshopCard({ reference, title, subtitle, meta, badges, aside, accent = "default", muted = false, onClick }: {
-  reference: string; title: string; subtitle?: ReactNode; meta?: ReactNode; badges?: ReactNode; aside?: ReactNode;
-  accent?: "default" | "urgent" | "warranty" | "scrapped" | "done"; muted?: boolean; onClick: () => void;
-}) {
-  const rail = accent === "urgent" ? "bg-destructive" : accent === "warranty" ? "bg-emerald-500" : accent === "scrapped" ? "bg-destructive/50" : accent === "done" ? "bg-emerald-500/40" : "bg-border";
-  return <button type="button" onClick={onClick}
-    className={cn("group relative flex w-full items-stretch overflow-hidden rounded-xl border border-border bg-card text-left transition hover:border-primary/40 hover:bg-accent/30", muted && "opacity-80")}>
-    <span className={cn("w-1 shrink-0", rail)} />
-    <div className="min-w-0 flex-1 p-3.5">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="font-mono text-[11px] font-bold uppercase tracking-wide text-muted-foreground">{reference}</p>
-          <h3 className="mt-0.5 truncate text-base font-bold tracking-tight">{title}</h3>
-          {subtitle && <div className="mt-0.5 truncate text-xs text-muted-foreground">{subtitle}</div>}
-        </div>
-        <div className="flex shrink-0 flex-wrap justify-end gap-1">{badges}</div>
-      </div>
-      {aside}
-      {meta && <div className="mt-3 flex items-center justify-between gap-3 border-t border-border pt-2.5 text-[11px] text-muted-foreground">{meta}</div>}
+export const STATUS_ORDER = ["working_on_it", "next", "awaiting_quote_approval", "pending_sent_in", "not_started", "completed", "scrapped"];
+
+export function statusRank(status: string) {
+  const index = STATUS_ORDER.indexOf(status);
+  return index === -1 ? STATUS_ORDER.length : index;
+}
+
+/** Groups records by status (queue order) and sorts each group by date, newest first. */
+export function groupByStatus<T>(rows: T[], getStatus: (row: T) => string, getDate: (row: T) => string) {
+  const map = new Map<string, T[]>();
+  rows.forEach((row) => {
+    const key = getStatus(row);
+    if (!map.has(key)) map.set(key, []);
+    map.get(key)!.push(row);
+  });
+  return Array.from(map.entries())
+    .sort((a, b) => statusRank(a[0]) - statusRank(b[0]))
+    .map(([status, group]) => [status, group.sort((a, b) => getDate(b).localeCompare(getDate(a)))] as [string, T[]]);
+}
+
+export function StatusGroup({ status, count, children }: { status: string; count: number; children: ReactNode }) {
+  return <section className="overflow-hidden rounded-xl border border-border bg-card">
+    <div className="flex items-center gap-2 border-b border-border bg-muted/40 px-3 py-2">
+      <StatusBadge status={status} />
+      <span className="text-[11px] font-semibold tabular-nums text-muted-foreground">{count}</span>
+      <span className="ml-auto text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Newest first</span>
     </div>
+    <div className="divide-y divide-border">{children}</div>
+  </section>;
+}
+
+/** Single compact list row (table-like on desktop). */
+export function WorkshopRow({ reference, primary, secondary, date, dateLabel, assignee, deadline, overdue, tags, active, muted, onClick }: {
+  reference: string; primary: ReactNode; secondary?: ReactNode; date: string; dateLabel?: string;
+  assignee?: string; deadline?: string | null; overdue?: boolean; tags?: ReactNode;
+  active?: boolean; muted?: boolean; onClick: () => void;
+}) {
+  return <button type="button" onClick={onClick}
+    className={cn("grid w-full grid-cols-[1fr_auto] gap-x-3 gap-y-1 px-3 py-2.5 text-left transition hover:bg-accent/40 sm:grid-cols-[minmax(0,7rem)_minmax(0,2fr)_minmax(0,1fr)_minmax(0,9rem)_minmax(0,8rem)] sm:items-center",
+      active && "bg-accent/60", muted && "text-muted-foreground")}>
+    <span className="font-mono text-[11px] font-bold uppercase tracking-wide text-muted-foreground">{reference}</span>
+    <span className="min-w-0 truncate text-sm font-semibold text-foreground">{primary}{secondary && <span className="ml-2 font-normal text-muted-foreground">{secondary}</span>}</span>
+    <span className="col-span-2 flex flex-wrap items-center gap-1 sm:col-span-1 sm:justify-start">{tags}</span>
+    <span className="hidden truncate text-xs text-muted-foreground sm:block">{assignee || "Unassigned"}</span>
+    <span className={cn("text-right text-[11px] tabular-nums text-muted-foreground sm:text-left", overdue && "font-bold text-destructive")}>
+      {deadline ? `Due ${formatDate(deadline)}` : `${dateLabel || "Received"} ${formatDate(date)}`}
+    </span>
   </button>;
+}
+
+export function ListHeadings({ columns }: { columns: string[] }) {
+  return <div className="hidden grid-cols-[minmax(0,7rem)_minmax(0,2fr)_minmax(0,1fr)_minmax(0,9rem)_minmax(0,8rem)] gap-3 px-3 pb-1 text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground sm:grid">
+    {columns.map((column) => <span key={column}>{column}</span>)}
+  </div>;
 }
 
 export function EmptyWorkshop({ history = false }: { history?: boolean }) {
@@ -134,25 +167,30 @@ export function EmptyWorkshop({ history = false }: { history?: boolean }) {
   </div>;
 }
 
-/** Solid, opaque detail bubble shell used by both workshop detail dialogs. */
-export function WorkshopDetail({ icon, reference, title, subtitle, badges, overlay, children, actions }: {
+/** Right-hand side panel used for workshop detail — no floating bubble. */
+export function WorkshopPanel({ open, onOpenChange, icon, reference, title, subtitle, badges, overlay, children, actions }: {
+  open: boolean; onOpenChange: (open: boolean) => void;
   icon: ReactNode; reference: string; title: string; subtitle?: ReactNode; badges?: ReactNode; overlay?: ReactNode;
   children: ReactNode; actions?: ReactNode;
 }) {
-  return <div className="relative flex max-h-[92dvh] flex-col bg-card">
-    {overlay}
-    <div className="sticky top-0 z-20 flex items-start gap-3 border-b border-border bg-muted/40 px-5 py-4 sm:px-6">
-      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-border bg-card text-primary">{icon}</span>
-      <div className="min-w-0 flex-1 pr-8">
-        <p className="font-mono text-[11px] font-bold uppercase tracking-wide text-muted-foreground">{reference}</p>
-        <h2 className="truncate text-xl font-bold tracking-tight">{title}</h2>
-        {subtitle && <div className="mt-0.5 truncate text-sm text-muted-foreground">{subtitle}</div>}
-        {badges && <div className="mt-2 flex flex-wrap gap-1.5">{badges}</div>}
-      </div>
-    </div>
-    <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-5 sm:p-6">{children}</div>
-    {actions && <div className="sticky bottom-0 z-20 flex flex-col gap-2 border-t border-border bg-muted/40 p-4 sm:flex-row sm:justify-end sm:px-6">{actions}</div>}
-  </div>;
+  return <Sheet open={open} onOpenChange={onOpenChange}>
+    <SheetContent side="right" className="flex w-full flex-col gap-0 border-l border-border bg-background p-0 sm:max-w-xl">
+      {overlay}
+      <SheetHeader className="space-y-0 border-b border-border bg-muted/40 px-5 py-4 text-left">
+        <div className="flex items-start gap-3 pr-8">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-border bg-card text-primary">{icon}</span>
+          <div className="min-w-0 flex-1">
+            <p className="font-mono text-[11px] font-bold uppercase tracking-wide text-muted-foreground">{reference}</p>
+            <SheetTitle className="truncate text-xl font-bold tracking-tight">{title}</SheetTitle>
+            {subtitle && <div className="mt-0.5 truncate text-sm text-muted-foreground">{subtitle}</div>}
+            {badges && <div className="mt-2 flex flex-wrap gap-1.5">{badges}</div>}
+          </div>
+        </div>
+      </SheetHeader>
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5">{children}</div>
+      {actions && <div className="flex flex-col gap-2 border-t border-border bg-muted/40 p-4 sm:flex-row sm:justify-end">{actions}</div>}
+    </SheetContent>
+  </Sheet>;
 }
 
 export function DetailSection({ title, children, className }: { title: string; children: ReactNode; className?: string }) {
