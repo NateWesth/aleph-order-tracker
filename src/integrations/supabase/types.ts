@@ -2036,6 +2036,125 @@ export type Database = {
           },
         ]
       }
+      repair_tickets: {
+        Row: {
+          assigned_to: string | null
+          client: string
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          customer_information: string | null
+          date_received_back_from_supplier: string | null
+          date_received_by_client: string
+          deadline_date: string | null
+          id: string
+          invoice_number: string | null
+          invoiced: boolean
+          is_warranty: boolean
+          notes: string | null
+          priority: string
+          scrap_reason: string | null
+          scrapped_at: string | null
+          scrapped_by: string | null
+          status: string
+          supplier_information: string | null
+          ticket_number: string
+          tool_code: string
+          tool_information: string
+          updated_at: string
+          warranty_expires_at: string | null
+          warranty_months: number | null
+          warranty_source_ticket_id: string | null
+        }
+        Insert: {
+          assigned_to?: string | null
+          client: string
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          customer_information?: string | null
+          date_received_back_from_supplier?: string | null
+          date_received_by_client?: string
+          deadline_date?: string | null
+          id?: string
+          invoice_number?: string | null
+          invoiced?: boolean
+          is_warranty?: boolean
+          notes?: string | null
+          priority?: string
+          scrap_reason?: string | null
+          scrapped_at?: string | null
+          scrapped_by?: string | null
+          status?: string
+          supplier_information?: string | null
+          ticket_number: string
+          tool_code: string
+          tool_information: string
+          updated_at?: string
+          warranty_expires_at?: string | null
+          warranty_months?: number | null
+          warranty_source_ticket_id?: string | null
+        }
+        Update: {
+          assigned_to?: string | null
+          client?: string
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          customer_information?: string | null
+          date_received_back_from_supplier?: string | null
+          date_received_by_client?: string
+          deadline_date?: string | null
+          id?: string
+          invoice_number?: string | null
+          invoiced?: boolean
+          is_warranty?: boolean
+          notes?: string | null
+          priority?: string
+          scrap_reason?: string | null
+          scrapped_at?: string | null
+          scrapped_by?: string | null
+          status?: string
+          supplier_information?: string | null
+          ticket_number?: string
+          tool_code?: string
+          tool_information?: string
+          updated_at?: string
+          warranty_expires_at?: string | null
+          warranty_months?: number | null
+          warranty_source_ticket_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "repair_tickets_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "repair_tickets_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "repair_tickets_scrapped_by_fkey"
+            columns: ["scrapped_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "repair_tickets_warranty_source_ticket_id_fkey"
+            columns: ["warranty_source_ticket_id"]
+            isOneToOne: false
+            referencedRelation: "repair_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       reps: {
         Row: {
           commission_method: string
@@ -2065,6 +2184,93 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      sharpening_jobs: {
+        Row: {
+          assigned_to: string | null
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          customer_name: string
+          date_received: string
+          deadline_date: string | null
+          id: string
+          invoice_number: string | null
+          invoiced: boolean
+          job_number: string
+          notes: string | null
+          order_number: string | null
+          priority: string
+          quantity: number
+          status: string
+          third_party_name: string | null
+          third_party_quantity: number | null
+          third_party_reference: string | null
+          third_party_status: string | null
+          updated_at: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          customer_name: string
+          date_received?: string
+          deadline_date?: string | null
+          id?: string
+          invoice_number?: string | null
+          invoiced?: boolean
+          job_number: string
+          notes?: string | null
+          order_number?: string | null
+          priority?: string
+          quantity?: number
+          status?: string
+          third_party_name?: string | null
+          third_party_quantity?: number | null
+          third_party_reference?: string | null
+          third_party_status?: string | null
+          updated_at?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          customer_name?: string
+          date_received?: string
+          deadline_date?: string | null
+          id?: string
+          invoice_number?: string | null
+          invoiced?: boolean
+          job_number?: string
+          notes?: string | null
+          order_number?: string | null
+          priority?: string
+          quantity?: number
+          status?: string
+          third_party_name?: string | null
+          third_party_quantity?: number | null
+          third_party_reference?: string | null
+          third_party_status?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sharpening_jobs_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sharpening_jobs_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       suppliers: {
         Row: {
