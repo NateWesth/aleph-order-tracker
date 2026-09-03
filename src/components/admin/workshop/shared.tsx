@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { AlertTriangle, CalendarDays, CheckCircle2, Clock3, Search, UserRound } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 
 export const SERVICE_STATUSES = [
@@ -124,7 +124,7 @@ export function groupByStatus<T>(rows: T[], getStatus: (row: T) => string, getDa
 }
 
 export function StatusGroup({ status, count, children }: { status: string; count: number; children: ReactNode }) {
-  return <section className="overflow-hidden rounded-xl border border-border bg-card">
+  return <section className="mb-3 break-inside-avoid overflow-hidden rounded-xl border border-border bg-card">
     <div className="flex items-center gap-2 border-b border-border bg-muted/40 px-3 py-2">
       <StatusBadge status={status} />
       <span className="text-[11px] font-semibold tabular-nums text-muted-foreground">{count}</span>
@@ -134,29 +134,33 @@ export function StatusGroup({ status, count, children }: { status: string; count
   </section>;
 }
 
-/** Single compact list row (table-like on desktop). */
+/** Compact two-line list row that works inside narrow status columns. */
 export function WorkshopRow({ reference, primary, secondary, date, dateLabel, assignee, deadline, overdue, tags, active, muted, onClick }: {
   reference: string; primary: ReactNode; secondary?: ReactNode; date: string; dateLabel?: string;
   assignee?: string; deadline?: string | null; overdue?: boolean; tags?: ReactNode;
   active?: boolean; muted?: boolean; onClick: () => void;
 }) {
   return <button type="button" onClick={onClick}
-    className={cn("grid w-full grid-cols-[1fr_auto] gap-x-3 gap-y-1 px-3 py-2.5 text-left transition hover:bg-accent/40 sm:grid-cols-[minmax(0,7rem)_minmax(0,2fr)_minmax(0,1fr)_minmax(0,9rem)_minmax(0,8rem)] sm:items-center",
-      active && "bg-accent/60", muted && "text-muted-foreground")}>
-    <span className="font-mono text-[11px] font-bold uppercase tracking-wide text-muted-foreground">{reference}</span>
-    <span className="min-w-0 truncate text-sm font-semibold text-foreground">{primary}{secondary && <span className="ml-2 font-normal text-muted-foreground">{secondary}</span>}</span>
-    <span className="col-span-2 flex flex-wrap items-center gap-1 sm:col-span-1 sm:justify-start">{tags}</span>
-    <span className="hidden truncate text-xs text-muted-foreground sm:block">{assignee || "Unassigned"}</span>
-    <span className={cn("text-right text-[11px] tabular-nums text-muted-foreground sm:text-left", overdue && "font-bold text-destructive")}>
-      {deadline ? `Due ${formatDate(deadline)}` : `${dateLabel || "Received"} ${formatDate(date)}`}
-    </span>
+    className={cn("block w-full px-3 py-2.5 text-left transition hover:bg-accent/40",
+      active && "bg-accent/60", muted && "opacity-70")}>
+    <div className="flex items-center gap-2">
+      <span className="font-mono text-[11px] font-bold uppercase tracking-wide text-muted-foreground">{reference}</span>
+      <span className={cn("ml-auto shrink-0 text-[11px] tabular-nums text-muted-foreground", overdue && "font-bold text-destructive")}>
+        {deadline ? `Due ${formatDate(deadline)}` : `${dateLabel || "Received"} ${formatDate(date)}`}
+      </span>
+    </div>
+    <div className="mt-0.5 truncate text-sm font-semibold text-foreground">
+      {primary}{secondary && <span className="ml-2 text-xs font-normal text-muted-foreground">{secondary}</span>}
+    </div>
+    <div className="mt-1 flex flex-wrap items-center gap-1.5">
+      {tags}
+      <span className="ml-auto flex items-center gap-1 text-[11px] text-muted-foreground"><UserRound className="h-3 w-3" />{assignee || "Unassigned"}</span>
+    </div>
   </button>;
 }
 
-export function ListHeadings({ columns }: { columns: string[] }) {
-  return <div className="hidden grid-cols-[minmax(0,7rem)_minmax(0,2fr)_minmax(0,1fr)_minmax(0,9rem)_minmax(0,8rem)] gap-3 px-3 pb-1 text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground sm:grid">
-    {columns.map((column) => <span key={column}>{column}</span>)}
-  </div>;
+export function ListHeadings(_: { columns: string[] }) {
+  return null;
 }
 
 export function EmptyWorkshop({ history = false }: { history?: boolean }) {
@@ -167,31 +171,32 @@ export function EmptyWorkshop({ history = false }: { history?: boolean }) {
   </div>;
 }
 
-/** Right-hand side panel used for workshop detail — no floating bubble. */
+/** Centered solid detail bubble (dialog) used for workshop detail. */
 export function WorkshopPanel({ open, onOpenChange, icon, reference, title, subtitle, badges, overlay, children, actions }: {
   open: boolean; onOpenChange: (open: boolean) => void;
   icon: ReactNode; reference: string; title: string; subtitle?: ReactNode; badges?: ReactNode; overlay?: ReactNode;
   children: ReactNode; actions?: ReactNode;
 }) {
-  return <Sheet open={open} onOpenChange={onOpenChange}>
-    <SheetContent side="right" className="flex w-full flex-col gap-0 border-l border-border bg-background p-0 sm:max-w-xl">
+  return <Dialog open={open} onOpenChange={onOpenChange}>
+    <DialogContent className="flex max-h-[90dvh] w-[calc(100%-16px)] max-w-3xl flex-col gap-0 overflow-hidden rounded-2xl border border-border bg-card p-0 shadow-2xl">
       {overlay}
-      <SheetHeader className="space-y-0 border-b border-border bg-muted/40 px-5 py-4 text-left">
+      <DialogHeader className="space-y-0 border-b border-border bg-muted/40 px-5 py-4 text-left">
         <div className="flex items-start gap-3 pr-8">
           <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-border bg-card text-primary">{icon}</span>
           <div className="min-w-0 flex-1">
             <p className="font-mono text-[11px] font-bold uppercase tracking-wide text-muted-foreground">{reference}</p>
-            <SheetTitle className="truncate text-xl font-bold tracking-tight">{title}</SheetTitle>
+            <DialogTitle className="truncate text-xl font-bold tracking-tight">{title}</DialogTitle>
             {subtitle && <div className="mt-0.5 truncate text-sm text-muted-foreground">{subtitle}</div>}
             {badges && <div className="mt-2 flex flex-wrap gap-1.5">{badges}</div>}
           </div>
         </div>
-      </SheetHeader>
-      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5">{children}</div>
+      </DialogHeader>
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-background p-5">{children}</div>
       {actions && <div className="flex flex-col gap-2 border-t border-border bg-muted/40 p-4 sm:flex-row sm:justify-end">{actions}</div>}
-    </SheetContent>
-  </Sheet>;
+    </DialogContent>
+  </Dialog>;
 }
+
 
 export function DetailSection({ title, children, className }: { title: string; children: ReactNode; className?: string }) {
   return <section className={cn("rounded-xl border border-border bg-background p-4", className)}>
