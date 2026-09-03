@@ -1399,7 +1399,7 @@ export default function FulfillmentPage() {
           <section><p className="mb-3 text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">Packages ready now</p><div className="grid gap-2 sm:grid-cols-2">{selectedDelivery.items.filter((item) => readyUnits(item) > 0).map((item) => <div key={item.id} className="flex items-start gap-3 rounded-2xl border border-border/45 bg-muted/30 p-3"><span className="grid min-w-10 place-items-center rounded-xl bg-primary/10 px-2 py-1.5 text-sm font-black text-primary">×{readyUnits(item)}</span><div className="min-w-0"><p className="text-sm font-semibold">{getItemDisplayName(item)}</p>{getItemSecondaryDescription(item) && <p className="mt-0.5 text-[10px] leading-relaxed text-muted-foreground">{getItemSecondaryDescription(item)}</p>}{item.code && <p className="mt-1 font-mono text-[10px] text-muted-foreground">{item.code}</p>}</div></div>)}</div></section>
           <section><label className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">Handover instructions</label><Textarea defaultValue={selectedDelivery.fulfillment_notes || ""} placeholder="Access details, contact person, delivery instructions…" className="min-h-24 resize-none rounded-2xl" onBlur={(event) => { if (event.target.value !== (selectedDelivery.fulfillment_notes || "")) void updateDelivery(selectedDelivery.id, { fulfillment_notes: event.target.value || null }); }} /></section>
         </div>
-        <aside className="space-y-4 rounded-[24px] border border-primary/10 bg-primary/[0.025] p-3 sm:p-4"><EntityComments entityType="delivery" entityId={selectedDelivery.id} orderId={selectedDelivery.id} defaultOpen /><EntityTimeline events={selectedDeliveryTimeline} memberName={memberName} /></aside>
+        <aside className="space-y-4 rounded-[24px] border border-border bg-muted p-3 sm:p-4"><EntityComments entityType="delivery" entityId={selectedDelivery.id} orderId={selectedDelivery.id} defaultOpen /><EntityTimeline events={selectedDeliveryTimeline} memberName={memberName} /></aside>
       </div>
       <div className="mt-5 flex flex-col gap-2 border-t border-border/60 pt-4 sm:flex-row"><Button variant="outline" className="rounded-xl" onClick={() => printDispatchManifest()}><Printer className="mr-1.5 h-4 w-4" />Print manifest</Button><Button className="flex-1 rounded-xl" onClick={() => setConfirmDeliveryId(selectedDelivery.id)} disabled={completingDeliveryId === selectedDelivery.id}><CheckCircle2 className="mr-1.5 h-4 w-4" />Complete handover</Button></div>
     </FulfillmentBubbleShell>
@@ -1421,9 +1421,9 @@ export default function FulfillmentPage() {
           <section><div className="mb-3 flex items-center justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">What arrived now?</p><p className="mt-1 text-xs text-muted-foreground">Enter actual quantities. Partial receipts remain active.</p></div><Button variant="outline" size="sm" className="rounded-xl" onClick={() => collectAllRemaining(selectedCollection)}>Fill remaining</Button></div><div className="space-y-2">{selectedCollection.linesView.filter((line) => line.remaining > 0).map((line) => <div key={line.key} className="grid gap-3 rounded-2xl border border-border/45 bg-muted/30 p-3 sm:grid-cols-[minmax(0,1fr)_120px] sm:items-center"><div className="min-w-0"><p className="text-sm font-semibold">{getPurchaseOrderLineDisplayName(line)}</p>{getPurchaseOrderLineSecondaryName(line) && <p className="mt-0.5 text-[10px] text-muted-foreground">{getPurchaseOrderLineSecondaryName(line)}</p>}{line.sku && <p className="mt-0.5 font-mono text-[10px] text-muted-foreground">{line.sku}</p>}<div className="mt-1.5 flex flex-wrap gap-2 text-[10px] text-muted-foreground">{line.collected > 0 && <span className="font-semibold text-emerald-600">{line.collected} received before</span>}<span className="font-bold text-primary">{line.remaining} remaining</span></div></div><div><label className="mb-1 block text-[9px] font-black uppercase tracking-wider text-muted-foreground">Received now</label><Input type="number" min={0} max={line.remaining} step="any" value={collectionDraft[selectedCollection.purchaseOrderId]?.[line.key] ?? ""} onChange={(event) => setDraftQty(selectedCollection.purchaseOrderId, line.key, Number(event.target.value), line.remaining)} placeholder="0" className="rounded-xl bg-background" /></div></div>)}</div></section>
           <section className="grid gap-3 sm:grid-cols-2"><div><label className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">Persistent movement instructions</label><Textarea defaultValue={selectedCollection.state?.notes || ""} placeholder="Supplier contact, gate instructions…" className="min-h-24 resize-none rounded-2xl" onBlur={(event) => { if (event.target.value !== (selectedCollection.state?.notes || "")) void updateCollectionState(selectedCollection, { notes: event.target.value || null }); }} /></div><div><label className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">Note for this receipt</label><Textarea value={collectionNotes[selectedCollection.purchaseOrderId] ?? ""} onChange={(event) => setCollectionNotes((current) => ({ ...current, [selectedCollection.purchaseOrderId]: event.target.value }))} placeholder="Short boxes, back-order, damaged carton…" className="min-h-24 resize-none rounded-2xl" /></div></section>
         </div>
-        <aside className="space-y-4 rounded-[24px] border border-primary/10 bg-primary/[0.025] p-3 sm:p-4"><EntityComments entityType="collection" entityId={selectedCollection.purchaseOrderId} defaultOpen /><EntityTimeline events={selectedCollectionTimeline} memberName={memberName} /></aside>
+        <aside className="space-y-4 rounded-[24px] border border-border bg-muted p-3 sm:p-4"><EntityComments entityType="collection" entityId={selectedCollection.purchaseOrderId} defaultOpen /><EntityTimeline events={selectedCollectionTimeline} memberName={memberName} /></aside>
       </div>
-      <div className="mt-5 flex flex-col gap-3 rounded-2xl border border-primary/15 bg-primary/[0.045] p-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-2xl font-black text-primary">{selectedCollectionDraftTotal}</p><p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">units received now</p></div><Button className="rounded-xl" disabled={collectingId === selectedCollection.purchaseOrderId || selectedCollectionDraftTotal <= 0} onClick={() => void markCollected(selectedCollection)}><PackageCheck className="mr-1.5 h-4 w-4" />{collectingId === selectedCollection.purchaseOrderId ? "Saving atomically…" : selectedCollection.state?.collection_method === "supplier-delivery" ? "Mark supplier delivery received" : "Record collection"}</Button></div>
+      <div className="mt-5 flex flex-col gap-3 rounded-2xl border border-border bg-muted p-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-2xl font-black text-primary">{selectedCollectionDraftTotal}</p><p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">units received now</p></div><Button className="rounded-xl" disabled={collectingId === selectedCollection.purchaseOrderId || selectedCollectionDraftTotal <= 0} onClick={() => void markCollected(selectedCollection)}><PackageCheck className="mr-1.5 h-4 w-4" />{collectingId === selectedCollection.purchaseOrderId ? "Saving atomically…" : selectedCollection.state?.collection_method === "supplier-delivery" ? "Mark supplier delivery received" : "Record collection"}</Button></div>
     </FulfillmentBubbleShell>
   ) : null;
 
@@ -1787,19 +1787,18 @@ function FulfillmentBubbleShell({
   if (typeof document === "undefined") return null;
   return createPortal(
     <div className="fulfillment-modal-backdrop fixed inset-0 z-[120] flex items-center justify-center p-2.5 sm:p-6" role="presentation">
-      <button type="button" className="absolute inset-0 bg-foreground/35 backdrop-blur-[3px]" onClick={onClose} aria-label="Close details" />
+      <button type="button" className="absolute inset-0 bg-black/45" onClick={onClose} aria-label="Close details" />
       <section
       ref={bubbleRef}
-      className="fulfillment-detail-modal animate-order-floating-bubble relative max-h-[calc(100dvh-1.25rem)] w-full max-w-4xl overflow-y-auto rounded-[28px] border-2 border-primary/15 bg-background/97 shadow-[0_32px_100px_-30px_hsl(var(--foreground)/0.62)] backdrop-blur-2xl sm:max-h-[calc(100dvh-3rem)]"
+      className="fulfillment-detail-modal animate-order-floating-bubble relative max-h-[calc(100dvh-1.25rem)] w-full max-w-4xl overflow-y-auto rounded-[28px] border border-border bg-background shadow-[0_24px_60px_-20px_hsl(var(--foreground)/0.35)] sm:max-h-[calc(100dvh-3rem)]"
       role="dialog"
       aria-modal="true"
       aria-label={`${eyebrow} ${title}`}
     >
       <div className="ribbon-bar h-1.5" aria-hidden />
-      <div className="relative border-b border-border/55 p-4 sm:p-5">
-        <div className="pointer-events-none absolute inset-x-12 -top-10 h-24 rounded-full bg-primary/15 blur-3xl" />
+      <div className="relative border-b border-border bg-background p-4 sm:p-5">
         <div className="relative flex items-start gap-3">
-          <span className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-2xl bg-background p-1 shadow-sm ring-1 ring-border/60">
+          <span className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-2xl bg-muted p-1 shadow-sm ring-1 ring-border">
             <img src="/lovable-uploads/e1088147-889e-43f6-bdf0-271189b88913.png" alt="" className="h-full w-full object-contain" />
           </span>
           <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-primary/10 text-primary"><Icon className="h-5 w-5" /></span>
@@ -1808,11 +1807,11 @@ function FulfillmentBubbleShell({
             <h2 className="mt-1 truncate font-display text-xl font-black tracking-tight sm:text-2xl">{title}</h2>
             <p className="mt-0.5 truncate text-sm font-semibold text-muted-foreground">{subtitle}</p>
           </div>
-          <button type="button" onClick={onClose} className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-muted/70 text-muted-foreground transition-all hover:scale-105 hover:bg-destructive/10 hover:text-destructive" aria-label="Close details"><X className="h-4 w-4" /></button>
+          <button type="button" onClick={onClose} className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-muted text-muted-foreground transition-all hover:scale-105 hover:bg-destructive/10 hover:text-destructive" aria-label="Close details"><X className="h-4 w-4" /></button>
         </div>
-        <div className="relative mt-3 flex items-center gap-2 rounded-xl bg-primary/[0.055] px-3 py-2 text-[11px] text-muted-foreground"><MessageSquareText className="h-3.5 w-3.5 text-primary" /><span>Live team thread, actions and movement history stay together here.</span><span className="ml-auto hidden font-semibold sm:inline">Esc to close</span></div>
+        <div className="relative mt-3 flex items-center gap-2 rounded-xl bg-muted px-3 py-2 text-[11px] text-muted-foreground"><MessageSquareText className="h-3.5 w-3.5 text-primary" /><span>Live team thread, actions and movement history stay together here.</span><span className="ml-auto hidden font-semibold sm:inline">Esc to close</span></div>
       </div>
-      <div className="p-4 sm:p-5 lg:p-6">{children}</div>
+      <div className="bg-background p-4 sm:p-5 lg:p-6">{children}</div>
       </section>
     </div>,
     document.body,
