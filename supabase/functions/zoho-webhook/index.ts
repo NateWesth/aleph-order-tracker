@@ -197,23 +197,8 @@ async function handleSalesOrderByNumber(
 ) {
   console.log('Looking up sales order by number:', soNumber)
 
-  const { data: cachedDocuments } = await supabase
-    .from('zoho_document_cache')
-    .select('payload')
-    .eq('document_type', 'sales_order')
-  const cachedByNumber = new Map<string, any>()
-  for (const row of cachedDocuments || []) {
-    const cached = row.payload as any
-    const number = String(cached?.salesorder_number || cached?.sales_order_number || '').trim().toUpperCase()
-    if (number && Array.isArray(cached?.line_items)) cachedByNumber.set(number, cached)
-  }
-
-  let accessToken = ''
-  let orgId = ''
-  const ensureZohoAccess = async () => {
-    if (!accessToken) accessToken = await getValidAccessToken(supabase, clientId, clientSecret)
-    if (!orgId) orgId = await getOrgId(supabase)
-  }
+  const accessToken = await getValidAccessToken(supabase, clientId, clientSecret)
+  const orgId = await getOrgId(supabase)
 
   // Search for the sales order by number
   const searchResp = await fetch(
@@ -276,8 +261,24 @@ async function handleBulkResyncItems(
     })
   }
 
-  const accessToken = await getValidAccessToken(supabase, clientId, clientSecret)
-  const orgId = await getOrgId(supabase)
+  // Prefer the existing document cache before spending Zoho API calls.
+  const { data: cachedDocuments } = await supabase
+    .from('zoho_document_cache')
+    .select('payload')
+    .eq('document_type', 'sales_order')
+  const cachedByNumber = new Map<string, any>()
+  for (const row of cachedDocuments || []) {
+    const cached = row.payload as any
+    const number = String(cached?.salesorder_number || cached?.sales_order_number || '').trim().toUpperCase()
+    if (number && Array.isArray(cached?.line_items)) cachedByNumber.set(number, cached)
+  }
+
+  let accessToken = ''
+  let orgId = ''
+  const ensureZohoAccess = async () => {
+    if (!accessToken) accessToken = await getValidAccessToken(supabase, clientId, clientSecret)
+    if (!orgId) orgId = await getOrgId(supabase)
+  }
 
   let totalUpdated = 0
   let ordersProcessed = 0
