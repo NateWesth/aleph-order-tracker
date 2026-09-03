@@ -2198,6 +2198,7 @@ export type Database = {
           invoice_number: string | null
           invoiced: boolean
           job_number: string
+          legacy_assignee_names: string | null
           notes: string | null
           order_number: string | null
           priority: string
@@ -2221,6 +2222,7 @@ export type Database = {
           invoice_number?: string | null
           invoiced?: boolean
           job_number: string
+          legacy_assignee_names?: string | null
           notes?: string | null
           order_number?: string | null
           priority?: string
@@ -2244,6 +2246,7 @@ export type Database = {
           invoice_number?: string | null
           invoiced?: boolean
           job_number?: string
+          legacy_assignee_names?: string | null
           notes?: string | null
           order_number?: string | null
           priority?: string
