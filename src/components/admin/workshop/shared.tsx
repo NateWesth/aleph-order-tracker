@@ -47,18 +47,18 @@ export function WorkshopHeader({ eyebrow, title, description, stats, children }:
   stats: { label: string; value: ReactNode; tone?: "default" | "warning" | "danger" }[];
   children?: ReactNode;
 }) {
-  return <header className="rounded-2xl border border-border bg-card">
-    <div className="flex flex-col gap-4 border-b border-border p-4 sm:p-5 lg:flex-row lg:items-center lg:justify-between">
+  return <header className="overflow-hidden rounded-lg border border-border bg-card font-sans shadow-sm">
+    <div className="flex flex-col gap-4 border-b border-border p-4 sm:px-6 sm:py-4 lg:flex-row lg:items-center lg:justify-between">
       <div className="min-w-0">
-        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">{eyebrow}</p>
-        <h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">{title}</h1>
-        <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">{description}</p>
+        <p className="font-mono text-[10px] font-bold uppercase text-muted-foreground">{eyebrow}</p>
+        <h1 className="mt-1 font-mono text-2xl font-bold sm:text-3xl">{title}</h1>
+        <p className="mt-1 max-w-2xl text-sm leading-5 text-muted-foreground">{description}</p>
       </div>
       {children}
     </div>
     <dl className="grid grid-cols-2 divide-x divide-border sm:grid-cols-4">
       {stats.map((stat) => <div key={stat.label} className="px-4 py-3">
-        <dt className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">{stat.label}</dt>
+        <dt className="font-mono text-[10px] font-bold uppercase text-muted-foreground">{stat.label}</dt>
         <dd className={cn("mt-0.5 text-xl font-bold tabular-nums",
           stat.tone === "danger" && "text-destructive",
           stat.tone === "warning" && "text-amber-600 dark:text-amber-400")}>{stat.value}</dd>
@@ -76,7 +76,7 @@ export function WorkshopHero({ eyebrow, title, description, count, overdue, chil
 }
 
 export function WorkshopToolbar({ query, onQuery, placeholder = "Search reference, customer or tool…", children }: { query: string; onQuery: (value: string) => void; placeholder?: string; children: ReactNode }) {
-  return <div className="sticky top-0 z-20 -mx-2 flex flex-col gap-2 border-b border-border bg-background px-2 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+  return <div className="sticky top-0 z-20 flex flex-col gap-2 border border-border bg-card p-2 sm:flex-row sm:items-center sm:justify-between">
     <div className="relative min-w-0 flex-1 sm:max-w-sm">
       <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
       <Input value={query} onChange={(event) => onQuery(event.target.value)} placeholder={placeholder} className="h-10 rounded-lg pl-9" />
@@ -118,19 +118,26 @@ export function groupByStatus<T>(rows: T[], getStatus: (row: T) => string, getDa
     if (!map.has(key)) map.set(key, []);
     map.get(key)!.push(row);
   });
+  const presentStatuses = Array.from(map.keys());
+  const historyOnly = presentStatuses.length > 0 && presentStatuses.every((status) => status === "completed" || status === "scrapped");
+  if (!historyOnly) {
+    STATUS_ORDER.filter((status) => status !== "completed" && status !== "scrapped").forEach((status) => {
+      if (!map.has(status)) map.set(status, []);
+    });
+  }
   return Array.from(map.entries())
     .sort((a, b) => statusRank(a[0]) - statusRank(b[0]))
     .map(([status, group]) => [status, group.sort((a, b) => getDate(b).localeCompare(getDate(a)))] as [string, T[]]);
 }
 
 export function StatusGroup({ status, count, children }: { status: string; count: number; children: ReactNode }) {
-  return <section className="mb-3 break-inside-avoid overflow-hidden rounded-xl border border-border bg-card">
-    <div className="flex items-center gap-2 border-b border-border bg-muted/40 px-3 py-2">
+  return <section className={cn("flex w-[290px] min-w-[290px] flex-col overflow-hidden rounded-lg border border-border bg-muted/20 sm:w-[310px] sm:min-w-[310px]", status === "working_on_it" && "border-primary/35 bg-primary/[0.04]")}>
+    <div className="flex h-11 items-center gap-2 border-b border-border bg-card px-3">
       <StatusBadge status={status} />
       <span className="text-[11px] font-semibold tabular-nums text-muted-foreground">{count}</span>
-      <span className="ml-auto text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Newest first</span>
+      <span className="ml-auto font-mono text-[9px] font-semibold uppercase text-muted-foreground">Newest first</span>
     </div>
-    <div className="divide-y divide-border">{children}</div>
+    <div className="min-h-32 flex-1 space-y-2 overflow-y-auto p-2">{children}</div>
   </section>;
 }
 
@@ -141,15 +148,15 @@ export function WorkshopRow({ reference, primary, secondary, date, dateLabel, as
   active?: boolean; muted?: boolean; onClick: () => void;
 }) {
   return <button type="button" onClick={onClick}
-    className={cn("block w-full px-3 py-2.5 text-left transition hover:bg-accent/40",
-      active && "bg-accent/60", muted && "opacity-70")}>
+    className={cn("block w-full rounded-md border border-border border-l-[3px] border-l-muted-foreground/35 bg-card px-3 py-3 text-left shadow-sm transition hover:border-primary/50 hover:border-l-primary hover:bg-accent/20",
+      active && "border-primary border-l-primary bg-primary/[0.06]", overdue && "border-l-destructive", muted && "opacity-70")}>
     <div className="flex items-center gap-2">
-      <span className="font-mono text-[11px] font-bold uppercase tracking-wide text-muted-foreground">{reference}</span>
+      <span className="font-mono text-[11px] font-bold uppercase text-muted-foreground">{reference}</span>
       <span className={cn("ml-auto shrink-0 text-[11px] tabular-nums text-muted-foreground", overdue && "font-bold text-destructive")}>
         {deadline ? `Due ${formatDate(deadline)}` : `${dateLabel || "Received"} ${formatDate(date)}`}
       </span>
     </div>
-    <div className="mt-0.5 truncate text-sm font-semibold text-foreground">
+    <div className="mt-1 truncate text-sm font-semibold text-foreground">
       {primary}{secondary && <span className="ml-2 text-xs font-normal text-muted-foreground">{secondary}</span>}
     </div>
     <div className="mt-1 flex flex-wrap items-center gap-1.5">
@@ -178,37 +185,37 @@ export function WorkshopPanel({ open, onOpenChange, icon, reference, title, subt
   children: ReactNode; actions?: ReactNode;
 }) {
   return <Dialog open={open} onOpenChange={onOpenChange}>
-    <DialogContent className="flex max-h-[90dvh] w-[calc(100%-16px)] max-w-3xl flex-col gap-0 overflow-hidden rounded-2xl border border-border bg-card p-0 shadow-2xl">
+    <DialogContent className="workshop-workspace flex max-h-[90dvh] w-[calc(100%-16px)] max-w-4xl flex-col gap-0 overflow-hidden rounded-xl border border-border bg-card p-0 font-workshop shadow-2xl sm:w-[calc(100%-40px)]">
       {overlay}
-      <DialogHeader className="space-y-0 border-b border-border bg-muted/40 px-5 py-4 text-left">
+      <DialogHeader className="space-y-0 border-b border-border bg-card px-5 py-5 text-left sm:px-7">
         <div className="flex items-start gap-3 pr-8">
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-border bg-card text-primary">{icon}</span>
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-md border border-primary/30 bg-primary/10 text-primary">{icon}</span>
           <div className="min-w-0 flex-1">
-            <p className="font-mono text-[11px] font-bold uppercase tracking-wide text-muted-foreground">{reference}</p>
-            <DialogTitle className="truncate text-xl font-bold tracking-tight">{title}</DialogTitle>
+            <p className="font-mono text-[11px] font-bold uppercase text-muted-foreground">{reference}</p>
+            <DialogTitle className="truncate font-mono text-xl font-bold sm:text-2xl">{title}</DialogTitle>
             {subtitle && <div className="mt-0.5 truncate text-sm text-muted-foreground">{subtitle}</div>}
             {badges && <div className="mt-2 flex flex-wrap gap-1.5">{badges}</div>}
           </div>
         </div>
       </DialogHeader>
-      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-background p-5">{children}</div>
-      {actions && <div className="flex flex-col gap-2 border-t border-border bg-muted/40 p-4 sm:flex-row sm:justify-end">{actions}</div>}
+      <div className="min-h-0 flex-1 overflow-y-auto bg-card p-5 sm:p-7"><div className="space-y-6">{children}</div></div>
+      {actions && <div className="flex flex-col gap-2 border-t border-border bg-muted/30 p-4 sm:flex-row sm:justify-end sm:px-7">{actions}</div>}
     </DialogContent>
   </Dialog>;
 }
 
 
 export function DetailSection({ title, children, className }: { title: string; children: ReactNode; className?: string }) {
-  return <section className={cn("rounded-xl border border-border bg-background p-4", className)}>
-    <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">{title}</p>
+  return <section className={cn("border-t border-border pt-5", className)}>
+    <p className="mb-4 font-mono text-[10px] font-bold uppercase text-muted-foreground">{title}</p>
     {children}
   </section>;
 }
 
 export function DetailValue({ label, value, icon }: { label: string; value?: ReactNode; icon?: ReactNode }) {
-  return <div className="rounded-lg border border-border bg-background p-3">
-    <p className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-[0.15em] text-muted-foreground">{icon}{label}</p>
-    <div className="mt-1 break-words text-sm font-semibold text-foreground">{value || "—"}</div>
+  return <div className="min-w-0 py-1">
+    <p className="flex items-center gap-1.5 font-mono text-[9px] font-bold uppercase text-muted-foreground">{icon}{label}</p>
+    <div className="mt-1 break-words text-sm font-medium text-foreground">{value || "—"}</div>
   </div>;
 }
 

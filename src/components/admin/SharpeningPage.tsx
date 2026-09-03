@@ -107,7 +107,7 @@ export default function SharpeningPage() {
     else { toast({ title: status === "completed" ? "Moved to sharpening history" : `Status changed to ${SERVICE_STATUSES.find(([id]) => id === status)?.[1]}` }); await load(true); }
   };
 
-  return <div className="space-y-4 pb-10">
+  return <div className="workshop-workspace space-y-4 bg-background pb-10 font-workshop text-foreground">
     <WorkshopHeader
       eyebrow="Workshop desk"
       title="Sharpening"
@@ -129,7 +129,7 @@ export default function SharpeningPage() {
       ]} />
     </WorkshopToolbar>
 
-    {loading ? <div className="space-y-2">{[1,2,3].map((n) => <div key={n} className="h-24 animate-pulse rounded-xl bg-muted/50" />)}</div> : groups.length === 0 ? <EmptyWorkshop history={tab === "history"} /> : <div className="[column-fill:balance] gap-3 sm:columns-2 xl:columns-3">
+    {loading ? <div className="space-y-2">{[1,2,3].map((n) => <div key={n} className="h-24 animate-pulse rounded-lg bg-muted/50" />)}</div> : groups.length === 0 ? <EmptyWorkshop history={tab === "history"} /> : <div className="flex min-h-[32rem] gap-3 overflow-x-auto rounded-lg border border-border bg-muted/10 p-3 pb-4">
       <ListHeadings columns={["Job", "Customer", "Flags", "Assigned to", "Date"]} />
       {groups.map(([status, statusJobs]) => <StatusGroup key={status} status={status} count={statusJobs.length}>
         {statusJobs.map((job) => {

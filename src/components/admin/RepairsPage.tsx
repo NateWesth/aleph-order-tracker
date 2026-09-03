@@ -77,7 +77,7 @@ export default function RepairsPage() {
   const updateStatus = async (ticket: RepairTicket, status: string) => { const previous=tickets; setTickets((current)=>current.map((row)=>row.id===ticket.id?{...row,status}:row)); const {error}=await db.from("repair_tickets").update({status}).eq("id",ticket.id); if(error){setTickets(previous);toast({title:"Status not updated",description:error.message,variant:"destructive"});}else{toast({title:status==="completed"?"Moved to repair history":"Repair status updated"});await load(true);} };
   const scrap = async () => { if (!selected) return; setSaving(true); const {error}=await db.from("repair_tickets").update({status:"scrapped",scrap_reason:scrapReason.trim()||null,scrapped_by:user?.id}).eq("id",selected.id); setSaving(false); if(error){toast({title:"Repair not scrapped",description:error.message,variant:"destructive"});return;} setScrapOpen(false);setScrapReason("");toast({title:"Tool marked as scrapped",description:"The ticket is retained permanently in Repair History."});await load(true); };
 
-  return <div className="space-y-4 pb-10">
+  return <div className="workshop-workspace space-y-4 bg-background pb-10 font-workshop text-foreground">
     <WorkshopHeader
       eyebrow="After-sales workshop"
       title="Repairs"
@@ -100,7 +100,7 @@ export default function RepairsPage() {
       ]} />
     </WorkshopToolbar>
 
-    {loading ? <div className="space-y-2">{[1,2,3].map(n => <div key={n} className="h-24 animate-pulse rounded-xl bg-muted/50" />)}</div> : groups.length === 0 ? <EmptyWorkshop history={tab === "history"} /> : <div className="[column-fill:balance] gap-3 sm:columns-2 xl:columns-3">
+    {loading ? <div className="space-y-2">{[1,2,3].map(n => <div key={n} className="h-24 animate-pulse rounded-lg bg-muted/50" />)}</div> : groups.length === 0 ? <EmptyWorkshop history={tab === "history"} /> : <div className="flex min-h-[32rem] gap-3 overflow-x-auto rounded-lg border border-border bg-muted/10 p-3 pb-4">
       <ListHeadings columns={["Ticket", "Client / tool", "Flags", "Assigned to", "Date"]} />
       {groups.map(([status, statusTickets]) => <StatusGroup key={status} status={status} count={statusTickets.length}>
         {statusTickets.map(ticket => {
