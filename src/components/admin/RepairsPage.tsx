@@ -100,7 +100,7 @@ export default function RepairsPage() {
       ]} />
     </WorkshopToolbar>
 
-    {loading ? <div className="space-y-2">{[1,2,3].map(n => <div key={n} className="h-24 animate-pulse rounded-xl bg-muted/50" />)}</div> : groups.length === 0 ? <EmptyWorkshop history={tab === "history"} /> : <div className="space-y-3">
+    {loading ? <div className="space-y-2">{[1,2,3].map(n => <div key={n} className="h-24 animate-pulse rounded-xl bg-muted/50" />)}</div> : groups.length === 0 ? <EmptyWorkshop history={tab === "history"} /> : <div className="[column-fill:balance] gap-3 sm:columns-2 xl:columns-3">
       <ListHeadings columns={["Ticket", "Client / tool", "Flags", "Assigned to", "Date"]} />
       {groups.map(([status, statusTickets]) => <StatusGroup key={status} status={status} count={statusTickets.length}>
         {statusTickets.map(ticket => {
