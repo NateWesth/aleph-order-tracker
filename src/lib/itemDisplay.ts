@@ -47,6 +47,22 @@ export const getItemSecondaryDescription = (item: ItemDisplaySource) => {
 };
 
 /**
+ * Purchase-order lines use the supplier-entered line description as their
+ * primary label. The catalogue name is only a fallback because generic SKUs
+ * such as M-MISC can share one name across many unrelated products.
+ */
+export const getPurchaseOrderLineDisplayName = (item: ItemDisplaySource) => {
+  const description = normalize(item.description);
+  return description || normalize(item.name) || normalize(item.code || item.sku) || "Unnamed PO line";
+};
+
+export const getPurchaseOrderLineSecondaryName = (item: ItemDisplaySource) => {
+  const description = normalize(item.description);
+  const name = normalize(item.name);
+  return description && name && description.toLowerCase() !== name.toLowerCase() ? name : "";
+};
+
+/**
  * Shared SKUs such as M-MISC do not identify one product. Procurement and
  * analytics must keep each description in its own bucket instead of merging
  * unrelated custom lines into one giant "Miscellaneous" row.

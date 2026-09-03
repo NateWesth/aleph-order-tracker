@@ -222,7 +222,7 @@ function normalizePurchaseOrder(po: any) {
       return {
         sku,
         name: String(line.name || line.item_name || ''),
-        description: String(line.description || ''),
+        description: String(line.description || line.item_description || line.item_details || line.notes || '').trim(),
         quantity,
         quantityReceived,
         quantityBilled,

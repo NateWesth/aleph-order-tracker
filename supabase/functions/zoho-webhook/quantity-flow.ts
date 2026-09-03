@@ -44,7 +44,7 @@ async function loadItems(supabase: Supa, orderIds: string[]) {
   if (!orderIds.length) return []
   const { data } = await supabase
     .from('order_items')
-    .select('id, order_id, name, code, quantity, qty_on_po, qty_received, qty_invoiced, qty_completed, created_at')
+    .select('id, order_id, name, code, description, notes, quantity, qty_on_po, qty_received, qty_invoiced, qty_completed, created_at')
     .in('order_id', orderIds)
     .order('created_at', { ascending: true })
   return data || []
@@ -100,7 +100,8 @@ export async function allocatePurchaseOrder(supabase: Supa, po: any) {
 
   for (const line of lineItems) {
     const sku = norm(line.sku || line.item_code)
-    const name = norm(line.name || line.item_name || line.description)
+    const poDescription = String(line.description || line.item_description || line.item_details || line.notes || '').trim()
+    const name = norm(line.name || line.item_name || poDescription)
     let remaining = Math.round(Number(line.quantity || 0))
     if (remaining <= 0) continue
 
@@ -121,9 +122,13 @@ export async function allocatePurchaseOrder(supabase: Supa, po: any) {
       if (awaiting <= 0) continue
 
       const take = Math.min(awaiting, remaining)
+      const genericLine = sku.startsWith('m-misc') || sku === 'misc' || sku === 'miscellaneous' || norm(item.name).startsWith('m-misc')
+      const descriptionFromPO = poDescription && (genericLine || !String(item.description || '').trim())
+        ? poDescription
+        : item.description
       const { error } = await supabase
         .from('order_items')
-        .update({ qty_on_po: (item.qty_on_po || 0) + take, updated_at: new Date().toISOString() })
+        .update({ qty_on_po: (item.qty_on_po || 0) + take, description: descriptionFromPO || null, updated_at: new Date().toISOString() })
         .eq('id', item.id)
       if (error) {
         console.error('Failed to allocate PO qty to item', item.id, error)
