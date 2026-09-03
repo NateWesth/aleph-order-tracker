@@ -31,6 +31,7 @@ const typeConfig: Record<string, { icon: typeof Package; color: string }> = {
   comment_reply: { icon: Reply, color: 'text-blue-500' },
   comment_mention: { icon: AtSign, color: 'text-warning' },
   comment_reaction: { icon: SmilePlus, color: 'text-blue-500' },
+  workshop_assignment: { icon: UserCog, color: 'text-primary' },
 };
 
 function NotificationItem({
@@ -56,12 +57,17 @@ function NotificationItem({
   const openTarget = () => {
     if (!notification.read) onRead(notification.id);
     const entityType = notification.metadata?.entity_type || notification.metadata?.kind;
+    const workspaceType = entityType === "repair" ? "repairs" : entityType;
     const entityId = notification.metadata?.entity_id || notification.metadata?.purchase_order_id;
     if (entityType === "delivery" || entityType === "collection") {
       const storageKey = entityType === "delivery" ? "aleph:open-delivery" : "aleph:open-collection";
       if (entityId || notification.order_id) window.sessionStorage.setItem(storageKey, String(entityId || notification.order_id));
       window.dispatchEvent(new CustomEvent("setActiveView", { detail: "fulfillment" }));
       window.setTimeout(() => window.dispatchEvent(new CustomEvent(`aleph:open-${entityType}`, { detail: entityId || notification.order_id })), 80);
+    } else if (workspaceType === "sharpening" || workspaceType === "repairs") {
+      if (entityId) window.sessionStorage.setItem(`aleph:open-${workspaceType}`, String(entityId));
+      window.dispatchEvent(new CustomEvent("setActiveView", { detail: workspaceType }));
+      window.setTimeout(() => window.dispatchEvent(new CustomEvent(`aleph:open-${workspaceType}`, { detail: entityId })), 80);
     } else if (notification.order_id && onNavigate) {
       window.sessionStorage.setItem("aleph:open-order", notification.order_id);
       onNavigate(notification.order_id);

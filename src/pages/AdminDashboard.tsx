@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Package, History, BarChart3, Settings, LogOut, Building2, Box, Users, Truck, FileText, Command, ShoppingCart, Percent, Sparkles, Bot, PanelLeftClose, PanelLeftOpen, Radar, Warehouse, MoreHorizontal, Home, ListFilter, UserRoundCheck, BrainCircuit, Rows3 } from "lucide-react";
+import { Package, History, BarChart3, Settings, LogOut, Building2, Box, Users, Truck, FileText, Command, ShoppingCart, Percent, Sparkles, Bot, PanelLeftClose, PanelLeftOpen, Radar, Warehouse, MoreHorizontal, Home, ListFilter, UserRoundCheck, BrainCircuit, Rows3, Scissors, Wrench } from "lucide-react";
 import ChangelogDialog, { hasUnreadChangelog } from "@/components/admin/ChangelogDialog";
 import KeyboardShortcutsDialog from "@/components/admin/KeyboardShortcutsDialog";
 import { playClick, playWhoosh } from "@/utils/ambientSounds";
@@ -45,6 +45,8 @@ const loadBuyingSheetPage = () => import("@/components/admin/BuyingSheetPage");
 const loadCommissionPage = () => import("@/components/admin/CommissionPage");
 const loadControlTower = () => import("@/components/admin/OperationsControlTower");
 const loadFulfillmentPage = () => import("@/components/admin/FulfillmentPage");
+const loadSharpeningPage = () => import("@/components/admin/SharpeningPage");
+const loadRepairsPage = () => import("@/components/admin/RepairsPage");
 
 const OrdersPage = lazy(loadOrdersPage);
 const CompletedPage = lazy(loadCompletedPage);
@@ -59,6 +61,8 @@ const BuyingSheetPage = lazy(loadBuyingSheetPage);
 const CommissionPage = lazy(loadCommissionPage);
 const OperationsControlTower = lazy(loadControlTower);
 const FulfillmentPage = lazy(loadFulfillmentPage);
+const SharpeningPage = lazy(loadSharpeningPage);
+const RepairsPage = lazy(loadRepairsPage);
 const FloatingAIChat = lazy(() => import("@/components/admin/FloatingAIChat"));
 
 const WORKSPACE_PREFETCHERS: Record<string, () => Promise<unknown>> = {
@@ -75,11 +79,13 @@ const WORKSPACE_PREFETCHERS: Record<string, () => Promise<unknown>> = {
   users: loadUsersManagementPage,
   "control-tower": loadControlTower,
   fulfillment: loadFulfillmentPage,
+  sharpening: loadSharpeningPage,
+  repairs: loadRepairsPage,
 };
 
 const RAIL_STORAGE_KEY = "aleph:workspace-rail-expanded";
 const WORKSPACE_STORAGE_KEY = "aleph:last-workspace";
-const RESTORABLE_WORKSPACES = new Set(["home", "my-work", "orders", "fulfillment", "history", "clients", "suppliers", "stats", "po-tracking", "buying-sheet", "items", "control-tower"]);
+const RESTORABLE_WORKSPACES = new Set(["home", "my-work", "orders", "fulfillment", "sharpening", "repairs", "history", "clients", "suppliers", "stats", "po-tracking", "buying-sheet", "items", "control-tower"]);
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -267,6 +273,8 @@ const AdminDashboard = () => {
     { id: "my-work", label: "My Work", icon: UserRoundCheck, badge: 0 },
     { id: "orders", label: "Orders", icon: Package, badge: pendingOrdersCount },
     { id: "fulfillment", label: "Delivery & Collection", icon: Warehouse, badge: 0 },
+    { id: "sharpening", label: "Sharpening", icon: Scissors, badge: 0 },
+    { id: "repairs", label: "Repairs", icon: Wrench, badge: 0 },
     { id: "buying-sheet", label: "Buying", icon: ShoppingCart, badge: 0 },
     { id: "control-tower", label: "Control Tower", icon: Radar, badge: 0 },
     { id: "history", label: "History", icon: History, badge: unreadOrderUpdates },
@@ -278,7 +286,7 @@ const AdminDashboard = () => {
     ...(canEditCommission ? [{ id: "commission", label: "Commission", icon: Percent, badge: 0 }] : []),
     ...(isAdmin ? [{ id: "users", label: "Users", icon: Users, badge: 0 }] : []),
   ];
-  const primaryIds = new Set(["home", "my-work", "orders", "fulfillment", "buying-sheet", "control-tower", "history"]);
+  const primaryIds = new Set(["home", "my-work", "orders", "fulfillment", "sharpening", "repairs", "buying-sheet", "control-tower", "history"]);
   const navItems = allNavItems.filter((item) => primaryIds.has(item.id));
   const filteredNavItems = railQuery.trim()
     ? allNavItems.filter((item) => item.label.toLowerCase().includes(railQuery.trim().toLowerCase()))
@@ -521,6 +529,8 @@ const AdminDashboard = () => {
               {activeView === "my-work" && <MyWorkPage onNavigate={(view) => setActiveView(view)} />}
               {activeView === "orders" && <OrdersPage isAdmin={true} searchTerm={searchTerm} />}
               {activeView === "fulfillment" && <FulfillmentPage />}
+              {activeView === "sharpening" && <SharpeningPage />}
+              {activeView === "repairs" && <RepairsPage />}
               {activeView === "history" && <CompletedPage isAdmin={true} searchTerm={searchTerm} />}
               {activeView === "clients" && <ClientCompaniesPage />}
               {activeView === "suppliers" && <SuppliersPage />}
