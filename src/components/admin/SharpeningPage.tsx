@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import EntityComments from "@/components/admin/EntityComments";
 import { cn } from "@/lib/utils";
-import { AssignmentLine, DetailSection, DetailValue, EmptyWorkshop, formatDate, isOverdue, memberLabel, monthLabel, MonthDivider, PRIORITIES, PriorityBadge, SERVICE_STATUSES, StatusBadge, TeamMember, WorkshopCard, WorkshopDetail, WorkshopHeader, WorkshopTabs, WorkshopToolbar } from "@/components/admin/workshop/shared";
+import { DetailSection, DetailValue, EmptyWorkshop, formatDate, isOverdue, memberLabel, groupByStatus, ListHeadings, StatusGroup, PRIORITIES, PriorityBadge, SERVICE_STATUSES, StatusBadge, TeamMember, WorkshopPanel, WorkshopRow, WorkshopHeader, WorkshopTabs, WorkshopToolbar } from "@/components/admin/workshop/shared";
 
 interface SharpeningJob {
   id: string; date_received: string; job_number: string; customer_name: string; quantity: number;
@@ -84,9 +84,7 @@ export default function SharpeningPage() {
     if (urgent) return urgent;
     return (b.date_received || "").localeCompare(a.date_received || "");
   });
-  const groups = useMemo(() => Object.entries(visible.reduce<Record<string, SharpeningJob[]>>((acc, job) => {
-    const key = monthLabel(job.date_received); (acc[key] ||= []).push(job); return acc;
-  }, {})), [visible]);
+  const groups = useMemo(() => groupByStatus(visible, (job) => job.status, (job) => job.date_received), [visible]);
 
   const openCreate = () => { setEditingId(null); setDraft(emptyDraft()); setFormOpen(true); };
   const openEdit = (job: SharpeningJob) => { setEditingId(job.id); setDraft({ date_received: job.date_received, job_number: job.job_number, customer_name: job.customer_name, quantity: job.quantity, priority: job.priority, order_number: job.order_number, assigned_to: job.assigned_to, status: job.status, deadline_date: job.deadline_date, invoiced: job.invoiced, invoice_number: job.invoice_number, third_party_name: job.third_party_name, third_party_quantity: job.third_party_quantity, third_party_reference: job.third_party_reference, third_party_status: job.third_party_status, notes: job.notes }); setSelected(null); setFormOpen(true); };
@@ -131,24 +129,28 @@ export default function SharpeningPage() {
       ]} />
     </WorkshopToolbar>
 
-    {loading ? <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-3">{[1,2,3,4,5,6].map((n) => <div key={n} className="h-32 animate-pulse rounded-xl bg-muted/50" />)}</div> : groups.length === 0 ? <EmptyWorkshop history={tab === "history"} /> : <div className="space-y-5">{groups.map(([month, monthJobs]) => <section key={month}>
-      <MonthDivider label={month} count={monthJobs.length} noun="job" />
-      <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-3">{monthJobs.map((job) => {
-        const overdue = isOverdue(job.deadline_date, job.status === "completed");
-        return <WorkshopCard
-          key={job.id}
-          onClick={() => setSelected(job)}
-          reference={`Job ${job.job_number}`}
-          title={job.customer_name}
-          subtitle={job.order_number ? `Order ${job.order_number}` : `Received ${formatDate(job.date_received)}`}
-          accent={job.status === "completed" ? "done" : job.priority === "urgent" || overdue ? "urgent" : "default"}
-          muted={job.status === "completed"}
-          badges={<><PriorityBadge priority={job.priority} /><span className="rounded-md bg-muted px-2 py-0.5 text-[11px] font-bold tabular-nums text-foreground">×{job.quantity}</span></>}
-          aside={<><div className="mt-3"><StatusBadge status={job.status} /></div><AssignmentLine member={job.assigned_to ? memberMap.get(job.assigned_to) : null} deadline={job.deadline_date} overdue={overdue} /></>}
-          meta={<><span>{job.invoiced ? `Invoiced ${job.invoice_number || ""}`.trim() : "Not invoiced"}</span><span className="font-semibold text-primary opacity-0 transition group-hover:opacity-100">Open →</span></>}
-        />;
-      })}</div>
-    </section>)}</div>}
+    {loading ? <div className="space-y-2">{[1,2,3].map((n) => <div key={n} className="h-24 animate-pulse rounded-xl bg-muted/50" />)}</div> : groups.length === 0 ? <EmptyWorkshop history={tab === "history"} /> : <div className="space-y-3">
+      <ListHeadings columns={["Job", "Customer", "Flags", "Assigned to", "Date"]} />
+      {groups.map(([status, statusJobs]) => <StatusGroup key={status} status={status} count={statusJobs.length}>
+        {statusJobs.map((job) => {
+          const overdue = isOverdue(job.deadline_date, job.status === "completed");
+          return <WorkshopRow
+            key={job.id}
+            onClick={() => setSelected(job)}
+            active={selected?.id === job.id}
+            muted={job.status === "completed"}
+            reference={job.job_number}
+            primary={job.customer_name}
+            secondary={job.order_number ? `Order ${job.order_number}` : undefined}
+            date={job.date_received}
+            deadline={job.deadline_date}
+            overdue={overdue}
+            assignee={memberLabel(job.assigned_to ? memberMap.get(job.assigned_to) : null)}
+            tags={<><PriorityBadge priority={job.priority} /><span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-bold tabular-nums">×{job.quantity}</span>{job.invoiced && <span className="rounded bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-bold uppercase text-emerald-600">Invoiced</span>}</>}
+          />;
+        })}
+      </StatusGroup>)}
+    </div>}
 
 
     <Dialog open={formOpen} onOpenChange={setFormOpen}><DialogContent className="max-h-[92dvh] w-[calc(100%-20px)] max-w-3xl overflow-y-auto rounded-[28px] p-0"><div className="border-b border-border/60 bg-primary/[0.06] p-5 sm:p-6"><DialogHeader><DialogTitle className="flex items-center gap-2 text-2xl font-black"><span className="grid h-10 w-10 place-items-center rounded-2xl bg-primary text-primary-foreground"><Scissors className="h-5 w-5" /></span>{editingId ? "Edit sharpening job" : "New sharpening job"}</DialogTitle></DialogHeader><p className="mt-2 text-sm text-muted-foreground">Manual workshop record—no external API calls are made.</p></div><div className="space-y-6 p-5 sm:p-6">
@@ -159,21 +161,25 @@ export default function SharpeningPage() {
       <Field label="Notes"><Textarea value={draft.notes || ""} onChange={(e) => set("notes", e.target.value || null)} className="min-h-24 resize-none" placeholder="Condition, special instructions, quote details…" /></Field><div className="flex flex-col-reverse gap-2 border-t pt-4 sm:flex-row sm:justify-end"><Button variant="outline" onClick={() => setFormOpen(false)}>Cancel</Button><Button onClick={() => void save()} disabled={saving}>{saving ? "Saving…" : editingId ? "Save changes" : "Add to queue"}</Button></div>
     </div></DialogContent></Dialog>
 
-    <Dialog open={!!selected} onOpenChange={(open) => !open && setSelected(null)}><DialogContent className="w-[calc(100%-20px)] max-w-3xl overflow-hidden rounded-2xl border border-border bg-card p-0 shadow-xl">{selected && <WorkshopDetail
+    <WorkshopPanel
+      open={!!selected}
+      onOpenChange={(open) => !open && setSelected(null)}
       icon={<Scissors className="h-5 w-5" />}
-      reference={`Job ${selected.job_number}`}
-      title={selected.customer_name}
-      subtitle={<>×{selected.quantity} · Received {formatDate(selected.date_received)}</>}
-      badges={<><StatusBadge status={selected.status} /><PriorityBadge priority={selected.priority} /></>}
-      actions={<><Button variant="outline" className="sm:min-w-40" onClick={() => openEdit(selected)}><Edit3 className="mr-2 h-4 w-4" />Edit details</Button>{selected.status !== "completed" && <Button className="sm:min-w-40" onClick={() => void updateStatus(selected, "completed")}><CheckCircle2 className="mr-2 h-4 w-4" />Complete & archive</Button>}</>}
+      reference={selected ? `Job ${selected.job_number}` : ""}
+      title={selected?.customer_name || ""}
+      subtitle={selected ? <>×{selected.quantity} · Received {formatDate(selected.date_received)}</> : null}
+      badges={selected ? <><StatusBadge status={selected.status} /><PriorityBadge priority={selected.priority} /></> : null}
+      actions={selected ? <><Button variant="outline" className="sm:min-w-36" onClick={() => openEdit(selected)}><Edit3 className="mr-2 h-4 w-4" />Edit details</Button>{selected.status !== "completed" && <Button className="sm:min-w-40" onClick={() => void updateStatus(selected, "completed")}><CheckCircle2 className="mr-2 h-4 w-4" />Complete & archive</Button>}</> : null}
     >
-      <DialogHeader className="sr-only"><DialogTitle>Sharpening job {selected.job_number}</DialogTitle></DialogHeader>
+      {selected && <>
+
       <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3"><DetailValue label="Received" value={formatDate(selected.date_received)} icon={<CalendarClock className="h-3.5 w-3.5" />} /><DetailValue label="Quantity" value={`×${selected.quantity}`} /><DetailValue label="Order" value={selected.order_number} /><DetailValue label="Assigned to" value={memberLabel(selected.assigned_to ? memberMap.get(selected.assigned_to) : null)} icon={<UserRound className="h-3.5 w-3.5" />} /><DetailValue label="Deadline" value={formatDate(selected.deadline_date)} /><DetailValue label="Invoice" value={selected.invoiced ? selected.invoice_number || "Completed" : "Not invoiced"} icon={<FileText className="h-3.5 w-3.5" />} /></div>
       <DetailSection title="Move the job forward"><div className="grid grid-cols-2 gap-2 sm:grid-cols-3">{SERVICE_STATUSES.map(([value,label]) => <button key={value} onClick={() => void updateStatus(selected, value)} className={cn("rounded-lg border px-3 py-2 text-xs font-semibold transition", selected.status === value ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card hover:border-primary/40 hover:bg-accent/40")}>{label}</button>)}</div></DetailSection>
       {(selected.third_party_name || selected.third_party_reference) && <DetailSection title="Third-party work"><div className="grid gap-2.5 sm:grid-cols-2"><DetailValue label="Repairer / supplier" value={selected.third_party_name} /><DetailValue label="Reference" value={selected.third_party_reference} /><DetailValue label="Quantity" value={selected.third_party_quantity} /><DetailValue label="Status" value={selected.third_party_status ? <StatusBadge status={selected.third_party_status} /> : null} /></div></DetailSection>}
       {selected.notes && <DetailValue label="Workshop notes" value={<p className="whitespace-pre-wrap font-normal leading-6">{selected.notes}</p>} icon={<ClipboardList className="h-3.5 w-3.5" />} />}
       <EntityComments entityType="sharpening" entityId={selected.id} defaultOpen />
-    </WorkshopDetail>}</DialogContent></Dialog>
+      </>}
+    </WorkshopPanel>
 
   </div>;
 }
