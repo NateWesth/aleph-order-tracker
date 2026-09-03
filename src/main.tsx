@@ -3,6 +3,10 @@ import { createRoot } from "react-dom/client";
 import { Capacitor } from "@capacitor/core";
 import App from "./App.tsx";
 import "./index.css";
+import "@fontsource/work-sans/400.css";
+import "@fontsource/work-sans/500.css";
+import "@fontsource/work-sans/600.css";
+import "@fontsource/work-sans/700.css";
 
 // Preview / dev environments must NEVER be served by a cached service worker,
 // otherwise the Lovable preview keeps showing an old build.

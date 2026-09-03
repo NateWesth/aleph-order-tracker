@@ -118,6 +118,13 @@ export function groupByStatus<T>(rows: T[], getStatus: (row: T) => string, getDa
     if (!map.has(key)) map.set(key, []);
     map.get(key)!.push(row);
   });
+  const presentStatuses = Array.from(map.keys());
+  const historyOnly = presentStatuses.length > 0 && presentStatuses.every((status) => status === "completed" || status === "scrapped");
+  if (!historyOnly) {
+    STATUS_ORDER.filter((status) => status !== "completed" && status !== "scrapped").forEach((status) => {
+      if (!map.has(status)) map.set(status, []);
+    });
+  }
   return Array.from(map.entries())
     .sort((a, b) => statusRank(a[0]) - statusRank(b[0]))
     .map(([status, group]) => [status, group.sort((a, b) => getDate(b).localeCompare(getDate(a)))] as [string, T[]]);
@@ -178,7 +185,7 @@ export function WorkshopPanel({ open, onOpenChange, icon, reference, title, subt
   children: ReactNode; actions?: ReactNode;
 }) {
   return <Dialog open={open} onOpenChange={onOpenChange}>
-    <DialogContent className="flex max-h-[90dvh] w-[calc(100%-16px)] max-w-4xl flex-col gap-0 overflow-hidden rounded-xl border border-border bg-card p-0 shadow-2xl sm:w-[calc(100%-40px)]">
+    <DialogContent className="workshop-workspace flex max-h-[90dvh] w-[calc(100%-16px)] max-w-4xl flex-col gap-0 overflow-hidden rounded-xl border border-border bg-card p-0 font-workshop shadow-2xl sm:w-[calc(100%-40px)]">
       {overlay}
       <DialogHeader className="space-y-0 border-b border-border bg-card px-5 py-5 text-left sm:px-7">
         <div className="flex items-start gap-3 pr-8">

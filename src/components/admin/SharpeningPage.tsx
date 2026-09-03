@@ -107,7 +107,7 @@ export default function SharpeningPage() {
     else { toast({ title: status === "completed" ? "Moved to sharpening history" : `Status changed to ${SERVICE_STATUSES.find(([id]) => id === status)?.[1]}` }); await load(true); }
   };
 
-  return <div className="space-y-4 pb-10">
+  return <div className="workshop-workspace space-y-4 bg-background pb-10 font-workshop text-foreground">
     <WorkshopHeader
       eyebrow="Workshop desk"
       title="Sharpening"
