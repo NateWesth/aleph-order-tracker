@@ -1787,19 +1787,18 @@ function FulfillmentBubbleShell({
   if (typeof document === "undefined") return null;
   return createPortal(
     <div className="fulfillment-modal-backdrop fixed inset-0 z-[120] flex items-center justify-center p-2.5 sm:p-6" role="presentation">
-      <button type="button" className="absolute inset-0 bg-foreground/35 backdrop-blur-[3px]" onClick={onClose} aria-label="Close details" />
+      <button type="button" className="absolute inset-0 bg-black/45" onClick={onClose} aria-label="Close details" />
       <section
       ref={bubbleRef}
-      className="fulfillment-detail-modal animate-order-floating-bubble relative max-h-[calc(100dvh-1.25rem)] w-full max-w-4xl overflow-y-auto rounded-[28px] border-2 border-primary/15 bg-background/97 shadow-[0_32px_100px_-30px_hsl(var(--foreground)/0.62)] backdrop-blur-2xl sm:max-h-[calc(100dvh-3rem)]"
+      className="fulfillment-detail-modal animate-order-floating-bubble relative max-h-[calc(100dvh-1.25rem)] w-full max-w-4xl overflow-y-auto rounded-[28px] border border-border bg-background shadow-[0_24px_60px_-20px_hsl(var(--foreground)/0.35)] sm:max-h-[calc(100dvh-3rem)]"
       role="dialog"
       aria-modal="true"
       aria-label={`${eyebrow} ${title}`}
     >
       <div className="ribbon-bar h-1.5" aria-hidden />
-      <div className="relative border-b border-border/55 p-4 sm:p-5">
-        <div className="pointer-events-none absolute inset-x-12 -top-10 h-24 rounded-full bg-primary/15 blur-3xl" />
+      <div className="relative border-b border-border bg-background p-4 sm:p-5">
         <div className="relative flex items-start gap-3">
-          <span className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-2xl bg-background p-1 shadow-sm ring-1 ring-border/60">
+          <span className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-2xl bg-muted p-1 shadow-sm ring-1 ring-border">
             <img src="/lovable-uploads/e1088147-889e-43f6-bdf0-271189b88913.png" alt="" className="h-full w-full object-contain" />
           </span>
           <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-primary/10 text-primary"><Icon className="h-5 w-5" /></span>
@@ -1808,11 +1807,11 @@ function FulfillmentBubbleShell({
             <h2 className="mt-1 truncate font-display text-xl font-black tracking-tight sm:text-2xl">{title}</h2>
             <p className="mt-0.5 truncate text-sm font-semibold text-muted-foreground">{subtitle}</p>
           </div>
-          <button type="button" onClick={onClose} className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-muted/70 text-muted-foreground transition-all hover:scale-105 hover:bg-destructive/10 hover:text-destructive" aria-label="Close details"><X className="h-4 w-4" /></button>
+          <button type="button" onClick={onClose} className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-muted text-muted-foreground transition-all hover:scale-105 hover:bg-destructive/10 hover:text-destructive" aria-label="Close details"><X className="h-4 w-4" /></button>
         </div>
-        <div className="relative mt-3 flex items-center gap-2 rounded-xl bg-primary/[0.055] px-3 py-2 text-[11px] text-muted-foreground"><MessageSquareText className="h-3.5 w-3.5 text-primary" /><span>Live team thread, actions and movement history stay together here.</span><span className="ml-auto hidden font-semibold sm:inline">Esc to close</span></div>
+        <div className="relative mt-3 flex items-center gap-2 rounded-xl bg-muted px-3 py-2 text-[11px] text-muted-foreground"><MessageSquareText className="h-3.5 w-3.5 text-primary" /><span>Live team thread, actions and movement history stay together here.</span><span className="ml-auto hidden font-semibold sm:inline">Esc to close</span></div>
       </div>
-      <div className="p-4 sm:p-5 lg:p-6">{children}</div>
+      <div className="bg-background p-4 sm:p-5 lg:p-6">{children}</div>
       </section>
     </div>,
     document.body,
