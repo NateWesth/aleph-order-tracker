@@ -79,8 +79,11 @@ function isWithinCollectionRetention(date: unknown): boolean {
   return Number.isFinite(timestamp) && timestamp >= collectionCutoffMs()
 }
 
+// PO tracking must show every still-open purchase order, however old. The
+// three-week retention window applies only to the collections board (applied
+// client-side in FulfillmentPage), never to this shared snapshot.
 function currentPurchaseOrders(entries: POEntry[]): POEntry[] {
-  return entries.filter((entry) => isWithinCollectionRetention(entry.date))
+  return entries
 }
 
 Deno.serve(async (req) => {
@@ -277,13 +280,12 @@ Deno.serve(async (req) => {
 })
 
 async function fetchOutstandingPurchaseOrders(accessToken: string, orgId: string, cachedEntries: POEntry[]): Promise<POEntry[]> {
-  // Zoho sorts newest first, so stop as soon as the rolling three-week window
-  // ends. This both enforces the operational rule and avoids historic API reads.
+  // Zoho sorts newest first. Page until MAX_PO_SUMMARIES so old-but-still-open
+  // purchase orders stay visible on the PO tracking board.
   const candidates: any[] = []
   let inspectedSummaries = 0
   let page = 1
   let hasMore = true
-  let reachedRetentionCutoff = false
   while (hasMore && inspectedSummaries < MAX_PO_SUMMARIES) {
     const data = await fetchZohoPage(
       accessToken,
@@ -297,12 +299,6 @@ async function fetchOutstandingPurchaseOrders(accessToken: string, orgId: string
       inspectedSummaries++
       if (inspectedSummaries > MAX_PO_SUMMARIES) break
 
-      const summaryDate = summary.date || summary.purchaseorder_date
-      if (!isWithinCollectionRetention(summaryDate)) {
-        if (Number.isFinite(new Date(String(summaryDate || '')).getTime())) reachedRetentionCutoff = true
-        continue
-      }
-
       const status = String(summary.status || '').trim().toLowerCase()
       const billedStatus = String(summary.billed_status || '').trim().toLowerCase()
       const receivedStatus = String(summary.received_status || '').trim().toLowerCase()
@@ -311,7 +307,7 @@ async function fetchOutstandingPurchaseOrders(accessToken: string, orgId: string
       candidates.push(summary)
     }
 
-    hasMore = !reachedRetentionCutoff && (data.page_context?.has_more_page ?? false)
+    hasMore = data.page_context?.has_more_page ?? false
     page++
   }
 
