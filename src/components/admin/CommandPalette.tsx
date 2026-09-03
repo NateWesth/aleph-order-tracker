@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from "@/components/ui/command";
-import { Package, History, Building2, Truck, FileText, Box, Users, BarChart3, Settings, Home, LogOut, Mic, ShoppingCart, Warehouse, Percent, Hash, Loader2, UserRoundCheck, Radar, Sparkles } from "lucide-react";
+import { Package, History, Building2, Truck, FileText, Box, Users, BarChart3, Settings, Home, LogOut, Mic, ShoppingCart, Warehouse, Percent, Hash, Loader2, UserRoundCheck, Radar, Sparkles, Scissors, Wrench } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 interface CommandPaletteProps {
@@ -17,6 +17,8 @@ const NAVIGATION_ITEMS = [
   { id: "control-tower", label: "Control Tower", icon: Radar, keywords: "control tower exceptions routes dispatch team map" },
   { id: "orders", label: "Orders Board", icon: Package, keywords: "orders board kanban active" },
   { id: "fulfillment", label: "Delivery & Collection", icon: Warehouse, keywords: "delivery collection fulfillment dispatch pickup" },
+  { id: "sharpening", label: "Sharpening Workshop", icon: Scissors, keywords: "sharpening workshop jobs blades" },
+  { id: "repairs", label: "Repairs & Warranty", icon: Wrench, keywords: "repairs warranty tools tickets workshop" },
   { id: "history", label: "Order History", icon: History, keywords: "history completed delivered past" },
   { id: "clients", label: "Clients", icon: Building2, keywords: "clients companies customers" },
   { id: "suppliers", label: "Suppliers", icon: Truck, keywords: "suppliers vendors" },
