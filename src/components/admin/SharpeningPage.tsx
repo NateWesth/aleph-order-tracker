@@ -109,26 +109,47 @@ export default function SharpeningPage() {
     else { toast({ title: status === "completed" ? "Moved to sharpening history" : `Status changed to ${SERVICE_STATUSES.find(([id]) => id === status)?.[1]}` }); await load(true); }
   };
 
-  return <div className="space-y-5 pb-10">
-    <WorkshopHero eyebrow="Workshop desk" title="Sharpening" description="A focused, manual queue for every sharpening job—deadlines, ownership, invoicing and third-party work in one calm workspace." count={outstanding.length} overdue={overdueCount}>
-      <Button size="lg" onClick={openCreate} className="h-12 rounded-2xl px-5 shadow-lg shadow-primary/20"><Plus className="mr-2 h-5 w-5" />New sharpening job</Button>
-    </WorkshopHero>
+  return <div className="space-y-4 pb-10">
+    <WorkshopHeader
+      eyebrow="Workshop desk"
+      title="Sharpening"
+      description="A focused, manual queue for every sharpening job — deadlines, ownership, invoicing and third-party work in one place."
+      stats={[
+        { label: "Outstanding", value: outstanding.length },
+        { label: "Overdue", value: overdueCount, tone: overdueCount > 0 ? "danger" : "default" },
+        { label: "Urgent", value: outstanding.filter((job) => job.priority === "urgent").length, tone: "warning" },
+        { label: "Completed", value: jobs.length - outstanding.length },
+      ]}
+    >
+      <Button onClick={openCreate} className="h-11 rounded-lg px-5"><Plus className="mr-2 h-4 w-4" />New sharpening job</Button>
+    </WorkshopHeader>
 
-    <WorkshopToolbar query={query} onQuery={setQuery}>
-      <div className="grid grid-cols-2 rounded-2xl bg-muted/55 p-1"><button onClick={() => setTab("outstanding")} className={cn("rounded-xl px-4 py-2 text-xs font-black transition", tab === "outstanding" ? "bg-background text-primary shadow-sm" : "text-muted-foreground")}>Outstanding · {outstanding.length}</button><button onClick={() => setTab("history")} className={cn("rounded-xl px-4 py-2 text-xs font-black transition", tab === "history" ? "bg-background text-primary shadow-sm" : "text-muted-foreground")}>History · {jobs.length - outstanding.length}</button></div>
+    <WorkshopToolbar query={query} onQuery={setQuery} placeholder="Search job number, customer, order or invoice…">
+      <WorkshopTabs value={tab} onChange={setTab} tabs={[
+        { id: "outstanding" as const, label: "Outstanding", count: outstanding.length },
+        { id: "history" as const, label: "History", count: jobs.length - outstanding.length },
+      ]} />
     </WorkshopToolbar>
 
-    {loading ? <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{[1,2,3,4,5,6].map((n) => <div key={n} className="h-44 animate-pulse rounded-[24px] bg-muted/45" />)}</div> : groups.length === 0 ? <EmptyWorkshop history={tab === "history"} /> : groups.map(([month, monthJobs]) => <section key={month}>
-      <div className="mb-3 flex items-center gap-3"><h2 className="text-sm font-black tracking-tight">{month}</h2><span className="h-px flex-1 bg-border/60" /><span className="text-[10px] font-bold text-muted-foreground">{monthJobs.length} {monthJobs.length === 1 ? "job" : "jobs"}</span></div>
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{monthJobs.map((job) => {
+    {loading ? <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-3">{[1,2,3,4,5,6].map((n) => <div key={n} className="h-32 animate-pulse rounded-xl bg-muted/50" />)}</div> : groups.length === 0 ? <EmptyWorkshop history={tab === "history"} /> : <div className="space-y-5">{groups.map(([month, monthJobs]) => <section key={month}>
+      <MonthDivider label={month} count={monthJobs.length} noun="job" />
+      <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-3">{monthJobs.map((job) => {
         const overdue = isOverdue(job.deadline_date, job.status === "completed");
-        return <button key={job.id} type="button" onClick={() => setSelected(job)} className={cn("group relative overflow-hidden rounded-[24px] border bg-card p-4 text-left shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-lg", job.priority === "urgent" && "border-red-500/30", overdue && "ring-1 ring-red-500/20")}>
-          <span className="absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-primary via-amber-400 to-red-500" /><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="text-[10px] font-black uppercase tracking-[0.16em] text-primary">Job {job.job_number}</p><h3 className="mt-1 truncate text-lg font-black tracking-tight">{job.customer_name}</h3></div><div className="flex gap-1"><PriorityBadge priority={job.priority} /></div></div>
-          <div className="mt-4 flex items-center justify-between gap-3"><StatusBadge status={job.status} /><span className="rounded-xl bg-primary/8 px-2.5 py-1 text-xs font-black text-primary">×{job.quantity}</span></div><AssignmentLine member={job.assigned_to ? memberMap.get(job.assigned_to) : null} deadline={job.deadline_date} overdue={overdue} />
-          <div className="mt-4 flex items-center justify-between border-t border-border/45 pt-3 text-[10px] font-semibold text-muted-foreground"><span>{job.order_number ? `Order ${job.order_number}` : `Received ${formatDate(job.date_received)}`}</span><span className="text-primary opacity-0 transition group-hover:opacity-100">Open details →</span></div>
-        </button>;
+        return <WorkshopCard
+          key={job.id}
+          onClick={() => setSelected(job)}
+          reference={`Job ${job.job_number}`}
+          title={job.customer_name}
+          subtitle={job.order_number ? `Order ${job.order_number}` : `Received ${formatDate(job.date_received)}`}
+          accent={job.status === "completed" ? "done" : job.priority === "urgent" || overdue ? "urgent" : "default"}
+          muted={job.status === "completed"}
+          badges={<><PriorityBadge priority={job.priority} /><span className="rounded-md bg-muted px-2 py-0.5 text-[11px] font-bold tabular-nums text-foreground">×{job.quantity}</span></>}
+          aside={<><div className="mt-3"><StatusBadge status={job.status} /></div><AssignmentLine member={job.assigned_to ? memberMap.get(job.assigned_to) : null} deadline={job.deadline_date} overdue={overdue} /></>}
+          meta={<><span>{job.invoiced ? `Invoiced ${job.invoice_number || ""}`.trim() : "Not invoiced"}</span><span className="font-semibold text-primary opacity-0 transition group-hover:opacity-100">Open →</span></>}
+        />;
       })}</div>
-    </section>)}
+    </section>)}</div>}
+
 
     <Dialog open={formOpen} onOpenChange={setFormOpen}><DialogContent className="max-h-[92dvh] w-[calc(100%-20px)] max-w-3xl overflow-y-auto rounded-[28px] p-0"><div className="border-b border-border/60 bg-primary/[0.06] p-5 sm:p-6"><DialogHeader><DialogTitle className="flex items-center gap-2 text-2xl font-black"><span className="grid h-10 w-10 place-items-center rounded-2xl bg-primary text-primary-foreground"><Scissors className="h-5 w-5" /></span>{editingId ? "Edit sharpening job" : "New sharpening job"}</DialogTitle></DialogHeader><p className="mt-2 text-sm text-muted-foreground">Manual workshop record—no external API calls are made.</p></div><div className="space-y-6 p-5 sm:p-6">
       <FormSection title="Job intake"><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"><Field label="Date received"><Input type="date" value={draft.date_received} onChange={(e) => set("date_received", e.target.value)} /></Field><Field label="Job number *"><Input value={draft.job_number} onChange={(e) => set("job_number", e.target.value)} placeholder="SH-1042" /></Field><Field label="Order number"><Input value={draft.order_number || ""} onChange={(e) => set("order_number", e.target.value || null)} placeholder="Optional" /></Field><Field label="Customer name *" wide><Input value={draft.customer_name} onChange={(e) => set("customer_name", e.target.value)} /></Field><Field label="Quantity"><Input type="number" min={1} value={draft.quantity} onChange={(e) => set("quantity", Math.max(1, Number(e.target.value)))} /></Field></div></FormSection>
