@@ -236,7 +236,6 @@ function normalizePurchaseOrder(po: any) {
 
   if (
     !String(po.purchaseorder_id || '') ||
-    !isWithinCollectionRetention(purchaseOrderDate) ||
     EXCLUDED_PO_STATUSES.has(status) ||
     EXCLUDED_RECEIVED_STATUSES.has(receivedStatus) ||
     lines.length === 0
@@ -297,7 +296,7 @@ async function updateCachesFromPurchaseOrderUnlocked(supabase: any, previous: an
     .eq('id', PO_CACHE_ID)
     .maybeSingle()
   const purchaseOrders = Array.isArray(poRow?.payload)
-    ? [...poRow.payload].filter((po: any) => isWithinCollectionRetention(po.date))
+    ? [...poRow.payload]
     : []
   const id = String(purchaseOrder.purchaseorder_id || '')
   const withoutCurrent = purchaseOrders.filter((po: any) => String(po.purchaseOrderId) !== id)

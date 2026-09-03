@@ -425,7 +425,8 @@ export default function OrderDetailsDialog({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full overflow-y-auto p-0 sm:max-w-2xl lg:max-w-3xl">\n        <div className="p-5 sm:p-6">
+      <SheetContent side="right" className="w-full overflow-y-auto p-0 sm:max-w-2xl lg:max-w-3xl">
+        <div className="p-5 sm:p-6">
         <SheetHeader className="text-left">
           <div className="flex items-center justify-between">
             <SheetTitle>Order Details - {order.order_number}</SheetTitle>
