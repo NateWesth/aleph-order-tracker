@@ -50,8 +50,28 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }
+  // Zoho itself authenticates with the shared secret. The app's own admin
+  // tools call this function with a Supabase session, so accept a verified
+  // admin JWT as an equally trusted caller.
   const suppliedSecret = req.headers.get('x-zoho-webhook-secret') || req.headers.get('x-webhook-secret')
-  if (suppliedSecret !== webhookSecret) {
+  let authorized = suppliedSecret === webhookSecret
+  if (!authorized) {
+    const bearer = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '')
+    if (bearer) {
+      const { data: userData } = await supabase.auth.getUser(bearer)
+      const userId = userData?.user?.id
+      if (userId) {
+        const { data: role } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', userId)
+          .eq('role', 'admin')
+          .maybeSingle()
+        authorized = Boolean(role)
+      }
+    }
+  }
+  if (!authorized) {
     return new Response(JSON.stringify({ error: 'Invalid webhook secret' }), {
       status: 401,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
