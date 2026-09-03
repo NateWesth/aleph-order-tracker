@@ -83,7 +83,7 @@ export function WorkshopToolbar({ query, onQuery, placeholder = "Search referenc
   </div>;
 }
 
-export function WorkshopTabs<T extends string>({ value, onChange, tabs }: { value: T; onChange: (value: T) => void; tabs: { id: T; label: string; count: number }[] }) {
+export function WorkshopTabs({ value, onChange, tabs }: { value: string; onChange: (value: string) => void; tabs: { id: string; label: string; count: number }[] }) {
   return <div className="flex rounded-lg border border-border bg-muted/40 p-1">
     {tabs.map((tab) => <button key={tab.id} type="button" onClick={() => onChange(tab.id)}
       className={cn("flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-semibold transition",

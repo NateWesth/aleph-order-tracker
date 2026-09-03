@@ -93,7 +93,7 @@ export default function RepairsPage() {
     </WorkshopHeader>
 
     <WorkshopToolbar query={query} onQuery={setQuery} placeholder="Search ticket, client, tool code or invoice…">
-      <WorkshopTabs value={tab} onChange={setTab} tabs={[
+      <WorkshopTabs value={tab} onChange={(value) => setTab(value as "outstanding" | "warranty" | "history")} tabs={[
         { id: "outstanding" as const, label: "Repairs", count: normalActive.length },
         { id: "warranty" as const, label: "Warranty", count: warrantyActive.length },
         { id: "history" as const, label: "History", count: history.length },

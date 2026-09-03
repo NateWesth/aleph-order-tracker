@@ -125,7 +125,7 @@ export default function SharpeningPage() {
     </WorkshopHeader>
 
     <WorkshopToolbar query={query} onQuery={setQuery} placeholder="Search job number, customer, order or invoice…">
-      <WorkshopTabs value={tab} onChange={setTab} tabs={[
+      <WorkshopTabs value={tab} onChange={(value) => setTab(value as "outstanding" | "history")} tabs={[
         { id: "outstanding" as const, label: "Outstanding", count: outstanding.length },
         { id: "history" as const, label: "History", count: jobs.length - outstanding.length },
       ]} />
