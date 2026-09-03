@@ -32,39 +32,148 @@ export function StatusBadge({ status }: { status: string }) {
     : status === "working_on_it" ? "border-blue-500/25 bg-blue-500/10 text-blue-700 dark:text-blue-300"
     : status === "awaiting_quote_approval" ? "border-amber-500/25 bg-amber-500/10 text-amber-700 dark:text-amber-300"
     : status === "next" ? "border-primary/25 bg-primary/10 text-primary" : "border-border/60 bg-muted/60 text-muted-foreground";
-  return <Badge variant="outline" className={cn("rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wide", tone)}>{statusLabel(status)}</Badge>;
+  return <Badge variant="outline" className={cn("rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide", tone)}>{statusLabel(status)}</Badge>;
 }
 
 export function PriorityBadge({ priority }: { priority: string }) {
   if (priority === "normal" || priority === "low") return null;
-  return <Badge className={cn("rounded-full text-[10px] uppercase", priority === "urgent" ? "bg-red-600 text-white" : "bg-orange-500 text-white")}>{priority}</Badge>;
+  return <Badge className={cn("rounded-md px-2 py-0.5 text-[10px] font-bold uppercase", priority === "urgent" ? "bg-destructive text-destructive-foreground" : "bg-amber-500 text-background")}>{priority}</Badge>;
 }
 
-export function WorkshopHero({ eyebrow, title, description, count, overdue, children }: { eyebrow: string; title: string; description: string; count: number; overdue: number; children: ReactNode }) {
-  return <section className="relative overflow-hidden rounded-[28px] border border-primary/15 bg-gradient-to-br from-primary/[0.12] via-background to-amber-500/[0.08] p-5 shadow-sm sm:p-7">
-    <div className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full bg-primary/10 blur-3xl" />
-    <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-      <div className="max-w-2xl"><p className="text-[10px] font-black uppercase tracking-[0.22em] text-primary">{eyebrow}</p><h1 className="mt-2 text-3xl font-black tracking-[-0.035em] sm:text-4xl">{title}</h1><p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">{description}</p>
-        <div className="mt-4 flex flex-wrap gap-2"><Badge variant="secondary" className="rounded-full"><Clock3 className="mr-1.5 h-3.5 w-3.5" />{count} outstanding</Badge>{overdue > 0 && <Badge variant="destructive" className="rounded-full"><AlertTriangle className="mr-1.5 h-3.5 w-3.5" />{overdue} overdue</Badge>}</div>
-      </div>{children}
+/** Compact, editorial page header — no gradients, no glass. */
+export function WorkshopHeader({ eyebrow, title, description, stats, children }: {
+  eyebrow: string; title: string; description: string;
+  stats: { label: string; value: ReactNode; tone?: "default" | "warning" | "danger" }[];
+  children?: ReactNode;
+}) {
+  return <header className="rounded-2xl border border-border bg-card">
+    <div className="flex flex-col gap-4 border-b border-border p-4 sm:p-5 lg:flex-row lg:items-center lg:justify-between">
+      <div className="min-w-0">
+        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">{eyebrow}</p>
+        <h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">{title}</h1>
+        <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">{description}</p>
+      </div>
+      {children}
     </div>
-  </section>;
+    <dl className="grid grid-cols-2 divide-x divide-border sm:grid-cols-4">
+      {stats.map((stat) => <div key={stat.label} className="px-4 py-3">
+        <dt className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">{stat.label}</dt>
+        <dd className={cn("mt-0.5 text-xl font-bold tabular-nums",
+          stat.tone === "danger" && "text-destructive",
+          stat.tone === "warning" && "text-amber-600 dark:text-amber-400")}>{stat.value}</dd>
+      </div>)}
+    </dl>
+  </header>;
 }
 
-export function WorkshopToolbar({ query, onQuery, children }: { query: string; onQuery: (value: string) => void; children: ReactNode }) {
-  return <div className="sticky top-0 z-20 -mx-2 flex flex-col gap-3 border-b border-border/45 bg-background/90 px-2 py-3 backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between">
-    <div className="relative min-w-0 flex-1 sm:max-w-md"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input value={query} onChange={(event) => onQuery(event.target.value)} placeholder="Search reference, customer or tool…" className="h-11 rounded-2xl bg-muted/35 pl-9" /></div>{children}
+/** Backwards-compatible hero shim. */
+export function WorkshopHero({ eyebrow, title, description, count, overdue, children }: { eyebrow: string; title: string; description: string; count: number; overdue: number; children: ReactNode }) {
+  return <WorkshopHeader eyebrow={eyebrow} title={title} description={description} stats={[
+    { label: "Outstanding", value: count },
+    { label: "Overdue", value: overdue, tone: overdue > 0 ? "danger" : "default" },
+  ]}>{children}</WorkshopHeader>;
+}
+
+export function WorkshopToolbar({ query, onQuery, placeholder = "Search reference, customer or tool…", children }: { query: string; onQuery: (value: string) => void; placeholder?: string; children: ReactNode }) {
+  return <div className="sticky top-0 z-20 -mx-2 flex flex-col gap-2 border-b border-border bg-background px-2 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+    <div className="relative min-w-0 flex-1 sm:max-w-sm">
+      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+      <Input value={query} onChange={(event) => onQuery(event.target.value)} placeholder={placeholder} className="h-10 rounded-lg pl-9" />
+    </div>{children}
   </div>;
 }
 
+export function WorkshopTabs<T extends string>({ value, onChange, tabs }: { value: T; onChange: (value: T) => void; tabs: { id: T; label: string; count: number }[] }) {
+  return <div className="flex rounded-lg border border-border bg-muted/40 p-1">
+    {tabs.map((tab) => <button key={tab.id} type="button" onClick={() => onChange(tab.id)}
+      className={cn("flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-semibold transition",
+        value === tab.id ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>
+      {tab.label}
+      <span className={cn("rounded px-1.5 py-0.5 text-[10px] font-bold tabular-nums", value === tab.id ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground")}>{tab.count}</span>
+    </button>)}
+  </div>;
+}
+
+export function MonthDivider({ label, count, noun }: { label: string; count: number; noun: string }) {
+  return <div className="mb-2 flex items-center gap-3 pt-1">
+    <h2 className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground">{label}</h2>
+    <span className="h-px flex-1 bg-border" />
+    <span className="text-[11px] font-semibold tabular-nums text-muted-foreground">{count} {noun}{count === 1 ? "" : "s"}</span>
+  </div>;
+}
+
+/** Dense, scannable record row used by both workshop queues. */
+export function WorkshopCard({ reference, title, subtitle, meta, badges, aside, accent = "default", muted = false, onClick }: {
+  reference: string; title: string; subtitle?: ReactNode; meta?: ReactNode; badges?: ReactNode; aside?: ReactNode;
+  accent?: "default" | "urgent" | "warranty" | "scrapped" | "done"; muted?: boolean; onClick: () => void;
+}) {
+  const rail = accent === "urgent" ? "bg-destructive" : accent === "warranty" ? "bg-emerald-500" : accent === "scrapped" ? "bg-destructive/50" : accent === "done" ? "bg-emerald-500/40" : "bg-border";
+  return <button type="button" onClick={onClick}
+    className={cn("group relative flex w-full items-stretch overflow-hidden rounded-xl border border-border bg-card text-left transition hover:border-primary/40 hover:bg-accent/30", muted && "opacity-80")}>
+    <span className={cn("w-1 shrink-0", rail)} />
+    <div className="min-w-0 flex-1 p-3.5">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="font-mono text-[11px] font-bold uppercase tracking-wide text-muted-foreground">{reference}</p>
+          <h3 className="mt-0.5 truncate text-base font-bold tracking-tight">{title}</h3>
+          {subtitle && <div className="mt-0.5 truncate text-xs text-muted-foreground">{subtitle}</div>}
+        </div>
+        <div className="flex shrink-0 flex-wrap justify-end gap-1">{badges}</div>
+      </div>
+      {aside}
+      {meta && <div className="mt-3 flex items-center justify-between gap-3 border-t border-border pt-2.5 text-[11px] text-muted-foreground">{meta}</div>}
+    </div>
+  </button>;
+}
+
 export function EmptyWorkshop({ history = false }: { history?: boolean }) {
-  return <div className="rounded-[26px] border border-dashed border-border/70 bg-muted/15 px-5 py-14 text-center"><span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-emerald-500/10 text-emerald-600"><CheckCircle2 className="h-6 w-6" /></span><h3 className="mt-4 font-black">{history ? "No matching history" : "Workshop queue is clear"}</h3><p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">{history ? "Completed work remains safely searchable here." : "New manual work will appear here as soon as a team member adds it."}</p></div>;
+  return <div className="rounded-xl border border-dashed border-border bg-card px-5 py-14 text-center">
+    <span className="mx-auto grid h-11 w-11 place-items-center rounded-lg bg-emerald-500/10 text-emerald-600"><CheckCircle2 className="h-5 w-5" /></span>
+    <h3 className="mt-3 font-bold">{history ? "No matching history" : "Workshop queue is clear"}</h3>
+    <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">{history ? "Completed work remains safely searchable here." : "New manual work will appear here as soon as a team member adds it."}</p>
+  </div>;
+}
+
+/** Solid, opaque detail bubble shell used by both workshop detail dialogs. */
+export function WorkshopDetail({ icon, reference, title, subtitle, badges, overlay, children, actions }: {
+  icon: ReactNode; reference: string; title: string; subtitle?: ReactNode; badges?: ReactNode; overlay?: ReactNode;
+  children: ReactNode; actions?: ReactNode;
+}) {
+  return <div className="relative flex max-h-[92dvh] flex-col bg-card">
+    {overlay}
+    <div className="sticky top-0 z-20 flex items-start gap-3 border-b border-border bg-muted/40 px-5 py-4 sm:px-6">
+      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-border bg-card text-primary">{icon}</span>
+      <div className="min-w-0 flex-1 pr-8">
+        <p className="font-mono text-[11px] font-bold uppercase tracking-wide text-muted-foreground">{reference}</p>
+        <h2 className="truncate text-xl font-bold tracking-tight">{title}</h2>
+        {subtitle && <div className="mt-0.5 truncate text-sm text-muted-foreground">{subtitle}</div>}
+        {badges && <div className="mt-2 flex flex-wrap gap-1.5">{badges}</div>}
+      </div>
+    </div>
+    <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-5 sm:p-6">{children}</div>
+    {actions && <div className="sticky bottom-0 z-20 flex flex-col gap-2 border-t border-border bg-muted/40 p-4 sm:flex-row sm:justify-end sm:px-6">{actions}</div>}
+  </div>;
+}
+
+export function DetailSection({ title, children, className }: { title: string; children: ReactNode; className?: string }) {
+  return <section className={cn("rounded-xl border border-border bg-background p-4", className)}>
+    <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">{title}</p>
+    {children}
+  </section>;
 }
 
 export function DetailValue({ label, value, icon }: { label: string; value?: ReactNode; icon?: ReactNode }) {
-  return <div className="rounded-2xl border border-border/50 bg-muted/25 p-3.5"><p className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.15em] text-muted-foreground">{icon}{label}</p><div className="mt-1.5 break-words text-sm font-semibold text-foreground">{value || "—"}</div></div>;
+  return <div className="rounded-lg border border-border bg-background p-3">
+    <p className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-[0.15em] text-muted-foreground">{icon}{label}</p>
+    <div className="mt-1 break-words text-sm font-semibold text-foreground">{value || "—"}</div>
+  </div>;
 }
 
 export function AssignmentLine({ member, deadline, overdue }: { member?: TeamMember | null; deadline?: string | null; overdue?: boolean }) {
-  return <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground"><span className="flex items-center gap-1"><UserRound className="h-3.5 w-3.5" />{memberLabel(member)}</span>{deadline && <span className={cn("flex items-center gap-1", overdue && "font-bold text-destructive")}><CalendarDays className="h-3.5 w-3.5" />Due {formatDate(deadline)}</span>}</div>;
+  return <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
+    <span className="flex items-center gap-1"><UserRound className="h-3.5 w-3.5" />{memberLabel(member)}</span>
+    {deadline && <span className={cn("flex items-center gap-1", overdue && "font-bold text-destructive")}><CalendarDays className="h-3.5 w-3.5" />Due {formatDate(deadline)}</span>}
+  </div>;
 }
+
+export { AlertTriangle, Clock3 };
