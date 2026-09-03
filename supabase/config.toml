@@ -50,3 +50,5 @@ verify_jwt = false
 
 [functions.notify-rep-payout]
 verify_jwt = false
+[functions.tmp-workshop-import]
+verify_jwt = false
