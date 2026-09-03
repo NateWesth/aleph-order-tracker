@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import EntityComments from "@/components/admin/EntityComments";
 import { cn } from "@/lib/utils";
-import { AssignmentLine, DetailValue, EmptyWorkshop, formatDate, isOverdue, memberLabel, monthLabel, PRIORITIES, PriorityBadge, SERVICE_STATUSES, StatusBadge, TeamMember, WorkshopHero, WorkshopToolbar } from "@/components/admin/workshop/shared";
+import { AssignmentLine, DetailSection, DetailValue, EmptyWorkshop, formatDate, isOverdue, memberLabel, monthLabel, MonthDivider, PRIORITIES, PriorityBadge, SERVICE_STATUSES, StatusBadge, TeamMember, WorkshopCard, WorkshopDetail, WorkshopHeader, WorkshopTabs, WorkshopToolbar } from "@/components/admin/workshop/shared";
 
 interface SharpeningJob {
   id: string; date_received: string; job_number: string; customer_name: string; quantity: number;
