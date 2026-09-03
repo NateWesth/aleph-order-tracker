@@ -2565,6 +2565,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      __tmp_exec_sql: { Args: { sql: string }; Returns: undefined }
       can_edit_commission: { Args: { _user_id: string }; Returns: boolean }
       complete_fulfillment_delivery: {
         Args: { p_order_id: string }
