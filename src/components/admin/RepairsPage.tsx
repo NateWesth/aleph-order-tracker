@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import EntityComments from "@/components/admin/EntityComments";
 import { cn } from "@/lib/utils";
-import { AssignmentLine, DetailSection, DetailValue, EmptyWorkshop, formatDate, isOverdue, memberLabel, monthLabel, MonthDivider, PRIORITIES, PriorityBadge, SERVICE_STATUSES, StatusBadge, TeamMember, WorkshopCard, WorkshopDetail, WorkshopHeader, WorkshopTabs, WorkshopToolbar } from "@/components/admin/workshop/shared";
+import { DetailSection, DetailValue, EmptyWorkshop, formatDate, isOverdue, memberLabel, groupByStatus, ListHeadings, StatusGroup, PRIORITIES, PriorityBadge, SERVICE_STATUSES, StatusBadge, TeamMember, WorkshopPanel, WorkshopRow, WorkshopHeader, WorkshopTabs, WorkshopToolbar } from "@/components/admin/workshop/shared";
 
 interface RepairTicket {
   id: string; ticket_number: string; client: string; tool_code: string; tool_information: string;
@@ -56,7 +56,7 @@ export default function RepairsPage() {
   const overdueCount = active.filter((ticket) => isOverdue(ticket.deadline_date)).length;
   const base = tab === "history" ? history : tab === "warranty" ? warrantyActive : normalActive;
   const visible = base.filter((ticket) => `${ticket.ticket_number} ${ticket.client} ${ticket.tool_code} ${ticket.tool_information} ${ticket.supplier_information || ""}`.toLowerCase().includes(query.trim().toLowerCase())).sort((a,b) => Number(b.priority === "urgent") - Number(a.priority === "urgent") || b.date_received_by_client.localeCompare(a.date_received_by_client));
-  const groups = useMemo(() => Object.entries(visible.reduce<Record<string,RepairTicket[]>>((acc,ticket) => { const key = monthLabel(ticket.date_received_by_client); (acc[key] ||= []).push(ticket); return acc; }, {})), [visible]);
+  const groups = useMemo(() => groupByStatus(visible, (ticket) => ticket.status, (ticket) => ticket.date_received_by_client), [visible]);
 
   const warrantyMatch = useMemo(() => {
     const code = draft.tool_code.trim().toLowerCase(); if (!code) return null;
@@ -100,24 +100,28 @@ export default function RepairsPage() {
       ]} />
     </WorkshopToolbar>
 
-    {loading ? <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-3">{[1,2,3,4,5,6].map(n => <div key={n} className="h-36 animate-pulse rounded-xl bg-muted/50" />)}</div> : groups.length === 0 ? <EmptyWorkshop history={tab === "history"} /> : <div className="space-y-5">{groups.map(([month, monthTickets]) => <section key={month}>
-      <MonthDivider label={month} count={monthTickets.length} noun="ticket" />
-      <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-3">{monthTickets.map(ticket => {
-        const overdue = isOverdue(ticket.deadline_date, ["completed","scrapped"].includes(ticket.status));
-        return <WorkshopCard
-          key={ticket.id}
-          onClick={() => setSelected(ticket)}
-          reference={`Ticket ${ticket.ticket_number}`}
-          title={ticket.client}
-          subtitle={<span className="font-mono uppercase text-primary">{ticket.tool_code}</span>}
-          accent={ticket.status === "scrapped" ? "scrapped" : ticket.is_warranty ? "warranty" : ticket.priority === "urgent" || overdue ? "urgent" : ticket.status === "completed" ? "done" : "default"}
-          muted={["completed","scrapped"].includes(ticket.status)}
-          badges={<><PriorityBadge priority={ticket.priority} />{ticket.is_warranty && <Badge className="rounded-md bg-emerald-600 px-2 py-0.5 text-[10px] font-bold uppercase text-white"><ShieldCheck className="mr-1 h-3 w-3" />Warranty</Badge>}{ticket.status === "scrapped" && <Badge variant="destructive" className="rounded-md px-2 py-0.5 text-[10px] font-bold uppercase">Scrapped</Badge>}</>}
-          aside={<><p className="mt-2 line-clamp-2 text-xs leading-5 text-muted-foreground">{ticket.tool_information}</p><div className="mt-2.5"><StatusBadge status={ticket.status} /></div><AssignmentLine member={ticket.assigned_to ? memberMap.get(ticket.assigned_to) : null} deadline={ticket.deadline_date} overdue={overdue} /></>}
-          meta={<><span>Received {formatDate(ticket.date_received_by_client)}</span><span className="font-semibold text-primary opacity-0 transition group-hover:opacity-100">Open →</span></>}
-        />;
-      })}</div>
-    </section>)}</div>}
+    {loading ? <div className="space-y-2">{[1,2,3].map(n => <div key={n} className="h-24 animate-pulse rounded-xl bg-muted/50" />)}</div> : groups.length === 0 ? <EmptyWorkshop history={tab === "history"} /> : <div className="space-y-3">
+      <ListHeadings columns={["Ticket", "Client / tool", "Flags", "Assigned to", "Date"]} />
+      {groups.map(([status, statusTickets]) => <StatusGroup key={status} status={status} count={statusTickets.length}>
+        {statusTickets.map(ticket => {
+          const overdue = isOverdue(ticket.deadline_date, ["completed","scrapped"].includes(ticket.status));
+          return <WorkshopRow
+            key={ticket.id}
+            onClick={() => setSelected(ticket)}
+            active={selected?.id === ticket.id}
+            muted={["completed","scrapped"].includes(ticket.status)}
+            reference={ticket.ticket_number}
+            primary={ticket.client}
+            secondary={ticket.tool_code}
+            date={ticket.date_received_by_client}
+            deadline={ticket.deadline_date}
+            overdue={overdue}
+            assignee={memberLabel(ticket.assigned_to ? memberMap.get(ticket.assigned_to) : null)}
+            tags={<><PriorityBadge priority={ticket.priority} />{ticket.is_warranty && <span className="rounded bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-bold uppercase text-emerald-600">Warranty</span>}{ticket.status === "scrapped" && <span className="rounded bg-destructive/10 px-1.5 py-0.5 text-[10px] font-bold uppercase text-destructive">Scrapped</span>}{ticket.invoiced && <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-bold uppercase text-muted-foreground">Invoiced</span>}</>}
+          />;
+        })}
+      </StatusGroup>)}
+    </div>}
 
     <Dialog open={formOpen} onOpenChange={setFormOpen}><DialogContent className="max-h-[92dvh] w-[calc(100%-20px)] max-w-3xl overflow-y-auto rounded-[28px] p-0"><div className="border-b border-border/60 bg-primary/[.06] p-5 sm:p-6"><DialogHeader><DialogTitle className="flex items-center gap-2 text-2xl font-black"><span className="grid h-10 w-10 place-items-center rounded-2xl bg-primary text-primary-foreground"><Wrench className="h-5 w-5"/></span>{editingId?"Edit repair ticket":"New repair ticket"}</DialogTitle></DialogHeader><p className="mt-2 text-sm text-muted-foreground">Tool code is the warranty key. Use the same code every time a tool returns.</p></div><div className="space-y-6 p-5 sm:p-6">
       <FormSection title="Ticket & tool"><div className="grid gap-4 sm:grid-cols-2"><Field label="Ticket number *"><Input value={draft.ticket_number} onChange={e=>set("ticket_number",e.target.value)} placeholder="REP-2048"/></Field><Field label="Date received by client *"><Input type="date" value={draft.date_received_by_client} onChange={e=>set("date_received_by_client",e.target.value)}/></Field><Field label="Client *"><Input value={draft.client} onChange={e=>set("client",e.target.value)}/></Field><Field label="Tool code / serial *"><Input value={draft.tool_code} onChange={e=>set("tool_code",e.target.value)} placeholder="Unique code used for warranty matching" className="uppercase"/></Field><Field label="Tool information *" wide><Textarea value={draft.tool_information} onChange={e=>set("tool_information",e.target.value)} className="min-h-20" placeholder="Make, model, serial, fault and accessories received…"/></Field></div>{warrantyMatch&&<div className="mt-4 flex gap-3 rounded-2xl border border-emerald-500/25 bg-emerald-500/10 p-4 text-emerald-800 dark:text-emerald-200"><ShieldCheck className="mt-0.5 h-5 w-5 shrink-0"/><div><p className="text-sm font-black">Warranty automatically detected</p><p className="mt-0.5 text-xs">Tool code matches {warrantyMatch.ticket_number}. Coverage runs until {formatDate(warrantyMatch.warranty_expires_at)}; this ticket will enter Warranty Repairs.</p></div></div>}</FormSection>
@@ -128,16 +132,18 @@ export default function RepairsPage() {
       <div className="flex flex-col-reverse gap-2 border-t pt-4 sm:flex-row sm:justify-end"><Button variant="outline" onClick={()=>setFormOpen(false)}>Cancel</Button><Button onClick={()=>void save()} disabled={saving}>{saving?"Saving…":editingId?"Save changes":"Add repair"}</Button></div>
     </div></DialogContent></Dialog>
 
-    <Dialog open={!!selected} onOpenChange={open=>!open&&setSelected(null)}><DialogContent className="w-[calc(100%-20px)] max-w-3xl overflow-hidden rounded-2xl border border-border bg-card p-0 shadow-xl">{selected&&<WorkshopDetail
+    <WorkshopPanel
+      open={!!selected}
+      onOpenChange={open=>!open&&setSelected(null)}
       icon={<Wrench className="h-5 w-5" />}
-      reference={`Ticket ${selected.ticket_number}`}
-      title={selected.client}
-      subtitle={<span className="font-mono uppercase text-primary">{selected.tool_code}</span>}
-      badges={<><StatusBadge status={selected.status}/><PriorityBadge priority={selected.priority}/>{selected.is_warranty&&<Badge className="rounded-md bg-emerald-600 px-2 py-0.5 text-[10px] font-bold uppercase text-white"><ShieldCheck className="mr-1 h-3 w-3"/>Warranty repair</Badge>}</>}
-      overlay={selected.status==="scrapped"?<div className="pointer-events-none absolute inset-0 z-30 grid place-items-center overflow-hidden" aria-hidden><span className="-rotate-12 whitespace-nowrap rounded-xl border-[7px] border-red-600/20 px-7 py-3 text-5xl font-black tracking-[.16em] text-red-600/20 sm:text-7xl">SCRAPPED</span></div>:null}
-      actions={<><Button variant="outline" className="sm:min-w-36" onClick={()=>openEdit(selected)}><Edit3 className="mr-2 h-4 w-4"/>Edit details</Button>{!["completed","scrapped"].includes(selected.status)&&<><Button variant="destructive" onClick={()=>setScrapOpen(true)}><Trash2 className="mr-2 h-4 w-4"/>Scrap tool</Button><Button className="sm:min-w-40" onClick={()=>void updateStatus(selected,"completed")}><CheckCircle2 className="mr-2 h-4 w-4"/>Complete & archive</Button></>}</>}
+      reference={selected ? `Ticket ${selected.ticket_number}` : ""}
+      title={selected?.client || ""}
+      subtitle={selected ? <span className="font-mono uppercase text-primary">{selected.tool_code}</span> : null}
+      badges={selected ? <><StatusBadge status={selected.status}/><PriorityBadge priority={selected.priority}/>{selected.is_warranty&&<Badge className="rounded-md bg-emerald-600 px-2 py-0.5 text-[10px] font-bold uppercase text-white"><ShieldCheck className="mr-1 h-3 w-3"/>Warranty</Badge>}</> : null}
+      overlay={selected?.status==="scrapped"?<div className="pointer-events-none absolute inset-0 z-30 grid place-items-center overflow-hidden" aria-hidden><span className="-rotate-12 whitespace-nowrap rounded-xl border-[7px] border-red-600/20 px-6 py-3 text-4xl font-black tracking-[.16em] text-red-600/20 sm:text-6xl">SCRAPPED</span></div>:null}
+      actions={selected ? <><Button variant="outline" className="sm:min-w-32" onClick={()=>openEdit(selected)}><Edit3 className="mr-2 h-4 w-4"/>Edit details</Button>{!["completed","scrapped"].includes(selected.status)&&<><Button variant="destructive" onClick={()=>setScrapOpen(true)}><Trash2 className="mr-2 h-4 w-4"/>Scrap tool</Button><Button className="sm:min-w-36" onClick={()=>void updateStatus(selected,"completed")}><CheckCircle2 className="mr-2 h-4 w-4"/>Complete & archive</Button></>}</> : null}
     >
-      <DialogHeader className="sr-only"><DialogTitle>Repair ticket {selected.ticket_number}</DialogTitle></DialogHeader>
+      {selected && <>
       {selected.is_warranty&&<div className="flex gap-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4"><ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600"/><div><p className="text-sm font-bold text-emerald-800 dark:text-emerald-200">Covered warranty repair</p><p className="mt-0.5 text-xs text-emerald-700 dark:text-emerald-300">Automatically matched to {tickets.find(t=>t.id===selected.warranty_source_ticket_id)?.ticket_number||"a previous repair"} by tool code.</p></div></div>}
       <DetailValue label="Tool information" value={<p className="whitespace-pre-wrap font-normal leading-6">{selected.tool_information}</p>} icon={<Hammer className="h-3.5 w-3.5"/>}/>
       <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3"><DetailValue label="Received" value={formatDate(selected.date_received_by_client)} icon={<CalendarClock className="h-3.5 w-3.5"/>}/><DetailValue label="Assigned to" value={memberLabel(selected.assigned_to?memberMap.get(selected.assigned_to):null)} icon={<UserRound className="h-3.5 w-3.5"/>}/><DetailValue label="Deadline" value={formatDate(selected.deadline_date)}/><DetailValue label="Supplier return" value={formatDate(selected.date_received_back_from_supplier)}/><DetailValue label="Warranty" value={selected.warranty_expires_at?`${selected.warranty_months} months · to ${formatDate(selected.warranty_expires_at)}`:"Not set"}/><DetailValue label="Invoice" value={selected.invoiced?selected.invoice_number||"Completed":"Not invoiced"}/></div>
@@ -146,7 +152,8 @@ export default function RepairsPage() {
       {selected.notes&&<DetailValue label="Repair notes" value={<p className="whitespace-pre-wrap font-normal leading-6">{selected.notes}</p>}/>}
       {selected.scrap_reason&&<DetailValue label="Scrap reason" value={<p className="font-normal text-red-700 dark:text-red-300">{selected.scrap_reason}</p>}/>}
       <EntityComments entityType="repair" entityId={selected.id} defaultOpen/>
-    </WorkshopDetail>}</DialogContent></Dialog>
+      </>}
+    </WorkshopPanel>
 
     <Dialog open={scrapOpen} onOpenChange={setScrapOpen}><DialogContent className="w-[calc(100%-24px)] max-w-md rounded-[26px]"><DialogHeader><DialogTitle className="flex items-center gap-2 text-xl font-black text-destructive"><AlertTriangle className="h-5 w-5"/>Mark this tool as scrapped?</DialogTitle></DialogHeader><p className="text-sm text-muted-foreground">The record is not deleted. It moves to history and receives a permanent red SCRAPPED stamp.</p><div><Label className="mb-1.5 block text-[10px] font-black uppercase tracking-wider text-muted-foreground">Reason (recommended)</Label><Textarea value={scrapReason} onChange={e=>setScrapReason(e.target.value)} placeholder="Unsafe to repair, parts unavailable…" className="min-h-24"/></div><div className="flex justify-end gap-2"><Button variant="outline" onClick={()=>setScrapOpen(false)}>Cancel</Button><Button variant="destructive" disabled={saving} onClick={()=>void scrap()}>{saving?"Saving…":"Confirm scrap"}</Button></div></DialogContent></Dialog>
   </div>;
