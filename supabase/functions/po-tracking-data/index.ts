@@ -50,6 +50,18 @@ function sourceModifiedAt(record: any): string {
   return String(record?.last_modified_time || record?.updated_time || record?.modified_time || '')
 }
 
+function sourceLineDescription(line: any): string {
+  return String(line?.description || line?.item_description || line?.item_details || line?.notes || '').trim()
+}
+
+function cachedLineDescriptionsAreComplete(entry: POEntry): boolean {
+  return Array.isArray(entry.lines) && entry.lines.every((line) => {
+    const sku = String(line.sku || '').trim().toLowerCase()
+    const generic = sku.startsWith('m-misc') || sku === 'misc' || sku === 'miscellaneous'
+    return !generic || Boolean(String(line.description || '').trim())
+  })
+}
+
 function isExcludedSku(sku: string): boolean {
   const s = (sku || '').trim().toUpperCase()
   return s.startsWith('SH-') || s.startsWith('ZSH')
@@ -316,7 +328,7 @@ async function fetchOutstandingPurchaseOrders(accessToken: string, orgId: string
         const id = String(summary.purchaseorder_id || '')
         const cached = cachedById.get(id)
         const modifiedAt = sourceModifiedAt(summary)
-        if (cached && modifiedAt && cached.sourceModifiedAt === modifiedAt) {
+        if (cached && modifiedAt && cached.sourceModifiedAt === modifiedAt && cachedLineDescriptionsAreComplete(cached)) {
           return { summary, cached }
         }
         try {
@@ -363,7 +375,7 @@ async function fetchOutstandingPurchaseOrders(accessToken: string, orgId: string
         lines.push({
           sku,
           name: String(line.name || ''),
-          description: String(line.description || ''),
+          description: sourceLineDescription(line),
           quantity,
           quantityReceived,
           quantityBilled,

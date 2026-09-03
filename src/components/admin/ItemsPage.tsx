@@ -43,6 +43,7 @@ import {
 import { toast } from "sonner";
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import PageHeader from "@/components/ui/PageHeader";
+import { getPurchaseOrderLineDisplayName, getPurchaseOrderLineSecondaryName } from "@/lib/itemDisplay";
 
 interface Item {
   id: string;
@@ -96,7 +97,7 @@ const ItemsPage = () => {
         .range((nextPage - 1) * PAGE_SIZE, nextPage * PAGE_SIZE - 1);
 
       if (q) {
-        query = query.or(`name.ilike.%${q}%,code.ilike.%${q}%`);
+        query = query.or(`name.ilike.%${q}%,code.ilike.%${q}%,description.ilike.%${q}%`);
       }
 
       const { data, error, count } = await query;
@@ -365,7 +366,10 @@ const ItemsPage = () => {
         </div>
       ) : (
         <div className="catalogue-card-grid grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-          {items.map((item, index) => (
+          {items.map((item, index) => {
+            const displayName = getPurchaseOrderLineDisplayName(item);
+            const secondaryName = getPurchaseOrderLineSecondaryName(item);
+            return (
             <article key={item.id} className="group relative isolate overflow-hidden rounded-[24px] border border-border/60 bg-card/90 p-4 shadow-[0_22px_48px_-42px_hsl(var(--foreground)/.5)] transition-all duration-200 hover:-translate-y-1 hover:border-primary/25 hover:shadow-[0_28px_58px_-40px_hsl(var(--primary)/.35)]">
               <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary via-primary/35 to-transparent" aria-hidden />
               <div className="flex items-start gap-3">
@@ -374,12 +378,13 @@ const ItemsPage = () => {
                 </span>
                 <div className="min-w-0 flex-1">
                   <span className="inline-flex max-w-full rounded-lg bg-muted px-2 py-1 font-mono text-[10px] font-bold text-muted-foreground">{item.code}</span>
-                  <h3 className="mt-2 line-clamp-2 font-display text-base font-black leading-tight text-foreground">{item.name}</h3>
+                  <h3 className="mt-2 line-clamp-3 font-display text-base font-black leading-tight text-foreground">{displayName}</h3>
                 </div>
               </div>
 
               <div className="mt-4 min-h-[52px] rounded-2xl bg-muted/35 px-3 py-2.5">
-                <p className="line-clamp-2 text-xs leading-relaxed text-muted-foreground">{item.description || "No description has been added yet."}</p>
+                <p className="text-[9px] font-black uppercase tracking-[0.14em] text-muted-foreground">Catalogue name</p>
+                <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-muted-foreground">{secondaryName || item.name || "No separate catalogue name"}</p>
               </div>
 
               <div className="mt-3 flex items-center justify-between gap-3 border-t border-border/45 pt-3">
@@ -397,7 +402,8 @@ const ItemsPage = () => {
                 </div>
               </div>
             </article>
-          ))}
+            );
+          })}
         </div>
       )}
 

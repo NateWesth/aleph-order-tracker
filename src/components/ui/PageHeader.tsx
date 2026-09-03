@@ -30,8 +30,8 @@ export function PageHeader({ title, description, icon: Icon, stats, actions, too
       <div className="pointer-events-none absolute -right-12 -top-24 h-64 w-64 rounded-full bg-primary/[0.09] blur-3xl" aria-hidden />
 
       <div className="relative">
-        <div className="grid gap-5 p-5 sm:p-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center lg:p-7">
-          <div className="flex min-w-0 items-center gap-4 sm:gap-5">
+        <div className="aleph-command-primary grid gap-5 p-5 sm:p-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center lg:p-7">
+          <div className="aleph-command-title flex min-w-0 items-center gap-4 sm:gap-5">
             {Icon && (
               <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[20px] border border-primary/15 bg-gradient-to-br from-primary/18 to-primary/5 text-primary shadow-[0_18px_35px_-24px_hsl(var(--primary))] sm:h-16 sm:w-16">
                 <Icon className="h-6 w-6 sm:h-7 sm:w-7" />
@@ -45,11 +45,11 @@ export function PageHeader({ title, description, icon: Icon, stats, actions, too
               {description && <p className="mt-2 max-w-3xl text-xs leading-relaxed text-muted-foreground sm:text-sm">{description}</p>}
             </div>
           </div>
-          {actions && <div className="flex flex-wrap items-center gap-2 lg:max-w-lg lg:justify-end">{actions}</div>}
+          {actions && <div className="aleph-command-actions flex flex-wrap items-center gap-2 lg:max-w-lg lg:justify-end">{actions}</div>}
         </div>
 
         {stats && stats.length > 0 && (
-          <div className="grid grid-cols-2 gap-px border-y border-border/55 bg-border/55 sm:flex sm:border-b-0">
+          <div className="aleph-command-stats grid grid-cols-2 gap-px border-y border-border/55 bg-border/55 sm:flex sm:border-b-0">
             {stats.map((stat) => (
               <div key={stat.label} className="flex min-w-[145px] items-center gap-3 bg-background/55 px-4 py-3 backdrop-blur sm:flex-1 sm:px-5">
                 {stat.icon && <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/10"><stat.icon className="h-4 w-4 text-primary" /></span>}

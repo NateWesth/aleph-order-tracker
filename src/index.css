@@ -3423,3 +3423,204 @@ html[data-density="dense"] .app-page-stage .rounded-\[24px\] { border-radius: 1r
   .aleph-page-workspace { --aleph-card-gap: .75rem; }
   .aleph-page-workspace .sticky { max-width: 100%; }
 }
+
+/* ============================================================
+   ALEPH MOBILE WORKSPACE V10 — TOUCH-FIRST, NOT SHRUNK DESKTOP
+   ============================================================ */
+@media (max-width: 639px) {
+  .app-shell main.aleph-content-scroll {
+    scroll-padding-top: .5rem;
+    padding-bottom: calc(5.25rem + env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  .app-page-stage {
+    padding: .6rem .6rem 1rem !important;
+  }
+
+  .aleph-page-workspace {
+    gap: .7rem;
+  }
+
+  .aleph-command-header {
+    border-radius: 1.25rem !important;
+    box-shadow: 0 16px 38px -32px hsl(var(--foreground) / .5) !important;
+  }
+
+  .aleph-command-primary {
+    gap: .8rem !important;
+    padding: .9rem !important;
+  }
+
+  .aleph-command-title {
+    align-items: flex-start !important;
+    gap: .7rem !important;
+  }
+
+  .aleph-command-title > span:first-child {
+    width: 2.65rem !important;
+    height: 2.65rem !important;
+    border-radius: .9rem !important;
+  }
+
+  .aleph-command-title h1 {
+    font-size: 1.35rem !important;
+    line-height: 1.1 !important;
+  }
+
+  .aleph-command-title p:last-child {
+    margin-top: .35rem !important;
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .aleph-command-actions {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .aleph-command-actions > button,
+  .aleph-command-actions > a {
+    width: 100%;
+    min-width: 0;
+    min-height: 2.75rem;
+  }
+
+  .aleph-command-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .aleph-command-stats > div {
+    min-width: 0 !important;
+    padding: .7rem .8rem !important;
+  }
+
+  .aleph-page-command-dock {
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    scrollbar-width: none;
+  }
+
+  .aleph-page-command-dock::-webkit-scrollbar,
+  .orders-mobile-swipe::-webkit-scrollbar,
+  .fulfillment-board-grid::-webkit-scrollbar {
+    display: none;
+  }
+
+  .app-page-stage [role="tablist"] {
+    justify-content: flex-start;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    scrollbar-width: none;
+  }
+
+  .app-page-stage [role="tab"] {
+    min-height: 2.75rem;
+    flex: 0 0 auto;
+  }
+
+  .app-page-stage .overflow-x-auto {
+    overscroll-behavior-inline: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Orders become four full-width, horizontally swipeable workflow screens. */
+  .orders-mobile-swipe {
+    display: flex !important;
+    gap: .65rem !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    scroll-snap-type: x mandatory;
+    scroll-padding-inline: .1rem;
+    scrollbar-width: none;
+  }
+
+  .orders-mobile-swipe > .order-board-lane-frame {
+    flex: 0 0 calc(100vw - 1.35rem);
+    width: calc(100vw - 1.35rem) !important;
+    height: calc(100dvh - var(--aleph-header-height, 70px) - 7rem);
+    min-height: 30rem;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+  }
+
+  /* Dispatch uses the same one-lane-at-a-time swipe model on phones. */
+  .fulfillment-board-grid {
+    display: flex !important;
+    grid-template-columns: none !important;
+    gap: .65rem !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+  }
+
+  .fulfillment-board-grid > .fulfillment-lane {
+    flex: 0 0 calc(100vw - 1.35rem) !important;
+    width: calc(100vw - 1.35rem) !important;
+    min-height: 30rem;
+    max-height: calc(100dvh - var(--aleph-header-height, 70px) - 8.25rem);
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+  }
+
+  .fulfillment-v3 > section.sticky {
+    position: relative !important;
+    top: auto !important;
+    z-index: 10;
+    padding: .65rem !important;
+    border-radius: 1.15rem !important;
+  }
+
+  .fulfillment-v3 > section:first-child > div:last-child {
+    padding: .85rem !important;
+  }
+
+  .fulfillment-v3 > section:first-child h1 {
+    font-size: 1.35rem !important;
+  }
+
+  .fulfillment-detail-modal {
+    max-height: calc(100dvh - 1rem) !important;
+    border-radius: 1.4rem !important;
+  }
+
+  .fulfillment-detail-modal > div:nth-child(2) {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: hsl(var(--background) / .96);
+    backdrop-filter: blur(18px);
+  }
+
+  .fulfillment-detail-modal textarea {
+    min-height: 6rem !important;
+  }
+
+  .catalogue-card-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .catalogue-card-grid > article {
+    border-radius: 1.15rem !important;
+    padding: .85rem !important;
+  }
+
+  /* Mobile dialogs use almost the full screen and keep controls reachable. */
+  [role="dialog"] {
+    width: calc(100vw - 1rem) !important;
+    max-width: calc(100vw - 1rem) !important;
+  }
+
+  [role="dialog"] button,
+  [role="dialog"] [role="button"] {
+    min-height: 2.75rem;
+    touch-action: manipulation;
+  }
+
+  .aleph-mobile-nav button {
+    min-height: 3.45rem;
+  }
+}

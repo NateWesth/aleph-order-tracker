@@ -1149,7 +1149,7 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
 
             <div
               className={cn(
-                "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4 w-full overflow-visible",
+                "orders-mobile-swipe grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4 w-full overflow-visible",
                 "items-start lg:items-stretch",
               )}
             >

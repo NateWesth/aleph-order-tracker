@@ -33,7 +33,7 @@ import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import { OrderWithCompany } from "@/components/orders/types/orderTypes";
 import OrderDetailsDialog from "@/components/orders/components/OrderDetailsDialog";
 import PageHeader from "@/components/ui/PageHeader";
-import { getItemDisplayName } from "@/lib/itemDisplay";
+import { getPurchaseOrderLineDisplayName, getPurchaseOrderLineSecondaryName } from "@/lib/itemDisplay";
 import { cn } from "@/lib/utils";
 
 interface POLine {
@@ -564,7 +564,8 @@ export default function POTrackingPage() {
                                 <div className="space-y-2">
                                   {po.lines.map((line, idx) => (
                                     <div key={`${po.purchaseOrderId}-${idx}`} className="p-2 rounded-md bg-background border space-y-1">
-                                      <p className="text-sm font-medium">{getItemDisplayName({ sku: line.sku, name: line.name, description: line.description })}</p>
+                                      <p className="text-sm font-medium">{getPurchaseOrderLineDisplayName(line)}</p>
+                                      {getPurchaseOrderLineSecondaryName(line) && <p className="text-xs text-muted-foreground">{getPurchaseOrderLineSecondaryName(line)}</p>}
                                       <p className="text-xs font-mono text-muted-foreground">{line.sku || "-"}</p>
                                       <div className="grid grid-cols-4 gap-1 text-xs">
                                         <div><span className="text-muted-foreground block">Ord</span>{line.quantity}</div>
@@ -593,7 +594,7 @@ export default function POTrackingPage() {
                                       <TableRow key={`${po.purchaseOrderId}-${idx}`}>
                                         <TableCell className="font-mono text-xs">{line.sku || "-"}</TableCell>
                                         <TableCell className="max-w-[320px] truncate">
-                                          {getItemDisplayName({ sku: line.sku, name: line.name, description: line.description })}
+                                          {getPurchaseOrderLineDisplayName(line)}
                                         </TableCell>
                                         <TableCell className="text-right">{line.quantity}</TableCell>
                                         <TableCell className="text-right">{line.quantityReceived}</TableCell>
