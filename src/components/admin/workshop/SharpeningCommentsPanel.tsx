@@ -185,7 +185,7 @@ export default function SharpeningCommentsPanel({ entityType, title, subtitle, r
       toast({ title: "Comment not sent", description: "Check your connection and try again.", variant: "destructive" });
       return;
     }
-    setBody(""); setReplyTo(null); setTargetJob(null); setMentionedIds(new Map());
+    setBody(""); setReplyTo(null); setTargetRef(null); setMentionedIds(new Map());
     void load();
   };
 
@@ -298,7 +298,7 @@ export default function SharpeningCommentsPanel({ entityType, title, subtitle, r
                 ? <><span className="font-semibold text-primary">Replying to {replyTo.user_id === user?.id ? "you" : replyTo.author}: </span><span className="text-muted-foreground">{replyTo.body}</span></>
                 : <><span className="font-semibold text-logo-cyan">On job </span><span className="text-muted-foreground">{refMap.get(targetRef!)?.reference}</span></>}
             </span>
-            <button onClick={() => { setReplyTo(null); setTargetJob(null); }} className="shrink-0 text-muted-foreground hover:text-destructive"><X className="h-3 w-3" /></button>
+            <button onClick={() => { setReplyTo(null); setTargetRef(null); }} className="shrink-0 text-muted-foreground hover:text-destructive"><X className="h-3 w-3" /></button>
           </div>
         )}
 
