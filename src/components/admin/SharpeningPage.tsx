@@ -129,27 +129,29 @@ export default function SharpeningPage() {
       ]} />
     </WorkshopToolbar>
 
-    {loading ? <div className="space-y-2">{[1,2,3].map((n) => <div key={n} className="h-24 animate-pulse rounded-lg bg-muted/50" />)}</div> : groups.length === 0 ? <EmptyWorkshop history={tab === "history"} /> : <div className="space-y-4 rounded-lg border border-border bg-muted/10 p-3">
-      {groups.map(([status, statusJobs]) => <StatusGroup key={status} status={status} count={statusJobs.length}>
-        {statusJobs.map((job) => {
-          const overdue = isOverdue(job.deadline_date, job.status === "completed");
-          return <WorkshopRow
-            key={job.id}
-            onClick={() => setSelected(job)}
-            active={selected?.id === job.id}
-            muted={job.status === "completed"}
-            reference={job.job_number}
-            primary={job.customer_name}
-            secondary={job.order_number ? `Order ${job.order_number}` : undefined}
-            date={job.date_received}
-            deadline={job.deadline_date}
-            overdue={overdue}
-            assignee={memberLabel(job.assigned_to ? memberMap.get(job.assigned_to) : null)}
-            tags={<><PriorityBadge priority={job.priority} /><span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-bold tabular-nums">×{job.quantity}</span>{job.invoiced && <span className="rounded bg-success/10 px-1.5 py-0.5 text-[10px] font-bold uppercase text-success">Invoiced</span>}</>}
-          />;
-        })}
-      </StatusGroup>)}
-    </div>}
+    {loading ? <div className="space-y-2">{[1,2,3].map((n) => <div key={n} className="h-24 animate-pulse rounded-lg bg-muted/50" />)}</div> : monthGroups.length === 0 ? <EmptyWorkshop history={tab === "history"} /> : <BoardTable
+      groups={monthGroups}
+      collapsed={collapsed}
+      onToggle={(id) => setCollapsed((current) => ({ ...current, [id]: !current[id] }))}
+      rowKey={(job) => job.id}
+      onRowClick={(job) => setSelected(job)}
+      activeKey={selected?.id}
+      noun="job"
+      columns={[
+        { key: "job", label: "Job", cell: (job) => <span className="whitespace-nowrap px-1 font-semibold">{job.job_number}</span> },
+        { key: "received", label: "Received date", align: "center", cell: (job) => <span className="whitespace-nowrap text-xs text-muted-foreground">{formatDate(job.date_received)}</span> },
+        { key: "customer", label: "Customer", cell: (job) => <span className="px-1">{job.customer_name}</span> },
+        { key: "qty", label: "Qty", align: "center", width: "64px", cell: (job) => <span className="tabular-nums">{job.quantity}</span>, summary: (rows) => <span>{rows.reduce((sum, row) => sum + (row.quantity || 0), 0)} sum</span> },
+        { key: "priority", label: "Priority", align: "center", width: "104px", cell: (job) => <BoardCell tone={job.priority === "urgent" ? "danger" : job.priority === "high" ? "warning" : "neutral"}>{job.priority}</BoardCell> },
+        { key: "order", label: "Order no", align: "center", cell: (job) => <span className="text-xs text-muted-foreground">{job.order_number || "—"}</span> },
+        { key: "assigned", label: "Assigned", align: "center", width: "140px", cell: (job) => job.assigned_to ? <BoardCell tone="info">{memberLabel(memberMap.get(job.assigned_to))}</BoardCell> : <span className="text-xs text-muted-foreground">Unassigned</span> },
+        { key: "status", label: "Status", align: "center", width: "170px", cell: (job) => <BoardStatusCell status={job.status} /> },
+        { key: "deadline", label: "Deadline", align: "center", width: "130px", cell: (job) => job.deadline_date ? <span className={cn("whitespace-nowrap text-xs font-semibold", isOverdue(job.deadline_date, job.status === "completed") ? "text-destructive" : "text-muted-foreground")}>{formatDate(job.deadline_date)}</span> : <span className="text-xs text-muted-foreground">—</span> },
+        { key: "invoice", label: "Invoice", align: "center", width: "110px", cell: (job) => job.invoiced ? <BoardCell tone="success">Done</BoardCell> : <span className="text-xs text-muted-foreground">—</span> },
+        { key: "third", label: "Third party", align: "center", cell: (job) => <span className="text-xs text-muted-foreground">{job.third_party_name || "—"}</span> },
+      ]}
+    />}
+
 
 
     <Dialog open={formOpen} onOpenChange={setFormOpen}><DialogContent className="max-h-[92dvh] w-[calc(100%-20px)] max-w-3xl overflow-y-auto rounded-[28px] p-0"><div className="border-b border-border/60 bg-primary/[0.06] p-5 sm:p-6"><DialogHeader><DialogTitle className="flex items-center gap-2 text-2xl font-black"><span className="grid h-10 w-10 place-items-center rounded-2xl bg-primary text-primary-foreground"><Scissors className="h-5 w-5" /></span>{editingId ? "Edit sharpening job" : "New sharpening job"}</DialogTitle></DialogHeader><p className="mt-2 text-sm text-muted-foreground">Manual workshop record—no external API calls are made.</p></div><div className="space-y-6 p-5 sm:p-6">
