@@ -51,6 +51,18 @@
     --ribbon-5: 142 60% 40%;
     --ribbon-6: 28 90% 54%;
 
+    /* Logo spectrum — sampled directly from the Aleph mark (cyan #00A0C6,
+       violet #5C017D, magenta #A3027E, ink #1F2E34). Used for workshop
+       status / priority coding. */
+    --logo-cyan: 191 100% 39%;
+    --logo-teal: 196 100% 30%;
+    --logo-violet: 285 98% 30%;
+    --logo-magenta: 312 98% 32%;
+    --logo-pink: 322 80% 46%;
+    --logo-ink: 197 26% 16%;
+    --logo-on: 0 0% 100%;
+
+
     --border: 214 18% 89%;
     --input: 214 18% 89%;
     --ring: 205 90% 42%;
