@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlarmClock, MessageCircle, Plus } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { useMemo } from "react";
+import { AlarmClock, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { formatDate, isOverdue } from "@/components/admin/workshop/shared";
@@ -17,28 +16,10 @@ export interface FocusJob {
   priority: string;
 }
 
-interface FeedComment {
-  id: string;
-  entity_id: string;
-  body: string;
-  created_at: string;
-  author: string;
-}
-
 function daysWaiting(date: string) {
   const start = new Date(date);
   if (Number.isNaN(start.getTime())) return 0;
   return Math.max(0, Math.round((Date.now() - start.getTime()) / 86400000));
-}
-
-function relative(value: string) {
-  const then = new Date(value).getTime();
-  if (Number.isNaN(then)) return "";
-  const mins = Math.round((Date.now() - then) / 60000);
-  if (mins < 1) return "now";
-  if (mins < 60) return `${mins}m ago`;
-  if (mins < 1440) return `${Math.round(mins / 60)}h ago`;
-  return `${Math.round(mins / 1440)}d ago`;
 }
 
 export default function SharpeningFocusHeader({ jobs, onOpenJob, onCreate }: {
@@ -46,44 +27,11 @@ export default function SharpeningFocusHeader({ jobs, onOpenJob, onCreate }: {
   onOpenJob: (id: string) => void;
   onCreate: () => void;
 }) {
-  const [comments, setComments] = useState<FeedComment[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const jobMap = useMemo(() => new Map(jobs.map((job) => [job.id, job])), [jobs]);
-
   const oldest = useMemo(() => jobs
     .filter((job) => job.status !== "completed")
     .slice()
     .sort((a, b) => (a.date_received || "").localeCompare(b.date_received || ""))
     .slice(0, 3), [jobs]);
-
-  const loadComments = useCallback(async () => {
-    const { data, error } = await supabase
-      .from("entity_comments")
-      .select("id, entity_id, body, created_at, profiles:user_id(full_name, email)")
-      .eq("entity_type", "sharpening")
-      .order("created_at", { ascending: false })
-      .limit(25);
-    if (!error) {
-      setComments(((data || []) as any[]).map((row) => ({
-        id: row.id,
-        entity_id: row.entity_id,
-        body: row.body,
-        created_at: row.created_at,
-        author: row.profiles?.full_name || row.profiles?.email || "Team member",
-      })));
-    }
-    setLoading(false);
-  }, []);
-
-  useEffect(() => {
-    void loadComments();
-    const channel = supabase
-      .channel("sharpening-comment-feed")
-      .on("postgres_changes", { event: "*", schema: "public", table: "entity_comments" }, () => void loadComments())
-      .subscribe();
-    return () => { void supabase.removeChannel(channel); };
-  }, [loadComments]);
 
   return <header className="grid gap-3 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
     <section className="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
