@@ -161,7 +161,7 @@ export default function SharpeningCommentsPanel({ entityType, title, subtitle, r
     }
   };
 
-  const activeJobId = replyTo?.entity_id || targetJob;
+  const activeJobId = replyTo?.entity_id || targetRef;
 
   const send = async () => {
     const trimmed = body.trim();
@@ -173,7 +173,7 @@ export default function SharpeningCommentsPanel({ entityType, title, subtitle, r
     setSending(true);
     const mentionIds = [...mentionedIds.entries()].filter(([name]) => trimmed.includes(`@${name}`)).map(([, id]) => id);
     const { error } = await supabase.from("entity_comments").insert({
-      entity_type: "sharpening",
+      entity_type: entityType,
       entity_id: activeJobId,
       user_id: user.id,
       body: trimmed,
@@ -201,8 +201,8 @@ export default function SharpeningCommentsPanel({ entityType, title, subtitle, r
       <div className="flex items-center gap-2 border-b border-border px-4 py-3">
         <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-logo-cyan/15 text-logo-cyan"><MessageCircle className="h-4 w-4" /></span>
         <div className="min-w-0">
-          <h2 className="truncate text-sm font-bold">Sharpening comments</h2>
-          <p className="truncate text-[11px] text-muted-foreground">Reply, @mention the team, # to reference a job</p>
+          <h2 className="truncate text-sm font-bold">{title}</h2>
+          <p className="truncate text-[11px] text-muted-foreground">{subtitle}</p>
         </div>
       </div>
 
@@ -210,9 +210,9 @@ export default function SharpeningCommentsPanel({ entityType, title, subtitle, r
         {loading && comments.length === 0 ? (
           <div className="flex items-center justify-center py-6 text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /></div>
         ) : comments.length === 0 ? (
-          <p className="px-4 py-6 text-center text-sm text-muted-foreground">No comments on sharpening jobs yet.</p>
+          <p className="px-4 py-6 text-center text-sm text-muted-foreground">No comments yet.</p>
         ) : comments.map((comment) => {
-          const job = jobMap.get(comment.entity_id);
+          const job = refMap.get(comment.entity_id);
           const parent = comment.reply_to_id ? commentById.get(comment.reply_to_id) : null;
           const mine = comment.user_id === user?.id;
           const summary = reactionSummary(comment.id);
@@ -221,7 +221,7 @@ export default function SharpeningCommentsPanel({ entityType, title, subtitle, r
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => onOpenJob(comment.entity_id)}
+                  onClick={() => onOpen(comment.entity_id)}
                   className="truncate rounded-md bg-logo-cyan/15 px-1.5 py-0.5 text-[10px] font-bold text-logo-cyan hover:bg-logo-cyan/25"
                 >
                   {job ? job.job_number : "Job"}
@@ -291,12 +291,12 @@ export default function SharpeningCommentsPanel({ entityType, title, subtitle, r
           </div>
         )}
 
-        {(replyTo || targetJob) && (
+        {(replyTo || targetRef) && (
           <div className="flex items-center justify-between gap-2 border-b border-border bg-muted/40 px-3 py-1.5 text-xs">
             <span className="min-w-0 truncate">
               {replyTo
                 ? <><span className="font-semibold text-primary">Replying to {replyTo.user_id === user?.id ? "you" : replyTo.author}: </span><span className="text-muted-foreground">{replyTo.body}</span></>
-                : <><span className="font-semibold text-logo-cyan">On job </span><span className="text-muted-foreground">{jobMap.get(targetJob!)?.job_number}</span></>}
+                : <><span className="font-semibold text-logo-cyan">On job </span><span className="text-muted-foreground">{refMap.get(targetRef!)?.job_number}</span></>}
             </span>
             <button onClick={() => { setReplyTo(null); setTargetJob(null); }} className="shrink-0 text-muted-foreground hover:text-destructive"><X className="h-3 w-3" /></button>
           </div>
