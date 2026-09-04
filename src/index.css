@@ -120,6 +120,17 @@
     --ribbon-5: 142 55% 50%;
     --ribbon-6: 28 90% 60%;
 
+    /* Logo spectrum — brightened for dark surfaces */
+    --logo-cyan: 191 90% 48%;
+    --logo-teal: 196 88% 42%;
+    --logo-violet: 285 75% 55%;
+    --logo-magenta: 312 78% 52%;
+    --logo-pink: 322 82% 60%;
+    --logo-ink: 197 16% 40%;
+    --logo-on: 222 32% 8%;
+
+
+
     --border: 222 18% 18%;
     --input: 222 18% 16%;
     --ring: 205 90% 58%;
