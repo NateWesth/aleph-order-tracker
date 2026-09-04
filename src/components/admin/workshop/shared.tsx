@@ -28,18 +28,22 @@ export const formatDate = (date?: string | null) => date ? new Date(`${date}T12:
 export const monthLabel = (date?: string | null) => date ? new Date(`${date}T12:00:00`).toLocaleDateString("en-ZA", { month: "long", year: "numeric" }) : "Date not set";
 export const isOverdue = (deadline?: string | null, complete = false) => !!deadline && !complete && new Date(`${deadline}T23:59:59`).getTime() < Date.now();
 
+/** Soft, logo-coded status chip (matches the board's status colours). */
 export function StatusBadge({ status }: { status: string }) {
-  const tone = status === "completed" ? "border-success/25 bg-success/10 text-success"
-    : status === "working_on_it" ? "border-info/25 bg-info/10 text-info"
-    : status === "awaiting_quote_approval" ? "border-warning/25 bg-warning/10 text-warning"
-    : status === "next" ? "border-primary/25 bg-primary/10 text-primary" : "border-border/60 bg-muted/60 text-muted-foreground";
-  return <Badge variant="outline" className={cn("rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide", tone)}>{statusLabel(status)}</Badge>;
+  const tone = status === "completed" ? "border-logo-cyan/30 bg-logo-cyan/12 text-logo-cyan"
+    : status === "working_on_it" ? "border-logo-magenta/30 bg-logo-magenta/12 text-logo-magenta"
+    : status === "next" ? "border-logo-teal/30 bg-logo-teal/12 text-logo-teal"
+    : status === "awaiting_quote_approval" ? "border-logo-pink/30 bg-logo-pink/12 text-logo-pink"
+    : status === "pending_sent_in" ? "border-logo-violet/30 bg-logo-violet/12 text-logo-violet"
+    : "border-border/60 bg-muted/60 text-muted-foreground";
+  return <Badge variant="outline" className={cn("rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide", tone)}>{statusLabel(status)}</Badge>;
 }
 
 export function PriorityBadge({ priority }: { priority: string }) {
   if (priority === "normal" || priority === "low") return null;
-  return <Badge className={cn("rounded-md px-2 py-0.5 text-[10px] font-bold uppercase", priority === "urgent" ? "bg-destructive text-destructive-foreground" : "bg-warning text-warning-foreground")}>{priority}</Badge>;
+  return <Badge className={cn("rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase text-white", priority === "urgent" ? "bg-logo-magenta hover:bg-logo-magenta" : "bg-logo-pink hover:bg-logo-pink")}>{priority}</Badge>;
 }
+
 
 /** Compact, editorial page header — no gradients, no glass. */
 export function WorkshopHeader({ eyebrow, title, description, stats, children }: {
