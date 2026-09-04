@@ -131,37 +131,49 @@ export function groupByStatus<T>(rows: T[], getStatus: (row: T) => string, getDa
 }
 
 export function StatusGroup({ status, count, children }: { status: string; count: number; children: ReactNode }) {
-  return <section className={cn("flex w-[290px] min-w-[290px] flex-col overflow-hidden rounded-lg border border-border bg-muted/20 sm:w-[310px] sm:min-w-[310px]", status === "working_on_it" && "border-primary/35 bg-primary/[0.04]")}>
-    <div className="flex h-11 items-center gap-2 border-b border-border bg-card px-3">
+  return <section className={cn("overflow-hidden rounded-xl border border-border bg-card", status === "working_on_it" && "border-primary/35 bg-primary/[0.04]")}>
+    <div className="flex h-10 items-center gap-2 border-b border-border bg-muted/40 px-3">
       <StatusBadge status={status} />
       <span className="text-[11px] font-semibold tabular-nums text-muted-foreground">{count}</span>
       <span className="ml-auto font-mono text-[9px] font-semibold uppercase text-muted-foreground">Newest first</span>
     </div>
-    <div className="min-h-32 flex-1 space-y-2 overflow-y-auto p-2">{children}</div>
+    <div className="divide-y divide-border">{children}</div>
   </section>;
 }
 
-/** Compact two-line list row that works inside narrow status columns. */
+/** Wide horizontal list row for a categorized vertical layout. */
 export function WorkshopRow({ reference, primary, secondary, date, dateLabel, assignee, deadline, overdue, tags, active, muted, onClick }: {
   reference: string; primary: ReactNode; secondary?: ReactNode; date: string; dateLabel?: string;
   assignee?: string; deadline?: string | null; overdue?: boolean; tags?: ReactNode;
   active?: boolean; muted?: boolean; onClick: () => void;
 }) {
   return <button type="button" onClick={onClick}
-    className={cn("block w-full rounded-md border border-border border-l-[3px] border-l-muted-foreground/35 bg-card px-3 py-3 text-left shadow-sm transition hover:border-primary/50 hover:border-l-primary hover:bg-accent/20",
-      active && "border-primary border-l-primary bg-primary/[0.06]", overdue && "border-l-destructive", muted && "opacity-70")}>
-    <div className="flex items-center gap-2">
-      <span className="font-mono text-[11px] font-bold uppercase text-muted-foreground">{reference}</span>
-      <span className={cn("ml-auto shrink-0 text-[11px] tabular-nums text-muted-foreground", overdue && "font-bold text-destructive")}>
-        {deadline ? `Due ${formatDate(deadline)}` : `${dateLabel || "Received"} ${formatDate(date)}`}
+    className={cn("group flex w-full items-center gap-3 border-l-[3px] border-l-muted-foreground/35 bg-card px-3 py-3 text-left transition hover:border-l-primary hover:bg-accent/20 sm:px-4 sm:py-3.5",
+      active && "border-l-primary bg-primary/[0.06]", overdue && "border-l-destructive", muted && "opacity-70")}>
+    <div className="min-w-0 flex-1">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        <span className="font-mono text-[11px] font-bold uppercase text-muted-foreground">{reference}</span>
+        <span className="truncate text-sm font-semibold text-foreground">{primary}</span>
+        {secondary && <span className="hidden truncate text-xs text-muted-foreground sm:inline">{secondary}</span>}
+      </div>
+      <div className="mt-1 flex flex-wrap items-center gap-1.5 sm:hidden">
+        {tags}
+      </div>
+    </div>
+    <div className="hidden flex-1 items-center gap-4 sm:flex">
+      <div className="flex flex-1 items-center gap-1.5">{tags}</div>
+      <div className="flex shrink-0 items-center gap-4 text-[11px] text-muted-foreground">
+        <span className="flex items-center gap-1"><UserRound className="h-3 w-3" />{assignee || "Unassigned"}</span>
+        <span className={cn("tabular-nums", overdue && "font-bold text-destructive")}>
+          {deadline ? `Due ${formatDate(deadline)}` : `${dateLabel || "Received"} ${formatDate(date)}`}
+        </span>
+      </div>
+    </div>
+    <div className="flex shrink-0 flex-col items-end gap-0.5 text-[11px] text-muted-foreground sm:hidden">
+      <span className="flex items-center gap-1"><UserRound className="h-3 w-3" />{assignee || "Unassigned"}</span>
+      <span className={cn("tabular-nums", overdue && "font-bold text-destructive")}>
+        {deadline ? `Due ${formatDate(deadline)}` : formatDate(date)}
       </span>
-    </div>
-    <div className="mt-1 truncate text-sm font-semibold text-foreground">
-      {primary}{secondary && <span className="ml-2 text-xs font-normal text-muted-foreground">{secondary}</span>}
-    </div>
-    <div className="mt-1 flex flex-wrap items-center gap-1.5">
-      {tags}
-      <span className="ml-auto flex items-center gap-1 text-[11px] text-muted-foreground"><UserRound className="h-3 w-3" />{assignee || "Unassigned"}</span>
     </div>
   </button>;
 }
