@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, CalendarClock, CheckCircle2, Edit3, Hammer, History, PackageOpen, Plus, ShieldCheck, Ticket, Trash2, UserRound, Wrench } from "lucide-react";
+import { AlertTriangle, CalendarClock, CheckCircle2, Edit3, Hammer, ShieldCheck, Trash2, UserRound, Wrench } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -12,7 +12,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import EntityComments from "@/components/admin/EntityComments";
 import { cn } from "@/lib/utils";
-import { DetailSection, DetailValue, EmptyWorkshop, formatDate, isOverdue, memberLabel, groupByStatus, ListHeadings, StatusGroup, PRIORITIES, PriorityBadge, PrioritySelect, SERVICE_STATUSES, StatusBadge, TeamMember, WorkshopPanel, WorkshopRow, WorkshopHeader, WorkshopTabs, WorkshopToolbar } from "@/components/admin/workshop/shared";
+import { DetailSection, DetailValue, EmptyWorkshop, formatDate, isOverdue, memberLabel, monthLabel, PriorityBadge, PrioritySelect, SERVICE_STATUSES, StatusBadge, TeamMember, WorkshopPanel, WorkshopTabs, WorkshopToolbar } from "@/components/admin/workshop/shared";
+import SharpeningFocusHeader from "@/components/admin/workshop/SharpeningFocusHeader";
+import BoardTable, { BoardCell, BoardPriorityCell, BoardStatusCell, GROUP_SPINES, statusTone } from "@/components/admin/workshop/BoardTable";
 
 interface RepairTicket {
   id: string; ticket_number: string; client: string; tool_code: string; tool_information: string;
@@ -23,6 +25,15 @@ interface RepairTicket {
   notes: string | null; scrap_reason: string | null; scrapped_at: string | null; completed_at: string | null; created_at: string;
 }
 type RepairDraft = Omit<RepairTicket, "id" | "warranty_expires_at" | "is_warranty" | "warranty_source_ticket_id" | "scrapped_at" | "completed_at" | "created_at" | "scrap_reason">;
+const STATUS_BUTTON: Record<string, string> = {
+  cyan: "border-logo-cyan bg-logo-cyan text-logo-on",
+  teal: "border-logo-teal bg-logo-teal text-white",
+  violet: "border-logo-violet bg-logo-violet text-white",
+  magenta: "border-logo-magenta bg-logo-magenta text-white",
+  pink: "border-logo-pink bg-logo-pink text-white",
+  ink: "border-logo-ink bg-logo-ink text-white",
+  neutral: "border-foreground/20 bg-foreground/85 text-background",
+};
 const today = () => new Date().toISOString().slice(0, 10);
 const emptyDraft = (): RepairDraft => ({ ticket_number: "", client: "", tool_code: "", tool_information: "", date_received_by_client: today(), supplier_information: null, customer_information: null, assigned_to: null, priority: "normal", status: "not_started", deadline_date: null, date_received_back_from_supplier: null, warranty_months: null, invoiced: false, invoice_number: null, notes: null });
 
@@ -35,6 +46,7 @@ export default function RepairsPage() {
   const [formOpen, setFormOpen] = useState(false); const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<RepairDraft>(emptyDraft); const [saving, setSaving] = useState(false);
   const [scrapOpen, setScrapOpen] = useState(false); const [scrapReason, setScrapReason] = useState("");
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
   const load = useCallback(async (quiet = false) => {
     if (!quiet) setLoading(true);
@@ -53,10 +65,24 @@ export default function RepairsPage() {
   const active = tickets.filter((ticket) => !["completed", "scrapped"].includes(ticket.status));
   const warrantyActive = active.filter((ticket) => ticket.is_warranty); const normalActive = active.filter((ticket) => !ticket.is_warranty);
   const history = tickets.filter((ticket) => ["completed", "scrapped"].includes(ticket.status));
-  const overdueCount = active.filter((ticket) => isOverdue(ticket.deadline_date)).length;
   const base = tab === "history" ? history : tab === "warranty" ? warrantyActive : normalActive;
-  const visible = base.filter((ticket) => `${ticket.ticket_number} ${ticket.client} ${ticket.tool_code} ${ticket.tool_information} ${ticket.supplier_information || ""}`.toLowerCase().includes(query.trim().toLowerCase())).sort((a,b) => Number(b.priority === "urgent") - Number(a.priority === "urgent") || b.date_received_by_client.localeCompare(a.date_received_by_client));
-  const groups = useMemo(() => groupByStatus(visible, (ticket) => ticket.status, (ticket) => ticket.date_received_by_client), [visible]);
+  const visible = base.filter((ticket) => `${ticket.ticket_number} ${ticket.client} ${ticket.tool_code} ${ticket.tool_information} ${ticket.supplier_information || ""} ${ticket.invoice_number || ""}`.toLowerCase().includes(query.trim().toLowerCase())).sort((a,b) => Number(b.priority === "urgent") - Number(a.priority === "urgent") || b.date_received_by_client.localeCompare(a.date_received_by_client));
+  const monthGroups = useMemo(() => {
+    const map = new Map<string, RepairTicket[]>();
+    visible.forEach((ticket) => {
+      const key = (ticket.date_received_by_client || "").slice(0, 7) || "unknown";
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(ticket);
+    });
+    return Array.from(map.entries())
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .map(([key, rows], index) => ({
+        id: key,
+        label: key === "unknown" ? "Date not set" : monthLabel(`${key}-01`),
+        rows,
+        spine: GROUP_SPINES[index % GROUP_SPINES.length],
+      }));
+  }, [visible]);
 
   const warrantyMatch = useMemo(() => {
     const code = draft.tool_code.trim().toLowerCase(); if (!code) return null;
@@ -78,19 +104,17 @@ export default function RepairsPage() {
   const scrap = async () => { if (!selected) return; setSaving(true); const {error}=await db.from("repair_tickets").update({status:"scrapped",scrap_reason:scrapReason.trim()||null,scrapped_by:user?.id}).eq("id",selected.id); setSaving(false); if(error){toast({title:"Repair not scrapped",description:error.message,variant:"destructive"});return;} setScrapOpen(false);setScrapReason("");toast({title:"Tool marked as scrapped",description:"The ticket is retained permanently in Repair History."});await load(true); };
 
   return <div className="workshop-workspace space-y-4 bg-background pb-10 font-sans text-foreground">
-    <WorkshopHeader
-      eyebrow="After-sales workshop"
-      title="Repairs"
-      description="Track every tool from intake to supplier return. Repeat tool codes are automatically checked against completed warranty periods."
-      stats={[
-        { label: "Outstanding", value: normalActive.length },
-        { label: "Warranty", value: warrantyActive.length },
-        { label: "Overdue", value: overdueCount, tone: overdueCount > 0 ? "danger" : "default" },
-        { label: "History", value: history.length },
-      ]}
-    >
-      <Button onClick={openCreate} className="h-11 rounded-lg px-5"><Plus className="mr-2 h-4 w-4" />New repair ticket</Button>
-    </WorkshopHeader>
+    <SharpeningFocusHeader
+      items={tickets.map((ticket) => ({ id: ticket.id, reference: ticket.ticket_number, title: ticket.client, subtitle: ticket.tool_code, date: ticket.date_received_by_client, deadline: ticket.deadline_date, status: ticket.status, priority: ticket.priority }))}
+      noun="repair"
+      doneStatuses={["completed", "scrapped"]}
+      entityType="repair"
+      commentsTitle="Repair comments"
+      commentsSubtitle="Reply, @mention the team, # to reference a ticket"
+      createLabel="New repair"
+      onCreate={openCreate}
+      onOpen={(id) => { const ticket = tickets.find((row) => row.id === id); if (ticket) setSelected(ticket); }}
+    />
 
     <WorkshopToolbar query={query} onQuery={setQuery} placeholder="Search ticket, client, tool code or invoice…">
       <WorkshopTabs value={tab} onChange={(value) => setTab(value as "outstanding" | "warranty" | "history")} tabs={[
@@ -100,27 +124,27 @@ export default function RepairsPage() {
       ]} />
     </WorkshopToolbar>
 
-    {loading ? <div className="space-y-2">{[1,2,3].map(n => <div key={n} className="h-24 animate-pulse rounded-lg bg-muted/50" />)}</div> : groups.length === 0 ? <EmptyWorkshop history={tab === "history"} /> : <div className="space-y-4 rounded-lg border border-border bg-muted/10 p-3">
-      {groups.map(([status, statusTickets]) => <StatusGroup key={status} status={status} count={statusTickets.length}>
-        {statusTickets.map(ticket => {
-          const overdue = isOverdue(ticket.deadline_date, ["completed","scrapped"].includes(ticket.status));
-          return <WorkshopRow
-            key={ticket.id}
-            onClick={() => setSelected(ticket)}
-            active={selected?.id === ticket.id}
-            muted={["completed","scrapped"].includes(ticket.status)}
-            reference={ticket.ticket_number}
-            primary={ticket.client}
-            secondary={ticket.tool_code}
-            date={ticket.date_received_by_client}
-            deadline={ticket.deadline_date}
-            overdue={overdue}
-            assignee={memberLabel(ticket.assigned_to ? memberMap.get(ticket.assigned_to) : null)}
-            tags={<><PriorityBadge priority={ticket.priority} />{ticket.is_warranty && <span className="rounded bg-success/10 px-1.5 py-0.5 text-[10px] font-bold uppercase text-success">Warranty</span>}{ticket.status === "scrapped" && <span className="rounded bg-destructive/10 px-1.5 py-0.5 text-[10px] font-bold uppercase text-destructive">Scrapped</span>}{ticket.invoiced && <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-bold uppercase text-muted-foreground">Invoiced</span>}</>}
-          />;
-        })}
-      </StatusGroup>)}
-    </div>}
+    {loading ? <div className="space-y-2">{[1,2,3].map(n => <div key={n} className="h-24 animate-pulse rounded-lg bg-muted/50" />)}</div> : monthGroups.length === 0 ? <EmptyWorkshop history={tab === "history"} /> : <BoardTable
+      groups={monthGroups}
+      collapsed={collapsed}
+      onToggle={(id) => setCollapsed((current) => ({ ...current, [id]: !current[id] }))}
+      rowKey={(ticket) => ticket.id}
+      onRowClick={(ticket) => setSelected(ticket)}
+      activeKey={selected?.id}
+      noun="ticket"
+      columns={[
+        { key: "ticket", label: "Ticket", cell: (ticket) => <span className="whitespace-nowrap px-1 font-semibold">{ticket.ticket_number}</span> },
+        { key: "received", label: "Received date", align: "center", cell: (ticket) => <span className="whitespace-nowrap text-xs text-muted-foreground">{formatDate(ticket.date_received_by_client)}</span> },
+        { key: "client", label: "Client", cell: (ticket) => <span className="px-1">{ticket.client}</span> },
+        { key: "tool", label: "Tool", align: "center", cell: (ticket) => <span className="font-mono text-xs uppercase text-muted-foreground">{ticket.tool_code}</span> },
+        { key: "priority", label: "Priority", align: "center", width: "104px", cell: (ticket) => <BoardPriorityCell priority={ticket.priority} /> },
+        { key: "assigned", label: "Assigned", align: "center", width: "140px", cell: (ticket) => ticket.assigned_to ? <BoardCell tone="violet">{memberLabel(memberMap.get(ticket.assigned_to))}</BoardCell> : <span className="text-xs text-muted-foreground">Unassigned</span> },
+        { key: "status", label: "Status", align: "center", width: "170px", cell: (ticket) => <BoardStatusCell status={ticket.status} /> },
+        { key: "deadline", label: "Deadline", align: "center", width: "130px", cell: (ticket) => ticket.deadline_date ? <span className={cn("whitespace-nowrap text-xs font-semibold", isOverdue(ticket.deadline_date, ["completed","scrapped"].includes(ticket.status)) ? "text-destructive" : "text-muted-foreground")}>{formatDate(ticket.deadline_date)}</span> : <span className="text-xs text-muted-foreground">—</span> },
+        { key: "warranty", label: "Warranty", align: "center", width: "130px", cell: (ticket) => ticket.is_warranty ? <BoardCell tone="teal">Warranty</BoardCell> : ticket.warranty_expires_at ? <span className="whitespace-nowrap text-xs text-muted-foreground">to {formatDate(ticket.warranty_expires_at)}</span> : <span className="text-xs text-muted-foreground">—</span> },
+        { key: "invoice", label: "Invoice", align: "center", width: "110px", cell: (ticket) => ticket.invoiced ? <BoardCell tone="cyan">Done</BoardCell> : <span className="text-xs text-muted-foreground">—</span> },
+      ]}
+    />}
 
     <Dialog open={formOpen} onOpenChange={setFormOpen}><DialogContent className="max-h-[92dvh] w-[calc(100%-20px)] max-w-3xl overflow-y-auto rounded-[28px] p-0"><div className="border-b border-border/60 bg-primary/[.06] p-5 sm:p-6"><DialogHeader><DialogTitle className="flex items-center gap-2 text-2xl font-black"><span className="grid h-10 w-10 place-items-center rounded-2xl bg-primary text-primary-foreground"><Wrench className="h-5 w-5"/></span>{editingId?"Edit repair ticket":"New repair ticket"}</DialogTitle></DialogHeader><p className="mt-2 text-sm text-muted-foreground">Tool code is the warranty key. Use the same code every time a tool returns.</p></div><div className="space-y-6 p-5 sm:p-6">
       <FormSection title="Ticket & tool"><div className="grid gap-4 sm:grid-cols-2"><Field label="Ticket number *"><Input value={draft.ticket_number} onChange={e=>set("ticket_number",e.target.value)} placeholder="REP-2048"/></Field><Field label="Date received by client *"><Input type="date" value={draft.date_received_by_client} onChange={e=>set("date_received_by_client",e.target.value)}/></Field><Field label="Client *"><Input value={draft.client} onChange={e=>set("client",e.target.value)}/></Field><Field label="Tool code / serial *"><Input value={draft.tool_code} onChange={e=>set("tool_code",e.target.value)} placeholder="Unique code used for warranty matching" className="uppercase"/></Field><Field label="Tool information *" wide><Textarea value={draft.tool_information} onChange={e=>set("tool_information",e.target.value)} className="min-h-20" placeholder="Make, model, serial, fault and accessories received…"/></Field></div>{warrantyMatch&&<div className="mt-4 flex gap-3 rounded-2xl border border-success/25 bg-success/10 p-4 text-success"><ShieldCheck className="mt-0.5 h-5 w-5 shrink-0"/><div><p className="text-sm font-black">Warranty automatically detected</p><p className="mt-0.5 text-xs">Tool code matches {warrantyMatch.ticket_number}. Coverage runs until {formatDate(warrantyMatch.warranty_expires_at)}; this ticket will enter Warranty Repairs.</p></div></div>}</FormSection>
@@ -148,7 +172,7 @@ export default function RepairsPage() {
           <DetailValue label="Tool information" value={<p className="whitespace-pre-wrap font-normal leading-6">{selected.tool_information}</p>} icon={<Hammer className="h-3.5 w-3.5"/>}/>
           <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3"><DetailValue label="Received" value={formatDate(selected.date_received_by_client)} icon={<CalendarClock className="h-3.5 w-3.5"/>}/><DetailValue label="Assigned to" value={memberLabel(selected.assigned_to?memberMap.get(selected.assigned_to):null)} icon={<UserRound className="h-3.5 w-3.5"/>}/><DetailValue label="Deadline" value={formatDate(selected.deadline_date)}/><DetailValue label="Supplier return" value={formatDate(selected.date_received_back_from_supplier)}/><DetailValue label="Warranty" value={selected.warranty_expires_at?`${selected.warranty_months} months · to ${formatDate(selected.warranty_expires_at)}`:"Not set"}/><DetailValue label="Invoice" value={selected.invoiced?selected.invoice_number||"Completed":"Not invoiced"}/></div>
           <div className="grid gap-2.5 sm:grid-cols-2"><DetailValue label="Supplier information" value={<p className="whitespace-pre-wrap font-normal">{selected.supplier_information||"—"}</p>}/><DetailValue label="Customer information" value={<p className="whitespace-pre-wrap font-normal">{selected.customer_information||"—"}</p>}/></div>
-          {!["completed","scrapped"].includes(selected.status)&&<DetailSection title="Move the repair forward"><div className="grid grid-cols-2 gap-2 sm:grid-cols-3">{SERVICE_STATUSES.map(([id,label])=><button key={id} onClick={()=>void updateStatus(selected,id)} className={cn("rounded-lg border px-3 py-2 text-xs font-semibold transition",selected.status===id?"border-primary bg-primary text-primary-foreground":"border-border bg-card hover:border-primary/40 hover:bg-accent/40")}>{label}</button>)}</div></DetailSection>}
+          {!["completed","scrapped"].includes(selected.status)&&<DetailSection title="Move the repair forward"><div className="grid grid-cols-2 gap-2 sm:grid-cols-3">{SERVICE_STATUSES.map(([id,label])=><button key={id} onClick={()=>void updateStatus(selected,id)} className={cn("rounded-xl border px-3 py-2 text-xs font-semibold transition",selected.status===id?STATUS_BUTTON[statusTone(id)]:"border-border bg-card text-muted-foreground hover:border-logo-cyan/40 hover:bg-accent/40 hover:text-foreground")}>{label}</button>)}</div></DetailSection>}
           {selected.notes&&<DetailValue label="Repair notes" value={<p className="whitespace-pre-wrap font-normal leading-6">{selected.notes}</p>}/>}
           {selected.scrap_reason&&<DetailValue label="Scrap reason" value={<p className="font-normal text-destructive">{selected.scrap_reason}</p>}/>}
         </div>

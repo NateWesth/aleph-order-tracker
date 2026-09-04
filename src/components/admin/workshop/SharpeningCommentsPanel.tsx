@@ -8,10 +8,10 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import EmojiPicker, { QUICK_REACTIONS } from "@/components/orders/components/EmojiPicker";
 
-export interface CommentJob {
+export interface CommentReference {
   id: string;
-  job_number: string;
-  customer_name: string;
+  reference: string;
+  label: string;
 }
 
 interface FeedComment {
@@ -37,9 +37,12 @@ function relative(value: string) {
   return `${Math.round(mins / 1440)}d ago`;
 }
 
-export default function SharpeningCommentsPanel({ jobs, onOpenJob }: {
-  jobs: CommentJob[];
-  onOpenJob: (id: string) => void;
+export default function SharpeningCommentsPanel({ entityType, title, subtitle, references, onOpen }: {
+  entityType: string;
+  title: string;
+  subtitle: string;
+  references: CommentReference[];
+  onOpen: (id: string) => void;
 }) {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -49,20 +52,20 @@ export default function SharpeningCommentsPanel({ jobs, onOpenJob }: {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [body, setBody] = useState("");
-  const [targetJob, setTargetJob] = useState<string | null>(null);
+  const [targetRef, setTargetRef] = useState<string | null>(null);
   const [replyTo, setReplyTo] = useState<FeedComment | null>(null);
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [jobQuery, setJobQuery] = useState<string | null>(null);
   const [mentionedIds, setMentionedIds] = useState<Map<string, string>>(new Map());
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  const jobMap = useMemo(() => new Map(jobs.map((job) => [job.id, job])), [jobs]);
+  const refMap = useMemo(() => new Map(references.map((ref) => [ref.id, ref])), [references]);
 
   const load = useCallback(async () => {
     const { data, error } = await supabase
       .from("entity_comments")
       .select("id, entity_id, user_id, body, created_at, reply_to_id")
-      .eq("entity_type", "sharpening")
+      .eq("entity_type", entityType)
       .order("created_at", { ascending: false })
       .limit(60);
     if (error) { setLoading(false); return; }
@@ -84,14 +87,14 @@ export default function SharpeningCommentsPanel({ jobs, onOpenJob }: {
       setReactions((reactionRows || []) as ReactionRow[]);
     } else setReactions([]);
     setLoading(false);
-  }, []);
+  }, [entityType]);
 
   useEffect(() => {
     void load();
     void supabase.from("profiles").select("id, full_name, email").order("full_name", { ascending: true })
       .then(({ data }) => setTeam((data || []) as TeamMember[]));
     const channel = supabase
-      .channel("sharpening-comment-feed")
+      .channel(`workshop-comment-feed-${entityType}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "entity_comments" }, () => void load())
       .on("postgres_changes", { event: "*", schema: "public", table: "entity_comment_reactions" }, () => void load())
       .subscribe();
@@ -109,8 +112,8 @@ export default function SharpeningCommentsPanel({ jobs, onOpenJob }: {
   const jobSuggestions = useMemo(() => {
     if (jobQuery === null) return [];
     const q = jobQuery.toLowerCase();
-    return jobs.filter((j) => `${j.job_number} ${j.customer_name}`.toLowerCase().includes(q)).slice(0, 5);
-  }, [jobQuery, jobs]);
+    return references.filter((r) => `${r.reference} ${r.label}`.toLowerCase().includes(q)).slice(0, 5);
+  }, [jobQuery, references]);
 
   const handleBodyChange = (value: string) => {
     setBody(value);
@@ -128,9 +131,9 @@ export default function SharpeningCommentsPanel({ jobs, onOpenJob }: {
     inputRef.current?.focus();
   };
 
-  const selectJob = (job: CommentJob) => {
-    setBody((prev) => prev.replace(/#([a-zA-Z0-9\-/ ]{0,30})$/, `#${job.job_number} `));
-    setTargetJob((prev) => prev ?? job.id);
+  const selectJob = (ref: CommentReference) => {
+    setBody((prev) => prev.replace(/#([a-zA-Z0-9\-/ ]{0,30})$/, `#${ref.reference} `));
+    setTargetRef((prev) => prev ?? ref.id);
     setJobQuery(null);
     inputRef.current?.focus();
   };
@@ -158,7 +161,7 @@ export default function SharpeningCommentsPanel({ jobs, onOpenJob }: {
     }
   };
 
-  const activeJobId = replyTo?.entity_id || targetJob;
+  const activeJobId = replyTo?.entity_id || targetRef;
 
   const send = async () => {
     const trimmed = body.trim();
@@ -170,7 +173,7 @@ export default function SharpeningCommentsPanel({ jobs, onOpenJob }: {
     setSending(true);
     const mentionIds = [...mentionedIds.entries()].filter(([name]) => trimmed.includes(`@${name}`)).map(([, id]) => id);
     const { error } = await supabase.from("entity_comments").insert({
-      entity_type: "sharpening",
+      entity_type: entityType,
       entity_id: activeJobId,
       user_id: user.id,
       body: trimmed,
@@ -182,7 +185,7 @@ export default function SharpeningCommentsPanel({ jobs, onOpenJob }: {
       toast({ title: "Comment not sent", description: "Check your connection and try again.", variant: "destructive" });
       return;
     }
-    setBody(""); setReplyTo(null); setTargetJob(null); setMentionedIds(new Map());
+    setBody(""); setReplyTo(null); setTargetRef(null); setMentionedIds(new Map());
     void load();
   };
 
@@ -198,8 +201,8 @@ export default function SharpeningCommentsPanel({ jobs, onOpenJob }: {
       <div className="flex items-center gap-2 border-b border-border px-4 py-3">
         <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-logo-cyan/15 text-logo-cyan"><MessageCircle className="h-4 w-4" /></span>
         <div className="min-w-0">
-          <h2 className="truncate text-sm font-bold">Sharpening comments</h2>
-          <p className="truncate text-[11px] text-muted-foreground">Reply, @mention the team, # to reference a job</p>
+          <h2 className="truncate text-sm font-bold">{title}</h2>
+          <p className="truncate text-[11px] text-muted-foreground">{subtitle}</p>
         </div>
       </div>
 
@@ -207,9 +210,9 @@ export default function SharpeningCommentsPanel({ jobs, onOpenJob }: {
         {loading && comments.length === 0 ? (
           <div className="flex items-center justify-center py-6 text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /></div>
         ) : comments.length === 0 ? (
-          <p className="px-4 py-6 text-center text-sm text-muted-foreground">No comments on sharpening jobs yet.</p>
+          <p className="px-4 py-6 text-center text-sm text-muted-foreground">No comments yet.</p>
         ) : comments.map((comment) => {
-          const job = jobMap.get(comment.entity_id);
+          const ref = refMap.get(comment.entity_id);
           const parent = comment.reply_to_id ? commentById.get(comment.reply_to_id) : null;
           const mine = comment.user_id === user?.id;
           const summary = reactionSummary(comment.id);
@@ -218,10 +221,10 @@ export default function SharpeningCommentsPanel({ jobs, onOpenJob }: {
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => onOpenJob(comment.entity_id)}
+                  onClick={() => onOpen(comment.entity_id)}
                   className="truncate rounded-md bg-logo-cyan/15 px-1.5 py-0.5 text-[10px] font-bold text-logo-cyan hover:bg-logo-cyan/25"
                 >
-                  {job ? job.job_number : "Job"}
+                  {ref ? ref.reference : "Item"}
                 </button>
                 <span className="truncate text-xs font-semibold">{mine ? "You" : comment.author}</span>
                 <span className="ml-auto shrink-0 text-[10px] text-muted-foreground">{relative(comment.created_at)}</span>
@@ -278,24 +281,24 @@ export default function SharpeningCommentsPanel({ jobs, onOpenJob }: {
         )}
         {jobSuggestions.length > 0 && (
           <div className="absolute bottom-full left-3 right-3 z-10 mb-1 overflow-hidden rounded-xl border border-border bg-popover shadow-lg">
-            {jobSuggestions.map((job) => (
-              <button key={job.id} onClick={() => selectJob(job)} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-logo-cyan/10">
+            {jobSuggestions.map((ref) => (
+              <button key={ref.id} onClick={() => selectJob(ref)} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-logo-cyan/10">
                 <Hash className="h-3.5 w-3.5 shrink-0 text-logo-cyan" />
-                <span className="truncate font-semibold">{job.job_number}</span>
-                <span className="truncate text-xs text-muted-foreground">{job.customer_name}</span>
+                <span className="truncate font-semibold">{ref.reference}</span>
+                <span className="truncate text-xs text-muted-foreground">{ref.label}</span>
               </button>
             ))}
           </div>
         )}
 
-        {(replyTo || targetJob) && (
+        {(replyTo || targetRef) && (
           <div className="flex items-center justify-between gap-2 border-b border-border bg-muted/40 px-3 py-1.5 text-xs">
             <span className="min-w-0 truncate">
               {replyTo
                 ? <><span className="font-semibold text-primary">Replying to {replyTo.user_id === user?.id ? "you" : replyTo.author}: </span><span className="text-muted-foreground">{replyTo.body}</span></>
-                : <><span className="font-semibold text-logo-cyan">On job </span><span className="text-muted-foreground">{jobMap.get(targetJob!)?.job_number}</span></>}
+                : <><span className="font-semibold text-logo-cyan">On job </span><span className="text-muted-foreground">{refMap.get(targetRef!)?.reference}</span></>}
             </span>
-            <button onClick={() => { setReplyTo(null); setTargetJob(null); }} className="shrink-0 text-muted-foreground hover:text-destructive"><X className="h-3 w-3" /></button>
+            <button onClick={() => { setReplyTo(null); setTargetRef(null); }} className="shrink-0 text-muted-foreground hover:text-destructive"><X className="h-3 w-3" /></button>
           </div>
         )}
 
