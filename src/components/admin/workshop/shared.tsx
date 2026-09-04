@@ -241,13 +241,13 @@ export function WorkshopPanel({ open, onOpenChange, icon, reference, title, subt
     <div className="fulfillment-modal-backdrop fixed inset-0 z-[120] flex items-center justify-center p-2.5 sm:p-6" role="presentation">
       <button type="button" className="absolute inset-0 bg-black/45" onClick={() => onOpenChange(false)} aria-label="Close details" />
       <section
-        className="fulfillment-detail-modal animate-order-floating-bubble relative flex max-h-[calc(100dvh-1.25rem)] w-full max-w-4xl flex-col overflow-hidden rounded-[28px] border border-border bg-background shadow-[0_24px_60px_-20px_hsl(var(--foreground)/0.35)] sm:max-h-[calc(100dvh-3rem)]"
+        className="fulfillment-detail-modal animate-order-floating-bubble relative max-h-[calc(100dvh-1.25rem)] w-full max-w-4xl overflow-y-auto rounded-[28px] border border-border bg-background shadow-[0_24px_60px_-20px_hsl(var(--foreground)/0.35)] sm:max-h-[calc(100dvh-3rem)]"
         role="dialog"
         aria-modal="true"
         aria-label={`${reference} ${title}`}
       >
-        <div className="ribbon-bar h-1.5 shrink-0" aria-hidden />
-        <div className="relative shrink-0 border-b border-border bg-background p-4 sm:p-5">
+        <div className="ribbon-bar h-1.5" aria-hidden />
+        <div className="relative border-b border-border bg-background p-4 sm:p-5">
           {overlay}
           <div className="relative flex items-start gap-3">
             <span className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-2xl bg-muted p-1 shadow-sm ring-1 ring-border">
