@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { formatDate, isOverdue } from "@/components/admin/workshop/shared";
+import SharpeningCommentsPanel from "@/components/admin/workshop/SharpeningCommentsPanel";
 
 export interface FocusJob {
   id: string;
@@ -54,7 +55,7 @@ export default function SharpeningFocusHeader({ jobs, onOpenJob, onCreate }: {
     .filter((job) => job.status !== "completed")
     .slice()
     .sort((a, b) => (a.date_received || "").localeCompare(b.date_received || ""))
-    .slice(0, 6), [jobs]);
+    .slice(0, 3), [jobs]);
 
   const loadComments = useCallback(async () => {
     const { data, error } = await supabase
@@ -123,38 +124,7 @@ export default function SharpeningFocusHeader({ jobs, onOpenJob, onCreate }: {
       </ul>
     </section>
 
-    <section className="flex max-h-[320px] flex-col overflow-hidden rounded-lg border border-border bg-card shadow-sm">
-      <div className="flex items-center gap-2 border-b border-border px-4 py-3">
-        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-logo-cyan/15 text-logo-cyan"><MessageCircle className="h-4 w-4" /></span>
-        <div className="min-w-0">
-          <h2 className="truncate text-sm font-bold">Sharpening comments</h2>
-          <p className="truncate text-[11px] text-muted-foreground">Everything the team said, newest first</p>
-        </div>
-      </div>
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        {loading ? <div className="space-y-2 p-4">{[1, 2, 3].map((n) => <div key={n} className="h-10 animate-pulse rounded-md bg-muted/50" />)}</div>
-          : comments.length === 0 ? <p className="px-4 py-6 text-center text-sm text-muted-foreground">No comments on sharpening jobs yet.</p>
-          : <ul className="divide-y divide-border">
-            {comments.map((comment) => {
-              const job = jobMap.get(comment.entity_id);
-              return <li key={comment.id}>
-                <button
-                  type="button"
-                  onClick={() => onOpenJob(comment.entity_id)}
-                  className="w-full px-4 py-2.5 text-left transition-colors hover:bg-muted/50"
-                >
-                  <span className="flex items-center gap-2">
-                    <span className="truncate rounded-md bg-logo-cyan/15 px-1.5 py-0.5 text-[10px] font-bold text-logo-cyan">{job ? job.job_number : "Job"}</span>
-                    <span className="truncate text-xs font-semibold">{job?.customer_name || "Unknown job"}</span>
-                    <span className="ml-auto shrink-0 text-[10px] text-muted-foreground">{relative(comment.created_at)}</span>
-                  </span>
-                  <span className="mt-1 block line-clamp-2 text-xs text-foreground/90">{comment.body}</span>
-                  <span className="mt-0.5 block text-[10px] text-muted-foreground">{comment.author}</span>
-                </button>
-              </li>;
-            })}
-          </ul>}
-      </div>
-    </section>
+    <SharpeningCommentsPanel jobs={jobs} onOpenJob={onOpenJob} />
+
   </header>;
 }
