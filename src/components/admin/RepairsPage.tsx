@@ -56,10 +56,24 @@ export default function RepairsPage() {
   const active = tickets.filter((ticket) => !["completed", "scrapped"].includes(ticket.status));
   const warrantyActive = active.filter((ticket) => ticket.is_warranty); const normalActive = active.filter((ticket) => !ticket.is_warranty);
   const history = tickets.filter((ticket) => ["completed", "scrapped"].includes(ticket.status));
-  const overdueCount = active.filter((ticket) => isOverdue(ticket.deadline_date)).length;
   const base = tab === "history" ? history : tab === "warranty" ? warrantyActive : normalActive;
-  const visible = base.filter((ticket) => `${ticket.ticket_number} ${ticket.client} ${ticket.tool_code} ${ticket.tool_information} ${ticket.supplier_information || ""}`.toLowerCase().includes(query.trim().toLowerCase())).sort((a,b) => Number(b.priority === "urgent") - Number(a.priority === "urgent") || b.date_received_by_client.localeCompare(a.date_received_by_client));
-  const groups = useMemo(() => groupByStatus(visible, (ticket) => ticket.status, (ticket) => ticket.date_received_by_client), [visible]);
+  const visible = base.filter((ticket) => `${ticket.ticket_number} ${ticket.client} ${ticket.tool_code} ${ticket.tool_information} ${ticket.supplier_information || ""} ${ticket.invoice_number || ""}`.toLowerCase().includes(query.trim().toLowerCase())).sort((a,b) => Number(b.priority === "urgent") - Number(a.priority === "urgent") || b.date_received_by_client.localeCompare(a.date_received_by_client));
+  const monthGroups = useMemo(() => {
+    const map = new Map<string, RepairTicket[]>();
+    visible.forEach((ticket) => {
+      const key = (ticket.date_received_by_client || "").slice(0, 7) || "unknown";
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(ticket);
+    });
+    return Array.from(map.entries())
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .map(([key, rows], index) => ({
+        id: key,
+        label: key === "unknown" ? "Date not set" : monthLabel(`${key}-01`),
+        rows,
+        spine: GROUP_SPINES[index % GROUP_SPINES.length],
+      }));
+  }, [visible]);
 
   const warrantyMatch = useMemo(() => {
     const code = draft.tool_code.trim().toLowerCase(); if (!code) return null;
