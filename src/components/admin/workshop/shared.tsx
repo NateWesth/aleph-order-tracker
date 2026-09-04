@@ -29,16 +29,16 @@ export const monthLabel = (date?: string | null) => date ? new Date(`${date}T12:
 export const isOverdue = (deadline?: string | null, complete = false) => !!deadline && !complete && new Date(`${deadline}T23:59:59`).getTime() < Date.now();
 
 export function StatusBadge({ status }: { status: string }) {
-  const tone = status === "completed" ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-    : status === "working_on_it" ? "border-blue-500/25 bg-blue-500/10 text-blue-700 dark:text-blue-300"
-    : status === "awaiting_quote_approval" ? "border-amber-500/25 bg-amber-500/10 text-amber-700 dark:text-amber-300"
+  const tone = status === "completed" ? "border-success/25 bg-success/10 text-success"
+    : status === "working_on_it" ? "border-info/25 bg-info/10 text-info"
+    : status === "awaiting_quote_approval" ? "border-warning/25 bg-warning/10 text-warning"
     : status === "next" ? "border-primary/25 bg-primary/10 text-primary" : "border-border/60 bg-muted/60 text-muted-foreground";
   return <Badge variant="outline" className={cn("rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide", tone)}>{statusLabel(status)}</Badge>;
 }
 
 export function PriorityBadge({ priority }: { priority: string }) {
   if (priority === "normal" || priority === "low") return null;
-  return <Badge className={cn("rounded-md px-2 py-0.5 text-[10px] font-bold uppercase", priority === "urgent" ? "bg-destructive text-destructive-foreground" : "bg-amber-500 text-background")}>{priority}</Badge>;
+  return <Badge className={cn("rounded-md px-2 py-0.5 text-[10px] font-bold uppercase", priority === "urgent" ? "bg-destructive text-destructive-foreground" : "bg-warning text-warning-foreground")}>{priority}</Badge>;
 }
 
 /** Compact, editorial page header — no gradients, no glass. */
@@ -50,18 +50,18 @@ export function WorkshopHeader({ eyebrow, title, description, stats, children }:
   return <header className="overflow-hidden rounded-lg border border-border bg-card font-sans shadow-sm">
     <div className="flex flex-col gap-4 border-b border-border p-4 sm:px-6 sm:py-4 lg:flex-row lg:items-center lg:justify-between">
       <div className="min-w-0">
-        <p className="font-mono text-[10px] font-bold uppercase text-muted-foreground">{eyebrow}</p>
-        <h1 className="mt-1 font-mono text-2xl font-bold sm:text-3xl">{title}</h1>
+        <p className="font-display text-[10px] font-bold uppercase text-muted-foreground">{eyebrow}</p>
+        <h1 className="mt-1 font-display text-2xl font-bold sm:text-3xl">{title}</h1>
         <p className="mt-1 max-w-2xl text-sm leading-5 text-muted-foreground">{description}</p>
       </div>
       {children}
     </div>
     <dl className="grid grid-cols-2 divide-x divide-border sm:grid-cols-4">
       {stats.map((stat) => <div key={stat.label} className="px-4 py-3">
-        <dt className="font-mono text-[10px] font-bold uppercase text-muted-foreground">{stat.label}</dt>
+        <dt className="font-display text-[10px] font-bold uppercase text-muted-foreground">{stat.label}</dt>
         <dd className={cn("mt-0.5 text-xl font-bold tabular-nums",
           stat.tone === "danger" && "text-destructive",
-          stat.tone === "warning" && "text-amber-600 dark:text-amber-400")}>{stat.value}</dd>
+          stat.tone === "warning" && "text-warning")}>{stat.value}</dd>
       </div>)}
     </dl>
   </header>;
@@ -135,7 +135,7 @@ export function StatusGroup({ status, count, children }: { status: string; count
     <div className="flex h-10 items-center gap-2 border-b border-border bg-muted/40 px-3">
       <StatusBadge status={status} />
       <span className="text-[11px] font-semibold tabular-nums text-muted-foreground">{count}</span>
-      <span className="ml-auto font-mono text-[9px] font-semibold uppercase text-muted-foreground">Newest first</span>
+      <span className="ml-auto font-display text-[9px] font-semibold uppercase text-muted-foreground">Newest first</span>
     </div>
     <div className="divide-y divide-border">{children}</div>
   </section>;
@@ -184,7 +184,7 @@ export function ListHeadings(_: { columns: string[] }) {
 
 export function EmptyWorkshop({ history = false }: { history?: boolean }) {
   return <div className="rounded-xl border border-dashed border-border bg-card px-5 py-14 text-center">
-    <span className="mx-auto grid h-11 w-11 place-items-center rounded-lg bg-emerald-500/10 text-emerald-600"><CheckCircle2 className="h-5 w-5" /></span>
+    <span className="mx-auto grid h-11 w-11 place-items-center rounded-lg bg-success/10 text-success"><CheckCircle2 className="h-5 w-5" /></span>
     <h3 className="mt-3 font-bold">{history ? "No matching history" : "Workshop queue is clear"}</h3>
     <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">{history ? "Completed work remains safely searchable here." : "New manual work will appear here as soon as a team member adds it."}</p>
   </div>;
@@ -197,13 +197,13 @@ export function WorkshopPanel({ open, onOpenChange, icon, reference, title, subt
   children: ReactNode; actions?: ReactNode;
 }) {
   return <Dialog open={open} onOpenChange={onOpenChange}>
-    <DialogContent className="workshop-workspace flex max-h-[90dvh] w-[calc(100%-16px)] max-w-3xl flex-col gap-0 overflow-hidden rounded-xl border border-border bg-card p-0 font-workshop shadow-2xl sm:w-[calc(100%-40px)]">
+    <DialogContent className="workshop-workspace flex max-h-[90dvh] w-[calc(100%-16px)] max-w-3xl flex-col gap-0 overflow-hidden rounded-xl border border-border bg-card p-0 font-sans shadow-2xl sm:w-[calc(100%-40px)]">
       {overlay}
       <DialogHeader className="space-y-0 border-b border-border bg-muted/30 px-5 py-4 text-left sm:px-7">
         <div className="flex items-start gap-3 pr-8">
           <span className="grid h-9 w-9 shrink-0 place-items-center rounded-md border border-primary/30 bg-primary/10 text-primary">{icon}</span>
           <div className="min-w-0 flex-1">
-            <p className="font-mono text-[10px] font-bold uppercase text-muted-foreground">{reference}</p>
+            <p className="font-display text-[10px] font-bold uppercase text-muted-foreground">{reference}</p>
             <DialogTitle className="truncate text-lg font-bold sm:text-xl">{title}</DialogTitle>
             {subtitle && <div className="mt-0.5 truncate text-sm text-muted-foreground">{subtitle}</div>}
             {badges && <div className="mt-2 flex flex-wrap gap-1.5">{badges}</div>}
@@ -219,14 +219,14 @@ export function WorkshopPanel({ open, onOpenChange, icon, reference, title, subt
 
 export function DetailSection({ title, children, className }: { title: string; children: ReactNode; className?: string }) {
   return <section className={cn("border-t border-border pt-5", className)}>
-    <p className="mb-4 font-mono text-[10px] font-bold uppercase text-muted-foreground">{title}</p>
+    <p className="mb-4 font-display text-[10px] font-bold uppercase text-muted-foreground">{title}</p>
     {children}
   </section>;
 }
 
 export function DetailValue({ label, value, icon }: { label: string; value?: ReactNode; icon?: ReactNode }) {
   return <div className="min-w-0 py-1">
-    <p className="flex items-center gap-1.5 font-mono text-[9px] font-bold uppercase text-muted-foreground">{icon}{label}</p>
+    <p className="flex items-center gap-1.5 font-display text-[9px] font-bold uppercase text-muted-foreground">{icon}{label}</p>
     <div className="mt-1 break-words text-sm font-medium text-foreground">{value || "—"}</div>
   </div>;
 }

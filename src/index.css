@@ -2,38 +2,8 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Graphite production-board treatment, scoped to the manual workshops. */
-.workshop-workspace {
-  --background: 216 9% 10%;
-  --foreground: 210 17% 89%;
-  --card: 214 9% 15%;
-  --card-foreground: 210 17% 89%;
-  --popover: 214 9% 15%;
-  --popover-foreground: 210 17% 89%;
-  --primary: 217 91% 60%;
-  --primary-foreground: 0 0% 100%;
-  --secondary: 214 9% 21%;
-  --secondary-foreground: 210 17% 89%;
-  --muted: 214 9% 21%;
-  --muted-foreground: 214 10% 66%;
-  --accent: 216 32% 24%;
-  --accent-foreground: 210 17% 89%;
-  --border: 214 9% 26%;
-  --input: 214 9% 26%;
-  --ring: 217 91% 60%;
-  font-family: "Work Sans", "Inter", sans-serif;
-  letter-spacing: 0;
-}
+/* Workshops inherit the app's active theme tokens — no local palette override. */
 
-.workshop-workspace h1,
-.workshop-workspace h2,
-.workshop-workspace h3,
-.workshop-workspace h4,
-.workshop-workspace h5,
-.workshop-workspace h6 {
-  font-family: "JetBrains Mono", ui-monospace, monospace;
-  letter-spacing: 0;
-}
 
 @layer base {
   :root {

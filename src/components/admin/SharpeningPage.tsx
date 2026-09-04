@@ -107,7 +107,7 @@ export default function SharpeningPage() {
     else { toast({ title: status === "completed" ? "Moved to sharpening history" : `Status changed to ${SERVICE_STATUSES.find(([id]) => id === status)?.[1]}` }); await load(true); }
   };
 
-  return <div className="workshop-workspace space-y-4 bg-background pb-10 font-workshop text-foreground">
+  return <div className="workshop-workspace space-y-4 bg-background pb-10 font-sans text-foreground">
     <WorkshopHeader
       eyebrow="Workshop desk"
       title="Sharpening"
@@ -145,7 +145,7 @@ export default function SharpeningPage() {
             deadline={job.deadline_date}
             overdue={overdue}
             assignee={memberLabel(job.assigned_to ? memberMap.get(job.assigned_to) : null)}
-            tags={<><PriorityBadge priority={job.priority} /><span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-bold tabular-nums">×{job.quantity}</span>{job.invoiced && <span className="rounded bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-bold uppercase text-emerald-600">Invoiced</span>}</>}
+            tags={<><PriorityBadge priority={job.priority} /><span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-bold tabular-nums">×{job.quantity}</span>{job.invoiced && <span className="rounded bg-success/10 px-1.5 py-0.5 text-[10px] font-bold uppercase text-success">Invoiced</span>}</>}
           />;
         })}
       </StatusGroup>)}
