@@ -87,14 +87,14 @@ export default function SharpeningCommentsPanel({ entityType, title, subtitle, r
       setReactions((reactionRows || []) as ReactionRow[]);
     } else setReactions([]);
     setLoading(false);
-  }, []);
+  }, [entityType]);
 
   useEffect(() => {
     void load();
     void supabase.from("profiles").select("id, full_name, email").order("full_name", { ascending: true })
       .then(({ data }) => setTeam((data || []) as TeamMember[]));
     const channel = supabase
-      .channel("sharpening-comment-feed")
+      .channel(`workshop-comment-feed-${entityType}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "entity_comments" }, () => void load())
       .on("postgres_changes", { event: "*", schema: "public", table: "entity_comment_reactions" }, () => void load())
       .subscribe();
