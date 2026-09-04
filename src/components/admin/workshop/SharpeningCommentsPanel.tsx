@@ -212,7 +212,7 @@ export default function SharpeningCommentsPanel({ entityType, title, subtitle, r
         ) : comments.length === 0 ? (
           <p className="px-4 py-6 text-center text-sm text-muted-foreground">No comments yet.</p>
         ) : comments.map((comment) => {
-          const job = refMap.get(comment.entity_id);
+          const ref = refMap.get(comment.entity_id);
           const parent = comment.reply_to_id ? commentById.get(comment.reply_to_id) : null;
           const mine = comment.user_id === user?.id;
           const summary = reactionSummary(comment.id);
@@ -224,7 +224,7 @@ export default function SharpeningCommentsPanel({ entityType, title, subtitle, r
                   onClick={() => onOpen(comment.entity_id)}
                   className="truncate rounded-md bg-logo-cyan/15 px-1.5 py-0.5 text-[10px] font-bold text-logo-cyan hover:bg-logo-cyan/25"
                 >
-                  {job ? job.job_number : "Job"}
+                  {ref ? ref.reference : "Item"}
                 </button>
                 <span className="truncate text-xs font-semibold">{mine ? "You" : comment.author}</span>
                 <span className="ml-auto shrink-0 text-[10px] text-muted-foreground">{relative(comment.created_at)}</span>
@@ -284,7 +284,7 @@ export default function SharpeningCommentsPanel({ entityType, title, subtitle, r
             {jobSuggestions.map((job) => (
               <button key={job.id} onClick={() => selectJob(job)} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-logo-cyan/10">
                 <Hash className="h-3.5 w-3.5 shrink-0 text-logo-cyan" />
-                <span className="truncate font-semibold">{job.job_number}</span>
+                <span className="truncate font-semibold">{ref.reference}</span>
                 <span className="truncate text-xs text-muted-foreground">{job.customer_name}</span>
               </button>
             ))}
@@ -296,7 +296,7 @@ export default function SharpeningCommentsPanel({ entityType, title, subtitle, r
             <span className="min-w-0 truncate">
               {replyTo
                 ? <><span className="font-semibold text-primary">Replying to {replyTo.user_id === user?.id ? "you" : replyTo.author}: </span><span className="text-muted-foreground">{replyTo.body}</span></>
-                : <><span className="font-semibold text-logo-cyan">On job </span><span className="text-muted-foreground">{refMap.get(targetRef!)?.job_number}</span></>}
+                : <><span className="font-semibold text-logo-cyan">On job </span><span className="text-muted-foreground">{refMap.get(targetRef!)?.reference}</span></>}
             </span>
             <button onClick={() => { setReplyTo(null); setTargetJob(null); }} className="shrink-0 text-muted-foreground hover:text-destructive"><X className="h-3 w-3" /></button>
           </div>
