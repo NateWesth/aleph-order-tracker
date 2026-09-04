@@ -129,8 +129,7 @@ export default function SharpeningPage() {
       ]} />
     </WorkshopToolbar>
 
-    {loading ? <div className="space-y-2">{[1,2,3].map((n) => <div key={n} className="h-24 animate-pulse rounded-lg bg-muted/50" />)}</div> : groups.length === 0 ? <EmptyWorkshop history={tab === "history"} /> : <div className="flex min-h-[32rem] gap-3 overflow-x-auto rounded-lg border border-border bg-muted/10 p-3 pb-4">
-      <ListHeadings columns={["Job", "Customer", "Flags", "Assigned to", "Date"]} />
+    {loading ? <div className="space-y-2">{[1,2,3].map((n) => <div key={n} className="h-24 animate-pulse rounded-lg bg-muted/50" />)}</div> : groups.length === 0 ? <EmptyWorkshop history={tab === "history"} /> : <div className="space-y-4 rounded-lg border border-border bg-muted/10 p-3">
       {groups.map(([status, statusJobs]) => <StatusGroup key={status} status={status} count={statusJobs.length}>
         {statusJobs.map((job) => {
           const overdue = isOverdue(job.deadline_date, job.status === "completed");
