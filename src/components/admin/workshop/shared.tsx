@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { AlertTriangle, CalendarDays, CheckCircle2, Clock3, MessageSquareText, Search, UserRound, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
 export const SERVICE_STATUSES = [
@@ -44,6 +45,34 @@ export function PriorityBadge({ priority }: { priority: string }) {
   return <Badge className={cn("rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase text-white", priority === "urgent" ? "bg-logo-magenta hover:bg-logo-magenta" : "bg-logo-pink hover:bg-logo-pink")}>{priority}</Badge>;
 }
 
+
+/** Priority select with logo-coded dots so options are colour-coded. */
+export const PRIORITY_DOT: Record<string, string> = {
+  low: "bg-muted-foreground",
+  normal: "bg-logo-teal",
+  high: "bg-logo-pink",
+  urgent: "bg-logo-magenta",
+};
+
+export function PrioritySelect({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  return (
+    <Select value={value} onValueChange={onChange}>
+      <SelectTrigger>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {PRIORITIES.map(([id, label]) => (
+          <SelectItem key={id} value={id}>
+            <span className="flex items-center gap-2">
+              <span className={cn("h-2 w-2 shrink-0 rounded-full", PRIORITY_DOT[id])} />
+              <span className={cn("font-medium", id === "urgent" && "text-logo-magenta", id === "high" && "text-logo-pink")}>{label}</span>
+            </span>
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
 
 /** Compact, editorial page header — no gradients, no glass. */
 export function WorkshopHeader({ eyebrow, title, description, stats, children }: {

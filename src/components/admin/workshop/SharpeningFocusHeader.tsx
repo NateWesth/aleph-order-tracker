@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlarmClock, MessageCircle, Plus } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { useMemo } from "react";
+import { AlarmClock, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { formatDate, isOverdue } from "@/components/admin/workshop/shared";
+import SharpeningCommentsPanel from "@/components/admin/workshop/SharpeningCommentsPanel";
 
 export interface FocusJob {
   id: string;
@@ -16,28 +16,10 @@ export interface FocusJob {
   priority: string;
 }
 
-interface FeedComment {
-  id: string;
-  entity_id: string;
-  body: string;
-  created_at: string;
-  author: string;
-}
-
 function daysWaiting(date: string) {
   const start = new Date(date);
   if (Number.isNaN(start.getTime())) return 0;
   return Math.max(0, Math.round((Date.now() - start.getTime()) / 86400000));
-}
-
-function relative(value: string) {
-  const then = new Date(value).getTime();
-  if (Number.isNaN(then)) return "";
-  const mins = Math.round((Date.now() - then) / 60000);
-  if (mins < 1) return "now";
-  if (mins < 60) return `${mins}m ago`;
-  if (mins < 1440) return `${Math.round(mins / 60)}h ago`;
-  return `${Math.round(mins / 1440)}d ago`;
 }
 
 export default function SharpeningFocusHeader({ jobs, onOpenJob, onCreate }: {
@@ -45,44 +27,11 @@ export default function SharpeningFocusHeader({ jobs, onOpenJob, onCreate }: {
   onOpenJob: (id: string) => void;
   onCreate: () => void;
 }) {
-  const [comments, setComments] = useState<FeedComment[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const jobMap = useMemo(() => new Map(jobs.map((job) => [job.id, job])), [jobs]);
-
   const oldest = useMemo(() => jobs
     .filter((job) => job.status !== "completed")
     .slice()
     .sort((a, b) => (a.date_received || "").localeCompare(b.date_received || ""))
-    .slice(0, 6), [jobs]);
-
-  const loadComments = useCallback(async () => {
-    const { data, error } = await supabase
-      .from("entity_comments")
-      .select("id, entity_id, body, created_at, profiles:user_id(full_name, email)")
-      .eq("entity_type", "sharpening")
-      .order("created_at", { ascending: false })
-      .limit(25);
-    if (!error) {
-      setComments(((data || []) as any[]).map((row) => ({
-        id: row.id,
-        entity_id: row.entity_id,
-        body: row.body,
-        created_at: row.created_at,
-        author: row.profiles?.full_name || row.profiles?.email || "Team member",
-      })));
-    }
-    setLoading(false);
-  }, []);
-
-  useEffect(() => {
-    void loadComments();
-    const channel = supabase
-      .channel("sharpening-comment-feed")
-      .on("postgres_changes", { event: "*", schema: "public", table: "entity_comments" }, () => void loadComments())
-      .subscribe();
-    return () => { void supabase.removeChannel(channel); };
-  }, [loadComments]);
+    .slice(0, 3), [jobs]);
 
   return <header className="grid gap-3 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
     <section className="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
@@ -123,38 +72,7 @@ export default function SharpeningFocusHeader({ jobs, onOpenJob, onCreate }: {
       </ul>
     </section>
 
-    <section className="flex max-h-[320px] flex-col overflow-hidden rounded-lg border border-border bg-card shadow-sm">
-      <div className="flex items-center gap-2 border-b border-border px-4 py-3">
-        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-logo-cyan/15 text-logo-cyan"><MessageCircle className="h-4 w-4" /></span>
-        <div className="min-w-0">
-          <h2 className="truncate text-sm font-bold">Sharpening comments</h2>
-          <p className="truncate text-[11px] text-muted-foreground">Everything the team said, newest first</p>
-        </div>
-      </div>
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        {loading ? <div className="space-y-2 p-4">{[1, 2, 3].map((n) => <div key={n} className="h-10 animate-pulse rounded-md bg-muted/50" />)}</div>
-          : comments.length === 0 ? <p className="px-4 py-6 text-center text-sm text-muted-foreground">No comments on sharpening jobs yet.</p>
-          : <ul className="divide-y divide-border">
-            {comments.map((comment) => {
-              const job = jobMap.get(comment.entity_id);
-              return <li key={comment.id}>
-                <button
-                  type="button"
-                  onClick={() => onOpenJob(comment.entity_id)}
-                  className="w-full px-4 py-2.5 text-left transition-colors hover:bg-muted/50"
-                >
-                  <span className="flex items-center gap-2">
-                    <span className="truncate rounded-md bg-logo-cyan/15 px-1.5 py-0.5 text-[10px] font-bold text-logo-cyan">{job ? job.job_number : "Job"}</span>
-                    <span className="truncate text-xs font-semibold">{job?.customer_name || "Unknown job"}</span>
-                    <span className="ml-auto shrink-0 text-[10px] text-muted-foreground">{relative(comment.created_at)}</span>
-                  </span>
-                  <span className="mt-1 block line-clamp-2 text-xs text-foreground/90">{comment.body}</span>
-                  <span className="mt-0.5 block text-[10px] text-muted-foreground">{comment.author}</span>
-                </button>
-              </li>;
-            })}
-          </ul>}
-      </div>
-    </section>
+    <SharpeningCommentsPanel jobs={jobs} onOpenJob={onOpenJob} />
+
   </header>;
 }
