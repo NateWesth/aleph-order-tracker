@@ -52,20 +52,20 @@ export default function SharpeningCommentsPanel({ entityType, title, subtitle, r
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [body, setBody] = useState("");
-  const [targetJob, setTargetJob] = useState<string | null>(null);
+  const [targetRef, setTargetRef] = useState<string | null>(null);
   const [replyTo, setReplyTo] = useState<FeedComment | null>(null);
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [jobQuery, setJobQuery] = useState<string | null>(null);
   const [mentionedIds, setMentionedIds] = useState<Map<string, string>>(new Map());
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  const jobMap = useMemo(() => new Map(jobs.map((job) => [job.id, job])), [jobs]);
+  const refMap = useMemo(() => new Map(references.map((ref) => [ref.id, ref])), [references]);
 
   const load = useCallback(async () => {
     const { data, error } = await supabase
       .from("entity_comments")
       .select("id, entity_id, user_id, body, created_at, reply_to_id")
-      .eq("entity_type", "sharpening")
+      .eq("entity_type", entityType)
       .order("created_at", { ascending: false })
       .limit(60);
     if (error) { setLoading(false); return; }
