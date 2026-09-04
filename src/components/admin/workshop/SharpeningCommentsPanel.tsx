@@ -8,10 +8,10 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import EmojiPicker, { QUICK_REACTIONS } from "@/components/orders/components/EmojiPicker";
 
-export interface CommentJob {
+export interface CommentReference {
   id: string;
-  job_number: string;
-  customer_name: string;
+  reference: string;
+  label: string;
 }
 
 interface FeedComment {
@@ -37,9 +37,12 @@ function relative(value: string) {
   return `${Math.round(mins / 1440)}d ago`;
 }
 
-export default function SharpeningCommentsPanel({ jobs, onOpenJob }: {
-  jobs: CommentJob[];
-  onOpenJob: (id: string) => void;
+export default function SharpeningCommentsPanel({ entityType, title, subtitle, references, onOpen }: {
+  entityType: string;
+  title: string;
+  subtitle: string;
+  references: CommentReference[];
+  onOpen: (id: string) => void;
 }) {
   const { user } = useAuth();
   const { toast } = useToast();
