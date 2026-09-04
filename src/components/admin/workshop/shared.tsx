@@ -241,13 +241,13 @@ export function WorkshopPanel({ open, onOpenChange, icon, reference, title, subt
     <div className="fulfillment-modal-backdrop fixed inset-0 z-[120] flex items-center justify-center p-2.5 sm:p-6" role="presentation">
       <button type="button" className="absolute inset-0 bg-black/45" onClick={() => onOpenChange(false)} aria-label="Close details" />
       <section
-        className="fulfillment-detail-modal animate-order-floating-bubble relative flex max-h-[calc(100dvh-1.25rem)] w-full max-w-4xl flex-col overflow-hidden rounded-[28px] border border-border bg-background shadow-[0_24px_60px_-20px_hsl(var(--foreground)/0.35)] sm:max-h-[calc(100dvh-3rem)]"
+        className="fulfillment-detail-modal animate-order-floating-bubble relative max-h-[calc(100dvh-1.25rem)] w-full max-w-4xl overflow-y-auto rounded-[28px] border border-border bg-background shadow-[0_24px_60px_-20px_hsl(var(--foreground)/0.35)] sm:max-h-[calc(100dvh-3rem)]"
         role="dialog"
         aria-modal="true"
         aria-label={`${reference} ${title}`}
       >
-        <div className="ribbon-bar h-1.5 shrink-0" aria-hidden />
-        <div className="relative shrink-0 border-b border-border bg-background p-4 sm:p-5">
+        <div className="ribbon-bar h-1.5" aria-hidden />
+        <div className="relative border-b border-border bg-background p-4 sm:p-5">
           {overlay}
           <div className="relative flex items-start gap-3">
             <span className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-2xl bg-muted p-1 shadow-sm ring-1 ring-border">
@@ -263,8 +263,10 @@ export function WorkshopPanel({ open, onOpenChange, icon, reference, title, subt
           </div>
           <div className="relative mt-3 flex items-center gap-2 rounded-xl bg-muted px-3 py-2 text-[11px] text-muted-foreground"><MessageSquareText className="h-3.5 w-3.5 text-primary" /><span>Live team thread, actions and history stay together here.</span><span className="ml-auto hidden font-semibold sm:inline">Esc to close</span></div>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto bg-background p-4 sm:p-5 lg:p-6"><div className="space-y-5">{children}</div></div>
-        {actions && <div className="flex shrink-0 flex-col gap-2 border-t border-border bg-muted/30 p-4 sm:flex-row sm:justify-end sm:px-6">{actions}</div>}
+        <div className="bg-background p-4 sm:p-5 lg:p-6">
+          <div className="space-y-5">{children}</div>
+          {actions && <div className="mt-5 flex flex-col gap-2 border-t border-border/60 pt-4 sm:flex-row">{actions}</div>}
+        </div>
       </section>
     </div>,
     document.body,
