@@ -149,7 +149,7 @@ export default function BoardTable<T>({ groups, columns, collapsed, onToggle, ro
             </button>
 
             {!isCollapsed && (
-              <div className="overflow-x-auto overscroll-y-auto border-t border-border/70">
+              <div className="overflow-x-auto overflow-y-visible border-t border-border/70">
                 <table className="w-full min-w-[960px] border-separate border-spacing-0 text-sm">
                   <thead>
                     <tr>
