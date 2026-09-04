@@ -281,11 +281,11 @@ export default function SharpeningCommentsPanel({ entityType, title, subtitle, r
         )}
         {jobSuggestions.length > 0 && (
           <div className="absolute bottom-full left-3 right-3 z-10 mb-1 overflow-hidden rounded-xl border border-border bg-popover shadow-lg">
-            {jobSuggestions.map((job) => (
-              <button key={job.id} onClick={() => selectJob(job)} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-logo-cyan/10">
+            {jobSuggestions.map((ref) => (
+              <button key={ref.id} onClick={() => selectJob(ref)} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-logo-cyan/10">
                 <Hash className="h-3.5 w-3.5 shrink-0 text-logo-cyan" />
                 <span className="truncate font-semibold">{ref.reference}</span>
-                <span className="truncate text-xs text-muted-foreground">{job.customer_name}</span>
+                <span className="truncate text-xs text-muted-foreground">{ref.label}</span>
               </button>
             ))}
           </div>
