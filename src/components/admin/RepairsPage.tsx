@@ -95,19 +95,17 @@ export default function RepairsPage() {
   const scrap = async () => { if (!selected) return; setSaving(true); const {error}=await db.from("repair_tickets").update({status:"scrapped",scrap_reason:scrapReason.trim()||null,scrapped_by:user?.id}).eq("id",selected.id); setSaving(false); if(error){toast({title:"Repair not scrapped",description:error.message,variant:"destructive"});return;} setScrapOpen(false);setScrapReason("");toast({title:"Tool marked as scrapped",description:"The ticket is retained permanently in Repair History."});await load(true); };
 
   return <div className="workshop-workspace space-y-4 bg-background pb-10 font-sans text-foreground">
-    <WorkshopHeader
-      eyebrow="After-sales workshop"
-      title="Repairs"
-      description="Track every tool from intake to supplier return. Repeat tool codes are automatically checked against completed warranty periods."
-      stats={[
-        { label: "Outstanding", value: normalActive.length },
-        { label: "Warranty", value: warrantyActive.length },
-        { label: "Overdue", value: overdueCount, tone: overdueCount > 0 ? "danger" : "default" },
-        { label: "History", value: history.length },
-      ]}
-    >
-      <Button onClick={openCreate} className="h-11 rounded-lg px-5"><Plus className="mr-2 h-4 w-4" />New repair ticket</Button>
-    </WorkshopHeader>
+    <SharpeningFocusHeader
+      items={tickets.map((ticket) => ({ id: ticket.id, reference: ticket.ticket_number, title: ticket.client, subtitle: ticket.tool_code, date: ticket.date_received_by_client, deadline: ticket.deadline_date, status: ticket.status, priority: ticket.priority }))}
+      noun="repair"
+      doneStatuses={["completed", "scrapped"]}
+      entityType="repair"
+      commentsTitle="Repair comments"
+      commentsSubtitle="Reply, @mention the team, # to reference a ticket"
+      createLabel="New repair"
+      onCreate={openCreate}
+      onOpen={(id) => { const ticket = tickets.find((row) => row.id === id); if (ticket) setSelected(ticket); }}
+    />
 
     <WorkshopToolbar query={query} onQuery={setQuery} placeholder="Search ticket, client, tool code or invoice…">
       <WorkshopTabs value={tab} onChange={(value) => setTab(value as "outstanding" | "warranty" | "history")} tabs={[
@@ -117,27 +115,27 @@ export default function RepairsPage() {
       ]} />
     </WorkshopToolbar>
 
-    {loading ? <div className="space-y-2">{[1,2,3].map(n => <div key={n} className="h-24 animate-pulse rounded-lg bg-muted/50" />)}</div> : groups.length === 0 ? <EmptyWorkshop history={tab === "history"} /> : <div className="space-y-4 rounded-lg border border-border bg-muted/10 p-3">
-      {groups.map(([status, statusTickets]) => <StatusGroup key={status} status={status} count={statusTickets.length}>
-        {statusTickets.map(ticket => {
-          const overdue = isOverdue(ticket.deadline_date, ["completed","scrapped"].includes(ticket.status));
-          return <WorkshopRow
-            key={ticket.id}
-            onClick={() => setSelected(ticket)}
-            active={selected?.id === ticket.id}
-            muted={["completed","scrapped"].includes(ticket.status)}
-            reference={ticket.ticket_number}
-            primary={ticket.client}
-            secondary={ticket.tool_code}
-            date={ticket.date_received_by_client}
-            deadline={ticket.deadline_date}
-            overdue={overdue}
-            assignee={memberLabel(ticket.assigned_to ? memberMap.get(ticket.assigned_to) : null)}
-            tags={<><PriorityBadge priority={ticket.priority} />{ticket.is_warranty && <span className="rounded bg-success/10 px-1.5 py-0.5 text-[10px] font-bold uppercase text-success">Warranty</span>}{ticket.status === "scrapped" && <span className="rounded bg-destructive/10 px-1.5 py-0.5 text-[10px] font-bold uppercase text-destructive">Scrapped</span>}{ticket.invoiced && <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-bold uppercase text-muted-foreground">Invoiced</span>}</>}
-          />;
-        })}
-      </StatusGroup>)}
-    </div>}
+    {loading ? <div className="space-y-2">{[1,2,3].map(n => <div key={n} className="h-24 animate-pulse rounded-lg bg-muted/50" />)}</div> : monthGroups.length === 0 ? <EmptyWorkshop history={tab === "history"} /> : <BoardTable
+      groups={monthGroups}
+      collapsed={collapsed}
+      onToggle={(id) => setCollapsed((current) => ({ ...current, [id]: !current[id] }))}
+      rowKey={(ticket) => ticket.id}
+      onRowClick={(ticket) => setSelected(ticket)}
+      activeKey={selected?.id}
+      noun="ticket"
+      columns={[
+        { key: "ticket", label: "Ticket", cell: (ticket) => <span className="whitespace-nowrap px-1 font-semibold">{ticket.ticket_number}</span> },
+        { key: "received", label: "Received date", align: "center", cell: (ticket) => <span className="whitespace-nowrap text-xs text-muted-foreground">{formatDate(ticket.date_received_by_client)}</span> },
+        { key: "client", label: "Client", cell: (ticket) => <span className="px-1">{ticket.client}</span> },
+        { key: "tool", label: "Tool", align: "center", cell: (ticket) => <span className="font-mono text-xs uppercase text-muted-foreground">{ticket.tool_code}</span> },
+        { key: "priority", label: "Priority", align: "center", width: "104px", cell: (ticket) => <BoardPriorityCell priority={ticket.priority} /> },
+        { key: "assigned", label: "Assigned", align: "center", width: "140px", cell: (ticket) => ticket.assigned_to ? <BoardCell tone="violet">{memberLabel(memberMap.get(ticket.assigned_to))}</BoardCell> : <span className="text-xs text-muted-foreground">Unassigned</span> },
+        { key: "status", label: "Status", align: "center", width: "170px", cell: (ticket) => <BoardStatusCell status={ticket.status} /> },
+        { key: "deadline", label: "Deadline", align: "center", width: "130px", cell: (ticket) => ticket.deadline_date ? <span className={cn("whitespace-nowrap text-xs font-semibold", isOverdue(ticket.deadline_date, ["completed","scrapped"].includes(ticket.status)) ? "text-destructive" : "text-muted-foreground")}>{formatDate(ticket.deadline_date)}</span> : <span className="text-xs text-muted-foreground">—</span> },
+        { key: "warranty", label: "Warranty", align: "center", width: "130px", cell: (ticket) => ticket.is_warranty ? <BoardCell tone="teal">Warranty</BoardCell> : ticket.warranty_expires_at ? <span className="whitespace-nowrap text-xs text-muted-foreground">to {formatDate(ticket.warranty_expires_at)}</span> : <span className="text-xs text-muted-foreground">—</span> },
+        { key: "invoice", label: "Invoice", align: "center", width: "110px", cell: (ticket) => ticket.invoiced ? <BoardCell tone="cyan">Done</BoardCell> : <span className="text-xs text-muted-foreground">—</span> },
+      ]}
+    />}
 
     <Dialog open={formOpen} onOpenChange={setFormOpen}><DialogContent className="max-h-[92dvh] w-[calc(100%-20px)] max-w-3xl overflow-y-auto rounded-[28px] p-0"><div className="border-b border-border/60 bg-primary/[.06] p-5 sm:p-6"><DialogHeader><DialogTitle className="flex items-center gap-2 text-2xl font-black"><span className="grid h-10 w-10 place-items-center rounded-2xl bg-primary text-primary-foreground"><Wrench className="h-5 w-5"/></span>{editingId?"Edit repair ticket":"New repair ticket"}</DialogTitle></DialogHeader><p className="mt-2 text-sm text-muted-foreground">Tool code is the warranty key. Use the same code every time a tool returns.</p></div><div className="space-y-6 p-5 sm:p-6">
       <FormSection title="Ticket & tool"><div className="grid gap-4 sm:grid-cols-2"><Field label="Ticket number *"><Input value={draft.ticket_number} onChange={e=>set("ticket_number",e.target.value)} placeholder="REP-2048"/></Field><Field label="Date received by client *"><Input type="date" value={draft.date_received_by_client} onChange={e=>set("date_received_by_client",e.target.value)}/></Field><Field label="Client *"><Input value={draft.client} onChange={e=>set("client",e.target.value)}/></Field><Field label="Tool code / serial *"><Input value={draft.tool_code} onChange={e=>set("tool_code",e.target.value)} placeholder="Unique code used for warranty matching" className="uppercase"/></Field><Field label="Tool information *" wide><Textarea value={draft.tool_information} onChange={e=>set("tool_information",e.target.value)} className="min-h-20" placeholder="Make, model, serial, fault and accessories received…"/></Field></div>{warrantyMatch&&<div className="mt-4 flex gap-3 rounded-2xl border border-success/25 bg-success/10 p-4 text-success"><ShieldCheck className="mt-0.5 h-5 w-5 shrink-0"/><div><p className="text-sm font-black">Warranty automatically detected</p><p className="mt-0.5 text-xs">Tool code matches {warrantyMatch.ticket_number}. Coverage runs until {formatDate(warrantyMatch.warranty_expires_at)}; this ticket will enter Warranty Repairs.</p></div></div>}</FormSection>
