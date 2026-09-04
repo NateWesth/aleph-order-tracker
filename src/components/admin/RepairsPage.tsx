@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, CalendarClock, CheckCircle2, Edit3, Hammer, History, PackageOpen, Plus, ShieldCheck, Ticket, Trash2, UserRound, Wrench } from "lucide-react";
+import { AlertTriangle, CalendarClock, CheckCircle2, Edit3, Hammer, ShieldCheck, Trash2, UserRound, Wrench } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -12,7 +12,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import EntityComments from "@/components/admin/EntityComments";
 import { cn } from "@/lib/utils";
-import { DetailSection, DetailValue, EmptyWorkshop, formatDate, isOverdue, memberLabel, groupByStatus, ListHeadings, StatusGroup, PRIORITIES, PriorityBadge, PrioritySelect, SERVICE_STATUSES, StatusBadge, TeamMember, WorkshopPanel, WorkshopRow, WorkshopHeader, WorkshopTabs, WorkshopToolbar } from "@/components/admin/workshop/shared";
+import { DetailSection, DetailValue, EmptyWorkshop, formatDate, isOverdue, memberLabel, monthLabel, PriorityBadge, PrioritySelect, SERVICE_STATUSES, StatusBadge, TeamMember, WorkshopPanel, WorkshopTabs, WorkshopToolbar } from "@/components/admin/workshop/shared";
+import SharpeningFocusHeader from "@/components/admin/workshop/SharpeningFocusHeader";
+import BoardTable, { BoardCell, BoardPriorityCell, BoardStatusCell, GROUP_SPINES } from "@/components/admin/workshop/BoardTable";
 
 interface RepairTicket {
   id: string; ticket_number: string; client: string; tool_code: string; tool_information: string;
@@ -35,6 +37,7 @@ export default function RepairsPage() {
   const [formOpen, setFormOpen] = useState(false); const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<RepairDraft>(emptyDraft); const [saving, setSaving] = useState(false);
   const [scrapOpen, setScrapOpen] = useState(false); const [scrapReason, setScrapReason] = useState("");
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
   const load = useCallback(async (quiet = false) => {
     if (!quiet) setLoading(true);
