@@ -145,7 +145,7 @@ export default function SharpeningPage() {
             deadline={job.deadline_date}
             overdue={overdue}
             assignee={memberLabel(job.assigned_to ? memberMap.get(job.assigned_to) : null)}
-            tags={<><PriorityBadge priority={job.priority} /><span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-bold tabular-nums">×{job.quantity}</span>{job.invoiced && <span className="rounded bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-bold uppercase text-success">Invoiced</span>}</>}
+            tags={<><PriorityBadge priority={job.priority} /><span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-bold tabular-nums">×{job.quantity}</span>{job.invoiced && <span className="rounded bg-success/10 px-1.5 py-0.5 text-[10px] font-bold uppercase text-success">Invoiced</span>}</>}
           />;
         })}
       </StatusGroup>)}

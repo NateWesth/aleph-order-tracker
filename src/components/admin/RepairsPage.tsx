@@ -116,7 +116,7 @@ export default function RepairsPage() {
             deadline={ticket.deadline_date}
             overdue={overdue}
             assignee={memberLabel(ticket.assigned_to ? memberMap.get(ticket.assigned_to) : null)}
-            tags={<><PriorityBadge priority={ticket.priority} />{ticket.is_warranty && <span className="rounded bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-bold uppercase text-success">Warranty</span>}{ticket.status === "scrapped" && <span className="rounded bg-destructive/10 px-1.5 py-0.5 text-[10px] font-bold uppercase text-destructive">Scrapped</span>}{ticket.invoiced && <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-bold uppercase text-muted-foreground">Invoiced</span>}</>}
+            tags={<><PriorityBadge priority={ticket.priority} />{ticket.is_warranty && <span className="rounded bg-success/10 px-1.5 py-0.5 text-[10px] font-bold uppercase text-success">Warranty</span>}{ticket.status === "scrapped" && <span className="rounded bg-destructive/10 px-1.5 py-0.5 text-[10px] font-bold uppercase text-destructive">Scrapped</span>}{ticket.invoiced && <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-bold uppercase text-muted-foreground">Invoiced</span>}</>}
           />;
         })}
       </StatusGroup>)}
@@ -139,7 +139,7 @@ export default function RepairsPage() {
       title={selected?.client || ""}
       subtitle={selected ? <span className="font-mono uppercase text-primary">{selected.tool_code}</span> : null}
       badges={selected ? <><StatusBadge status={selected.status}/><PriorityBadge priority={selected.priority}/>{selected.is_warranty&&<Badge className="rounded-md bg-success px-2 py-0.5 text-[10px] font-bold uppercase text-success-foreground"><ShieldCheck className="mr-1 h-3 w-3"/>Warranty</Badge>}</> : null}
-      overlay={selected?.status==="scrapped"?<div className="pointer-events-none absolute inset-0 z-30 grid place-items-center overflow-hidden" aria-hidden><span className="-rotate-12 whitespace-nowrap rounded-xl border-[7px] border-red-600/20 px-6 py-3 text-4xl font-black tracking-[.16em] text-red-600/20 sm:text-6xl">SCRAPPED</span></div>:null}
+      overlay={selected?.status==="scrapped"?<div className="pointer-events-none absolute inset-0 z-30 grid place-items-center overflow-hidden" aria-hidden><span className="-rotate-12 whitespace-nowrap rounded-xl border-[7px] border-destructive/25 px-6 py-3 text-4xl font-black tracking-[.16em] text-destructive/20 sm:text-6xl">SCRAPPED</span></div>:null}
       actions={selected ? <><Button variant="outline" className="sm:min-w-32" onClick={()=>openEdit(selected)}><Edit3 className="mr-2 h-4 w-4"/>Edit details</Button>{!["completed","scrapped"].includes(selected.status)&&<><Button variant="destructive" onClick={()=>setScrapOpen(true)}><Trash2 className="mr-2 h-4 w-4"/>Scrap tool</Button><Button className="sm:min-w-36" onClick={()=>void updateStatus(selected,"completed")}><CheckCircle2 className="mr-2 h-4 w-4"/>Complete & archive</Button></>}</> : null}
     >
       {selected && <>
