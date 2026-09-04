@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import EntityComments from "@/components/admin/EntityComments";
 import { cn } from "@/lib/utils";
 import { DetailSection, DetailValue, EmptyWorkshop, formatDate, isOverdue, memberLabel, monthLabel, PRIORITIES, PriorityBadge, SERVICE_STATUSES, StatusBadge, TeamMember, WorkshopPanel, WorkshopHeader, WorkshopTabs, WorkshopToolbar } from "@/components/admin/workshop/shared";
-import BoardTable, { BoardCell, BoardStatusCell, GROUP_SPINES } from "@/components/admin/workshop/BoardTable";
+import BoardTable, { BoardCell, BoardPriorityCell, BoardStatusCell, GROUP_SPINES, statusTone } from "@/components/admin/workshop/BoardTable";
 
 interface SharpeningJob {
   id: string; date_received: string; job_number: string; customer_name: string; quantity: number;
@@ -24,6 +24,15 @@ interface SharpeningJob {
 }
 
 type JobDraft = Omit<SharpeningJob, "id" | "completed_at" | "created_at">;
+const STATUS_BUTTON: Record<string, string> = {
+  cyan: "border-logo-cyan bg-logo-cyan text-logo-on",
+  teal: "border-logo-teal bg-logo-teal text-white",
+  violet: "border-logo-violet bg-logo-violet text-white",
+  magenta: "border-logo-magenta bg-logo-magenta text-white",
+  pink: "border-logo-pink bg-logo-pink text-white",
+  ink: "border-logo-ink bg-logo-ink text-white",
+  neutral: "border-foreground/20 bg-foreground/85 text-background",
+};
 const today = () => new Date().toISOString().slice(0, 10);
 const emptyDraft = (): JobDraft => ({ date_received: today(), job_number: "", customer_name: "", quantity: 1, priority: "normal", order_number: null, assigned_to: null, status: "not_started", deadline_date: null, invoiced: false, invoice_number: null, third_party_name: null, third_party_quantity: null, third_party_reference: null, third_party_status: null, notes: null });
 
@@ -159,12 +168,12 @@ export default function SharpeningPage() {
         { key: "received", label: "Received date", align: "center", cell: (job) => <span className="whitespace-nowrap text-xs text-muted-foreground">{formatDate(job.date_received)}</span> },
         { key: "customer", label: "Customer", cell: (job) => <span className="px-1">{job.customer_name}</span> },
         { key: "qty", label: "Qty", align: "center", width: "64px", cell: (job) => <span className="tabular-nums">{job.quantity}</span>, summary: (rows) => <span>{rows.reduce((sum, row) => sum + (row.quantity || 0), 0)} sum</span> },
-        { key: "priority", label: "Priority", align: "center", width: "104px", cell: (job) => <BoardCell tone={job.priority === "urgent" ? "danger" : job.priority === "high" ? "warning" : "neutral"}>{job.priority}</BoardCell> },
+        { key: "priority", label: "Priority", align: "center", width: "104px", cell: (job) => <BoardPriorityCell priority={job.priority} /> },
         { key: "order", label: "Order no", align: "center", cell: (job) => <span className="text-xs text-muted-foreground">{job.order_number || "—"}</span> },
-        { key: "assigned", label: "Assigned", align: "center", width: "140px", cell: (job) => job.assigned_to ? <BoardCell tone="info">{memberLabel(memberMap.get(job.assigned_to))}</BoardCell> : <span className="text-xs text-muted-foreground">Unassigned</span> },
+        { key: "assigned", label: "Assigned", align: "center", width: "140px", cell: (job) => job.assigned_to ? <BoardCell tone="violet">{memberLabel(memberMap.get(job.assigned_to))}</BoardCell> : <span className="text-xs text-muted-foreground">Unassigned</span> },
         { key: "status", label: "Status", align: "center", width: "170px", cell: (job) => <BoardStatusCell status={job.status} /> },
         { key: "deadline", label: "Deadline", align: "center", width: "130px", cell: (job) => job.deadline_date ? <span className={cn("whitespace-nowrap text-xs font-semibold", isOverdue(job.deadline_date, job.status === "completed") ? "text-destructive" : "text-muted-foreground")}>{formatDate(job.deadline_date)}</span> : <span className="text-xs text-muted-foreground">—</span> },
-        { key: "invoice", label: "Invoice", align: "center", width: "110px", cell: (job) => job.invoiced ? <BoardCell tone="success">Done</BoardCell> : <span className="text-xs text-muted-foreground">—</span> },
+        { key: "invoice", label: "Invoice", align: "center", width: "110px", cell: (job) => job.invoiced ? <BoardCell tone="cyan">Done</BoardCell> : <span className="text-xs text-muted-foreground">—</span> },
         { key: "third", label: "Third party", align: "center", cell: (job) => <span className="text-xs text-muted-foreground">{job.third_party_name || "—"}</span> },
       ]}
     />}
@@ -192,7 +201,7 @@ export default function SharpeningPage() {
       {selected && <>
 
       <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3"><DetailValue label="Received" value={formatDate(selected.date_received)} icon={<CalendarClock className="h-3.5 w-3.5" />} /><DetailValue label="Quantity" value={`×${selected.quantity}`} /><DetailValue label="Order" value={selected.order_number} /><DetailValue label="Assigned to" value={memberLabel(selected.assigned_to ? memberMap.get(selected.assigned_to) : null)} icon={<UserRound className="h-3.5 w-3.5" />} /><DetailValue label="Deadline" value={formatDate(selected.deadline_date)} /><DetailValue label="Invoice" value={selected.invoiced ? selected.invoice_number || "Completed" : "Not invoiced"} icon={<FileText className="h-3.5 w-3.5" />} /></div>
-      <DetailSection title="Move the job forward"><div className="grid grid-cols-2 gap-2 sm:grid-cols-3">{SERVICE_STATUSES.map(([value,label]) => <button key={value} onClick={() => void updateStatus(selected, value)} className={cn("rounded-lg border px-3 py-2 text-xs font-semibold transition", selected.status === value ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card hover:border-primary/40 hover:bg-accent/40")}>{label}</button>)}</div></DetailSection>
+      <DetailSection title="Move the job forward"><div className="grid grid-cols-2 gap-2 sm:grid-cols-3">{SERVICE_STATUSES.map(([value,label]) => <button key={value} onClick={() => void updateStatus(selected, value)} className={cn("rounded-xl border px-3 py-2 text-xs font-semibold transition", selected.status === value ? STATUS_BUTTON[statusTone(value)] : "border-border bg-card text-muted-foreground hover:border-logo-cyan/40 hover:bg-accent/40 hover:text-foreground")}>{label}</button>)}</div></DetailSection>
       {(selected.third_party_name || selected.third_party_reference) && <DetailSection title="Third-party work"><div className="grid gap-2.5 sm:grid-cols-2"><DetailValue label="Repairer / supplier" value={selected.third_party_name} /><DetailValue label="Reference" value={selected.third_party_reference} /><DetailValue label="Quantity" value={selected.third_party_quantity} /><DetailValue label="Status" value={selected.third_party_status ? <StatusBadge status={selected.third_party_status} /> : null} /></div></DetailSection>}
       {selected.notes && <DetailValue label="Workshop notes" value={<p className="whitespace-pre-wrap font-normal leading-6">{selected.notes}</p>} icon={<ClipboardList className="h-3.5 w-3.5" />} />}
       <EntityComments entityType="sharpening" entityId={selected.id} defaultOpen />

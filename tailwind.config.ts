@@ -95,8 +95,20 @@ export default {
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
 				},
+				// Logo spectrum — sampled from the Aleph mark
+				logo: {
+					cyan: 'hsl(var(--logo-cyan) / <alpha-value>)',
+					teal: 'hsl(var(--logo-teal) / <alpha-value>)',
+					violet: 'hsl(var(--logo-violet) / <alpha-value>)',
+					magenta: 'hsl(var(--logo-magenta) / <alpha-value>)',
+					pink: 'hsl(var(--logo-pink) / <alpha-value>)',
+					ink: 'hsl(var(--logo-ink) / <alpha-value>)',
+					on: 'hsl(var(--logo-on) / <alpha-value>)',
+
+				},
 				// Brand colors - Bold vibrant palette
 				brand: {
+
 					blue: 'hsl(205 95% 45%)',
 					green: 'hsl(142 70% 38%)',
 					magenta: 'hsl(330 85% 58%)',
