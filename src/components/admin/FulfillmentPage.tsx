@@ -20,6 +20,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import EntityComments from "@/components/admin/EntityComments";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { queueOfflineOperation } from "@/services/offlineOperations";
+import { formatDistanceToNow } from "date-fns";
 import {
   ArrowRight,
   Archive,
@@ -345,6 +346,8 @@ export default function FulfillmentPage() {
   const [dispatchAreaLinks, setDispatchAreaLinks] = useState<DispatchAreaLink[]>([]);
   const [newAreaName, setNewAreaName] = useState("");
   const [areaSavingKey, setAreaSavingKey] = useState<string | null>(null);
+  const [poCacheFetchedAt, setPoCacheFetchedAt] = useState<string | null>(null);
+  const [poCacheRefreshing, setPoCacheRefreshing] = useState(false);
   const [bulkAssignee, setBulkAssignee] = useState("keep");
   const [bulkSchedule, setBulkSchedule] = useState("");
   const [bulkSaving, setBulkSaving] = useState(false);
@@ -399,7 +402,7 @@ export default function FulfillmentPage() {
           .limit(100),
         supabase.from("profiles").select("id, full_name, email, position").eq("approved", true).order("full_name"),
         supabase.from("fulfillment_settings").select("auto_assign_enabled, default_method").eq("id", true).maybeSingle(),
-        supabase.from("po_tracking_cache").select("payload, fetched_at").eq("id", PO_CACHE_ID).maybeSingle(),
+        supabase.functions.invoke("po-tracking-data", { body: { refresh: true } }),
         supabase.from("po_collection_state").select("purchase_order_id, purchase_order_number, vendor_id, vendor_name, assigned_to, status, collection_method, is_urgent, scheduled_for, notes, completed_at, dismissed_at, dismissed_by, last_seen_at"),
         supabase
           .from("po_collection_events")
@@ -476,7 +479,8 @@ export default function FulfillmentPage() {
         .sort((a, b) => Number(b.urgency === "urgent") - Number(a.urgency === "urgent"));
 
       const historyDeliveries = historicBase.map(decorateOrder);
-      const poPayload = Array.isArray(cacheRes.data?.payload) ? (cacheRes.data?.payload as unknown as ZohoPO[]) : [];
+      const poPayload = Array.isArray(cacheRes.data?.purchaseOrders) ? (cacheRes.data?.purchaseOrders as unknown as ZohoPO[]) : [];
+      setPoCacheFetchedAt(cacheRes.data?.fetchedAt || null);
       const stateRows = (statesRes.data || []) as POCollectionState[];
       const stateByPO = new Map(stateRows.map((row) => [row.purchase_order_id, row]));
       // Operational collections are a strict rolling three-week queue. A
@@ -1590,6 +1594,25 @@ export default function FulfillmentPage() {
             <div className="relative min-w-0 lg:max-w-sm lg:flex-1"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={activeMode === "collection" ? "Search PO, supplier, item or collector…" : "Search order, client, item or driver…"} className="h-10 rounded-xl bg-muted/35 pl-9" />{query && <button className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" onClick={() => setQuery("")}><X className="h-3.5 w-3.5" /></button>}</div>
             <div className="grid grid-cols-4 gap-1 rounded-xl bg-muted/45 p-1">{(["all", "mine", "today", "late"] as FocusFilter[]).map((filter) => <button key={filter} onClick={() => setFocusFilter(filter)} className={cn("rounded-lg px-2.5 py-2 text-[10px] font-bold capitalize", focusFilter === filter ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>{filter}</button>)}</div>
             <div className="flex items-center gap-2 rounded-xl border border-border/60 px-3 py-1.5"><Switch checked={settings.auto_assign_enabled} onCheckedChange={(checked) => void saveSettings({ auto_assign_enabled: checked })} /><div className="whitespace-nowrap"><p className="text-[10px] font-bold">Auto assign</p><p className="text-[9px] text-muted-foreground">Balance new work</p></div></div>
+            {activeMode === "collection" && (
+              <div className="flex items-center gap-1.5 rounded-xl border border-border/60 px-3 py-1.5 text-[10px] text-muted-foreground">
+                <RefreshCw className={cn("h-3 w-3", poCacheRefreshing && "animate-spin")} />
+                <span className="whitespace-nowrap">
+                  {poCacheFetchedAt ? `Zoho data · ${formatDistanceToNow(new Date(poCacheFetchedAt), { addSuffix: true })}` : "Zoho data · unknown"}
+                </span>
+                <button
+                  className="ml-1 font-bold text-primary hover:underline disabled:opacity-50"
+                  disabled={poCacheRefreshing}
+                  onClick={async () => {
+                    setPoCacheRefreshing(true);
+                    await fetchData();
+                    setPoCacheRefreshing(false);
+                  }}
+                >
+                  Refresh
+                </button>
+              </div>
+            )}
             {activeMode === "collection" && <Button variant="outline" className="h-10 rounded-xl" onClick={() => void autoAssignCollections()} disabled={assigning || !collectionQueue.length}><Sparkles className="mr-1.5 h-3.5 w-3.5" />{assigning ? "Assigning…" : "Balance"}</Button>}
 
           </div>}
