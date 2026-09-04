@@ -45,6 +45,34 @@ export function PriorityBadge({ priority }: { priority: string }) {
 }
 
 
+/** Priority select with logo-coded dots so options are colour-coded. */
+export const PRIORITY_DOT: Record<string, string> = {
+  low: "bg-muted-foreground",
+  normal: "bg-logo-teal",
+  high: "bg-logo-pink",
+  urgent: "bg-logo-magenta",
+};
+
+export function PrioritySelect({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  return (
+    <Select value={value} onValueChange={onChange}>
+      <SelectTrigger>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {PRIORITIES.map(([id, label]) => (
+          <SelectItem key={id} value={id}>
+            <span className="flex items-center gap-2">
+              <span className={cn("h-2 w-2 shrink-0 rounded-full", PRIORITY_DOT[id])} />
+              <span className={cn("font-medium", id === "urgent" && "text-logo-magenta", id === "high" && "text-logo-pink")}>{label}</span>
+            </span>
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
 /** Compact, editorial page header — no gradients, no glass. */
 export function WorkshopHeader({ eyebrow, title, description, stats, children }: {
   eyebrow: string; title: string; description: string;
