@@ -112,8 +112,8 @@ export default function SharpeningCommentsPanel({ entityType, title, subtitle, r
   const jobSuggestions = useMemo(() => {
     if (jobQuery === null) return [];
     const q = jobQuery.toLowerCase();
-    return jobs.filter((j) => `${j.job_number} ${j.customer_name}`.toLowerCase().includes(q)).slice(0, 5);
-  }, [jobQuery, jobs]);
+    return references.filter((r) => `${r.reference} ${r.label}`.toLowerCase().includes(q)).slice(0, 5);
+  }, [jobQuery, references]);
 
   const handleBodyChange = (value: string) => {
     setBody(value);
@@ -131,9 +131,9 @@ export default function SharpeningCommentsPanel({ entityType, title, subtitle, r
     inputRef.current?.focus();
   };
 
-  const selectJob = (job: CommentJob) => {
-    setBody((prev) => prev.replace(/#([a-zA-Z0-9\-/ ]{0,30})$/, `#${job.job_number} `));
-    setTargetJob((prev) => prev ?? job.id);
+  const selectJob = (ref: CommentReference) => {
+    setBody((prev) => prev.replace(/#([a-zA-Z0-9\-/ ]{0,30})$/, `#${ref.reference} `));
+    setTargetRef((prev) => prev ?? ref.id);
     setJobQuery(null);
     inputRef.current?.focus();
   };
