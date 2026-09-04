@@ -194,31 +194,52 @@ export function EmptyWorkshop({ history = false }: { history?: boolean }) {
   </div>;
 }
 
-/** Right-hand detail drawer used for workshop detail — solid surface, logo-spectrum rail. */
+/** Centered detail bubble — matches the collections/deliveries detail bubble. */
 export function WorkshopPanel({ open, onOpenChange, icon, reference, title, subtitle, badges, overlay, children, actions }: {
   open: boolean; onOpenChange: (open: boolean) => void;
   icon: ReactNode; reference: string; title: string; subtitle?: ReactNode; badges?: ReactNode; overlay?: ReactNode;
   children: ReactNode; actions?: ReactNode;
 }) {
-  return <Sheet open={open} onOpenChange={onOpenChange}>
-    <SheetContent side="right" className="flex w-full flex-col gap-0 border-l border-border bg-card p-0 sm:max-w-xl">
-      {overlay}
-      <div className="h-1 w-full shrink-0 bg-[linear-gradient(90deg,hsl(var(--logo-cyan)),hsl(var(--logo-teal)),hsl(var(--logo-violet)),hsl(var(--logo-magenta)),hsl(var(--logo-pink)))]" />
-      <SheetHeader className="space-y-0 border-b border-border bg-muted/30 px-5 py-4 text-left sm:px-6">
-        <div className="flex items-start gap-3 pr-8">
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-logo-cyan/12 text-logo-cyan ring-1 ring-inset ring-logo-cyan/25">{icon}</span>
-          <div className="min-w-0 flex-1">
-            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">{reference}</p>
-            <SheetTitle className="truncate text-lg font-bold sm:text-xl">{title}</SheetTitle>
-            {subtitle && <div className="mt-0.5 truncate text-sm text-muted-foreground">{subtitle}</div>}
-            {badges && <div className="mt-2 flex flex-wrap gap-1.5">{badges}</div>}
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") onOpenChange(false); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onOpenChange]);
+
+  if (!open || typeof document === "undefined") return null;
+  return createPortal(
+    <div className="fulfillment-modal-backdrop fixed inset-0 z-[120] flex items-center justify-center p-2.5 sm:p-6" role="presentation">
+      <button type="button" className="absolute inset-0 bg-black/45" onClick={() => onOpenChange(false)} aria-label="Close details" />
+      <section
+        className="fulfillment-detail-modal animate-order-floating-bubble relative flex max-h-[calc(100dvh-1.25rem)] w-full max-w-4xl flex-col overflow-hidden rounded-[28px] border border-border bg-background shadow-[0_24px_60px_-20px_hsl(var(--foreground)/0.35)] sm:max-h-[calc(100dvh-3rem)]"
+        role="dialog"
+        aria-modal="true"
+        aria-label={`${reference} ${title}`}
+      >
+        <div className="ribbon-bar h-1.5 shrink-0" aria-hidden />
+        <div className="relative shrink-0 border-b border-border bg-background p-4 sm:p-5">
+          {overlay}
+          <div className="relative flex items-start gap-3">
+            <span className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-2xl bg-muted p-1 shadow-sm ring-1 ring-border">
+              <img src="/lovable-uploads/e1088147-889e-43f6-bdf0-271189b88913.png" alt="" className="h-full w-full object-contain" />
+            </span>
+            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-primary/10 text-primary">{icon}</span>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary">{reference}</p>{badges}</div>
+              <h2 className="mt-1 truncate font-display text-xl font-black tracking-tight sm:text-2xl">{title}</h2>
+              {subtitle && <p className="mt-0.5 truncate text-sm font-semibold text-muted-foreground">{subtitle}</p>}
+            </div>
+            <button type="button" onClick={() => onOpenChange(false)} className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-muted text-muted-foreground transition-all hover:scale-105 hover:bg-destructive/10 hover:text-destructive" aria-label="Close details"><X className="h-4 w-4" /></button>
           </div>
+          <div className="relative mt-3 flex items-center gap-2 rounded-xl bg-muted px-3 py-2 text-[11px] text-muted-foreground"><MessageSquareText className="h-3.5 w-3.5 text-primary" /><span>Live team thread, actions and history stay together here.</span><span className="ml-auto hidden font-semibold sm:inline">Esc to close</span></div>
         </div>
-      </SheetHeader>
-      <div className="min-h-0 flex-1 overflow-y-auto bg-card p-5 sm:p-6"><div className="space-y-5">{children}</div></div>
-      {actions && <div className="flex flex-col gap-2 border-t border-border bg-muted/30 p-4 sm:flex-row sm:justify-end sm:px-6">{actions}</div>}
-    </SheetContent>
-  </Sheet>;
+        <div className="min-h-0 flex-1 overflow-y-auto bg-background p-4 sm:p-5 lg:p-6"><div className="space-y-5">{children}</div></div>
+        {actions && <div className="flex shrink-0 flex-col gap-2 border-t border-border bg-muted/30 p-4 sm:flex-row sm:justify-end sm:px-6">{actions}</div>}
+      </section>
+    </div>,
+    document.body,
+  );
 }
 
 
