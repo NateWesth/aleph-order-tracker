@@ -14,7 +14,7 @@ import EntityComments from "@/components/admin/EntityComments";
 import { cn } from "@/lib/utils";
 import { DetailSection, DetailValue, EmptyWorkshop, formatDate, isOverdue, memberLabel, monthLabel, PriorityBadge, PrioritySelect, SERVICE_STATUSES, StatusBadge, TeamMember, WorkshopPanel, WorkshopTabs, WorkshopToolbar } from "@/components/admin/workshop/shared";
 import SharpeningFocusHeader from "@/components/admin/workshop/SharpeningFocusHeader";
-import BoardTable, { BoardCell, BoardPriorityCell, BoardStatusCell, GROUP_SPINES } from "@/components/admin/workshop/BoardTable";
+import BoardTable, { BoardCell, BoardPriorityCell, BoardStatusCell, GROUP_SPINES, statusTone } from "@/components/admin/workshop/BoardTable";
 
 interface RepairTicket {
   id: string; ticket_number: string; client: string; tool_code: string; tool_information: string;
@@ -25,6 +25,15 @@ interface RepairTicket {
   notes: string | null; scrap_reason: string | null; scrapped_at: string | null; completed_at: string | null; created_at: string;
 }
 type RepairDraft = Omit<RepairTicket, "id" | "warranty_expires_at" | "is_warranty" | "warranty_source_ticket_id" | "scrapped_at" | "completed_at" | "created_at" | "scrap_reason">;
+const STATUS_BUTTON: Record<string, string> = {
+  cyan: "border-logo-cyan bg-logo-cyan text-logo-on",
+  teal: "border-logo-teal bg-logo-teal text-white",
+  violet: "border-logo-violet bg-logo-violet text-white",
+  magenta: "border-logo-magenta bg-logo-magenta text-white",
+  pink: "border-logo-pink bg-logo-pink text-white",
+  ink: "border-logo-ink bg-logo-ink text-white",
+  neutral: "border-foreground/20 bg-foreground/85 text-background",
+};
 const today = () => new Date().toISOString().slice(0, 10);
 const emptyDraft = (): RepairDraft => ({ ticket_number: "", client: "", tool_code: "", tool_information: "", date_received_by_client: today(), supplier_information: null, customer_information: null, assigned_to: null, priority: "normal", status: "not_started", deadline_date: null, date_received_back_from_supplier: null, warranty_months: null, invoiced: false, invoice_number: null, notes: null });
 
@@ -163,7 +172,7 @@ export default function RepairsPage() {
           <DetailValue label="Tool information" value={<p className="whitespace-pre-wrap font-normal leading-6">{selected.tool_information}</p>} icon={<Hammer className="h-3.5 w-3.5"/>}/>
           <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3"><DetailValue label="Received" value={formatDate(selected.date_received_by_client)} icon={<CalendarClock className="h-3.5 w-3.5"/>}/><DetailValue label="Assigned to" value={memberLabel(selected.assigned_to?memberMap.get(selected.assigned_to):null)} icon={<UserRound className="h-3.5 w-3.5"/>}/><DetailValue label="Deadline" value={formatDate(selected.deadline_date)}/><DetailValue label="Supplier return" value={formatDate(selected.date_received_back_from_supplier)}/><DetailValue label="Warranty" value={selected.warranty_expires_at?`${selected.warranty_months} months · to ${formatDate(selected.warranty_expires_at)}`:"Not set"}/><DetailValue label="Invoice" value={selected.invoiced?selected.invoice_number||"Completed":"Not invoiced"}/></div>
           <div className="grid gap-2.5 sm:grid-cols-2"><DetailValue label="Supplier information" value={<p className="whitespace-pre-wrap font-normal">{selected.supplier_information||"—"}</p>}/><DetailValue label="Customer information" value={<p className="whitespace-pre-wrap font-normal">{selected.customer_information||"—"}</p>}/></div>
-          {!["completed","scrapped"].includes(selected.status)&&<DetailSection title="Move the repair forward"><div className="grid grid-cols-2 gap-2 sm:grid-cols-3">{SERVICE_STATUSES.map(([id,label])=><button key={id} onClick={()=>void updateStatus(selected,id)} className={cn("rounded-lg border px-3 py-2 text-xs font-semibold transition",selected.status===id?"border-primary bg-primary text-primary-foreground":"border-border bg-card hover:border-primary/40 hover:bg-accent/40")}>{label}</button>)}</div></DetailSection>}
+          {!["completed","scrapped"].includes(selected.status)&&<DetailSection title="Move the repair forward"><div className="grid grid-cols-2 gap-2 sm:grid-cols-3">{SERVICE_STATUSES.map(([id,label])=><button key={id} onClick={()=>void updateStatus(selected,id)} className={cn("rounded-xl border px-3 py-2 text-xs font-semibold transition",selected.status===id?STATUS_BUTTON[statusTone(id)]:"border-border bg-card text-muted-foreground hover:border-logo-cyan/40 hover:bg-accent/40 hover:text-foreground")}>{label}</button>)}</div></DetailSection>}
           {selected.notes&&<DetailValue label="Repair notes" value={<p className="whitespace-pre-wrap font-normal leading-6">{selected.notes}</p>}/>}
           {selected.scrap_reason&&<DetailValue label="Scrap reason" value={<p className="font-normal text-destructive">{selected.scrap_reason}</p>}/>}
         </div>
