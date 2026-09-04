@@ -1,8 +1,8 @@
-import type { ReactNode } from "react";
-import { AlertTriangle, CalendarDays, CheckCircle2, Clock3, Search, UserRound } from "lucide-react";
+import { useEffect, type ReactNode } from "react";
+import { createPortal } from "react-dom";
+import { AlertTriangle, CalendarDays, CheckCircle2, Clock3, MessageSquareText, Search, UserRound, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 
 export const SERVICE_STATUSES = [
