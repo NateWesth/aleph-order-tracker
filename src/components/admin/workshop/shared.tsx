@@ -190,27 +190,27 @@ export function EmptyWorkshop({ history = false }: { history?: boolean }) {
   </div>;
 }
 
-/** Centered solid detail bubble (dialog) used for workshop detail. */
+/** Centered solid detail panel (dialog) used for workshop detail. */
 export function WorkshopPanel({ open, onOpenChange, icon, reference, title, subtitle, badges, overlay, children, actions }: {
   open: boolean; onOpenChange: (open: boolean) => void;
   icon: ReactNode; reference: string; title: string; subtitle?: ReactNode; badges?: ReactNode; overlay?: ReactNode;
   children: ReactNode; actions?: ReactNode;
 }) {
   return <Dialog open={open} onOpenChange={onOpenChange}>
-    <DialogContent className="workshop-workspace flex max-h-[90dvh] w-[calc(100%-16px)] max-w-4xl flex-col gap-0 overflow-hidden rounded-xl border border-border bg-card p-0 font-workshop shadow-2xl sm:w-[calc(100%-40px)]">
+    <DialogContent className="workshop-workspace flex max-h-[90dvh] w-[calc(100%-16px)] max-w-3xl flex-col gap-0 overflow-hidden rounded-xl border border-border bg-card p-0 font-workshop shadow-2xl sm:w-[calc(100%-40px)]">
       {overlay}
-      <DialogHeader className="space-y-0 border-b border-border bg-card px-5 py-5 text-left sm:px-7">
+      <DialogHeader className="space-y-0 border-b border-border bg-muted/30 px-5 py-4 text-left sm:px-7">
         <div className="flex items-start gap-3 pr-8">
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-md border border-primary/30 bg-primary/10 text-primary">{icon}</span>
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-md border border-primary/30 bg-primary/10 text-primary">{icon}</span>
           <div className="min-w-0 flex-1">
-            <p className="font-mono text-[11px] font-bold uppercase text-muted-foreground">{reference}</p>
-            <DialogTitle className="truncate font-mono text-xl font-bold sm:text-2xl">{title}</DialogTitle>
+            <p className="font-mono text-[10px] font-bold uppercase text-muted-foreground">{reference}</p>
+            <DialogTitle className="truncate text-lg font-bold sm:text-xl">{title}</DialogTitle>
             {subtitle && <div className="mt-0.5 truncate text-sm text-muted-foreground">{subtitle}</div>}
             {badges && <div className="mt-2 flex flex-wrap gap-1.5">{badges}</div>}
           </div>
         </div>
       </DialogHeader>
-      <div className="min-h-0 flex-1 overflow-y-auto bg-card p-5 sm:p-7"><div className="space-y-6">{children}</div></div>
+      <div className="min-h-0 flex-1 overflow-y-auto bg-card p-5 sm:p-7"><div className="space-y-5">{children}</div></div>
       {actions && <div className="flex flex-col gap-2 border-t border-border bg-muted/30 p-4 sm:flex-row sm:justify-end sm:px-7">{actions}</div>}
     </DialogContent>
   </Dialog>;
