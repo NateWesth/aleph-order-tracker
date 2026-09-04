@@ -12,7 +12,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import EntityComments from "@/components/admin/EntityComments";
 import { cn } from "@/lib/utils";
-import { DetailSection, DetailValue, EmptyWorkshop, formatDate, isOverdue, memberLabel, groupByStatus, ListHeadings, StatusGroup, PRIORITIES, PriorityBadge, SERVICE_STATUSES, StatusBadge, TeamMember, WorkshopPanel, WorkshopRow, WorkshopHeader, WorkshopTabs, WorkshopToolbar } from "@/components/admin/workshop/shared";
+import { DetailSection, DetailValue, EmptyWorkshop, formatDate, isOverdue, memberLabel, monthLabel, PRIORITIES, PriorityBadge, SERVICE_STATUSES, StatusBadge, TeamMember, WorkshopPanel, WorkshopHeader, WorkshopTabs, WorkshopToolbar } from "@/components/admin/workshop/shared";
+import BoardTable, { BoardCell, BoardStatusCell, GROUP_SPINES } from "@/components/admin/workshop/BoardTable";
 
 interface SharpeningJob {
   id: string; date_received: string; job_number: string; customer_name: string; quantity: number;
@@ -40,6 +41,7 @@ export default function SharpeningPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<JobDraft>(emptyDraft);
   const [saving, setSaving] = useState(false);
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
   const load = useCallback(async (quiet = false) => {
     if (!quiet) setLoading(true);
@@ -84,7 +86,22 @@ export default function SharpeningPage() {
     if (urgent) return urgent;
     return (b.date_received || "").localeCompare(a.date_received || "");
   });
-  const groups = useMemo(() => groupByStatus(visible, (job) => job.status, (job) => job.date_received), [visible]);
+  const monthGroups = useMemo(() => {
+    const map = new Map<string, SharpeningJob[]>();
+    visible.forEach((job) => {
+      const key = (job.date_received || "").slice(0, 7) || "unknown";
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(job);
+    });
+    return Array.from(map.entries())
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .map(([key, rows], index) => ({
+        id: key,
+        label: key === "unknown" ? "Date not set" : monthLabel(`${key}-01`),
+        rows,
+        spine: GROUP_SPINES[index % GROUP_SPINES.length],
+      }));
+  }, [visible]);
 
   const openCreate = () => { setEditingId(null); setDraft(emptyDraft()); setFormOpen(true); };
   const openEdit = (job: SharpeningJob) => { setEditingId(job.id); setDraft({ date_received: job.date_received, job_number: job.job_number, customer_name: job.customer_name, quantity: job.quantity, priority: job.priority, order_number: job.order_number, assigned_to: job.assigned_to, status: job.status, deadline_date: job.deadline_date, invoiced: job.invoiced, invoice_number: job.invoice_number, third_party_name: job.third_party_name, third_party_quantity: job.third_party_quantity, third_party_reference: job.third_party_reference, third_party_status: job.third_party_status, notes: job.notes }); setSelected(null); setFormOpen(true); };
