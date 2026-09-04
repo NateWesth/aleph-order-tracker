@@ -136,9 +136,14 @@ export default function SharpeningPage() {
 
   return <div className="workshop-workspace space-y-4 bg-background pb-10 font-sans text-foreground">
     <SharpeningFocusHeader
-      jobs={jobs}
+      items={jobs.map((job) => ({ id: job.id, reference: job.job_number, title: job.customer_name, subtitle: `×${job.quantity}`, date: job.date_received, deadline: job.deadline_date, status: job.status, priority: job.priority }))}
+      noun="sharpening job"
+      entityType="sharpening"
+      commentsTitle="Sharpening comments"
+      commentsSubtitle="Reply, @mention the team, # to reference a job"
+      createLabel="New job"
       onCreate={openCreate}
-      onOpenJob={(id) => { const job = jobs.find((row) => row.id === id); if (job) setSelected(job); }}
+      onOpen={(id) => { const job = jobs.find((row) => row.id === id); if (job) setSelected(job); }}
     />
 
     <WorkshopToolbar query={query} onQuery={setQuery} placeholder="Search job number, customer, order or invoice…">
