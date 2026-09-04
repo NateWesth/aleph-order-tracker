@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { AlertTriangle, CalendarDays, CheckCircle2, Clock3, MessageSquareText, Search, UserRound, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
 export const SERVICE_STATUSES = [
