@@ -12,7 +12,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import EntityComments from "@/components/admin/EntityComments";
 import { cn } from "@/lib/utils";
-import { DetailSection, DetailValue, EmptyWorkshop, formatDate, isOverdue, memberLabel, monthLabel, PRIORITIES, PriorityBadge, SERVICE_STATUSES, StatusBadge, TeamMember, WorkshopPanel, WorkshopHeader, WorkshopTabs, WorkshopToolbar } from "@/components/admin/workshop/shared";
+import { DetailSection, DetailValue, EmptyWorkshop, formatDate, isOverdue, memberLabel, monthLabel, PRIORITIES, PriorityBadge, SERVICE_STATUSES, StatusBadge, TeamMember, WorkshopPanel, WorkshopTabs, WorkshopToolbar } from "@/components/admin/workshop/shared";
+import SharpeningFocusHeader from "@/components/admin/workshop/SharpeningFocusHeader";
 import BoardTable, { BoardCell, BoardPriorityCell, BoardStatusCell, GROUP_SPINES, statusTone } from "@/components/admin/workshop/BoardTable";
 
 interface SharpeningJob {
@@ -134,19 +135,11 @@ export default function SharpeningPage() {
   };
 
   return <div className="workshop-workspace space-y-4 bg-background pb-10 font-sans text-foreground">
-    <WorkshopHeader
-      eyebrow="Workshop desk"
-      title="Sharpening"
-      description="A focused, manual queue for every sharpening job — deadlines, ownership, invoicing and third-party work in one place."
-      stats={[
-        { label: "Outstanding", value: outstanding.length },
-        { label: "Overdue", value: overdueCount, tone: overdueCount > 0 ? "danger" : "default" },
-        { label: "Urgent", value: outstanding.filter((job) => job.priority === "urgent").length, tone: "warning" },
-        { label: "Completed", value: jobs.length - outstanding.length },
-      ]}
-    >
-      <Button onClick={openCreate} className="h-11 rounded-lg px-5"><Plus className="mr-2 h-4 w-4" />New sharpening job</Button>
-    </WorkshopHeader>
+    <SharpeningFocusHeader
+      jobs={jobs}
+      onCreate={openCreate}
+      onOpenJob={(id) => { const job = jobs.find((row) => row.id === id); if (job) setSelected(job); }}
+    />
 
     <WorkshopToolbar query={query} onQuery={setQuery} placeholder="Search job number, customer, order or invoice…">
       <WorkshopTabs value={tab} onChange={(value) => setTab(value as "outstanding" | "history")} tabs={[
