@@ -1,320 +1,51 @@
-
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.8';
-import { encode as base64Encode } from "https://deno.land/std@0.190.0/encoding/base64.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
+import { buildTextPdf, emailRow, emptyRow, firstName, operationalEmail, sendOperationalEmail, shortDate, zaDate } from "../_shared/operational-email.ts";
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+const cors={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type"};
+const json=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers:{...cors,"Content-Type":"application/json"}});
+const dataOf=(result:PromiseSettledResult<any>)=>result.status==="fulfilled"?(result.value.data||[]):[];
+const company=(order:any)=>order.companies?.name||"Customer not linked";
+const ageDays=(value:string)=>Math.max(0,Math.floor((Date.now()-new Date(value).getTime())/86400000));
 
-async function sendMailgun(domain: string, apiKey: string, to: string, subject: string, html: string, pdfBase64: string, pdfFilename: string) {
-  const form = new FormData();
-  form.append('from', `Aleph Order System <mailgun@${domain}>`);
-  form.append('to', to);
-  form.append('subject', subject);
-  form.append('html', html);
-  
-  // Attach PDF
-  const pdfBytes = Uint8Array.from(atob(pdfBase64), c => c.charCodeAt(0));
-  form.append('attachment', new Blob([pdfBytes], { type: 'application/pdf' }), pdfFilename);
+serve(async(req:Request)=>{
+  if(req.method==="OPTIONS")return new Response(null,{headers:cors});
+  try{
+    const supabase=createClient(Deno.env.get("SUPABASE_URL")||"",Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")||"");
+    const key=Deno.env.get("MAILGUN_API_KEY"),domain=Deno.env.get("MAILGUN_DOMAIN");if(!key||!domain)return json({error:"Mailgun is not configured"},500);
+    const {data:recipients,error}=await supabase.from("profiles").select("id,email,full_name").eq("daily_morning_report",true).eq("approved",true);
+    if(error)throw error;if(!recipients?.length)return json({message:"No opted-in recipients",sent:0});
 
-  const baseUrl = Deno.env.get('MAILGUN_BASE_URL') || 'https://api.mailgun.net';
-  const resp = await fetch(`${baseUrl}/v3/${domain}/messages`, {
-    method: 'POST',
-    headers: { 'Authorization': `Basic ${btoa(`api:${apiKey}`)}` },
-    body: form,
-  });
-  if (!resp.ok) {
-    const errText = await resp.text();
-    throw new Error(`Mailgun error ${resp.status}: ${errText}`);
-  }
-  return await resp.json();
-}
-
-serve(async (req: Request): Promise<Response> => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
-
-  try {
-    console.log('=== Daily Morning Report Started ===');
-    
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
-
-    const mailgunApiKey = Deno.env.get('MAILGUN_API_KEY');
-    const mailgunDomain = Deno.env.get('MAILGUN_DOMAIN');
-    if (!mailgunApiKey || !mailgunDomain) {
-      return new Response(JSON.stringify({ error: 'MAILGUN_API_KEY or MAILGUN_DOMAIN not configured' }), {
-        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+    const results=await Promise.allSettled([
+      supabase.from("orders").select("id,order_number,status,urgency,description,created_at,assigned_to,fulfillment_status,companies(name)").neq("status","delivered").order("created_at",{ascending:false}).limit(500),
+      supabase.from("order_items").select("id,order_id,name,code,description,quantity,stock_status,qty_on_po,qty_received,qty_invoiced,qty_completed"),
+      supabase.from("order_purchase_orders").select("order_id,purchase_order_number"),
+      supabase.from("return_cases").select("id,rma_number,client_name,item_description,status,priority,due_date").not("status","in","(completed,rejected)").order("due_date"),
+      supabase.from("loan_assets").select("id,asset_code,tool_name,borrower_name,due_back_at,returned_at").is("returned_at",null).order("due_back_at"),
+      supabase.from("calibration_assets").select("id,asset_code,tool_name,next_due_on,status").neq("status","retired").order("next_due_on"),
+      supabase.from("sharpening_jobs").select("id,job_number,customer_name,status,priority,deadline_date").neq("status","completed").order("deadline_date"),
+      supabase.from("repair_tickets").select("id,ticket_number,client,status,priority,deadline_date,is_warranty").not("status","in","(completed,scrapped)").order("deadline_date"),
+    ]);
+    const [orders,items,pos,returns,loans,calibrations,sharpening,repairs]=results.map(dataOf);
+    const urgent=orders.filter((o:any)=>o.urgency==="urgent");
+    const stale=orders.filter((o:any)=>o.created_at&&ageDays(o.created_at)>=14);
+    const ready=orders.filter((o:any)=>o.status==="ready"||o.fulfillment_status==="ready"||items.some((i:any)=>i.order_id===o.id&&Number(i.qty_invoiced)>Number(i.qty_completed)));
+    const missingStock=orders.filter((o:any)=>items.some((i:any)=>i.order_id===o.id&&Number(i.qty_on_po)<Number(i.quantity)));
+    const now=Date.now();const overdueLoans=loans.filter((x:any)=>new Date(x.due_back_at).getTime()<now);const dueCalibration=calibrations.filter((x:any)=>x.status==="due"||x.status==="expired"||new Date(x.next_due_on).getTime()<now+30*86400000);
+    const overdueWorkshop=[...sharpening.map((x:any)=>({...x,ref:x.job_number,client:x.customer_name,type:"Sharpening"})),...repairs.map((x:any)=>({...x,ref:x.ticket_number,type:x.is_warranty?"Warranty repair":"Repair"}))].filter((x:any)=>x.deadline_date&&new Date(x.deadline_date).getTime()<now);
+    const attention=urgent.length+overdueLoans.length+dueCalibration.length+overdueWorkshop.length;
+    const orderRow=(o:any)=>{const lineCount=items.filter((i:any)=>i.order_id===o.id).length;const po=pos.filter((p:any)=>p.order_id===o.id).map((p:any)=>p.purchase_order_number).join(", ");return emailRow(o.order_number,`${company(o)} · ${lineCount} line${lineCount===1?"":"s"}${po?` · PO ${po}`:""}`,o.urgency||o.status,o.urgency==="urgent"?"#d82d87":"#7155d9")};
+    const day=zaDate();let sent=0,failed=0;
+    for(const recipient of recipients){if(!recipient.email)continue;
+      const html=operationalEmail({eyebrow:"Morning operations brief",title:attention?`${attention} items need attention`:"A clear start to the day",date:day,greeting:`Good morning, ${firstName(recipient.full_name)}.`,intro:attention?"Here is the confirmed work that needs attention first. Routine records stay out of the way so the team can act quickly.":"There are no urgent cross-workspace exceptions this morning. The active pipeline is summarised below.",metrics:[{label:"Open orders",value:orders.length,tone:"violet"},{label:"Urgent",value:urgent.length,tone:"magenta"},{label:"Ready",value:ready.length,tone:"cyan"},{label:"Service due",value:overdueLoans.length+dueCalibration.length,tone:"amber"}],sections:[
+        {title:"Act first",subtitle:"Urgent orders and work already past its commitment",accent:"#d82d87",html:[...urgent.slice(0,5).map(orderRow),...overdueWorkshop.slice(0,4).map((x:any)=>emailRow(x.ref,`${x.type} · ${x.client} · deadline ${shortDate(x.deadline_date)}`,"overdue","#d82d87"))].join("")||emptyRow("No urgent or overdue operational work")},
+        {title:"Assets requiring control",subtitle:"Loan returns and calibration deadlines",accent:"#e69a18",html:[...overdueLoans.slice(0,4).map((x:any)=>emailRow(x.asset_code,`${x.tool_name} · with ${x.borrower_name} · due ${shortDate(x.due_back_at)}`,"loan overdue","#e69a18")),...dueCalibration.slice(0,4).map((x:any)=>emailRow(x.asset_code,`${x.tool_name} · calibration ${shortDate(x.next_due_on)}`,x.status,"#e69a18"))].join("")||emptyRow("No loan or calibration exceptions")},
+        {title:"Pipeline to unlock",subtitle:"Purchasing gaps and delivery-ready work",accent:"#11b7c9",html:[...missingStock.slice(0,4).map(orderRow),...ready.slice(0,4).map(orderRow)].join("")||emptyRow("No blocked or delivery-ready orders")},
+        ...(returns.length?[{title:"Open customer returns",subtitle:"RMA cases still requiring a resolution",accent:"#7155d9",html:returns.slice(0,5).map((x:any)=>emailRow(x.rma_number,`${x.client_name} · ${x.item_description} · due ${shortDate(x.due_date)}`,x.status)).join("")}]:[]),
+      ],ctaLabel:"Open My Work",ctaPath:"/admin",footerNote:"Morning brief · routine detail is available in Aleph when needed"});
+      const pdf=buildTextPdf(`ALEPH MORNING BRIEF - ${day}`,[`Open orders: ${orders.length} | Urgent: ${urgent.length} | Ready: ${ready.length} | 14+ days: ${stale.length}`,"",...urgent.slice(0,15).map((o:any)=>`URGENT  ${o.order_number}  ${company(o)}`),...overdueWorkshop.slice(0,15).map((x:any)=>`OVERDUE ${x.type} ${x.ref} ${x.client}`),...overdueLoans.slice(0,10).map((x:any)=>`LOAN DUE ${x.asset_code} ${x.borrower_name}`)]);
+      try{await sendOperationalEmail(domain,key,recipient.email,attention?`Morning brief · ${attention} need attention`:`Morning brief · Operations clear`,html,pdf,`aleph-morning-${new Date().toISOString().slice(0,10)}.pdf`);sent++;}catch(err){console.error("Morning email failed",recipient.id,err);failed++;}
     }
-
-    const { data: recipients, error: recipientsErr } = await supabase
-      .from('profiles')
-      .select('id, email, full_name')
-      .eq('daily_morning_report', true);
-
-    if (recipientsErr || !recipients || recipients.length === 0) {
-      console.log('No recipients opted in for morning report');
-      return new Response(JSON.stringify({ message: 'No recipients', sent: 0 }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-
-    // Fetch active orders (NOT delivered)
-    const { data: orders } = await supabase
-      .from('orders')
-      .select('id, order_number, status, urgency, description, total_amount, created_at, company_id, companies(name)')
-      .neq('status', 'delivered')
-      .order('created_at', { ascending: false });
-
-    const { data: allItems } = await supabase
-      .from('order_items')
-      .select('id, name, code, quantity, progress_stage, stock_status, order_id');
-
-    const { data: allPOs } = await supabase
-      .from('order_purchase_orders')
-      .select('order_id, purchase_order_number, suppliers(name)');
-
-    const activeOrders = orders || [];
-    const items = allItems || [];
-    const pos = allPOs || [];
-
-    const awaitingStock = activeOrders.filter(o => o.status === 'ordered');
-    const inStock = activeOrders.filter(o => o.status === 'in-stock');
-    const inProgress = activeOrders.filter(o => o.status === 'in-progress');
-    const ready = activeOrders.filter(o => o.status === 'ready');
-
-    const today = new Date().toLocaleDateString('en-ZA', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-
-    // ── HTML helpers ──
-
-    const urgencyDot = (u: string) => {
-      const c = u === 'urgent' ? '#dc2626' : u === 'high' ? '#ea580c' : '#9ca3af';
-      return `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${c};margin-right:6px;"></span>`;
-    };
-
-    const itemTable = (orderItems: any[]) => {
-      if (orderItems.length === 0) return '<p style="color:#9ca3af;font-size:12px;margin:6px 0 0;">No items</p>';
-      return `<table width="100%" cellpadding="0" cellspacing="0" style="margin-top:8px;border-collapse:collapse;">
-        <tr style="background:#f9fafb;">
-          <td style="padding:4px 8px;font-size:11px;font-weight:600;color:#6b7280;border-bottom:1px solid #e5e7eb;">Item</td>
-          <td style="padding:4px 8px;font-size:11px;font-weight:600;color:#6b7280;border-bottom:1px solid #e5e7eb;text-align:center;">Qty</td>
-          <td style="padding:4px 8px;font-size:11px;font-weight:600;color:#6b7280;border-bottom:1px solid #e5e7eb;text-align:right;">Stock</td>
-        </tr>
-        ${orderItems.map(i => {
-          const stockLabel = i.stock_status === 'in-stock' ? 'Received' : i.stock_status === 'ordered' ? 'On Order' : 'Not Ordered';
-          const stockColor = i.stock_status === 'in-stock' ? '#16a34a' : i.stock_status === 'ordered' ? '#d97706' : '#dc2626';
-          return `<tr>
-            <td style="padding:5px 8px;font-size:12px;color:#374151;border-bottom:1px solid #f3f4f6;">${i.name}${i.code ? ` <span style="color:#9ca3af;">${i.code}</span>` : ''}</td>
-            <td style="padding:5px 8px;font-size:12px;color:#374151;border-bottom:1px solid #f3f4f6;text-align:center;">${i.quantity}</td>
-            <td style="padding:5px 8px;font-size:11px;font-weight:600;color:${stockColor};border-bottom:1px solid #f3f4f6;text-align:right;">${stockLabel}</td>
-          </tr>`;
-        }).join('')}
-      </table>`;
-    };
-
-    const orderCard = (order: any, showItems: boolean) => {
-      const company = (order.companies as any)?.name || 'Unknown';
-      const orderItems = items.filter(i => i.order_id === order.id);
-      const orderPOs = pos.filter(p => p.order_id === order.id);
-      return `
-        <div style="border:1px solid #e5e7eb;border-radius:8px;padding:14px 16px;margin-bottom:10px;background:#ffffff;">
-          <table width="100%" cellpadding="0" cellspacing="0"><tr>
-            <td>${urgencyDot(order.urgency || 'normal')}<span style="font-weight:700;font-size:14px;color:#111827;">${order.order_number}</span></td>
-            <td style="text-align:right;font-size:12px;color:#6b7280;">${orderItems.length} item${orderItems.length !== 1 ? 's' : ''}</td>
-          </tr></table>
-          <div style="font-size:13px;color:#6b7280;margin-top:2px;">${company}</div>
-          ${orderPOs.length > 0 ? `<div style="font-size:11px;color:#9ca3af;margin-top:4px;">PO: ${orderPOs.map(p => p.purchase_order_number).join(', ')}</div>` : ''}
-          ${showItems ? itemTable(orderItems) : ''}
-        </div>`;
-    };
-
-    const sectionHeader = (title: string, count: number, color: string) => `
-      <div style="margin-top:28px;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid ${color};">
-        <table width="100%" cellpadding="0" cellspacing="0"><tr>
-          <td><span style="font-size:15px;font-weight:700;color:${color};">${title}</span></td>
-          <td style="text-align:right;"><span style="background:${color};color:#fff;font-size:11px;font-weight:700;padding:2px 10px;border-radius:99px;">${count}</span></td>
-        </tr></table>
-      </div>`;
-
-    const statBox = (label: string, value: number, color: string) =>
-      `<td style="padding:12px 8px;text-align:center;">
-        <div style="font-size:24px;font-weight:800;color:${color};line-height:1;">${value}</div>
-        <div style="font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;margin-top:4px;">${label}</div>
-      </td>`;
-
-    const emailHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
-    <body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
-      <div style="max-width:600px;margin:0 auto;background:#ffffff;">
-
-        <!-- Header -->
-        <div style="background:#111827;padding:24px;">
-          <p style="color:#4b5563;font-size:11px;text-transform:uppercase;letter-spacing:2px;margin:0 0 4px;">Aleph Engineering & Supplies</p>
-          <h1 style="color:#ffffff;margin:0;font-size:18px;font-weight:700;">Morning Board Report</h1>
-          <p style="color:#6b7280;margin:4px 0 0;font-size:12px;">${today}</p>
-        </div>
-
-        <!-- Stats -->
-        <div style="background:#f9fafb;border-bottom:1px solid #e5e7eb;padding:4px 0;">
-          <table width="100%" cellpadding="0" cellspacing="0"><tr>
-            ${statBox('Awaiting', awaitingStock.length, '#dc2626')}
-            <td style="width:1px;background:#e5e7eb;"></td>
-            ${statBox('In Stock', inStock.length, '#2563eb')}
-            <td style="width:1px;background:#e5e7eb;"></td>
-            ${statBox('In Progress', inProgress.length, '#7c3aed')}
-            <td style="width:1px;background:#e5e7eb;"></td>
-            ${statBox('Ready', ready.length, '#16a34a')}
-          </tr></table>
-        </div>
-
-        <div style="padding:0 24px 24px;">
-
-          <!-- Awaiting Stock — full detail with item tables -->
-          ${sectionHeader('Awaiting Stock', awaitingStock.length, '#dc2626')}
-          ${awaitingStock.length > 0
-            ? awaitingStock.map(o => orderCard(o, true)).join('')
-            : '<p style="color:#16a34a;font-size:13px;margin:4px 0;">All stock received ✓</p>'}
-
-          <!-- In Stock — cards without item tables -->
-          ${sectionHeader('In Stock', inStock.length, '#2563eb')}
-          ${inStock.length > 0
-            ? inStock.map(o => orderCard(o, false)).join('')
-            : '<p style="color:#9ca3af;font-size:13px;font-style:italic;">None</p>'}
-
-          <!-- In Progress -->
-          ${sectionHeader('In Progress', inProgress.length, '#7c3aed')}
-          ${inProgress.length > 0
-            ? inProgress.map(o => orderCard(o, false)).join('')
-            : '<p style="color:#9ca3af;font-size:13px;font-style:italic;">None</p>'}
-
-          <!-- Ready -->
-          ${sectionHeader('Ready for Collection / Delivery', ready.length, '#16a34a')}
-          ${ready.length > 0
-            ? ready.map(o => orderCard(o, false)).join('')
-            : '<p style="color:#9ca3af;font-size:13px;font-style:italic;">None</p>'}
-
-        </div>
-
-        <!-- Footer -->
-        <div style="background:#f9fafb;padding:14px 24px;text-align:center;border-top:1px solid #e5e7eb;">
-          <p style="font-size:11px;color:#9ca3af;margin:0;">Automated report · Aleph Engineering & Supplies</p>
-          <p style="font-size:11px;margin:4px 0 0;"><a href="https://aleph-order-tracker.lovable.app/settings" style="color:#6b7280;">Manage preferences</a></p>
-        </div>
-      </div>
-    </body></html>`;
-
-    const pdfContent = buildPdfBase64({
-      date: today, awaitingStock, inStock, inProgress, ready, items, pos, total: activeOrders.length,
-    });
-
-    const pdfFilename = `morning-report-${new Date().toISOString().split('T')[0]}.pdf`;
-    let sent = 0, failed = 0;
-    for (const recipient of recipients) {
-      if (!recipient.email) continue;
-      try {
-        await sendMailgun(mailgunDomain, mailgunApiKey, recipient.email, `Morning Board Report — ${today}`, emailHtml, pdfContent, pdfFilename);
-        sent++; console.log(`Sent to ${recipient.email}`);
-      } catch (err) { console.error(`Error ${recipient.email}:`, err); failed++; }
-    }
-
-    return new Response(JSON.stringify({ sent, failed, recipients: recipients.length }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
-
-  } catch (error) {
-    console.error('Morning report error:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
-  }
+    return json({sent,failed,recipients:recipients.length,summary:{orders:orders.length,attention}});
+  }catch(error){console.error("Morning report error",error);return json({error:error instanceof Error?error.message:"Unexpected morning report error"},500);}
 });
-
-function buildPdfBase64(data: any): string {
-  const { date, awaitingStock, inStock, inProgress, ready, items, pos, total } = data;
-  const L: string[] = [];
-  const line = '='.repeat(62);
-  const thin = '-'.repeat(62);
-
-  L.push('');
-  L.push('  ALEPH ENGINEERING & SUPPLIES');
-  L.push('  Morning Board Report');
-  L.push(`  ${date}`);
-  L.push('');
-  L.push(line);
-  L.push('');
-  L.push(`  BOARD OVERVIEW`);
-  L.push(`  Awaiting Stock: ${awaitingStock.length}   In Stock: ${inStock.length}   In Progress: ${inProgress.length}   Ready: ${ready.length}   Total: ${total}`);
-  L.push('');
-  L.push(line);
-
-  // Awaiting Stock detail
-  L.push('');
-  L.push(`  AWAITING STOCK (${awaitingStock.length})`);
-  L.push(thin);
-  if (awaitingStock.length === 0) {
-    L.push('  All stock received.');
-  } else {
-    awaitingStock.forEach((o: any) => {
-      const company = (o.companies as any)?.name || 'Unknown';
-      const oi = items.filter((i: any) => i.order_id === o.id);
-      const op = pos.filter((p: any) => p.order_id === o.id);
-      L.push('');
-      L.push(`  ${o.order_number}  |  ${company}  |  Priority: ${(o.urgency || 'normal').toUpperCase()}`);
-      if (op.length > 0) L.push(`  PO: ${op.map((p: any) => p.purchase_order_number).join(', ')}`);
-      if (oi.length > 0) {
-        L.push('  +-----------------------------------------+------+-------------+');
-        L.push('  | Item                                    | Qty  | Stock       |');
-        L.push('  +-----------------------------------------+------+-------------+');
-        oi.forEach((i: any) => {
-          const name = `${i.name}${i.code ? ` (${i.code})` : ''}`.substring(0, 39).padEnd(39);
-          const qty = String(i.quantity).padEnd(4);
-          const stock = (i.stock_status === 'in-stock' ? 'Received' : i.stock_status === 'ordered' ? 'On Order' : 'Not Ordered').padEnd(11);
-          L.push(`  | ${name} | ${qty} | ${stock} |`);
-        });
-        L.push('  +-----------------------------------------+------+-------------+');
-      }
-    });
-  }
-
-  const addCompactSection = (title: string, list: any[]) => {
-    L.push('');
-    L.push(line);
-    L.push('');
-    L.push(`  ${title} (${list.length})`);
-    L.push(thin);
-    if (list.length === 0) { L.push('  None.'); return; }
-    list.forEach((o: any) => {
-      const c = (o.companies as any)?.name || 'Unknown';
-      const n = items.filter((i: any) => i.order_id === o.id).length;
-      L.push(`  ${o.order_number}  |  ${c}  |  ${n} item${n !== 1 ? 's' : ''}  |  ${(o.urgency || 'normal').toUpperCase()}`);
-    });
-  };
-
-  addCompactSection('IN STOCK', inStock);
-  addCompactSection('IN PROGRESS', inProgress);
-  addCompactSection('READY FOR COLLECTION / DELIVERY', ready);
-
-  L.push('');
-  L.push(line);
-  L.push('');
-  L.push('  Generated by Aleph Order Management System');
-
-  const text = L.join('\n');
-  const safe = text.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)').replace(/[^\x20-\x7E\n]/g, '');
-  const tl = safe.split('\n');
-  let s = 'BT\n/F1 8 Tf\n'; let y = 760;
-  for (const l of tl) { if (y < 40) { s += `1 0 0 1 28 ${y} Tm\n(... continued on next page) Tj\n`; break; } s += `1 0 0 1 28 ${y} Tm\n(${l}) Tj\n`; y -= 12; }
-  s += 'ET';
-  const p = ['%PDF-1.4','1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj','2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj',
-    `3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]/Contents 4 0 R/Resources<</Font<</F1 5 0 R>>>>>>endobj`,
-    `4 0 obj<</Length ${s.length}>>\nstream\n${s}\nendstream\nendobj`,'5 0 obj<</Type/Font/Subtype/Type1/BaseFont/Courier>>endobj'];
-  const xr = p.join('\n').length + 1;
-  p.push('xref','0 6','0000000000 65535 f ','0000000009 00000 n ','0000000058 00000 n ','0000000115 00000 n ','0000000300 00000 n ','0000000500 00000 n ',
-    'trailer<</Size 6/Root 1 0 R>>',`startxref\n${xr}`,'%%EOF');
-  return base64Encode(new TextEncoder().encode(p.join('\n')));
-}

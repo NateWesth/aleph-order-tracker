@@ -6,18 +6,23 @@ import { useLiveData } from "@/hooks/useLiveData";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import ContinuityPanel from "@/components/admin/ContinuityPanel";
 
 interface MyWorkPageProps { onNavigate: (view: string) => void; }
 export default function MyWorkPage({ onNavigate }: MyWorkPageProps) {
   const { user } = useAuth();
   const [deliveries,setDeliveries]=useState<any[]>([]); const [collections,setCollections]=useState<any[]>([]); const [tasks,setTasks]=useState<any[]>([]); const [exceptions,setExceptions]=useState<any[]>([]); const [routes,setRoutes]=useState<any[]>([]); const [loading,setLoading]=useState(true);
-  const load=useCallback(async()=>{ if(!user?.id)return; const s=supabase as any; const [d,c,t,e,r]=await Promise.all([
-    s.from("orders").select("id,order_number,company_id,fulfillment_status,fulfillment_scheduled_for,companies(name,address)").eq("fulfillment_assigned_to",user.id).is("completed_date",null).neq("status","delivered").neq("fulfillment_status","completed"),
-    s.from("po_collection_state").select("purchase_order_id,purchase_order_number,vendor_name,status,scheduled_for,notes").eq("assigned_to",user.id).is("completed_at",null).is("dismissed_at",null).neq("status","collected"),
-    s.from("team_action_items").select("*").eq("assigned_to",user.id).neq("status","done").order("due_at",{ascending:true}),
-    s.from("operations_exceptions").select("*").eq("assigned_to",user.id).neq("status","resolved").order("created_at",{ascending:false}),
-    s.from("dispatch_routes").select("*").eq("driver_id",user.id).not("status","in","(completed,cancelled)").order("route_date",{ascending:true}),
-  ]); setDeliveries(d.data||[]);setCollections(c.data||[]);setTasks(t.data||[]);setExceptions(e.data||[]);setRoutes(r.data||[]);setLoading(false);},[user?.id]);
+  const load=useCallback(async()=>{ if(!user?.id)return; const s=supabase as any;
+    const now=new Date().toISOString();
+    const cover=await s.from("responsibility_delegations").select("owner_id").eq("delegate_id",user.id).neq("status","cancelled").lte("starts_at",now).gte("ends_at",now);
+    const coveredIds=[user.id,...(cover.data||[]).map((row:any)=>row.owner_id).filter(Boolean)];
+    const [d,c,t,e,r]=await Promise.all([
+      s.from("orders").select("id,order_number,company_id,fulfillment_status,fulfillment_scheduled_for,fulfillment_assigned_to,companies(name,address)").in("fulfillment_assigned_to",coveredIds).is("completed_date",null).neq("status","delivered").neq("fulfillment_status","completed"),
+      s.from("po_collection_state").select("purchase_order_id,purchase_order_number,vendor_name,status,scheduled_for,notes,assigned_to").in("assigned_to",coveredIds).is("completed_at",null).is("dismissed_at",null).neq("status","collected"),
+      s.from("team_action_items").select("*").in("assigned_to",coveredIds).neq("status","done").order("due_at",{ascending:true}),
+      s.from("operations_exceptions").select("*").in("assigned_to",coveredIds).neq("status","resolved").order("created_at",{ascending:false}),
+      s.from("dispatch_routes").select("*").in("driver_id",coveredIds).not("status","in","(completed,cancelled)").order("route_date",{ascending:true}),
+    ]); setDeliveries(d.data||[]);setCollections(c.data||[]);setTasks(t.data||[]);setExceptions(e.data||[]);setRoutes(r.data||[]);setLoading(false);},[user?.id]);
   useEffect(()=>{void load()},[load]); useLiveData(["orders","po_collection_state","team_action_items","operations_exceptions","dispatch_routes"],()=>void load(),{channelName:"my-work-live"});
   const total=deliveries.length+collections.length+tasks.length+exceptions.length;
   const nextRoute=routes[0]; const stops=useMemo(()=>Array.isArray(nextRoute?.stops)?nextRoute.stops:[],[nextRoute]);
@@ -37,6 +42,7 @@ export default function MyWorkPage({ onNavigate }: MyWorkPageProps) {
       <div><p className="text-xs font-bold uppercase tracking-[.18em] text-primary">Personal workspace</p><h1 className="mt-1 text-3xl font-black tracking-tight">My Work</h1><p className="mt-1 text-sm text-muted-foreground">What needs your attention, in the order it matters.</p></div>
       <Badge variant="secondary" className="w-fit rounded-full px-3 py-1">{loading?"…":total} assigned</Badge>
     </div>
+    <ContinuityPanel />
     {nextRoute && <Card className="border-primary/15 bg-primary/[.035] shadow-sm"><CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0"><div className="flex items-center gap-2"><Route className="h-4 w-4 text-primary"/><p className="truncate font-bold">{nextRoute.name}</p><Badge variant="outline" className="text-[10px]">{stops.length} stops</Badge></div><p className="mt-1 text-xs text-muted-foreground">{nextRoute.completed_stops||0} completed · active dispatch run</p></div>{nextRoute.map_url && <Button asChild size="sm" className="rounded-xl"><a href={nextRoute.map_url} target="_blank" rel="noreferrer"><Navigation className="mr-2 h-4 w-4"/>Navigate</a></Button>}</CardContent></Card>}
     <div className="grid gap-4 lg:grid-cols-[1.15fr_.85fr]">
       <WorkLane title="Now" description="Overdue, urgent or blocked" count={nowItems.length} emphasis>{nowItems.map((item:any)=><FocusRow key={item.id} {...item} onOpen={()=>onNavigate(item.view)}/>)}</WorkLane>

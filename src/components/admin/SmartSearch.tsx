@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Search, X, Clock, Package, Building2, Box, Truck, ArrowRight, Loader2 } from "lucide-react";
+import { Search, X, Clock, Package, Building2, Box, Truck, ArrowRight, Loader2, RefreshCcw, Wrench, CalendarCheck } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 
 interface SearchResult {
   id: string;
-  type: "order" | "company" | "item" | "supplier";
+  type: "order" | "company" | "item" | "supplier" | "return" | "loan" | "calibration";
   title: string;
   subtitle: string;
   badge?: string;
@@ -57,6 +57,9 @@ const TYPE_CONFIG = {
   company: { icon: Building2, label: "Company", color: "text-emerald-500", bg: "bg-emerald-500/10" },
   item: { icon: Box, label: "Item", color: "text-amber-500", bg: "bg-amber-500/10" },
   supplier: { icon: Truck, label: "Supplier", color: "text-purple-500", bg: "bg-purple-500/10" },
+  return: { icon: RefreshCcw, label: "Return", color: "text-pink-500", bg: "bg-pink-500/10" },
+  loan: { icon: Wrench, label: "Loan tool", color: "text-violet-500", bg: "bg-violet-500/10" },
+  calibration: { icon: CalendarCheck, label: "Calibration", color: "text-cyan-600", bg: "bg-cyan-500/10" },
 };
 
 export default function SmartSearch({ onNavigate, onSelectResult, className }: SmartSearchProps) {
@@ -100,7 +103,7 @@ export default function SmartSearch({ onNavigate, onSelectResult, className }: S
     const q = searchQuery.trim();
 
     try {
-      const [ordersRes, companiesRes, itemsRes, suppliersRes] = await Promise.all([
+      const [ordersRes, companiesRes, itemsRes, suppliersRes, returnsRes, loansRes, calibrationRes] = await Promise.all([
         supabase
           .from("orders")
           .select("id, order_number, status, description, reference, urgency")
@@ -121,6 +124,9 @@ export default function SmartSearch({ onNavigate, onSelectResult, className }: S
           .select("id, name, code, contact_person")
           .or(`name.ilike.%${q}%,code.ilike.%${q}%,contact_person.ilike.%${q}%`)
           .limit(5),
+        (supabase as any).from("return_cases").select("id,rma_number,client_name,item_description,status").or(`rma_number.ilike.%${q}%,client_name.ilike.%${q}%,item_description.ilike.%${q}%`).limit(5),
+        (supabase as any).from("loan_assets").select("id,asset_code,tool_name,serial_number,borrower_name").or(`asset_code.ilike.%${q}%,tool_name.ilike.%${q}%,serial_number.ilike.%${q}%,borrower_name.ilike.%${q}%`).limit(5),
+        (supabase as any).from("calibration_assets").select("id,asset_code,tool_name,serial_number,status").or(`asset_code.ilike.%${q}%,tool_name.ilike.%${q}%,serial_number.ilike.%${q}%`).limit(5),
       ]);
 
       const allResults: (SearchResult & { score: number })[] = [];
@@ -183,6 +189,10 @@ export default function SmartSearch({ onNavigate, onSelectResult, className }: S
         }
       });
 
+      (returnsRes.data || []).forEach((r: any) => allResults.push({ id:r.id, type:"return", title:r.rma_number, subtitle:`${r.client_name} · ${r.item_description}`, badge:r.status, score:scoreMatch(`${r.rma_number} ${r.client_name} ${r.item_description}`,q) }));
+      (loansRes.data || []).forEach((r: any) => allResults.push({ id:r.id, type:"loan", title:r.asset_code, subtitle:`${r.tool_name} · ${r.borrower_name}`, score:scoreMatch(`${r.asset_code} ${r.tool_name} ${r.serial_number||""} ${r.borrower_name}`,q) }));
+      (calibrationRes.data || []).forEach((r: any) => allResults.push({ id:r.id, type:"calibration", title:r.asset_code, subtitle:`${r.tool_name} · ${r.status}`, badge:r.status, score:scoreMatch(`${r.asset_code} ${r.tool_name} ${r.serial_number||""}`,q) }));
+
       allResults.sort((a, b) => b.score - a.score);
       setResults(allResults.slice(0, 12));
     } catch (error) {
@@ -230,6 +240,9 @@ export default function SmartSearch({ onNavigate, onSelectResult, className }: S
       case "company": onNavigate("clients"); break;
       case "item": onNavigate("items"); break;
       case "supplier": onNavigate("suppliers"); break;
+      case "return":
+      case "loan":
+      case "calibration": onNavigate("service-desk"); break;
     }
   };
 
