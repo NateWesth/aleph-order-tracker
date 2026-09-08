@@ -32,6 +32,78 @@ export type Database = {
         }
         Relationships: []
       }
+      calibration_assets: {
+        Row: {
+          asset_code: string
+          calibration_interval_months: number
+          certificate_reference: string | null
+          certificate_url: string | null
+          created_at: string
+          created_by: string
+          id: string
+          last_calibrated_on: string | null
+          next_due_on: string
+          notes: string | null
+          provider: string | null
+          responsible_user_id: string | null
+          serial_number: string | null
+          status: string
+          tool_name: string
+          updated_at: string
+        }
+        Insert: {
+          asset_code: string
+          calibration_interval_months?: number
+          certificate_reference?: string | null
+          certificate_url?: string | null
+          created_at?: string
+          created_by?: string
+          id?: string
+          last_calibrated_on?: string | null
+          next_due_on: string
+          notes?: string | null
+          provider?: string | null
+          responsible_user_id?: string | null
+          serial_number?: string | null
+          status?: string
+          tool_name: string
+          updated_at?: string
+        }
+        Update: {
+          asset_code?: string
+          calibration_interval_months?: number
+          certificate_reference?: string | null
+          certificate_url?: string | null
+          created_at?: string
+          created_by?: string
+          id?: string
+          last_calibrated_on?: string | null
+          next_due_on?: string
+          notes?: string | null
+          provider?: string | null
+          responsible_user_id?: string | null
+          serial_number?: string | null
+          status?: string
+          tool_name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calibration_assets_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calibration_assets_responsible_user_id_fkey"
+            columns: ["responsible_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_invitations: {
         Row: {
           accepted_at: string | null
@@ -824,6 +896,78 @@ export type Database = {
         }
         Relationships: []
       }
+      loan_assets: {
+        Row: {
+          asset_code: string
+          borrower_name: string
+          borrower_type: string
+          checked_out_at: string
+          condition_in: string | null
+          condition_out: string | null
+          created_at: string
+          created_by: string
+          due_back_at: string
+          id: string
+          notes: string | null
+          responsible_user_id: string | null
+          returned_at: string | null
+          serial_number: string | null
+          tool_name: string
+          updated_at: string
+        }
+        Insert: {
+          asset_code: string
+          borrower_name: string
+          borrower_type?: string
+          checked_out_at?: string
+          condition_in?: string | null
+          condition_out?: string | null
+          created_at?: string
+          created_by?: string
+          due_back_at: string
+          id?: string
+          notes?: string | null
+          responsible_user_id?: string | null
+          returned_at?: string | null
+          serial_number?: string | null
+          tool_name: string
+          updated_at?: string
+        }
+        Update: {
+          asset_code?: string
+          borrower_name?: string
+          borrower_type?: string
+          checked_out_at?: string
+          condition_in?: string | null
+          condition_out?: string | null
+          created_at?: string
+          created_by?: string
+          due_back_at?: string
+          id?: string
+          notes?: string | null
+          responsible_user_id?: string | null
+          returned_at?: string | null
+          serial_number?: string | null
+          tool_name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "loan_assets_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "loan_assets_responsible_user_id_fkey"
+            columns: ["responsible_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           created_at: string
@@ -1372,6 +1516,55 @@ export type Database = {
           },
         ]
       }
+      order_relationships: {
+        Row: {
+          created_at: string
+          created_by: string
+          id: string
+          related_order_id: string
+          relationship_type: string
+          source_order_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string
+          id?: string
+          related_order_id: string
+          relationship_type: string
+          source_order_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          id?: string
+          related_order_id?: string
+          relationship_type?: string
+          source_order_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_relationships_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_relationships_related_order_id_fkey"
+            columns: ["related_order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_relationships_source_order_id_fkey"
+            columns: ["source_order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_tag_assignments: {
         Row: {
           assigned_by: string
@@ -1834,6 +2027,61 @@ export type Database = {
         }
         Relationships: []
       }
+      product_substitutions: {
+        Row: {
+          active: boolean
+          alternative_item_id: string
+          compatibility_note: string | null
+          created_at: string
+          created_by: string
+          id: string
+          preference_rank: number
+          source_item_id: string
+        }
+        Insert: {
+          active?: boolean
+          alternative_item_id: string
+          compatibility_note?: string | null
+          created_at?: string
+          created_by?: string
+          id?: string
+          preference_rank?: number
+          source_item_id: string
+        }
+        Update: {
+          active?: boolean
+          alternative_item_id?: string
+          compatibility_note?: string | null
+          created_at?: string
+          created_by?: string
+          id?: string
+          preference_rank?: number
+          source_item_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_substitutions_alternative_item_id_fkey"
+            columns: ["alternative_item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_substitutions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_substitutions_source_item_id_fkey"
+            columns: ["source_item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           approved: boolean | null
@@ -2185,6 +2433,149 @@ export type Database = {
         }
         Relationships: []
       }
+      responsibility_delegations: {
+        Row: {
+          created_at: string
+          created_by: string
+          delegate_id: string
+          ends_at: string
+          id: string
+          notes: string | null
+          owner_id: string
+          scopes: string[]
+          starts_at: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string
+          delegate_id: string
+          ends_at: string
+          id?: string
+          notes?: string | null
+          owner_id: string
+          scopes?: string[]
+          starts_at: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          delegate_id?: string
+          ends_at?: string
+          id?: string
+          notes?: string | null
+          owner_id?: string
+          scopes?: string[]
+          starts_at?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "responsibility_delegations_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "responsibility_delegations_delegate_id_fkey"
+            columns: ["delegate_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "responsibility_delegations_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      return_cases: {
+        Row: {
+          assigned_to: string | null
+          client_name: string
+          completed_at: string | null
+          created_at: string
+          created_by: string
+          due_date: string | null
+          id: string
+          item_description: string
+          order_id: string | null
+          priority: string
+          quantity: number
+          reason: string
+          resolution: string | null
+          rma_number: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          client_name: string
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string
+          due_date?: string | null
+          id?: string
+          item_description: string
+          order_id?: string | null
+          priority?: string
+          quantity?: number
+          reason: string
+          resolution?: string | null
+          rma_number: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          client_name?: string
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string
+          due_date?: string | null
+          id?: string
+          item_description?: string
+          order_id?: string | null
+          priority?: string
+          quantity?: number
+          reason?: string
+          resolution?: string | null
+          rma_number?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "return_cases_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "return_cases_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "return_cases_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sharpening_jobs: {
         Row: {
           assigned_to: string | null
@@ -2380,6 +2771,32 @@ export type Database = {
           },
         ]
       }
+      user_activity_checkpoints: {
+        Row: {
+          last_seen_at: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          last_seen_at?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          last_seen_at?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_activity_checkpoints_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string | null
@@ -2565,6 +2982,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      apply_item_substitution: {
+        Args: { p_alternative_item_id: string; p_order_item_id: string }
+        Returns: undefined
+      }
       can_edit_commission: { Args: { _user_id: string }; Returns: boolean }
       complete_fulfillment_delivery: {
         Args: { p_order_id: string }
@@ -2619,6 +3040,10 @@ export type Database = {
         Args: { update_id: string; user_uuid: string }
         Returns: undefined
       }
+      merge_orders: {
+        Args: { p_source_order_id: string; p_target_order_id: string }
+        Returns: string
+      }
       record_po_collection: {
         Args: {
           p_collection_method?: string
@@ -2650,6 +3075,14 @@ export type Database = {
           commission_method: string
           commission_rate: number
         }[]
+      }
+      split_order_items: {
+        Args: {
+          p_item_ids: string[]
+          p_new_order_number: string
+          p_source_order_id: string
+        }
+        Returns: string
       }
       try_acquire_zoho_sync_lock: {
         Args: { lease_seconds?: number; requested_key: string }
