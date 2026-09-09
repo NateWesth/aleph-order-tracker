@@ -25,9 +25,12 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useGlobalUnreadCount } from "@/hooks/useGlobalUnreadCount";
 import { cn } from "@/lib/utils";
 import { triggerHapticFeedback } from "@/utils/haptics";
-import OperationsHomePage from "@/components/admin/OperationsHomePage";
-import MyWorkPage from "@/components/admin/MyWorkPage";
-import OperationsIntelligencePage from "@/components/admin/OperationsIntelligencePage";
+const loadHomePage = () => import("@/components/admin/OperationsHomePage");
+const OperationsHomePage = lazy(loadHomePage);
+const MyWorkPage = lazy(() => import("@/components/admin/MyWorkPage"));
+const OperationsIntelligencePage = lazy(() => import("@/components/admin/OperationsIntelligencePage"));
+const loadScenarioPlanner = () => import("@/components/admin/ScenarioPlannerPage");
+const ScenarioPlannerPage = lazy(loadScenarioPlanner);
 import { useWorkspaceDensity } from "@/hooks/useWorkspaceDensity";
 
 // Route-level splitting keeps the dashboard interactive while large workspaces
@@ -70,7 +73,8 @@ const OrderLabPage = lazy(loadOrderLabPage);
 const FloatingAIChat = lazy(() => import("@/components/admin/FloatingAIChat"));
 
 const WORKSPACE_PREFETCHERS: Record<string, () => Promise<unknown>> = {
-  home: loadCustomizableDashboard,
+  home: loadHomePage,
+  "scenario-planner": loadScenarioPlanner,
   orders: loadOrdersPage,
   history: loadCompletedPage,
   clients: loadClientCompaniesPage,
@@ -91,7 +95,7 @@ const WORKSPACE_PREFETCHERS: Record<string, () => Promise<unknown>> = {
 
 const RAIL_STORAGE_KEY = "aleph:workspace-rail-expanded";
 const WORKSPACE_STORAGE_KEY = "aleph:last-workspace";
-const RESTORABLE_WORKSPACES = new Set(["home", "my-work", "orders", "fulfillment", "sharpening", "repairs", "service-desk", "order-lab", "history", "clients", "suppliers", "stats", "po-tracking", "buying-sheet", "items", "control-tower"]);
+const RESTORABLE_WORKSPACES = new Set(["home", "my-work", "orders", "fulfillment", "sharpening", "repairs", "service-desk", "order-lab", "scenario-planner", "history", "clients", "suppliers", "stats", "po-tracking", "buying-sheet", "items", "control-tower"]);
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -99,6 +103,8 @@ const AdminDashboard = () => {
   const { user, signOut } = useAuth();
   const [activeView, setActiveView] = useState(() => {
     if (typeof window === "undefined") return "orders";
+    const requestedView = new URLSearchParams(window.location.search).get("view");
+    if (requestedView && RESTORABLE_WORKSPACES.has(requestedView)) return requestedView;
     const savedView = window.localStorage.getItem(WORKSPACE_STORAGE_KEY);
     return savedView && RESTORABLE_WORKSPACES.has(savedView) ? savedView : "orders";
   });
@@ -283,6 +289,7 @@ const AdminDashboard = () => {
     { id: "repairs", label: "Repairs", icon: Wrench, badge: 0 },
     { id: "service-desk", label: "Assets & Service", icon: LifeBuoy, badge: 0 },
     { id: "order-lab", label: "Order Lab", icon: FlaskConical, badge: 0 },
+    { id: "scenario-planner", label: "Scenario Planner", icon: BrainCircuit, badge: 0 },
     { id: "buying-sheet", label: "Buying", icon: ShoppingCart, badge: 0 },
     { id: "control-tower", label: "Control Tower", icon: Radar, badge: 0 },
     { id: "history", label: "History", icon: History, badge: unreadOrderUpdates },
@@ -541,6 +548,7 @@ const AdminDashboard = () => {
               {activeView === "repairs" && <RepairsPage />}
               {activeView === "service-desk" && <ServiceDeskPage />}
               {activeView === "order-lab" && <OrderLabPage />}
+              {activeView === "scenario-planner" && <ScenarioPlannerPage onNavigate={setActiveView} />}
               {activeView === "history" && <CompletedPage isAdmin={true} searchTerm={searchTerm} />}
               {activeView === "clients" && <ClientCompaniesPage />}
               {activeView === "suppliers" && <SuppliersPage />}

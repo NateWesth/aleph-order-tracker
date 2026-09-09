@@ -14,11 +14,12 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { readAllRows } from "@/lib/readAllRows";
 import { cn } from "@/lib/utils";
 
 type Order = {id:string;order_number:string;company_id:string|null;status:string|null;urgency:string|null;description:string|null;assigned_to:string|null;created_at:string|null;companies?:{name:string}|null};
 type OrderItem = {id:string;order_id:string;name:string;code:string|null;description:string|null;quantity:number;qty_on_po:number;qty_received:number;qty_invoiced:number;qty_completed:number};
-type CatalogItem = {id:string;name:string;code:string;description:string|null;stock_level?:number|null};
+type CatalogItem = {id:string;name:string;code:string;description:string|null};
 type Substitution = {id:string;source_item_id:string;alternative_item_id:string;compatibility_note:string|null;preference_rank:number;active:boolean};
 type Risk = {key:string;severity:"critical"|"warning"|"info";title:string;detail:string;order?:Order};
 const processed=(item:OrderItem)=>[item.qty_on_po,item.qty_received,item.qty_invoiced,item.qty_completed].some(Number);
@@ -28,20 +29,33 @@ export default function OrderLabPage(){
   const [orders,setOrders]=useState<Order[]>([]);const [orderItems,setOrderItems]=useState<OrderItem[]>([]);const [catalog,setCatalog]=useState<CatalogItem[]>([]);const [subs,setSubs]=useState<Substitution[]>([]);const [loading,setLoading]=useState(true);
   const [splitOpen,setSplitOpen]=useState(false);const [sourceId,setSourceId]=useState("");const [targetId,setTargetId]=useState("");const [newNumber,setNewNumber]=useState("");const [selectedItems,setSelectedItems]=useState<string[]>([]);const [working,setWorking]=useState(false);
   const [sourceItemId,setSourceItemId]=useState("");const [alternativeItemId,setAlternativeItemId]=useState("");const [compatibilityNote,setCompatibilityNote]=useState("");
-  const load=useCallback(async()=>{setLoading(true);const [o,oi,i,s]=await Promise.all([
-    db.from("orders").select("id,order_number,company_id,status,urgency,description,assigned_to,created_at,companies(name)").neq("status","delivered").order("created_at",{ascending:false}).limit(500),
-    db.from("order_items").select("id,order_id,name,code,description,quantity,qty_on_po,qty_received,qty_invoiced,qty_completed"),
-    db.from("items").select("id,name,code,description,stock_level").order("name").limit(2000),
-    db.from("product_substitutions").select("*").eq("active",true).order("preference_rank"),
-  ]);setOrders(o.data||[]);setOrderItems(oi.data||[]);setCatalog(i.data||[]);setSubs(s.data||[]);setLoading(false)},[db]);
-  useEffect(()=>{void load()},[load]);useLiveData(["orders","order_items","product_substitutions"],()=>void load(),{channelName:"order-lab-live",debounceMs:350});
+  const [loadError,setLoadError]=useState("");
+  const load=useCallback(async()=>{
+    try {
+      const [allOrders,items,substitutions]=await Promise.all([
+        readAllRows<Order>((from,to)=>db.from("orders").select("id,order_number,company_id,status,urgency,description,assigned_to,created_at,companies(name)").is("completed_date",null).order("id").range(from,to)),
+        readAllRows<CatalogItem>((from,to)=>db.from("items").select("id,name,code,description").order("name").order("id").range(from,to)),
+        readAllRows<Substitution>((from,to)=>db.from("product_substitutions").select("*").eq("active",true).order("preference_rank").order("id").range(from,to)),
+      ]);
+      const active=allOrders.filter(o=>!["delivered","completed","cancelled","canceled"].includes(o.status||""));
+      const lines:OrderItem[]=[];
+      for(let offset=0;offset<active.length;offset+=100) {
+        lines.push(...await readAllRows<OrderItem>((from,to)=>db.from("order_items").select("id,order_id,name,code,description,quantity,qty_on_po,qty_received,qty_invoiced,qty_completed").in("order_id",active.slice(offset,offset+100).map(o=>o.id)).order("id").range(from,to)));
+      }
+      setOrders(active);setOrderItems(lines);setCatalog(items);setSubs(substitutions);setLoadError("");
+    } catch(error) { setLoadError(error instanceof Error?error.message:"Order data could not load"); }
+    finally { setLoading(false); }
+  },[db]);
+  useEffect(()=>{void load()},[load]);
+  useLiveData(["orders","order_items","items","product_substitutions"],load,{channelName:"order-lab-live",debounceMs:600});
+  const itemsByOrder=useMemo(()=>{const map=new Map<string,OrderItem[]>();orderItems.forEach(line=>{const rows=map.get(line.order_id)||[];rows.push(line);map.set(line.order_id,rows)});return map},[orderItems]);
   const orderMap=useMemo(()=>new Map(orders.map(o=>[o.id,o])),[orders]);const catalogMap=useMemo(()=>new Map(catalog.map(i=>[i.id,i])),[catalog]);
   const source=orders.find(o=>o.id===sourceId);const sourceLines=orderItems.filter(i=>i.order_id===sourceId);const untouchedLines=sourceLines.filter(i=>!processed(i));
   const mergeTargets=orders.filter(o=>o.id!==sourceId&&o.company_id===source?.company_id);
 
   const risks=useMemo<Risk[]>(()=>{
     const found:Risk[]=[];const numberCount=new Map<string,number>();orders.forEach(o=>numberCount.set(o.order_number,(numberCount.get(o.order_number)||0)+1));
-    orders.forEach(order=>{const lines=orderItems.filter(i=>i.order_id===order.id);const age=order.created_at?(Date.now()-new Date(order.created_at).getTime())/86400000:0;
+    orders.forEach(order=>{const lines=itemsByOrder.get(order.id)||[];const age=order.created_at?(Date.now()-new Date(order.created_at).getTime())/86400000:0;
       if((numberCount.get(order.order_number)||0)>1)found.push({key:`dup-${order.id}`,severity:"critical",title:"Duplicate order number",detail:`${order.order_number} appears more than once.`,order});
       if(!order.company_id)found.push({key:`company-${order.id}`,severity:"critical",title:"Customer missing",detail:`${order.order_number} is not connected to a customer.`,order});
       if(!lines.length)found.push({key:`items-${order.id}`,severity:"warning",title:"Empty order",detail:`${order.order_number} contains no item lines.`,order});
@@ -50,7 +64,7 @@ export default function OrderLabPage(){
       if(order.urgency==="urgent"&&!order.assigned_to)found.push({key:`owner-${order.id}`,severity:"warning",title:"Urgent order has no owner",detail:`${order.order_number} needs a responsible person.`,order});
       if(age>21)found.push({key:`age-${order.id}`,severity:"info",title:"Long-running order",detail:`${order.order_number} has remained open for ${Math.floor(age)} days.`,order});
     });return found.sort((a,b)=>({critical:0,warning:1,info:2}[a.severity]-{critical:0,warning:1,info:2}[b.severity]));
-  },[orders,orderItems]);
+  },[orders,itemsByOrder]);
 
   const split=async()=>{if(!sourceId||!newNumber.trim()||!selectedItems.length){toast({title:"Choose an order, at least one untouched line and a new number",variant:"destructive"});return;}setWorking(true);const {data,error}=await db.rpc("split_order_items",{p_source_order_id:sourceId,p_item_ids:selectedItems,p_new_order_number:newNumber.trim()});setWorking(false);if(error){toast({title:"Order was not split",description:error.message,variant:"destructive"});return;}setSplitOpen(false);toast({title:"Order split safely",description:`New order created: ${newNumber.trim()}`});window.sessionStorage.setItem("aleph:open-order",String(data));await load()};
   const merge=async()=>{if(!sourceId||!targetId){toast({title:"Choose a source and destination order",variant:"destructive"});return;}setWorking(true);const {error}=await db.rpc("merge_orders",{p_source_order_id:sourceId,p_target_order_id:targetId});setWorking(false);if(error){toast({title:"Orders were not merged",description:error.message,variant:"destructive"});return;}toast({title:"Orders merged",description:"Items and purchase-order links now live on the destination order."});setSourceId("");setTargetId("");await load()};
@@ -58,9 +72,10 @@ export default function OrderLabPage(){
   const applySub=async(lineId:string,alternativeId:string)=>{const {error}=await db.rpc("apply_item_substitution",{p_order_item_id:lineId,p_alternative_item_id:alternativeId});if(error)toast({title:"Alternative not applied",description:error.message,variant:"destructive"});else{toast({title:"Order line substituted",description:"The original item is preserved in the order audit trail."});await load()}};
 
   return <div className="space-y-5 pb-12 animate-in fade-in duration-300">
+    {loadError&&<div role="alert" className="rounded-xl border border-destructive/30 p-4 text-sm"><p>Live checks are incomplete: {loadError}</p><Button variant="outline" onClick={()=>load()} className="mt-2">Retry</Button></div>}
     <section className="relative overflow-hidden rounded-[30px] border border-primary/15 bg-gradient-to-br from-card via-card to-logo-violet/[.08] p-5 shadow-lg sm:p-7"><div className="absolute -right-16 -top-16 h-64 w-64 rounded-full bg-logo-magenta/10 blur-3xl"/><div className="relative"><Badge className="rounded-full"><Beaker className="mr-1 h-3 w-3"/>Order Lab</Badge><h1 className="mt-3 text-3xl font-black tracking-[-.04em] sm:text-4xl">Change orders safely. Catch mistakes early.</h1><p className="mt-2 max-w-2xl text-sm text-muted-foreground">Controlled split and merge tools, approved product alternatives and a live quality scan—all without calling Zoho.</p></div></section>
     <Tabs defaultValue="guard"><TabsList className="h-auto w-full justify-start overflow-x-auto rounded-2xl"><TabsTrigger value="guard"><ShieldAlert className="mr-2 h-4 w-4"/>Prevention <Badge variant="secondary" className="ml-2">{risks.length}</Badge></TabsTrigger><TabsTrigger value="split"><GitPullRequestArrow className="mr-2 h-4 w-4"/>Split & merge</TabsTrigger><TabsTrigger value="alternatives"><Lightbulb className="mr-2 h-4 w-4"/>Alternatives</TabsTrigger></TabsList>
-      <TabsContent value="guard"><div className="mb-3 grid grid-cols-3 gap-3"><MiniStat label="Critical" value={risks.filter(r=>r.severity==="critical").length} tone="text-destructive"/><MiniStat label="Warnings" value={risks.filter(r=>r.severity==="warning").length} tone="text-amber-600"/><MiniStat label="Checks run" value={orders.length*6} tone="text-logo-teal"/></div><div className="space-y-2">{loading?<div className="h-44 animate-pulse rounded-2xl bg-muted/50"/>:risks.length?risks.map(r=><RiskRow key={r.key} risk={r}/>):<EmptyState icon={CheckCircle2} title="Every live check passed" body="No duplicates, impossible quantities, missing customers or incomplete miscellaneous lines were found."/>}</div></TabsContent>
+      <TabsContent value="guard"><div className="mb-3 grid grid-cols-3 gap-3"><MiniStat label="Critical" value={risks.filter(r=>r.severity==="critical").length} tone="text-destructive"/><MiniStat label="Warnings" value={risks.filter(r=>r.severity==="warning").length} tone="text-amber-600"/><MiniStat label="Checks run" value={orders.length*6} tone="text-logo-teal"/></div><div className="space-y-2">{loading?<div className="h-44 animate-pulse rounded-2xl bg-muted/50"/>:loadError?<p className="p-6 text-muted-foreground">Cannot confirm order health until all data loads.</p>:risks.length?risks.map(r=><RiskRow key={r.key} risk={r}/>):<EmptyState icon={CheckCircle2} title="Every live check passed" body="No duplicates, impossible quantities, missing customers or incomplete miscellaneous lines were found."/>}</div></TabsContent>
       <TabsContent value="split"><div className="grid gap-4 lg:grid-cols-2"><ToolCard icon={GitPullRequestArrow} title="Split an order" body="Move selected untouched item lines into a new order. Lines already on a PO, received, invoiced or completed are protected."><Button onClick={()=>{setSourceId("");setSelectedItems([]);setNewNumber("");setSplitOpen(true)}}><GitPullRequestArrow className="mr-2 h-4 w-4"/>Start safe split</Button></ToolCard><ToolCard icon={GitMerge} title="Merge orders" body="Combine open orders for the same customer. Items and PO links move to the destination; the source is retained in history."><OrderPicker label="Source order" value={sourceId} orders={orders} onChange={v=>{setSourceId(v);setTargetId("")}}/><OrderPicker label="Destination" value={targetId} orders={mergeTargets} onChange={setTargetId}/><Button onClick={merge} disabled={working||!targetId}><GitMerge className="mr-2 h-4 w-4"/>{working?"Merging…":"Merge into destination"}</Button></ToolCard></div></TabsContent>
       <TabsContent value="alternatives"><div className="grid gap-4 lg:grid-cols-[.8fr_1.2fr]"><ToolCard icon={Plus} title="Create approved alternative" body="Build a reusable compatibility list for unavailable products."><CatalogPicker label="Original product" value={sourceItemId} items={catalog} onChange={setSourceItemId}/><CatalogPicker label="Approved alternative" value={alternativeItemId} items={catalog.filter(i=>i.id!==sourceItemId)} onChange={setAlternativeItemId}/><div><Label className="mb-1 block text-xs font-bold">Compatibility note</Label><Textarea value={compatibilityNote} onChange={e=>setCompatibilityNote(e.target.value)} placeholder="Why this is a safe replacement…"/></div><Button onClick={addSub}><WandSparkles className="mr-2 h-4 w-4"/>Save alternative</Button></ToolCard><div className="space-y-3">{subs.length?subs.map(sub=><SubCard key={sub.id} sub={sub} source={catalogMap.get(sub.source_item_id)} alternative={catalogMap.get(sub.alternative_item_id)} lines={orderItems.filter(line=>!processed(line)&&line.code&&line.code===catalogMap.get(sub.source_item_id)?.code)} orders={orderMap} onApply={line=>applySub(line.id,sub.alternative_item_id)}/>):<EmptyState icon={Sparkles} title="No approved alternatives yet" body="Create the first product pairing to make substitutions fast and consistent."/>}</div></div></TabsContent>
     </Tabs>

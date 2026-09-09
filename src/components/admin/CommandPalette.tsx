@@ -21,6 +21,7 @@ const NAVIGATION_ITEMS = [
   { id: "repairs", label: "Repairs & Warranty", icon: Wrench, keywords: "repairs warranty tools tickets workshop" },
   { id: "service-desk", label: "Assets & Service", icon: LifeBuoy, keywords: "returns rma loans demo tools calibration certificates compliance" },
   { id: "order-lab", label: "Order Lab", icon: FlaskConical, keywords: "split merge alternatives substitutions mistakes quality checks" },
+  { id: "scenario-planner", label: "Scenario Planner", icon: FlaskConical, keywords: "what if supplier delay scenario risk delivery commitment planning" },
   { id: "history", label: "Order History", icon: History, keywords: "history completed delivered past" },
   { id: "clients", label: "Clients", icon: Building2, keywords: "clients companies customers" },
   { id: "suppliers", label: "Suppliers", icon: Truck, keywords: "suppliers vendors" },
