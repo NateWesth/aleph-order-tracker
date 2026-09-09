@@ -2,6 +2,7 @@ import { type ReactNode } from "react";
 import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { statusLabel } from "./shared";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 /**
  * Monday-style grouped board table: month groups with a coloured spine,
@@ -112,6 +113,7 @@ interface BoardTableProps<T> {
 }
 
 export default function BoardTable<T>({ groups, columns, collapsed, onToggle, rowKey, onRowClick, activeKey, noun = "job" }: BoardTableProps<T>) {
+  const mobile = useIsMobile();
   if (groups.length === 0) {
     return (
       <p className="rounded-2xl border border-dashed border-border bg-card px-4 py-10 text-center text-sm text-muted-foreground">
@@ -148,7 +150,27 @@ export default function BoardTable<T>({ groups, columns, collapsed, onToggle, ro
               </span>
             </button>
 
-            {!isCollapsed && (
+            {!isCollapsed && mobile && <div className="space-y-3 border-t p-3">
+              {group.rows.map(row => {
+                const key = rowKey(row);
+                const primary = columns.filter((column, index) => index < 3 || /status|priority/.test(column.key));
+                const secondary = columns.filter(column => !primary.includes(column));
+                return <article key={key} className={cn("min-w-0 rounded-xl border bg-background p-3", activeKey === key && "border-primary ring-1 ring-primary")}>
+                  <dl className="grid grid-cols-2 gap-3">
+                    {primary.map((column, index) => <div key={column.key} className={cn("min-w-0", index === 0 && "col-span-2")}>
+                      <dt className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{column.label}</dt>
+                      <dd className="break-words text-sm">{column.cell(row)}</dd>
+                    </div>)}
+                  </dl>
+                  {secondary.length > 0 && <details className="mt-3 border-t pt-2">
+                    <summary className="cursor-pointer py-2 text-xs font-semibold text-muted-foreground">More details</summary>
+                    <dl className="space-y-3 py-2">{secondary.map(column => <div key={column.key}><dt className="mb-1 text-[10px] uppercase text-muted-foreground">{column.label}</dt><dd className="break-words text-sm">{column.cell(row)}</dd></div>)}</dl>
+                  </details>}
+                  {onRowClick && <button type="button" onClick={() => onRowClick(row)} className="mt-3 flex min-h-11 w-full items-center justify-between rounded-lg bg-primary/10 px-3 text-sm font-semibold text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">Open {noun}<ChevronRight className="h-4 w-4" /></button>}
+                </article>;
+              })}
+            </div>}
+            {!isCollapsed && !mobile && (
               <div className="overflow-x-auto overflow-y-visible border-t border-border/70">
                 <table className="w-full min-w-[960px] border-separate border-spacing-0 text-sm">
                   <thead>
@@ -174,8 +196,15 @@ export default function BoardTable<T>({ groups, columns, collapsed, onToggle, ro
                         <tr
                           key={key}
                           onClick={() => onRowClick?.(row)}
+                          tabIndex={onRowClick ? 0 : undefined}
+                          onKeyDown={event => {
+                            if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) {
+                              event.preventDefault();
+                              onRowClick?.(row);
+                            }
+                          }}
                           className={cn(
-                            "group/row cursor-pointer transition-colors",
+                            "group/row cursor-pointer transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary",
                             index % 2 === 1 && "bg-muted/20",
                             "hover:bg-accent/40",
                             activeKey === key && "bg-accent/60",

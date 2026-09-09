@@ -71,6 +71,7 @@ function App() {
                   } />
                   {/* Redirect old client-dashboard to admin-dashboard */}
                   <Route path="/client-dashboard" element={<Navigate to="/admin-dashboard" replace />} />
+                  <Route path="/admin" element={<Navigate to="/admin-dashboard?view=my-work" replace />} />
                   <Route path="/settings" element={
                     <ProtectedRoute>
                       <Settings />

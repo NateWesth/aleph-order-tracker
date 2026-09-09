@@ -67,6 +67,7 @@ export default function SmartSearch({ onNavigate, onSelectResult, className }: S
   const [isOpen, setIsOpen] = useState(false);
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
+  const [searchError, setSearchError] = useState("");
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -92,7 +93,7 @@ export default function SmartSearch({ onNavigate, onSelectResult, className }: S
     localStorage.removeItem(RECENT_SEARCHES_KEY);
   };
 
-  const performSearch = useCallback(async (searchQuery: string) => {
+  const performSearch = useCallback(async (searchQuery: string, signal: AbortSignal) => {
     if (!searchQuery.trim() || searchQuery.length < 2) {
       setResults([]);
       setLoading(false);
@@ -100,7 +101,8 @@ export default function SmartSearch({ onNavigate, onSelectResult, className }: S
     }
 
     setLoading(true);
-    const q = searchQuery.trim();
+    const q = searchQuery.trim().replace(/[,()%_\\"]/g, " ").trim();
+    if (q.length < 2) { setResults([]); setLoading(false); return; }
 
     try {
       const [ordersRes, companiesRes, itemsRes, suppliersRes, returnsRes, loansRes, calibrationRes] = await Promise.all([
@@ -108,27 +110,30 @@ export default function SmartSearch({ onNavigate, onSelectResult, className }: S
           .from("orders")
           .select("id, order_number, status, description, reference, urgency")
           .or(`order_number.ilike.%${q}%,description.ilike.%${q}%,reference.ilike.%${q}%`)
-          .limit(5),
+          .limit(5).abortSignal(signal),
         supabase
           .from("companies")
           .select("id, name, code, contact_person")
           .or(`name.ilike.%${q}%,code.ilike.%${q}%,contact_person.ilike.%${q}%`)
-          .limit(5),
+          .limit(5).abortSignal(signal),
         supabase
           .from("items")
           .select("id, name, code, description")
           .or(`name.ilike.%${q}%,code.ilike.%${q}%,description.ilike.%${q}%`)
-          .limit(5),
+          .limit(5).abortSignal(signal),
         supabase
           .from("suppliers")
           .select("id, name, code, contact_person")
           .or(`name.ilike.%${q}%,code.ilike.%${q}%,contact_person.ilike.%${q}%`)
-          .limit(5),
-        (supabase as any).from("return_cases").select("id,rma_number,client_name,item_description,status").or(`rma_number.ilike.%${q}%,client_name.ilike.%${q}%,item_description.ilike.%${q}%`).limit(5),
-        (supabase as any).from("loan_assets").select("id,asset_code,tool_name,serial_number,borrower_name").or(`asset_code.ilike.%${q}%,tool_name.ilike.%${q}%,serial_number.ilike.%${q}%,borrower_name.ilike.%${q}%`).limit(5),
-        (supabase as any).from("calibration_assets").select("id,asset_code,tool_name,serial_number,status").or(`asset_code.ilike.%${q}%,tool_name.ilike.%${q}%,serial_number.ilike.%${q}%`).limit(5),
+          .limit(5).abortSignal(signal),
+        (supabase as any).from("return_cases").select("id,rma_number,client_name,item_description,status").or(`rma_number.ilike.%${q}%,client_name.ilike.%${q}%,item_description.ilike.%${q}%`).limit(5).abortSignal(signal),
+        (supabase as any).from("loan_assets").select("id,asset_code,tool_name,serial_number,borrower_name").or(`asset_code.ilike.%${q}%,tool_name.ilike.%${q}%,serial_number.ilike.%${q}%,borrower_name.ilike.%${q}%`).limit(5).abortSignal(signal),
+        (supabase as any).from("calibration_assets").select("id,asset_code,tool_name,serial_number,status").or(`asset_code.ilike.%${q}%,tool_name.ilike.%${q}%,serial_number.ilike.%${q}%`).limit(5).abortSignal(signal),
       ]);
 
+      if (signal.aborted) return;
+      const failed = [ordersRes, companiesRes, itemsRes, suppliersRes, returnsRes, loansRes, calibrationRes].filter(r => r.error);
+      setSearchError(failed.length ? "Some sources could not be searched. Results may be incomplete." : "");
       const allResults: (SearchResult & { score: number })[] = [];
 
       (ordersRes.data || []).forEach((o) => {
@@ -196,22 +201,26 @@ export default function SmartSearch({ onNavigate, onSelectResult, className }: S
       allResults.sort((a, b) => b.score - a.score);
       setResults(allResults.slice(0, 12));
     } catch (error) {
-      console.error("Search error:", error);
+      if (!signal.aborted) setSearchError("Search is unavailable. Please try again.");
     } finally {
-      setLoading(false);
+      if (!signal.aborted) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
+    const controller = new AbortController();
+    setResults([]);
+    setSelectedIndex(-1);
+    setSearchError("");
     if (debounceRef.current) clearTimeout(debounceRef.current);
     if (query.length >= 2) {
       setLoading(true);
-      debounceRef.current = setTimeout(() => performSearch(query), 250);
+      debounceRef.current = setTimeout(() => performSearch(query, controller.signal), 300);
     } else {
       setResults([]);
       setLoading(false);
     }
-    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+    return () => { controller.abort(); if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [query, performSearch]);
 
   // Close on outside click
@@ -236,7 +245,11 @@ export default function SmartSearch({ onNavigate, onSelectResult, className }: S
     }
 
     switch (result.type) {
-      case "order": onNavigate("orders"); break;
+      case "order":
+        window.sessionStorage.setItem("aleph:open-order", result.id);
+        onNavigate("orders");
+        window.dispatchEvent(new CustomEvent("aleph:open-order", { detail: result.id }));
+        break;
       case "company": onNavigate("clients"); break;
       case "item": onNavigate("items"); break;
       case "supplier": onNavigate("suppliers"); break;
@@ -248,11 +261,10 @@ export default function SmartSearch({ onNavigate, onSelectResult, className }: S
 
   const handleRecentClick = (term: string) => {
     setQuery(term);
-    performSearch(term);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    const items = query.length >= 2 ? results : [];
+    const items = query.length >= 2 ? Object.values(groupedResults).flat() : [];
     if (e.key === "ArrowDown") {
       e.preventDefault();
       setSelectedIndex((prev) => Math.min(prev + 1, items.length - 1));
@@ -298,6 +310,7 @@ export default function SmartSearch({ onNavigate, onSelectResult, className }: S
         />
         {query && (
           <button
+            aria-label="Clear search"
             onClick={() => { setQuery(""); setResults([]); inputRef.current?.focus(); }}
             className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
           >
@@ -337,7 +350,8 @@ export default function SmartSearch({ onNavigate, onSelectResult, className }: S
           {/* Search results */}
           {query.length >= 2 && (
             <>
-              {results.length === 0 && !loading && (
+              {searchError && <p role="alert" className="px-3 py-2 text-xs text-destructive">{searchError}</p>}
+              {results.length === 0 && !loading && !searchError && (
                 <div className="p-6 text-center text-sm text-muted-foreground">
                   No results found for "{query}"
                 </div>

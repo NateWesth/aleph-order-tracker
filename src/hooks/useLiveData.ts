@@ -35,10 +35,13 @@ export function useLiveData(
     if (!enabled) return;
 
     let timer: number | undefined;
+    let recoveryTimer: number | undefined;
+    let disposed = false;
     let inFlight = false;
     let rerunRequested = false;
 
     const run = async () => {
+      if (disposed) return;
       if (inFlight) {
         rerunRequested = true;
         return;
@@ -51,7 +54,7 @@ export function useLiveData(
         console.error(`Live data refresh failed for ${key}`, error);
       } finally {
         inFlight = false;
-        if (rerunRequested) {
+        if (rerunRequested && !disposed) {
           rerunRequested = false;
           fire();
         }
@@ -59,6 +62,7 @@ export function useLiveData(
     };
 
     const fire = () => {
+      if (disposed) return;
       if (timer) window.clearTimeout(timer);
       timer = window.setTimeout(() => void run(), debounceMs);
     };
@@ -75,10 +79,12 @@ export function useLiveData(
       );
     }
     channel.subscribe((status) => {
+      if (disposed) return;
       if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
         // Supabase reconnects the socket internally. Refreshing here prevents
         // a missed event from leaving another user's screen stale meanwhile.
-        window.setTimeout(fire, 1000);
+        window.clearTimeout(recoveryTimer);
+        recoveryTimer = window.setTimeout(fire, 1000);
       }
     });
 
@@ -95,6 +101,8 @@ export function useLiveData(
         : undefined;
 
     return () => {
+      disposed = true;
+      window.clearTimeout(recoveryTimer);
       if (timer) window.clearTimeout(timer);
       if (interval) window.clearInterval(interval);
       document.removeEventListener("visibilitychange", onVisible);
