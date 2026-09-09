@@ -40,61 +40,9 @@ export const queueOfflineOperation = (
   return queued;
 };
 
-const executeOperation = async (operation: OfflineOperation) => {
-  if (operation.kind === "update-order") {
-    const { error } = await supabase.from("orders").update(operation.payload.patch as never).eq("id", operation.payload.orderId);
-    if (error) throw error;
-    return;
-  }
-  if (operation.kind === "upsert-collection") {
-    const { error } = await supabase.from("po_collection_state").upsert(operation.payload as never, { onConflict: "purchase_order_id" });
-    if (error) throw error;
-    return;
-  }
-  if (operation.kind === "complete-delivery") {
-    const { error } = await supabase.rpc("complete_fulfillment_delivery", { p_order_id: operation.payload.orderId });
-    if (error) throw error;
-    return;
-  }
-  if (operation.kind === "record-collection") {
-    const { error } = await supabase.rpc("record_po_collection", operation.payload as never);
-    if (error) throw error;
-    return;
-  }
-  if (operation.kind === "create-route") {
-    const { error } = await supabase.from("dispatch_routes").insert(operation.payload as never);
-    if (error) throw error;
-    return;
-  }
-  const { error } = await supabase.from("fulfillment_timeline_events").insert(operation.payload as never);
-  if (error) throw error;
-};
-
-let activeFlush: Promise<number> | null = null;
-
-export const flushOfflineOperations = async () => {
-  if (activeFlush) return activeFlush;
-  activeFlush = (async () => {
-    if (!navigator.onLine) return readQueue().length;
-    const queue = readQueue();
-    const remaining = [...queue];
-    for (const operation of queue) {
-      try {
-        await executeOperation(operation);
-        const index = remaining.findIndex((candidate) => candidate.id === operation.id);
-        if (index >= 0) remaining.splice(index, 1);
-        writeQueue(remaining);
-      } catch (error) {
-        console.warn("Offline operation is still waiting to sync", operation.kind, error);
-        break;
-      }
-    }
-    return remaining.length;
-  })().finally(() => {
-    activeFlush = null;
-  });
-  return activeFlush;
-};
+// Legacy entries have no owner identity, expected version or idempotency key.
+// Preserve them for manual reconciliation instead of overwriting newer work.
+export const flushOfflineOperations = async () => readQueue().length;
 
 export const subscribeOfflineQueue = (listener: (count: number) => void) => {
   const handleChange = (event: Event) => listener(Number((event as CustomEvent<number>).detail ?? pendingOfflineOperationCount()));

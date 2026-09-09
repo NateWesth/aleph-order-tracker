@@ -6,6 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { useDraftRecovery } from "@/hooks/useDraftRecovery";
 import { cn } from "@/lib/utils";
 
 interface ItemComment {
@@ -31,6 +32,8 @@ export default function ItemCommentButton({ orderItemId, orderId, itemName, clas
   const [loaded, setLoaded] = useState(false);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  const [sendError,setSendError]=useState("");
+  const draftRecovery=useDraftRecovery(`quick-item-comment:${orderItemId}`,draft,!!draft.trim(),setDraft);
 
   // Lightweight count on mount so the dot indicator shows without opening the popover
   useEffect(() => {
@@ -100,7 +103,8 @@ export default function ItemCommentButton({ orderItemId, orderId, itemName, clas
 
   const handleSend = async () => {
     const content = draft.trim();
-    if (!content || !user) return;
+    if (!content || !user || sending) return;
+    setSendError("");
     setSending(true);
 
     let authorName = user.email ?? "Someone";
@@ -111,24 +115,22 @@ export default function ItemCommentButton({ orderItemId, orderId, itemName, clas
       .maybeSingle();
     if (profile?.full_name) authorName = profile.full_name;
 
-    const { error } = await supabase.from("order_item_comments").insert({
+    const { data: savedComment, error } = await supabase.from("order_item_comments").insert({
       order_item_id: orderItemId,
       user_id: user.id,
       body: content,
-    });
+    }).select("id,body,user_id,created_at").single();
 
 
     setSending(false);
     if (!error) {
-      setDraft("");
+      draftRecovery.clear();setDraft("");
       // Own insert also arrives via the realtime subscription above, but add
       // it immediately for a snappy feel rather than waiting on the round trip.
-      setComments((prev) => [
-        ...prev,
-        { id: crypto.randomUUID(), body: content, author_name: authorName, user_id: user.id, created_at: new Date().toISOString() },
-      ]);
-      setCount((c) => c + 1);
-    }
+      if(savedComment)setComments(prev=>prev.some(row=>row.id===savedComment.id)?prev:[...prev,{...savedComment,author_name:authorName}]);
+      const {count:latestCount}=await supabase.from("order_item_comments").select("id",{count:"exact",head:true}).eq("order_item_id",orderItemId);
+      if(latestCount!==null)setCount(latestCount);
+    } else {setSendError("Not sent. Your draft is kept: "+error.message);}
   };
 
   return (
@@ -181,7 +183,8 @@ export default function ItemCommentButton({ orderItemId, orderId, itemName, clas
         </div>
 
         <div className="flex items-end gap-2 border-t border-border p-2.5">
-          <Textarea
+          {draftRecovery.banner}{sendError&&<p role="alert" className="text-xs text-destructive">{sendError}</p>}
+            <Textarea
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => {

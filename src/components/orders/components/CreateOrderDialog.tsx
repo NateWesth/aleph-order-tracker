@@ -30,148 +30,27 @@ export default function CreateOrderDialog({
   const {
     user
   } = useAuth();
-  const handleSubmit = async (orderData: {
-    orderNumber: string;
-    reference?: string;
-    companyId: string;
-    totalAmount: number;
-    urgency: string;
-    notes?: string;
-    items: any[];
-    purchaseOrders: Array<{ id: string; supplierId: string; purchaseOrderNumber: string }>;
-  }) => {
-    if (!user?.id) {
-      console.error("❌ CreateOrderDialog: No user ID available");
-      toast({
-        title: "Error",
-        description: "User not authenticated. Please log in again.",
-        variant: "destructive"
-      });
-      return;
-    }
+  const handleSubmit = async (orderData:{requestId:string;orderNumber:string;companyId:string;urgency:string;items:any[];purchaseOrders:any[]}):Promise<boolean> => {
+    if(!user?.id||loading)return false;
     setLoading(true);
-    try {
-      // Get user role for additional context
-      const userRole = await getUserRole(user.id);
-
-      // Create description from items - NOW INCLUDING NOTES
-      const itemsDescription = orderData.items.filter(item => item.name && item.quantity > 0).map(item => {
-        let itemLine = `${item.name} (Qty: ${item.quantity})`;
-        if (item.notes && item.notes.trim()) {
-          itemLine += ` - ${item.notes.trim()}`;
-        }
-        return itemLine;
-      }).join('\n');
-
-      // Prepare order data for database insertion
-      const orderInsertData = {
-        order_number: orderData.orderNumber,
-        reference: orderData.reference || null,
-        description: itemsDescription,
-        notes: orderData.notes || null,
-        company_id: orderData.companyId,
-        total_amount: orderData.totalAmount || 0,
-        user_id: user.id,
-        status: 'pending',
-        urgency: orderData.urgency,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
-
-      // Verify company exists before creating order
-      if (orderInsertData.company_id) {
-        const {
-          data: companyCheck,
-          error: companyError
-        } = await supabase.from('companies').select('id, name, code').eq('id', orderInsertData.company_id).single();
-        if (companyError) {
-          console.error("❌ CreateOrderDialog: Company verification failed:", companyError);
-          throw new Error(`Company verification failed: ${companyError.message}`);
-        }
-      } else {
-        console.warn("⚠️ CreateOrderDialog: No company ID provided - order will be created without company link");
-      }
-
-      // Insert the order into the database
-      const {
-        data: createdOrder,
-        error: insertError
-      } = await supabase.from('orders').insert([orderInsertData]).select('*').single();
-      if (insertError) {
-        console.error("❌ CreateOrderDialog: Database insertion failed:", insertError);
-        console.error("❌ CreateOrderDialog: Insert error details:", {
-          code: insertError.code,
-          message: insertError.message,
-          details: insertError.details,
-          hint: insertError.hint
-        });
-        throw insertError;
-      }
-
-      // Insert purchase orders into the junction table
-      if (orderData.purchaseOrders && orderData.purchaseOrders.length > 0) {
-        
-        const poInsertData = orderData.purchaseOrders.map(po => ({
-          order_id: createdOrder.id,
-          supplier_id: po.supplierId,
-          purchase_order_number: po.purchaseOrderNumber,
-        }));
-
-        const { error: poError } = await supabase
-          .from('order_purchase_orders')
-          .insert(poInsertData);
-
-        if (poError) {
-          console.error("❌ CreateOrderDialog: Failed to insert purchase orders:", poError);
-          // Don't fail the order creation, just log the error
-        } else {
-        }
-      }
-
-      // Verify the order was saved with correct data
-      const {
-        data: verificationOrder,
-        error: verificationError
-      } = await supabase.from('orders').select('*').eq('id', createdOrder.id).single();
-      if (verificationError) {
-        console.error("❌ CreateOrderDialog: Order verification failed:", verificationError);
-      } else {
-      }
-
-      // Send email notification for new order
+    try{
+      const {data:createdId,error}=await (supabase as any).rpc("create_order_draft_safe",{
+        p_request_id:orderData.requestId,p_order:{order_number:orderData.orderNumber,company_id:orderData.companyId,urgency:orderData.urgency},
+        p_items:orderData.items,p_purchase_orders:orderData.purchaseOrders
+      });
+      if(error)throw new Error(error.message);
+      // A notification failure must not turn a confirmed order into a failed save.
       try {
-        // Get company name from the companies array
-        const company = companies.find(c => c.id === orderData.companyId);
-        const companyName = company?.name || 'Unknown Company';
         await sendOrderNotification({
-          orderId: createdOrder.id,
-          orderNumber: orderData.orderNumber,
-          companyName: companyName,
-          changeType: 'created',
-          newStatus: 'pending',
-          description: itemsDescription
+          orderId:createdId,orderNumber:orderData.orderNumber,
+          companyName:companies.find(company=>company.id===orderData.companyId)?.name||"Unknown Company",
+          changeType:"created",newStatus:"ordered",
+          description:orderData.items.map(item=>item.description||item.name).filter(Boolean).join(", ")
         });
-      } catch (emailError) {
-        console.error("❌ CreateOrderDialog: Email notification failed:", emailError);
-        // Don't fail the order creation if email fails
-      }
-      const urgencyText = orderData.urgency !== 'normal' ? ` with ${orderData.urgency.toUpperCase()} priority` : '';
-      toast({
-        title: "Order Created Successfully",
-        description: `Order ${orderData.orderNumber} has been created${urgencyText} and linked to the company.`
-      });
-      setOpen(false);
-      onOrderCreated();
-    } catch (error: any) {
-      console.error("❌ CreateOrderDialog: Order creation failed:", error);
-      toast({
-        title: "Error Creating Order",
-        description: error.message || "Failed to create order. Please try again.",
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
+      } catch(notificationError) { console.warn("Order saved; notification was not sent",notificationError); }
+      toast({title:"Order saved",description:"Order, items and PO links saved together."});setOpen(false);onOrderCreated();return true;
+    }catch(error){toast({title:"Order not confirmed — draft kept",description:error instanceof Error?error.message:"Retry the same draft",variant:"destructive"});return false;}
+    finally{setLoading(false);}
   };
   return <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>

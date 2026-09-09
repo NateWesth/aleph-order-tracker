@@ -48,7 +48,7 @@ export function NetworkStatusIndicator() {
   return (
     <div
       className={cn(
-        "fixed z-[100] left-1/2 -translate-x-1/2 top-4 pointer-events-none",
+        "fixed z-[100] left-1/2 -translate-x-1/2 top-4 w-max max-w-[92vw] pointer-events-none",
         "animate-fade-in"
       )}
       role="status"
@@ -65,12 +65,12 @@ export function NetworkStatusIndicator() {
         {isOnline ? (
           <>
             <Wifi className="h-4 w-4" />
-            {syncing ? `Syncing ${pendingChanges} saved change${pendingChanges === 1 ? "" : "s"}…` : pendingChanges ? `${pendingChanges} change${pendingChanges === 1 ? "" : "s"} waiting to sync` : "Back online · all changes synced"}
+            {pendingChanges ? `${pendingChanges} older offline actions need review in Dispatch` : "Back online · review and submit your device drafts"}
           </>
         ) : (
           <>
             <WifiOff className="h-4 w-4" />
-            Offline mode · {pendingChanges ? `${pendingChanges} change${pendingChanges === 1 ? "" : "s"} safely queued` : "changes will be safely queued"}
+            Offline · supported drafts stay on this device, not synced
           </>
         )}
       </div>

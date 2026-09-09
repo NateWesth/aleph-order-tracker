@@ -558,89 +558,21 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
   }, []);
 
   const handleCreateOrder = async (orderData: {
-    orderNumber: string;
-    reference?: string;
-    companyId: string;
-    totalAmount: number;
-    urgency: string;
-    notes?: string;
-    items: any[];
-  }) => {
-    if (!user?.id) {
-      toast({
-        title: "Error",
-        description: "Please log in to create orders",
-        variant: "destructive",
-      });
-
-      return;
-    }
-
+    requestId:string; orderNumber:string; companyId:string; totalAmount:number; urgency:string;
+    items:any[];purchaseOrders:any[];
+  }):Promise<boolean> => {
+    if(!user?.id||submitting)return false;
     setSubmitting(true);
-
-    try {
-      const itemsDescription = orderData.items
-        .filter((item) => item.name && item.quantity > 0)
-        .map((item) => {
-          const displayName = getItemDisplayName(item);
-          const secondary = getItemSecondaryDescription(item);
-          return `${displayName} (Qty: ${item.quantity})${secondary ? ` - ${secondary}` : ""}`;
-        })
-        .join("\n");
-
-      const { data: newOrder, error } = await supabase
-        .from("orders")
-        .insert({
-          order_number: orderData.orderNumber,
-          reference: orderData.reference || null,
-          description: itemsDescription,
-          notes: orderData.notes || null,
-          company_id: orderData.companyId,
-          total_amount: orderData.totalAmount || 0,
-          user_id: user.id,
-          status: "ordered",
-          urgency: orderData.urgency,
-        })
-        .select("id")
-        .single();
-
-      if (error) throw error;
-
-      const validItems = orderData.items.filter((item) => item.name && item.quantity > 0);
-
-      if (validItems.length > 0 && newOrder) {
-        const orderItemsToInsert = validItems.map((item) => ({
-          order_id: newOrder.id,
-          name: item.name,
-          code: item.code || null,
-          description: item.description?.trim() || null,
-          quantity: item.quantity,
-          stock_status: "awaiting",
-        }));
-
-        const { error: itemsError } = await supabase.from("order_items").insert(orderItemsToInsert);
-
-        if (itemsError) {
-          console.error("Error inserting order items:", itemsError);
-        }
-      }
-
-      toast({
-        title: "Order Created",
-        description: `Order ${orderData.orderNumber} has been created.`,
+    try{
+      const {error}=await (supabase as any).rpc("create_order_draft_safe",{
+        p_request_id:orderData.requestId,p_order:{order_number:orderData.orderNumber,company_id:orderData.companyId,urgency:orderData.urgency},
+        p_items:orderData.items,p_purchase_orders:orderData.purchaseOrders
       });
-
-      setCreateDialogOpen(false);
-      fetchOrders();
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to create order",
-        variant: "destructive",
-      });
-    } finally {
-      setSubmitting(false);
-    }
+      if(error)throw new Error(error.message);
+      toast({title:"Order created",description:`Order ${orderData.orderNumber}, items and PO links saved together.`});
+      setCreateDialogOpen(false);void fetchOrders();return true;
+    }catch(error){toast({title:"Order not confirmed — draft kept",description:error instanceof Error?error.message:"Retry the same draft",variant:"destructive"});return false;}
+    finally{setSubmitting(false);}
   };
 
   const handleSetItemStockStatus = useCallback(

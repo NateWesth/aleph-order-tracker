@@ -11,6 +11,8 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import EntityComments from "@/components/admin/EntityComments";
+import { useDraftRecovery } from "@/hooks/useDraftRecovery";
+import { useConflictSave } from "@/hooks/useConflictSave";
 import { cn } from "@/lib/utils";
 import { DetailSection, DetailValue, EmptyWorkshop, formatDate, isOverdue, memberLabel, monthLabel, PRIORITIES, PriorityBadge, PrioritySelect, SERVICE_STATUSES, StatusBadge, TeamMember, WorkshopPanel, WorkshopTabs, WorkshopToolbar } from "@/components/admin/workshop/shared";
 import SharpeningFocusHeader from "@/components/admin/workshop/SharpeningFocusHeader";
@@ -21,10 +23,10 @@ interface SharpeningJob {
   priority: string; order_number: string | null; assigned_to: string | null; status: string;
   deadline_date: string | null; invoiced: boolean; invoice_number: string | null;
   third_party_name: string | null; third_party_quantity: number | null; third_party_reference: string | null;
-  third_party_status: string | null; notes: string | null; completed_at: string | null; created_at: string;
+  third_party_status: string | null; notes: string | null; completed_at: string | null; created_at: string; updated_at: string;
 }
 
-type JobDraft = Omit<SharpeningJob, "id" | "completed_at" | "created_at">;
+type JobDraft = Omit<SharpeningJob, "id" | "completed_at" | "created_at" | "updated_at">;
 const STATUS_BUTTON: Record<string, string> = {
   cyan: "border-logo-cyan bg-logo-cyan text-logo-on",
   teal: "border-logo-teal bg-logo-teal text-white",
@@ -50,6 +52,9 @@ export default function SharpeningPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<JobDraft>(emptyDraft);
+  const [editBase,setEditBase]=useState<string|null>(null);
+  const conflicts=useConflictSave();
+  const recovery=useDraftRecovery("sharpening-form",{draft,editingId,editBase},formOpen,value=>{setDraft(value.draft);setEditingId(value.editingId);setEditBase(value.editBase);setFormOpen(true);});
   const [saving, setSaving] = useState(false);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
@@ -113,28 +118,29 @@ export default function SharpeningPage() {
       }));
   }, [visible]);
 
-  const openCreate = () => { setEditingId(null); setDraft(emptyDraft()); setFormOpen(true); };
-  const openEdit = (job: SharpeningJob) => { setEditingId(job.id); setDraft({ date_received: job.date_received, job_number: job.job_number, customer_name: job.customer_name, quantity: job.quantity, priority: job.priority, order_number: job.order_number, assigned_to: job.assigned_to, status: job.status, deadline_date: job.deadline_date, invoiced: job.invoiced, invoice_number: job.invoice_number, third_party_name: job.third_party_name, third_party_quantity: job.third_party_quantity, third_party_reference: job.third_party_reference, third_party_status: job.third_party_status, notes: job.notes }); setSelected(null); setFormOpen(true); };
+  const openCreate = () => { setEditBase(null); setEditingId(null); setDraft(emptyDraft()); setFormOpen(true); };
+  const openEdit = (job: SharpeningJob) => { setEditBase(job.updated_at); setEditingId(job.id); setDraft({ date_received: job.date_received, job_number: job.job_number, customer_name: job.customer_name, quantity: job.quantity, priority: job.priority, order_number: job.order_number, assigned_to: job.assigned_to, status: job.status, deadline_date: job.deadline_date, invoiced: job.invoiced, invoice_number: job.invoice_number, third_party_name: job.third_party_name, third_party_quantity: job.third_party_quantity, third_party_reference: job.third_party_reference, third_party_status: job.third_party_status, notes: job.notes }); setSelected(null); setFormOpen(true); };
   const set = <K extends keyof JobDraft>(key: K, value: JobDraft[K]) => setDraft((current) => ({ ...current, [key]: value }));
 
   const save = async () => {
     if (!draft.job_number.trim() || !draft.customer_name.trim()) { toast({ title: "Job number and customer are required", variant: "destructive" }); return; }
+    if(saving)return;
     setSaving(true);
-    const payload = { ...draft, job_number: draft.job_number.trim(), customer_name: draft.customer_name.trim(), order_number: draft.order_number?.trim() || null, invoice_number: draft.invoiced ? draft.invoice_number?.trim() || null : null, third_party_name: draft.third_party_name?.trim() || null, third_party_reference: draft.third_party_reference?.trim() || null, notes: draft.notes?.trim() || null, created_by: user?.id };
-    const result = editingId ? await db.from("sharpening_jobs").update(payload).eq("id", editingId) : await db.from("sharpening_jobs").insert(payload);
-    setSaving(false);
-    if (result.error) { toast({ title: "Job not saved", description: result.error.message, variant: "destructive" }); return; }
-    setFormOpen(false); toast({ title: editingId ? "Sharpening job updated" : "Sharpening job added", description: "The workshop queue is live for the whole team." }); await load(true);
+    try {
+      const payload = { ...draft, job_number: draft.job_number.trim(), customer_name: draft.customer_name.trim(), order_number: draft.order_number?.trim() || null, invoice_number: draft.invoiced ? draft.invoice_number?.trim() || null : null, third_party_name: draft.third_party_name?.trim() || null, third_party_reference: draft.third_party_reference?.trim() || null, notes: draft.notes?.trim() || null };
+      if(editingId) { if(!await conflicts.save("sharpening_jobs",editingId,payload,editBase))return; }
+      else { const {error}=await db.from("sharpening_jobs").insert({...payload,created_by:user?.id}); if(error)throw new Error(error.message); }
+      recovery.clear();setFormOpen(false);toast({title:editingId?"Changes saved":"Sharpening job added"});await load(true);
+    } catch(error) {toast({title:"Not saved — your draft is kept",description:error instanceof Error?error.message:"Please try again",variant:"destructive"});}
+    finally {setSaving(false);}
   };
 
   const updateStatus = async (job: SharpeningJob, status: string) => {
-    const previous = jobs; setJobs((current) => current.map((row) => row.id === job.id ? { ...row, status } : row));
-    const { error } = await db.from("sharpening_jobs").update({ status }).eq("id", job.id);
-    if (error) { setJobs(previous); toast({ title: "Status not updated", description: error.message, variant: "destructive" }); }
-    else { toast({ title: status === "completed" ? "Moved to sharpening history" : `Status changed to ${SERVICE_STATUSES.find(([id]) => id === status)?.[1]}` }); await load(true); }
+    try { if(await conflicts.save("sharpening_jobs",job.id,{status},job.updated_at))await load(true); }
+    catch(error){toast({title:"Status not saved",description:error instanceof Error?error.message:"Retry",variant:"destructive"});}
   };
-
   return <div className="workshop-workspace space-y-4 bg-background pb-10 font-sans text-foreground">
+    {conflicts.dialog}{!formOpen&&recovery.banner}
     <SharpeningFocusHeader
       items={jobs.map((job) => ({ id: job.id, reference: job.job_number, title: job.customer_name, subtitle: `×${job.quantity}`, date: job.date_received, deadline: job.deadline_date, status: job.status, priority: job.priority }))}
       noun="sharpening job"
@@ -178,13 +184,13 @@ export default function SharpeningPage() {
 
 
 
-    <Dialog open={formOpen} onOpenChange={setFormOpen}><DialogContent className="max-h-[92dvh] w-[calc(100%-20px)] max-w-3xl overflow-y-auto rounded-[28px] p-0"><div className="border-b border-border/60 bg-primary/[0.06] p-5 sm:p-6"><DialogHeader><DialogTitle className="flex items-center gap-2 text-2xl font-black"><span className="grid h-10 w-10 place-items-center rounded-2xl bg-primary text-primary-foreground"><Scissors className="h-5 w-5" /></span>{editingId ? "Edit sharpening job" : "New sharpening job"}</DialogTitle></DialogHeader><p className="mt-2 text-sm text-muted-foreground">Manual workshop record—no external API calls are made.</p></div><div className="space-y-6 p-5 sm:p-6">
+    <Dialog open={formOpen} onOpenChange={open=>{if(!saving)setFormOpen(open);}}><DialogContent className="max-h-[92dvh] w-[calc(100%-20px)] max-w-3xl overflow-y-auto rounded-[28px] p-0"><div className="border-b border-border/60 bg-primary/[0.06] p-5 sm:p-6"><DialogHeader><DialogTitle className="flex items-center gap-2 text-2xl font-black"><span className="grid h-10 w-10 place-items-center rounded-2xl bg-primary text-primary-foreground"><Scissors className="h-5 w-5" /></span>{editingId ? "Edit sharpening job" : "New sharpening job"}</DialogTitle></DialogHeader>{recovery.banner}<p className="mt-2 text-sm text-muted-foreground">Manual workshop record—no external API calls are made.</p></div><fieldset disabled={saving} className="min-w-0 space-y-6 p-5 sm:p-6">
       <FormSection title="Job intake"><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"><Field label="Date received"><Input type="date" value={draft.date_received} onChange={(e) => set("date_received", e.target.value)} /></Field><Field label="Job number *"><Input value={draft.job_number} onChange={(e) => set("job_number", e.target.value)} placeholder="SH-1042" /></Field><Field label="Order number"><Input value={draft.order_number || ""} onChange={(e) => set("order_number", e.target.value || null)} placeholder="Optional" /></Field><Field label="Customer name *" wide><Input value={draft.customer_name} onChange={(e) => set("customer_name", e.target.value)} /></Field><Field label="Quantity"><Input type="number" min={1} value={draft.quantity} onChange={(e) => set("quantity", Math.max(1, Number(e.target.value)))} /></Field></div></FormSection>
       <FormSection title="Workflow"><div className="grid gap-4 sm:grid-cols-2"><Field label="Status"><StatusSelect value={draft.status} onChange={(value) => set("status", value)} /></Field><Field label="Priority"><PrioritySelect value={draft.priority} onChange={(value) => set("priority", value)} /></Field><Field label="Assigned to"><TeamSelect value={draft.assigned_to} team={team} onChange={(value) => set("assigned_to", value)} /></Field><Field label="Deadline (optional)"><Input type="date" value={draft.deadline_date || ""} onChange={(e) => set("deadline_date", e.target.value || null)} /></Field></div></FormSection>
       <FormSection title="Invoice"><div className="grid gap-4 sm:grid-cols-2"><label className="flex min-h-11 items-center gap-3 rounded-xl border border-border/60 bg-muted/20 px-3 text-sm font-semibold"><input type="checkbox" checked={draft.invoiced} onChange={(e) => set("invoiced", e.target.checked)} className="h-4 w-4 accent-primary" />Invoice completed</label>{draft.invoiced && <Field label="Invoice number"><Input value={draft.invoice_number || ""} onChange={(e) => set("invoice_number", e.target.value || null)} /></Field>}</div></FormSection>
       <FormSection title="Third-party work" description="Leave blank when everything is handled internally."><div className="grid gap-4 sm:grid-cols-2"><Field label="Repairer / supplier"><Input value={draft.third_party_name || ""} onChange={(e) => set("third_party_name", e.target.value || null)} /></Field><Field label="Quantity"><Input type="number" min={0} value={draft.third_party_quantity ?? ""} onChange={(e) => set("third_party_quantity", e.target.value ? Number(e.target.value) : null)} /></Field><Field label="Reference"><Input value={draft.third_party_reference || ""} onChange={(e) => set("third_party_reference", e.target.value || null)} /></Field><Field label="Third-party status"><StatusSelect value={draft.third_party_status || "none"} allowNone onChange={(value) => set("third_party_status", value === "none" ? null : value)} /></Field></div></FormSection>
       <Field label="Notes"><Textarea value={draft.notes || ""} onChange={(e) => set("notes", e.target.value || null)} className="min-h-24 resize-none" placeholder="Condition, special instructions, quote details…" /></Field><div className="flex flex-col-reverse gap-2 border-t pt-4 sm:flex-row sm:justify-end"><Button variant="outline" onClick={() => setFormOpen(false)}>Cancel</Button><Button onClick={() => void save()} disabled={saving}>{saving ? "Saving…" : editingId ? "Save changes" : "Add to queue"}</Button></div>
-    </div></DialogContent></Dialog>
+    </fieldset></DialogContent></Dialog>
 
     <WorkshopPanel
       open={!!selected}

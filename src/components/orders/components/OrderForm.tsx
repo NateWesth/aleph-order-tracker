@@ -64,20 +64,22 @@ interface TemplatePrefill {
 
 interface OrderFormProps {
   onSubmit: (orderData: {
+    requestId: string;
     orderNumber: string;
     companyId: string;
     totalAmount: number;
     urgency: string;
     items: OrderItem[];
     purchaseOrders: PurchaseOrderEntry[];
-  }) => void;
+  }) => Promise<boolean>;
   loading?: boolean;
   templatePrefill?: TemplatePrefill | null;
 }
 
 const OrderForm = ({ onSubmit, loading = false, templatePrefill }: OrderFormProps) => {
-  const { loadDraft, saveDraft, clearDraft } = useAutoSaveDraft();
+  const { loadDraft, saveDraft, clearDraft, draftStatus } = useAutoSaveDraft();
   const [orderNumber, setOrderNumber] = useState("");
+  const [requestId,setRequestId]=useState<string>(()=>crypto.randomUUID());
   const [companyId, setCompanyId] = useState("");
   const [urgency, setUrgency] = useState("normal");
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrderEntry[]>([]);
@@ -100,6 +102,8 @@ const OrderForm = ({ onSubmit, loading = false, templatePrefill }: OrderFormProp
     initialized.current = true;
     const draft = loadDraft();
     if (draft) {
+      if(draft.requestId)setRequestId(draft.requestId);
+      if(draft.orderNumber)setOrderNumber(draft.orderNumber);
       setCompanyId(draft.companyId || "");
       setUrgency(draft.urgency || "normal");
       if (draft.items?.length > 0) setItems(draft.items.map((item: OrderItem) => ({ ...item, description: item.description || "" })));
@@ -130,12 +134,12 @@ const OrderForm = ({ onSubmit, loading = false, templatePrefill }: OrderFormProp
     if (!initialized.current) return;
     const hasContent = companyId || urgency !== "normal" || items.some(i => i.name.trim()) || purchaseOrders.length > 0;
     if (hasContent) {
-      saveDraft({ companyId, urgency, items, purchaseOrders });
+      saveDraft({ requestId, orderNumber, companyId, urgency, items, purchaseOrders });
     }
-  }, [companyId, urgency, items, purchaseOrders, saveDraft]);
+  }, [requestId, orderNumber, companyId, urgency, items, purchaseOrders, saveDraft]);
 
   useEffect(() => {
-    setOrderNumber(generateOrderNumber());
+    setOrderNumber(current=>current||generateOrderNumber());
 
     const fetchData = async () => {
       try {
@@ -269,7 +273,7 @@ const OrderForm = ({ onSubmit, loading = false, templatePrefill }: OrderFormProp
     );
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const validItems = items.filter(
@@ -293,9 +297,8 @@ const OrderForm = ({ onSubmit, loading = false, templatePrefill }: OrderFormProp
       (po) => po.supplierId && po.purchaseOrderNumber.trim()
     );
 
-    clearDraft();
-
-    onSubmit({
+    const saved = await onSubmit({
+      requestId,
       orderNumber: orderNumber || generateOrderNumber(),
       companyId,
       totalAmount: 0,
@@ -303,6 +306,7 @@ const OrderForm = ({ onSubmit, loading = false, templatePrefill }: OrderFormProp
       items: validItems,
       purchaseOrders: validPurchaseOrders,
     });
+    if(saved)clearDraft();
   };
 
   if (loadingData) {
@@ -315,6 +319,8 @@ const OrderForm = ({ onSubmit, loading = false, templatePrefill }: OrderFormProp
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      <fieldset disabled={loading} className="min-w-0 space-y-6">
+      {draftStatus&&<p role="status" className="rounded-xl border bg-muted/30 p-3 text-xs">{draftStatus}</p>}
       {/* Draft restored banner */}
       {draftRestored && (
         <div className="flex items-center justify-between p-3 bg-primary/5 rounded-lg border border-primary/20">
@@ -324,7 +330,7 @@ const OrderForm = ({ onSubmit, loading = false, templatePrefill }: OrderFormProp
             variant="ghost"
             size="sm"
             onClick={() => {
-              clearDraft();
+              clearDraft();setRequestId(crypto.randomUUID());
               setDraftRestored(false);
               setCompanyId("");
               setUrgency("normal");
@@ -631,6 +637,7 @@ const OrderForm = ({ onSubmit, loading = false, templatePrefill }: OrderFormProp
       >
         {loading ? "Creating..." : "Create Order"}
       </Button>
+      </fieldset>
     </form>
   );
 };
