@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { useDraftRecovery } from "@/hooks/useDraftRecovery";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -67,6 +68,8 @@ export default function OrderItemComments({ orderItemId, className, initialCount
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [mentionedIds, setMentionedIds] = useState<Map<string, string>>(new Map()); // name -> id
+  const draftRecovery=useDraftRecovery(`item-comment:${orderItemId}`,{body,replyTo,mentions:[...mentionedIds.entries()]},!!body.trim(),saved=>{setBody(saved.body);setReplyTo(saved.replyTo);setMentionedIds(new Map(saved.mentions));});
+
 
   const fetchComments = useCallback(async () => {
     if (!orderItemId) return;
@@ -225,7 +228,7 @@ export default function OrderItemComments({ orderItemId, className, initialCount
       onCountChange?.(nextCount);
       return nextCount;
     });
-    setBody("");
+    draftRecovery.clear();setBody("");
     const wasReplyingTo = replyTo;
     setReplyTo(null);
     const mentionIdsToSend = [...mentionedIds.entries()]
@@ -477,6 +480,7 @@ export default function OrderItemComments({ orderItemId, className, initialCount
                   </Button>
                 }
               />
+              {draftRecovery.banner}
               <Textarea
                 value={body}
                 onChange={(event) => handleBodyChange(event.target.value)}

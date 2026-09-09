@@ -4,6 +4,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLiveData } from "@/hooks/useLiveData";
+import { useConflictSave } from "@/hooks/useConflictSave";
+import { useDraftRecovery } from "@/hooks/useDraftRecovery";
+import PartialDeliveryDialog, { DeliveryReceiptHistory } from "@/components/admin/PartialDeliveryDialog";
+import DismissedCollections from "@/components/admin/DismissedCollections";
+import RecoverableNote from "@/components/admin/RecoverableNote";
 import { cn } from "@/lib/utils";
 import { getItemDisplayName, getItemSecondaryDescription, getPurchaseOrderLineDisplayName, getPurchaseOrderLineSecondaryName } from "@/lib/itemDisplay";
 import { Button } from "@/components/ui/button";
@@ -19,7 +24,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import EntityComments from "@/components/admin/EntityComments";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { queueOfflineOperation } from "@/services/offlineOperations";
+import { readAllRows } from "@/lib/readAllRows";
+import { pendingOfflineOperationCount } from "@/services/offlineOperations";
 import { formatDistanceToNow } from "date-fns";
 import {
   ArrowRight,
@@ -71,6 +77,7 @@ interface FulfillmentItem {
 }
 
 interface FulfillmentOrder {
+  updated_at: string;
   id: string;
   order_number: string;
   reference: string | null;
@@ -140,6 +147,7 @@ interface ZohoPO {
 }
 
 interface POCollectionState {
+  updated_at?: string;
   purchase_order_id: string;
   purchase_order_number: string;
   vendor_id: string | null;
@@ -336,6 +344,12 @@ export default function FulfillmentPage() {
   const [collectingId, setCollectingId] = useState<string | null>(null);
   const [collectionDraft, setCollectionDraft] = useState<Record<string, Record<string, number>>>({});
   const [collectionNotes, setCollectionNotes] = useState<Record<string, string>>({});
+  const conflicts = useConflictSave();
+  const [receiptAttempts,setReceiptAttempts]=useState<Record<string,{id:string;payload:any;events:string[]}>>({});
+  const collectionRecovery=useDraftRecovery("supplier-collection-drafts",{collectionDraft,collectionNotes,receiptAttempts},
+    Object.values(collectionDraft).some(lines=>Object.values(lines).some(qty=>qty>0))||Object.values(collectionNotes).some(Boolean)||Object.keys(receiptAttempts).length>0,
+    value=>{setCollectionDraft(value.collectionDraft);setCollectionNotes(value.collectionNotes);setReceiptAttempts(value.receiptAttempts||{});});
+
   const [selectedDeliveryId, setSelectedDeliveryId] = useState<string | null>(null);
   const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
   const [confirmDeliveryId, setConfirmDeliveryId] = useState<string | null>(null);
@@ -386,15 +400,15 @@ export default function FulfillmentPage() {
     if (!loadedRef.current) setLoading(true);
     try {
       const historyCutoff = new Date(Date.now() - FULFILLMENT_WINDOW_MS).toISOString();
-      const [ordersRes, deliveryHistoryRes, profilesRes, settingsRes, cacheRes, statesRes, eventsRes, areaRes, areaLinksRes, timelineRes] = await Promise.all([
+      const [ordersRes, deliveryHistoryRes, profilesRes, settingsRes, cacheRes, statesRes, eventsRes, areaRes, areaLinksRes, timelineRes, dismissalsRes] = await Promise.all([
         supabase
           .from("orders")
-          .select("id, order_number, reference, urgency, company_id, created_at, completed_date, status, fulfillment_method, fulfillment_status, fulfillment_assigned_to, fulfillment_scheduled_for, fulfillment_notes, fulfillment_routed_at")
+          .select("id, order_number, reference, urgency, company_id, created_at, updated_at, completed_date, status, fulfillment_method, fulfillment_status, fulfillment_assigned_to, fulfillment_scheduled_for, fulfillment_notes, fulfillment_routed_at")
           .is("completed_date", null)
           .order("created_at", { ascending: true }),
         supabase
           .from("orders")
-          .select("id, order_number, reference, urgency, company_id, created_at, completed_date, fulfillment_method, fulfillment_status, fulfillment_assigned_to, fulfillment_scheduled_for, fulfillment_notes, fulfillment_routed_at")
+          .select("id, order_number, reference, urgency, company_id, created_at, updated_at, completed_date, fulfillment_method, fulfillment_status, fulfillment_assigned_to, fulfillment_scheduled_for, fulfillment_notes, fulfillment_routed_at")
           .eq("fulfillment_method", "delivery")
           .eq("fulfillment_status", "completed")
           .gte("completed_date", historyCutoff)
@@ -403,7 +417,7 @@ export default function FulfillmentPage() {
         supabase.from("profiles").select("id, full_name, email, position").eq("approved", true).order("full_name"),
         supabase.from("fulfillment_settings").select("auto_assign_enabled, default_method").eq("id", true).maybeSingle(),
         supabase.functions.invoke("po-tracking-data", { body: { refresh: true } }),
-        supabase.from("po_collection_state").select("purchase_order_id, purchase_order_number, vendor_id, vendor_name, assigned_to, status, collection_method, is_urgent, scheduled_for, notes, completed_at, dismissed_at, dismissed_by, last_seen_at"),
+        supabase.from("po_collection_state").select("purchase_order_id, purchase_order_number, vendor_id, vendor_name, assigned_to, status, collection_method, is_urgent, scheduled_for, notes, completed_at, dismissed_at, dismissed_by, last_seen_at, updated_at"),
         supabase
           .from("po_collection_events")
           .select("id, purchase_order_id, purchase_order_number, vendor_id, vendor_name, collected_by, collected_at, total_units, fully_collected, notes")
@@ -418,6 +432,7 @@ export default function FulfillmentPage() {
           .gte("occurred_at", historyCutoff)
           .order("occurred_at", { ascending: false })
           .limit(500),
+        readAllRows<any>((from,to)=>(supabase as any).from("collection_dismissals").select("purchase_order_id").eq("active",true).order("purchase_order_id").range(from,to)).then(data=>({data,error:null})),
       ]);
 
       if (ordersRes.error) throw ordersRes.error;
@@ -482,6 +497,8 @@ export default function FulfillmentPage() {
       const poPayload = Array.isArray(cacheRes.data?.purchaseOrders) ? (cacheRes.data?.purchaseOrders as unknown as ZohoPO[]) : [];
       setPoCacheFetchedAt(cacheRes.data?.fetchedAt || null);
       const stateRows = (statesRes.data || []) as POCollectionState[];
+      if(dismissalsRes.error)throw dismissalsRes.error;
+      const dismissedIds=new Set((dismissalsRes.data||[]).map((row:any)=>row.purchase_order_id));
       const stateByPO = new Map(stateRows.map((row) => [row.purchase_order_id, row]));
       // Operational collections are a strict rolling three-week queue. A
       // dismissed PO remains hidden even if a cache refresh sees it again.
@@ -489,6 +506,7 @@ export default function FulfillmentPage() {
         isOpenCollectionPO(po)
         && isCurrentCollectionPO(po)
         && !stateByPO.get(po.purchaseOrderId)?.dismissed_at
+        && !dismissedIds.has(po.purchaseOrderId)
       );
       const activePOIds = focusedPOPayload.map((po) => po.purchaseOrderId).filter(Boolean);
       const activeEventsRes = activePOIds.length
@@ -526,7 +544,7 @@ export default function FulfillmentPage() {
       const knownIds = new Set((statesRes.data || []).map((row: any) => row.purchase_order_id));
       const missing = focusedPOPayload.filter((po) => !knownIds.has(po.purchaseOrderId));
       if (missing.length) {
-        await supabase.from("po_collection_state").upsert(
+        const inserted=await supabase.from("po_collection_state").upsert(
           missing.map((po) => ({
             purchase_order_id: po.purchaseOrderId,
             purchase_order_number: po.purchaseOrderNumber,
@@ -536,8 +554,13 @@ export default function FulfillmentPage() {
             last_seen_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           })) as any,
-          { onConflict: "purchase_order_id" },
-        );
+          { onConflict: "purchase_order_id", ignoreDuplicates: true },
+        ).select("*");
+        if(inserted.error)throw inserted.error;
+        if(inserted.data?.length)setCollectionStates(current=>{
+          const existing=new Set(current.map(row=>row.purchase_order_id));
+          return [...current,...inserted.data.filter(row=>!existing.has(row.purchase_order_id)) as POCollectionState[]];
+        });
       }
     } catch (error: any) {
       console.error("Fulfillment load failed", error);
@@ -615,7 +638,7 @@ export default function FulfillmentPage() {
     return () => window.removeEventListener("keydown", closeOnEscape);
   }, []);
 
-  useLiveData(["orders", "order_items", "po_tracking_cache", "po_collection_state", "po_collection_events", "po_collection_event_lines", "fulfillment_timeline_events", "dispatch_routes", "dispatch_areas", "dispatch_area_links"], fetchData, {
+  useLiveData(["orders", "order_items", "po_tracking_cache", "po_collection_state", "collection_dismissals", "po_collection_events", "po_collection_event_lines", "fulfillment_timeline_events", "dispatch_routes", "dispatch_areas", "dispatch_area_links"], fetchData, {
     debounceMs: 900,
     fallbackIntervalMs: 0,
     channelName: "fulfillment-workspace-v4-live",
@@ -694,6 +717,7 @@ export default function FulfillmentPage() {
         po.remainingUnits > 0
         && po.state?.status !== "collected"
         && !po.state?.completed_at
+        && !po.state?.dismissed_at
         && !fullyCollectedPOs.has(po.purchaseOrderId),
       )
       .sort((a, b) => {
@@ -702,68 +726,24 @@ export default function FulfillmentPage() {
       });
   }, [purchaseOrders, collectionStates, collectionEvents, collectedByLine, sourceQuantityByLine]);
 
-  const updateDelivery = async (orderId: string, patch: Record<string, unknown>) => {
-    const previous = deliveryOrders;
-    setDeliveryOrders((current) => current.map((order) => (order.id === orderId ? ({ ...order, ...patch } as FulfillmentOrder) : order)));
-    if (!navigator.onLine) {
-      queueOfflineOperation({ kind: "update-order", payload: { orderId, patch } });
-      toast({ title: "Saved offline", description: "The delivery update will sync automatically when the connection returns." });
-      return true;
-    }
-    const { error } = await supabase.from("orders").update(patch as any).eq("id", orderId);
-    if (error) {
-      setDeliveryOrders(previous);
-      toast({ title: "Update failed", description: error.message, variant: "destructive" });
-      return false;
-    }
-    return true;
+  const updateDelivery = async (orderId: string, patch: Record<string, unknown>, expected?: string|null) => {
+    const order=deliveryOrders.find(row=>row.id===orderId);
+    try {
+      const saved=await conflicts.save("orders",orderId,patch,expected===undefined?order?.updated_at||null:expected);
+      if(saved)await fetchData();return saved;
+    } catch(error){toast({title:"Not synced",description:error instanceof Error?error.message:"Refresh and retry",variant:"destructive"});return false;}
   };
-
-  const updateCollectionState = async (po: CollectionPOView, patch: Partial<POCollectionState>) => {
-    const previous = collectionStates;
-    const optimistic: POCollectionState = {
-      purchase_order_id: po.purchaseOrderId,
-      purchase_order_number: po.purchaseOrderNumber,
-      vendor_id: po.vendorId || null,
-      vendor_name: po.vendorName || "Unknown supplier",
-      assigned_to: null,
-      status: "pending",
-      collection_method: "pickup",
-      is_urgent: false,
-      scheduled_for: null,
-      notes: null,
-      completed_at: null,
-      dismissed_at: null,
-      dismissed_by: null,
-      last_seen_at: new Date().toISOString(),
-      ...(po.state || {}),
-      ...patch,
-    };
-    setCollectionStates((current) => [...current.filter((state) => state.purchase_order_id !== po.purchaseOrderId), optimistic]);
-    const persistencePayload = {
-      purchase_order_id: po.purchaseOrderId,
-      purchase_order_number: po.purchaseOrderNumber,
-      vendor_id: po.vendorId || null,
-      vendor_name: po.vendorName || "Unknown supplier",
-      ...patch,
-      updated_at: new Date().toISOString(),
-      last_seen_at: new Date().toISOString(),
-    };
-    if (!navigator.onLine) {
-      queueOfflineOperation({ kind: "upsert-collection", payload: persistencePayload });
-      toast({ title: "Saved offline", description: "The supplier movement update is queued safely on this device." });
-      return true;
-    }
-    const { error } = await supabase.from("po_collection_state").upsert(
-      persistencePayload as any,
-      { onConflict: "purchase_order_id" },
-    );
-    if (error) {
-      setCollectionStates(previous);
-      toast({ title: "Collection update failed", description: error.message, variant: "destructive" });
-      return false;
-    }
-    return true;
+  const updateCollectionState = async (po: CollectionPOView, patch: Partial<POCollectionState>, expected?:string|null) => {
+    try {
+      if(!po.state){throw new Error("Collection state is still loading. Refresh before editing.");}
+      const saved=await conflicts.save("po_collection_state",po.purchaseOrderId,patch,expected===undefined?po.state.updated_at||null:expected);
+      if(saved)await fetchData();return saved;
+    }catch(error){toast({title:"Not synced",description:error instanceof Error?error.message:"Refresh and retry",variant:"destructive"});return false;}
+  };
+  const saveBatch=async(changes:Array<{table:string;id:string;patch:Record<string,unknown>;updated_at:string|null}>)=>{
+    if(!navigator.onLine)throw new Error("Reconnect before applying a shared plan. No changes have been saved.");
+    const {error}=await (supabase as any).rpc("save_workflow_batch",{p_changes:changes});
+    if(error)throw new Error(error.message);
   };
 
   const saveSettings = async (patch: Partial<FulfillmentSettings>) => {
@@ -776,82 +756,50 @@ export default function FulfillmentPage() {
     if (error) toast({ title: "Settings not saved", description: error.message, variant: "destructive" });
   };
 
+  const lastAutoAssignment=useRef("");
+  const assignmentRevision=JSON.stringify(collectionQueue.filter(po=>!po.state?.assigned_to).map(po=>[po.purchaseOrderId,po.state?.updated_at]));
   const autoAssignCollections = useCallback(async () => {
     if (autoAssignLock.current || team.length === 0 || collectionQueue.length === 0) return;
     const unassigned = collectionQueue.filter((po) => !po.state?.assigned_to);
     if (!unassigned.length) return;
     autoAssignLock.current = true;
+    lastAutoAssignment.current=assignmentRevision;
     setAssigning(true);
     try {
       const load = new Map(team.map((member) => [member.id, collectionQueue.filter((po) => po.state?.assigned_to === member.id).length]));
+      let assigned=0;
       for (const po of unassigned) {
         const assignee = [...team].sort((a, b) => (load.get(a.id) || 0) - (load.get(b.id) || 0))[0];
         if (!assignee) break;
-        const { error } = await supabase.from("po_collection_state").upsert(
-          {
-            purchase_order_id: po.purchaseOrderId,
-            purchase_order_number: po.purchaseOrderNumber,
-            vendor_id: po.vendorId || null,
-            vendor_name: po.vendorName || "Unknown supplier",
-            assigned_to: assignee.id,
-            status: po.state?.status === "collected" ? "pending" : po.state?.status || "pending",
-            last_seen_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          } as any,
-          { onConflict: "purchase_order_id" },
-        );
-        if (!error) load.set(assignee.id, (load.get(assignee.id) || 0) + 1);
+        const {error}=await (supabase as any).rpc("save_workflow_batch",{p_changes:[{
+          table:"po_collection_state",id:po.purchaseOrderId,patch:{assigned_to:assignee.id},updated_at:po.state?.updated_at||null
+        }]});
+        if (!error) {load.set(assignee.id, (load.get(assignee.id) || 0) + 1);assigned++;}
       }
       await fetchData();
-      toast({ title: "Collections assigned", description: `${unassigned.length} PO${unassigned.length === 1 ? "" : "s"} balanced across the team.` });
+      toast({ title: assigned===unassigned.length?"Collections assigned":"Some assignments need review", description: `${assigned} of ${unassigned.length} collections assigned. ${assigned<unassigned.length?"Refresh and retry the remaining work.":""}` });
     } finally {
       autoAssignLock.current = false;
       setAssigning(false);
     }
-  }, [collectionQueue, fetchData, team, toast]);
+  }, [collectionQueue, fetchData, team, toast, assignmentRevision]);
 
   useEffect(() => {
-    if (!loading && settings.auto_assign_enabled && collectionQueue.some((po) => !po.state?.assigned_to)) {
+    if (!loading && settings.auto_assign_enabled && lastAutoAssignment.current!==assignmentRevision && collectionQueue.some((po) => !po.state?.assigned_to)) {
       void autoAssignCollections();
     }
-  }, [loading, settings.auto_assign_enabled, collectionQueue, autoAssignCollections]);
+  }, [loading, settings.auto_assign_enabled, collectionQueue, autoAssignCollections, assignmentRevision]);
 
-  const completeDelivery = async (order: FulfillmentOrder) => {
-    const readyItems = order.items.filter((item) => readyUnits(item) > 0);
-    if (!readyItems.length) return;
-    setCompletingDeliveryId(order.id);
-    try {
-      if (!navigator.onLine) {
-        queueOfflineOperation({ kind: "complete-delivery", payload: { orderId: order.id } });
-        setDeliveryOrders((current) => current.filter((candidate) => candidate.id !== order.id));
-        setConfirmDeliveryId(null);
-        setSelectedDeliveryId(null);
-        toast({ title: "Handover saved offline", description: `${order.order_number} will complete automatically when this device reconnects.` });
-        return;
-      }
-      const { data, error } = await supabase.rpc("complete_fulfillment_delivery", { p_order_id: order.id });
-      if (error) throw error;
-      const result = (data || {}) as { fully_done?: boolean };
-      toast({
-        title: "Delivery completed",
-        description: result.fully_done ? `${order.order_number} moved to Delivery History.` : `Ready quantities completed. Remaining items stay active.`,
-      });
-      setConfirmDeliveryId(null);
-      setSelectedDeliveryId(null);
-      await fetchData();
-    } catch (error: any) {
-      toast({ title: "Could not complete delivery", description: error.message || "Please try again.", variant: "destructive" });
-    } finally {
-      setCompletingDeliveryId(null);
-    }
-  };
+  const completeDelivery = async (order: FulfillmentOrder) => { setConfirmDeliveryId(order.id); };
 
   const setDraftQty = (poId: string, key: string, value: number, max: number) => {
+    if(receiptAttempts[poId]){toast({title:"Receipt result unconfirmed",description:"Retry the same receipt before changing its quantities."});return;}
     const safe = Math.max(0, Math.min(Number.isFinite(value) ? value : 0, max));
     setCollectionDraft((current) => ({ ...current, [poId]: { ...(current[poId] || {}), [key]: safe } }));
   };
 
   const collectAllRemaining = (po: CollectionPOView) => {
+    if(receiptAttempts[po.purchaseOrderId])return;
     const next: Record<string, number> = {};
     po.linesView.filter((line) => line.remaining > 0).forEach((line) => {
       next[line.key] = line.remaining;
@@ -898,33 +846,51 @@ export default function FulfillmentPage() {
         p_notes: notes,
         p_source_snapshot: po as any,
       };
-      if (!navigator.onLine) {
-        queueOfflineOperation({ kind: "record-collection", payload: collectionPayload });
-        setCollectionDraft((current) => ({ ...current, [po.purchaseOrderId]: {} }));
-        setCollectionNotes((current) => ({ ...current, [po.purchaseOrderId]: "" }));
-        if (fullyCollected) setPurchaseOrders((current) => current.filter((candidate) => candidate.purchaseOrderId !== po.purchaseOrderId));
-        toast({ title: "Receipt saved offline", description: `${totalUnits} unit${totalUnits === 1 ? "" : "s"} will sync to the PO and linked orders when reconnected.` });
-        return;
-      }
-      const { data, error } = await supabase.rpc("record_po_collection", collectionPayload);
+      if(!navigator.onLine)throw new Error("Not synced. Your quantities and notes are kept on this device; reconnect to submit.");
+      const attempt=receiptAttempts[po.purchaseOrderId]||{id:crypto.randomUUID(),payload:collectionPayload,events:collectionEvents.filter(event=>event.purchase_order_id===po.purchaseOrderId).map(event=>event.id).sort()};
+      setReceiptAttempts(current=>({...current,[po.purchaseOrderId]:attempt}));
+      const { data, error } = await (supabase as any).rpc("record_po_collection_safe",{
+        p_request_id:attempt.id,p_payload:attempt.payload,p_expected_event_ids:attempt.events
+      });
+      if(error?.code==="P0001")setReceiptAttempts(current=>{const next={...current};delete next[po.purchaseOrderId];return next;});
       if (error) throw error;
-      const result = (data || {}) as { order_units_synced?: number };
+      const result = (data || {}) as { order_units_synced?: number; fully_collected?:boolean; total_units?:number };
+      collectionRecovery.clear();setReceiptAttempts(current=>{const next={...current};delete next[po.purchaseOrderId];return next;});
 
       setCollectionDraft((current) => ({ ...current, [po.purchaseOrderId]: {} }));
       setCollectionNotes((current) => ({ ...current, [po.purchaseOrderId]: "" }));
       toast({
-        title: fullyCollected ? "PO fully collected" : "Partial collection saved",
-        description: fullyCollected
+        title: result.fully_collected ? "PO fully collected" : "Partial collection saved",
+        description: result.fully_collected
           ? `${po.purchaseOrderNumber} moved to history and ${result.order_units_synced || 0} linked order units advanced to In Stock.`
-          : `${totalUnits} unit${totalUnits === 1 ? "" : "s"} received; ${result.order_units_synced || 0} linked order units updated and ${remainingAfter} remain.`,
+          : `${result.total_units||0} units recorded; ${result.order_units_synced || 0} linked order units updated. Remaining quantities are being refreshed.`,
       });
-      if (fullyCollected) setSelectedCollectionId(null);
+      if (result.fully_collected) setSelectedCollectionId(null);
       await fetchData();
     } catch (error: any) {
       toast({ title: "Could not save collection", description: error.message || "Please try again.", variant: "destructive" });
     } finally {
       setCollectingId(null);
     }
+  };
+
+  // A confirmed collection may disappear from the queue before its response
+  // reaches this device. Recovery therefore cannot depend on a visible PO card.
+  const retryCollectionReceipt=async(poId:string)=>{
+    const attempt=receiptAttempts[poId];if(!attempt||collectingId)return;
+    setCollectingId(poId);
+    try{
+      const {error}=await (supabase as any).rpc("record_po_collection_safe",{p_request_id:attempt.id,p_payload:attempt.payload,p_expected_event_ids:attempt.events});
+      if(error){
+        if(error.code==="P0001")setReceiptAttempts(current=>{const next={...current};delete next[poId];return next;});
+        throw error;
+      }
+      setReceiptAttempts(current=>{const next={...current};delete next[poId];return next;});
+      setCollectionDraft(current=>({...current,[poId]:{}}));setCollectionNotes(current=>({...current,[poId]:""}));
+      collectionRecovery.clear();await fetchData();
+      toast({title:"Collection receipt confirmed",description:"The same receipt was checked safely; quantities were not counted twice."});
+    }catch(error:any){toast({title:"Receipt not confirmed",description:error.message,variant:"destructive"});}
+    finally{setCollectingId(null);}
   };
 
   const refreshNow = async () => {
@@ -1135,52 +1101,13 @@ export default function FulfillmentPage() {
       created_by: user.id,
     };
     try {
-      if (!navigator.onLine) {
-        queueOfflineOperation({ kind: "create-route", payload: routePayload });
-        deliveryStops.forEach((stop) => queueOfflineOperation({ kind: "update-order", payload: { orderId: stop.entityId, patch: { fulfillment_status: "scheduled", fulfillment_scheduled_for: scheduledAt, ...(driverId ? { fulfillment_assigned_to: driverId } : {}) } } }));
-        collectionStops.forEach((stop) => {
-          const po = collectionQueue.find((candidate) => candidate.purchaseOrderId === stop.entityId);
-          if (!po) return;
-          queueOfflineOperation({ kind: "upsert-collection", payload: {
-            purchase_order_id: po.purchaseOrderId,
-            purchase_order_number: po.purchaseOrderNumber,
-            vendor_id: po.vendorId || null,
-            vendor_name: po.vendorName || "Unknown supplier",
-            status: "scheduled",
-            scheduled_for: scheduledAt,
-            ...(driverId ? { assigned_to: driverId } : {}),
-          } });
-        });
-      } else {
-        const { data: route, error } = await supabase.from("dispatch_routes").insert(routePayload as any).select("id").single();
-        if (error) throw error;
-        if (deliveryStops.length) {
-          const orderPatch = { fulfillment_status: "scheduled", fulfillment_scheduled_for: scheduledAt, ...(driverId ? { fulfillment_assigned_to: driverId } : {}) };
-          const { error: orderError } = await supabase.from("orders").update(orderPatch as any).in("id", deliveryStops.map((stop) => stop.entityId));
-          if (orderError) throw orderError;
-        }
-        if (collectionStops.length) {
-          const collectionPayloads = collectionStops.map((stop) => {
-            const po = collectionQueue.find((candidate) => candidate.purchaseOrderId === stop.entityId)!;
-            return {
-              purchase_order_id: po.purchaseOrderId,
-              purchase_order_number: po.purchaseOrderNumber,
-              vendor_id: po.vendorId || null,
-              vendor_name: po.vendorName || "Unknown supplier",
-              assigned_to: driverId || po.state?.assigned_to || null,
-              status: "scheduled",
-              scheduled_for: scheduledAt,
-              collection_method: po.state?.collection_method || "pickup",
-              is_urgent: Boolean(po.state?.is_urgent),
-              notes: po.state?.notes || null,
-              last_seen_at: new Date().toISOString(),
-            };
-          });
-          const { error: collectionError } = await supabase.from("po_collection_state").upsert(collectionPayloads as any, { onConflict: "purchase_order_id" });
-          if (collectionError) throw collectionError;
-        }
-        await supabase.from("fulfillment_timeline_events").insert({ entity_type: "route", entity_id: route.id, event_type: "route_created", title: `Dispatch run created with ${routePlanStops.length} stops`, metadata: { routeName: routePayload.name, deliveries: deliveryStops.length, collections: collectionStops.length } } as any);
-      }
+      if(!navigator.onLine)throw new Error("Reconnect before saving a shared route. Your selections have been kept.");
+      const changes=[
+        ...deliveryStops.map(stop=>({table:"orders",id:stop.entityId,updated_at:deliveryOrders.find(row=>row.id===stop.entityId)?.updated_at||null,patch:{fulfillment_status:"scheduled",fulfillment_scheduled_for:scheduledAt,...(driverId?{fulfillment_assigned_to:driverId}:{})}})),
+        ...collectionStops.map(stop=>({table:"po_collection_state",id:stop.entityId,updated_at:collectionQueue.find(row=>row.purchaseOrderId===stop.entityId)?.state?.updated_at||null,patch:{status:"scheduled",scheduled_for:scheduledAt,...(driverId?{assigned_to:driverId}:{})}}))
+      ];
+      const {error}=await (supabase as any).rpc("create_dispatch_route_safe",{p_route:routePayload,p_changes:changes});
+      if(error)throw error;
       setDeliveryOrders((current) => current.map((order) => deliverySelection.has(order.id) ? ({ ...order, fulfillment_status: "scheduled", fulfillment_scheduled_for: scheduledAt, ...(driverId ? { fulfillment_assigned_to: driverId } : {}) } as FulfillmentOrder) : order));
       setCollectionStates((current) => current.map((state) => collectionSelection.has(state.purchase_order_id) ? ({ ...state, status: "scheduled", scheduled_for: scheduledAt, ...(driverId ? { assigned_to: driverId } : {}) } as POCollectionState) : state));
       toast({ title: navigator.onLine ? "Dispatch run saved" : "Dispatch run saved offline", description: `${deliveryStops.length} deliver${deliveryStops.length === 1 ? "y" : "ies"} and ${collectionStops.length} collection${collectionStops.length === 1 ? "" : "s"} grouped by learned area.` });
@@ -1205,22 +1132,9 @@ export default function FulfillmentPage() {
       patch.fulfillment_status = "scheduled";
     }
     setBulkSaving(true);
-    const previous = deliveryOrders;
-    setDeliveryOrders((current) => current.map((order) => deliverySelection.has(order.id) ? ({ ...order, ...patch } as FulfillmentOrder) : order));
-    if (!navigator.onLine) {
-      ids.forEach((orderId) => queueOfflineOperation({ kind: "update-order", payload: { orderId, patch } }));
-      setBulkSaving(false);
-      toast({ title: "Route plan saved offline", description: `${ids.length} deliveries will sync when reconnected.` });
-      setDeliverySelection(new Set());
-      return;
-    }
-    const { error } = await supabase.from("orders").update(patch as any).in("id", ids);
-    setBulkSaving(false);
-    if (error) {
-      setDeliveryOrders(previous);
-      toast({ title: "Route plan was not saved", description: error.message, variant: "destructive" });
-      return;
-    }
+    try{await saveBatch(ids.map(id=>({table:"orders",id,patch,updated_at:deliveryOrders.find(row=>row.id===id)?.updated_at||null})));await fetchData();}
+    catch(error){toast({title:"No plan changes saved",description:error instanceof Error?error.message:"Refresh and retry",variant:"destructive"});return;}
+    finally{setBulkSaving(false);}
     toast({ title: "Route plan applied", description: `${ids.length} deliver${ids.length === 1 ? "y" : "ies"} updated together.` });
     setDeliverySelection(new Set());
     setBulkAssignee("keep");
@@ -1232,15 +1146,9 @@ export default function FulfillmentPage() {
     if (!ids.length) return;
     const patch: Record<string, unknown> = { fulfillment_status: status, ...(status === "pending" ? { fulfillment_scheduled_for: null } : {}) };
     setBulkSaving(true);
-    const previous = deliveryOrders;
-    setDeliveryOrders((current) => current.map((order) => (deliverySelection.has(order.id) ? ({ ...order, ...patch } as FulfillmentOrder) : order)));
-    const { error } = await supabase.from("orders").update(patch as any).in("id", ids);
-    setBulkSaving(false);
-    if (error) {
-      setDeliveryOrders(previous);
-      toast({ title: "Move failed", description: error.message, variant: "destructive" });
-      return;
-    }
+    try{await saveBatch(ids.map(id=>({table:"orders",id,patch,updated_at:deliveryOrders.find(row=>row.id===id)?.updated_at||null})));await fetchData();}
+    catch(error){toast({title:"No movements saved",description:error instanceof Error?error.message:"Refresh and retry",variant:"destructive"});return;}
+    finally{setBulkSaving(false);}
     toast({ title: "Deliveries moved", description: `${ids.length} deliver${ids.length === 1 ? "y" : "ies"} moved.` });
     setDeliverySelection(new Set());
   };
@@ -1250,11 +1158,13 @@ export default function FulfillmentPage() {
     if (!targets.length) return;
     setBulkSaving(true);
     try {
-      for (const po of targets) {
-        await updateCollectionState(po, { status: status as POCollectionState["status"], ...(status === "pending" ? { scheduled_for: null } : {}) });
-      }
+      await saveBatch(targets.map(po=>({table:"po_collection_state",id:po.purchaseOrderId,updated_at:po.state.updated_at||null,
+        patch:{status,...(status==="pending"?{scheduled_for:null}:{})}})));
+      await fetchData();
       toast({ title: "Collections moved", description: `${targets.length} collection${targets.length === 1 ? "" : "s"} moved.` });
       setCollectionSelection(new Set());
+    } catch(error:any) {
+      toast({title:"Collections not moved",description:error.message,variant:"destructive"});
     } finally {
       setBulkSaving(false);
     }
@@ -1267,8 +1177,7 @@ export default function FulfillmentPage() {
     try {
       if (orderIds.length) {
         const patch = { fulfillment_status: "pending", fulfillment_scheduled_for: null, fulfillment_assigned_to: null };
-        const { error } = await supabase.from("orders").update(patch as any).in("id", orderIds);
-        if (error) throw error;
+        await saveBatch(orderIds.map(id=>({table:"orders",id,patch,updated_at:deliveryOrders.find(row=>row.id===id)?.updated_at||null})));
         setDeliveryOrders((current) => current.map((order) => (deliverySelection.has(order.id) ? ({ ...order, ...patch } as FulfillmentOrder) : order)));
       }
       if (poIds.length) {
@@ -1401,9 +1310,9 @@ export default function FulfillmentPage() {
           <section className="grid gap-3 sm:grid-cols-2"><Field label="Driver / assignee" icon={UserRound}><Select value={selectedDelivery.fulfillment_assigned_to || "unassigned"} onValueChange={(value) => void updateDelivery(selectedDelivery.id, { fulfillment_assigned_to: value === "unassigned" ? null : value })}><SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="unassigned">Unassigned</SelectItem>{team.map((member) => <SelectItem key={member.id} value={member.id}>{member.full_name || member.email || "Team member"}</SelectItem>)}</SelectContent></Select></Field><Field label="Dispatch time" icon={CalendarClock}><Input type="datetime-local" className="rounded-xl" value={toLocalDateTimeInput(selectedDelivery.fulfillment_scheduled_for)} onChange={(event) => void updateDelivery(selectedDelivery.id, { fulfillment_scheduled_for: event.target.value ? new Date(event.target.value).toISOString() : null, fulfillment_status: event.target.value ? "scheduled" : "pending" })} /></Field></section>
           <button type="button" onClick={() => void updateDelivery(selectedDelivery.id, { urgency: selectedDelivery.urgency === "urgent" ? "normal" : "urgent" })} className={cn("flex w-full items-center justify-between rounded-2xl border p-3 text-left transition-colors", selectedDelivery.urgency === "urgent" ? "border-destructive/30 bg-destructive/10 text-destructive" : "border-border/55 bg-muted/25 hover:bg-muted/50")}><span><span className="block text-xs font-black">Urgent delivery</span><span className="mt-0.5 block text-[10px] opacity-70">Pins this order ahead of standard work.</span></span><CircleAlert className="h-5 w-5" /></button>
           <section><p className="mb-3 text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">Packages ready now</p><div className="grid gap-2 sm:grid-cols-2">{selectedDelivery.items.filter((item) => readyUnits(item) > 0).map((item) => <div key={item.id} className="flex items-start gap-3 rounded-2xl border border-border/45 bg-muted/30 p-3"><span className="grid min-w-10 place-items-center rounded-xl bg-primary/10 px-2 py-1.5 text-sm font-black text-primary">×{readyUnits(item)}</span><div className="min-w-0"><p className="text-sm font-semibold">{getItemDisplayName(item)}</p>{getItemSecondaryDescription(item) && <p className="mt-0.5 text-[10px] leading-relaxed text-muted-foreground">{getItemSecondaryDescription(item)}</p>}{item.code && <p className="mt-1 font-mono text-[10px] text-muted-foreground">{item.code}</p>}</div></div>)}</div></section>
-          <section><label className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">Handover instructions</label><Textarea defaultValue={selectedDelivery.fulfillment_notes || ""} placeholder="Access details, contact person, delivery instructions…" className="min-h-24 resize-none rounded-2xl" onBlur={(event) => { if (event.target.value !== (selectedDelivery.fulfillment_notes || "")) void updateDelivery(selectedDelivery.id, { fulfillment_notes: event.target.value || null }); }} /></section>
+          <section><label className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">Handover instructions</label><RecoverableNote key={selectedDelivery.id} recordKey={selectedDelivery.id} value={selectedDelivery.fulfillment_notes} version={selectedDelivery.updated_at} onSave={(body,base)=>updateDelivery(selectedDelivery.id,{fulfillment_notes:body||null},base)}/></section>
         </div>
-        <aside className="space-y-4 rounded-[24px] border border-border bg-muted p-3 sm:p-4"><EntityComments entityType="delivery" entityId={selectedDelivery.id} orderId={selectedDelivery.id} defaultOpen /><EntityTimeline events={selectedDeliveryTimeline} memberName={memberName} /></aside>
+        <aside className="space-y-4 rounded-[24px] border border-border bg-muted p-3 sm:p-4"><EntityComments entityType="delivery" entityId={selectedDelivery.id} orderId={selectedDelivery.id} defaultOpen /><DeliveryReceiptHistory orderId={selectedDelivery.id}/><EntityTimeline events={selectedDeliveryTimeline} memberName={memberName} /></aside>
       </div>
       <div className="mt-5 flex flex-col gap-2 border-t border-border/60 pt-4 sm:flex-row"><Button variant="outline" className="rounded-xl" onClick={() => printDispatchManifest()}><Printer className="mr-1.5 h-4 w-4" />Print manifest</Button><Button className="flex-1 rounded-xl" onClick={() => setConfirmDeliveryId(selectedDelivery.id)} disabled={completingDeliveryId === selectedDelivery.id}><CheckCircle2 className="mr-1.5 h-4 w-4" />Complete handover</Button></div>
     </FulfillmentBubbleShell>
@@ -1423,7 +1332,7 @@ export default function FulfillmentPage() {
           <section className="grid gap-3 sm:grid-cols-2"><Field label="Stock movement" icon={Truck}><Select value={selectedCollection.state?.collection_method || "pickup"} onValueChange={(value: POCollectionState["collection_method"]) => void updateCollectionState(selectedCollection, { collection_method: value })}><SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="pickup">We collect from supplier</SelectItem><SelectItem value="supplier-delivery">Supplier delivers to us</SelectItem></SelectContent></Select></Field><button type="button" onClick={() => void updateCollectionState(selectedCollection, { is_urgent: !selectedCollection.state?.is_urgent })} className={cn("flex items-center justify-between rounded-2xl border p-3 text-left transition-colors", selectedCollection.state?.is_urgent ? "border-destructive/30 bg-destructive/10 text-destructive" : "border-border/55 bg-muted/25 hover:bg-muted/50")}><span><span className="block text-xs font-black">Urgent stock</span><span className="mt-0.5 block text-[10px] opacity-70">Moves this PO to the front.</span></span><CircleAlert className="h-5 w-5" /></button></section>
           <section className="grid gap-3 sm:grid-cols-2"><Field label={selectedCollection.state?.collection_method === "supplier-delivery" ? "Receiver / assignee" : "Collector / assignee"} icon={UserRound}><Select value={selectedCollection.state?.assigned_to || "unassigned"} onValueChange={(value) => void updateCollectionState(selectedCollection, { assigned_to: value === "unassigned" ? null : value })}><SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="unassigned">Unassigned</SelectItem>{team.map((member) => <SelectItem key={member.id} value={member.id}>{member.full_name || member.email || "Team member"}</SelectItem>)}</SelectContent></Select></Field><Field label={selectedCollection.state?.collection_method === "supplier-delivery" ? "Expected delivery time" : "Pickup time"} icon={CalendarClock}><Input type="datetime-local" className="rounded-xl" value={toLocalDateTimeInput(selectedCollection.state?.scheduled_for)} onChange={(event) => void updateCollectionState(selectedCollection, { scheduled_for: event.target.value ? new Date(event.target.value).toISOString() : null, status: event.target.value ? "scheduled" : "pending" })} /></Field></section>
           <section><div className="mb-3 flex items-center justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">What arrived now?</p><p className="mt-1 text-xs text-muted-foreground">Enter actual quantities. Partial receipts remain active.</p></div><Button variant="outline" size="sm" className="rounded-xl" onClick={() => collectAllRemaining(selectedCollection)}>Fill remaining</Button></div><div className="space-y-2">{selectedCollection.linesView.filter((line) => line.remaining > 0).map((line) => <div key={line.key} className="grid gap-3 rounded-2xl border border-border/45 bg-muted/30 p-3 sm:grid-cols-[minmax(0,1fr)_120px] sm:items-center"><div className="min-w-0"><p className="text-sm font-semibold">{getPurchaseOrderLineDisplayName(line)}</p>{getPurchaseOrderLineSecondaryName(line) && <p className="mt-0.5 text-[10px] text-muted-foreground">{getPurchaseOrderLineSecondaryName(line)}</p>}{line.sku && <p className="mt-0.5 font-mono text-[10px] text-muted-foreground">{line.sku}</p>}<div className="mt-1.5 flex flex-wrap gap-2 text-[10px] text-muted-foreground">{line.collected > 0 && <span className="font-semibold text-emerald-600">{line.collected} received before</span>}<span className="font-bold text-primary">{line.remaining} remaining</span></div></div><div><label className="mb-1 block text-[9px] font-black uppercase tracking-wider text-muted-foreground">Received now</label><Input type="number" min={0} max={line.remaining} step="any" value={collectionDraft[selectedCollection.purchaseOrderId]?.[line.key] ?? ""} onChange={(event) => setDraftQty(selectedCollection.purchaseOrderId, line.key, Number(event.target.value), line.remaining)} placeholder="0" className="rounded-xl bg-background" /></div></div>)}</div></section>
-          <section className="grid gap-3 sm:grid-cols-2"><div><label className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">Persistent movement instructions</label><Textarea defaultValue={selectedCollection.state?.notes || ""} placeholder="Supplier contact, gate instructions…" className="min-h-24 resize-none rounded-2xl" onBlur={(event) => { if (event.target.value !== (selectedCollection.state?.notes || "")) void updateCollectionState(selectedCollection, { notes: event.target.value || null }); }} /></div><div><label className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">Note for this receipt</label><Textarea value={collectionNotes[selectedCollection.purchaseOrderId] ?? ""} onChange={(event) => setCollectionNotes((current) => ({ ...current, [selectedCollection.purchaseOrderId]: event.target.value }))} placeholder="Short boxes, back-order, damaged carton…" className="min-h-24 resize-none rounded-2xl" /></div></section>
+          <section className="grid gap-3 sm:grid-cols-2"><div><label className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">Persistent movement instructions</label><RecoverableNote key={selectedCollection.purchaseOrderId} recordKey={selectedCollection.purchaseOrderId} value={selectedCollection.state?.notes||null} version={selectedCollection.state?.updated_at||null} onSave={(body,base)=>updateCollectionState(selectedCollection,{notes:body||null},base)}/></div><div><label className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">Note for this receipt</label><Textarea disabled={!!receiptAttempts[selectedCollection.purchaseOrderId]} value={collectionNotes[selectedCollection.purchaseOrderId] ?? ""} onChange={(event) => setCollectionNotes((current) => ({ ...current, [selectedCollection.purchaseOrderId]: event.target.value }))} placeholder="Short boxes, back-order, damaged carton…" className="min-h-24 resize-none rounded-2xl" /></div></section>
         </div>
         <aside className="space-y-4 rounded-[24px] border border-border bg-muted p-3 sm:p-4"><EntityComments entityType="collection" entityId={selectedCollection.purchaseOrderId} defaultOpen /><EntityTimeline events={selectedCollectionTimeline} memberName={memberName} /></aside>
       </div>
@@ -1503,7 +1412,7 @@ export default function FulfillmentPage() {
                       <Field label="Assigned to" icon={UserRound}><Select value={order.fulfillment_assigned_to || "unassigned"} onValueChange={(value) => void updateDelivery(order.id, { fulfillment_assigned_to: value === "unassigned" ? null : value })}><SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="unassigned">Unassigned</SelectItem>{team.map((member) => <SelectItem key={member.id} value={member.id}>{member.full_name || member.email || "Team member"}</SelectItem>)}</SelectContent></Select></Field>
                       <Field label="Status" icon={Clock3}><Select value={order.fulfillment_status} onValueChange={(value) => void updateDelivery(order.id, { fulfillment_status: value })}><SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="pending">Ready</SelectItem><SelectItem value="scheduled">Scheduled</SelectItem><SelectItem value="out-for-delivery">Out for delivery</SelectItem></SelectContent></Select></Field>
                       <Field label="Schedule" icon={CalendarClock}><Input type="datetime-local" className="rounded-xl" value={order.fulfillment_scheduled_for ? new Date(order.fulfillment_scheduled_for).toISOString().slice(0, 16) : ""} onChange={(e) => void updateDelivery(order.id, { fulfillment_scheduled_for: e.target.value ? new Date(e.target.value).toISOString() : null, fulfillment_status: e.target.value ? "scheduled" : order.fulfillment_status })} /></Field>
-                      <div className="sm:col-span-2"><label className="mb-1.5 text-[10px] font-black uppercase tracking-wider text-muted-foreground">Delivery notes</label><Textarea defaultValue={order.fulfillment_notes || ""} placeholder="Add delivery instructions…" className="min-h-20 resize-none rounded-xl" onBlur={(e) => { if (e.target.value !== (order.fulfillment_notes || "")) void updateDelivery(order.id, { fulfillment_notes: e.target.value || null }); }} /></div>
+                      <div className="sm:col-span-2"><label className="mb-1.5 text-[10px] font-black uppercase tracking-wider text-muted-foreground">Delivery notes</label><RecoverableNote key={order.id} recordKey={order.id} value={order.fulfillment_notes} version={order.updated_at} onSave={(body,base)=>updateDelivery(order.id,{fulfillment_notes:body||null},base)}/></div>
                     </div>
                     <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/50 p-4 sm:px-5"><p className="text-xs text-muted-foreground">{order.fulfillment_assigned_to ? `Assigned to ${memberName(order.fulfillment_assigned_to)}` : "Needs an assignee"}</p><Button size="sm" className="rounded-xl" onClick={() => void completeDelivery(order)}><CheckCircle2 className="mr-2 h-4 w-4" />Complete delivery</Button></div>
                   </CardContent>
@@ -1543,7 +1452,7 @@ export default function FulfillmentPage() {
                       <Field label="Collector / assignee" icon={UserRound}><Select value={po.state?.assigned_to || "unassigned"} onValueChange={(value) => void updateCollectionState(po, { assigned_to: value === "unassigned" ? null : value })}><SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="unassigned">Unassigned</SelectItem>{team.map((member) => <SelectItem key={member.id} value={member.id}>{member.full_name || member.email || "Team member"}</SelectItem>)}</SelectContent></Select></Field>
                       <Field label="Collection status" icon={Clock3}><Select value={po.state?.status === "collected" ? "pending" : po.state?.status || "pending"} onValueChange={(value: POCollectionState["status"]) => void updateCollectionState(po, { status: value })}><SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="pending">Pending</SelectItem><SelectItem value="scheduled">Scheduled</SelectItem><SelectItem value="collecting">Collecting now</SelectItem></SelectContent></Select></Field>
                       <Field label="Schedule" icon={CalendarClock}><Input type="datetime-local" className="rounded-xl" value={po.state?.scheduled_for ? new Date(po.state.scheduled_for).toISOString().slice(0, 16) : ""} onChange={(e) => void updateCollectionState(po, { scheduled_for: e.target.value ? new Date(e.target.value).toISOString() : null, status: e.target.value ? "scheduled" : "pending" })} /></Field>
-                      <div className="sm:col-span-2"><label className="mb-1.5 text-[10px] font-black uppercase tracking-wider text-muted-foreground">Collection event note</label><Textarea value={collectionNotes[po.purchaseOrderId] ?? ""} onChange={(e) => setCollectionNotes((current) => ({ ...current, [po.purchaseOrderId]: e.target.value }))} placeholder="Optional note: boxes short, back-order, supplier contact, etc." className="min-h-16 resize-none rounded-xl" /></div>
+                      <div className="sm:col-span-2"><label className="mb-1.5 text-[10px] font-black uppercase tracking-wider text-muted-foreground">Collection event note</label><Textarea disabled={!!receiptAttempts[po.purchaseOrderId]} value={collectionNotes[po.purchaseOrderId] ?? ""} onChange={(e) => setCollectionNotes((current) => ({ ...current, [po.purchaseOrderId]: e.target.value }))} placeholder="Optional note: boxes short, back-order, supplier contact, etc." className="min-h-16 resize-none rounded-xl" /></div>
                     </div>
 
                     <div className="flex flex-col gap-3 border-t border-border/50 p-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
@@ -1667,6 +1576,13 @@ export default function FulfillmentPage() {
         </AlertDialogContent>
       </AlertDialog>
 
+      {pendingOfflineOperationCount()>0&&<p role="status" className="rounded-xl border border-amber-500/40 p-3 text-sm">Older offline actions are preserved on this device but paused for manual review. They cannot be replayed safely without receipt IDs and record versions.</p>}
+      {conflicts.dialog}
+      {activeMode==="collection"&&<><DismissedCollections onChanged={()=>void fetchData()}/>{collectionRecovery.banner}
+        {Object.entries(receiptAttempts).map(([poId,attempt])=><div key={poId} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-500/40 p-3">
+          <div><p className="text-sm font-semibold">{attempt.payload.p_purchase_order_number} · receipt awaiting confirmation</p><p className="text-xs text-muted-foreground">Check this receipt even if the PO has left the active queue. Do not enter it again as a new collection.</p></div>
+          <Button size="sm" variant="outline" disabled={!!collectingId} onClick={()=>void retryCollectionReceipt(poId)}>Check / retry receipt</Button>
+        </div>)}</>}
       {fulfillmentBubble}
 
       {loading ? (
@@ -1753,9 +1669,9 @@ export default function FulfillmentPage() {
               <section className="grid gap-3 sm:grid-cols-2"><Field label="Driver / assignee" icon={UserRound}><Select value={selectedDelivery.fulfillment_assigned_to || "unassigned"} onValueChange={(value) => void updateDelivery(selectedDelivery.id, { fulfillment_assigned_to: value === "unassigned" ? null : value })}><SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="unassigned">Unassigned</SelectItem>{team.map((member) => <SelectItem key={member.id} value={member.id}>{member.full_name || member.email || "Team member"}</SelectItem>)}</SelectContent></Select></Field><Field label="Dispatch time" icon={CalendarClock}><Input type="datetime-local" className="rounded-xl" value={toLocalDateTimeInput(selectedDelivery.fulfillment_scheduled_for)} onChange={(event) => void updateDelivery(selectedDelivery.id, { fulfillment_scheduled_for: event.target.value ? new Date(event.target.value).toISOString() : null, fulfillment_status: event.target.value ? "scheduled" : "pending" })} /></Field></section>
               <button type="button" onClick={() => void updateDelivery(selectedDelivery.id, { urgency: selectedDelivery.urgency === "urgent" ? "normal" : "urgent" })} className={cn("flex w-full items-center justify-between rounded-2xl border p-3 text-left transition-colors", selectedDelivery.urgency === "urgent" ? "border-destructive/30 bg-destructive/10 text-destructive" : "border-border/55 bg-muted/25 hover:bg-muted/50")}><span><span className="block text-xs font-black">Urgent delivery</span><span className="mt-0.5 block text-[10px] opacity-70">Pins this order ahead of standard work.</span></span><CircleAlert className="h-5 w-5" /></button>
               <section><p className="mb-3 text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">Packages ready now</p><div className="space-y-2">{selectedDelivery.items.filter((item) => readyUnits(item) > 0).map((item) => <div key={item.id} className="flex items-start gap-3 rounded-2xl border border-border/45 bg-muted/30 p-3"><span className="grid min-w-10 place-items-center rounded-xl bg-primary/10 px-2 py-1.5 text-sm font-black text-primary">×{readyUnits(item)}</span><div className="min-w-0"><p className="text-sm font-semibold">{item.name}</p>{item.code && <p className="mt-0.5 font-mono text-[10px] text-muted-foreground">{item.code}</p>}</div></div>)}</div></section>
-              <EntityTimeline events={selectedDeliveryTimeline} memberName={memberName} />
+              <DeliveryReceiptHistory orderId={selectedDelivery.id}/><EntityTimeline events={selectedDeliveryTimeline} memberName={memberName} />
               <EntityComments entityType="delivery" entityId={selectedDelivery.id} orderId={selectedDelivery.id} />
-              <section><label className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">Handover instructions</label><Textarea defaultValue={selectedDelivery.fulfillment_notes || ""} placeholder="Access details, contact person, delivery instructions…" className="min-h-28 resize-none rounded-2xl" onBlur={(event) => { if (event.target.value !== (selectedDelivery.fulfillment_notes || "")) void updateDelivery(selectedDelivery.id, { fulfillment_notes: event.target.value || null }); }} /></section>
+              <section><label className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">Handover instructions</label><RecoverableNote key={selectedDelivery.id} recordKey={selectedDelivery.id} value={selectedDelivery.fulfillment_notes} version={selectedDelivery.updated_at} onSave={(body,base)=>updateDelivery(selectedDelivery.id,{fulfillment_notes:body||null},base)}/></section>
               <div className="flex flex-col gap-2 border-t border-border/60 pt-4 sm:flex-row"><Button variant="outline" className="rounded-xl" onClick={() => printDispatchManifest()}><Printer className="mr-1.5 h-4 w-4" />Print manifest</Button><Button className="flex-1 rounded-xl" onClick={() => setConfirmDeliveryId(selectedDelivery.id)} disabled={completingDeliveryId === selectedDelivery.id}><CheckCircle2 className="mr-1.5 h-4 w-4" />Complete handover</Button></div>
             </div>
           </>}
@@ -1774,16 +1690,14 @@ export default function FulfillmentPage() {
               <section><div className="mb-3 flex items-center justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">What arrived now?</p><p className="mt-1 text-xs text-muted-foreground">Enter actual quantities. Partial receipts remain on the board.</p></div><Button variant="outline" size="sm" className="rounded-xl" onClick={() => collectAllRemaining(selectedCollection)}>Fill remaining</Button></div><div className="space-y-2">{selectedCollection.linesView.filter((line) => line.remaining > 0).map((line) => <div key={line.key} className="grid gap-3 rounded-2xl border border-border/45 bg-muted/30 p-3 sm:grid-cols-[minmax(0,1fr)_120px] sm:items-center"><div className="min-w-0"><p className="text-sm font-semibold">{getItemDisplayName({ sku: line.sku, name: line.name, description: line.description })}</p>{line.sku && <p className="mt-0.5 font-mono text-[10px] text-muted-foreground">{line.sku}</p>}<div className="mt-1.5 flex flex-wrap gap-2 text-[10px] text-muted-foreground">{line.collected > 0 && <span className="font-semibold text-emerald-600">{line.collected} received before</span>}<span className="font-bold text-primary">{line.remaining} remaining</span></div></div><div><label className="mb-1 block text-[9px] font-black uppercase tracking-wider text-muted-foreground">Received now</label><Input type="number" min={0} max={line.remaining} step="any" value={collectionDraft[selectedCollection.purchaseOrderId]?.[line.key] ?? ""} onChange={(event) => setDraftQty(selectedCollection.purchaseOrderId, line.key, Number(event.target.value), line.remaining)} placeholder="0" className="rounded-xl bg-background" /></div></div>)}</div></section>
               <EntityTimeline events={selectedCollectionTimeline} memberName={memberName} />
               <EntityComments entityType="collection" entityId={selectedCollection.purchaseOrderId} />
-              <section className="grid gap-3 sm:grid-cols-2"><div><label className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">Persistent pickup instructions</label><Textarea defaultValue={selectedCollection.state?.notes || ""} placeholder="Supplier contact, gate instructions…" className="min-h-24 resize-none rounded-2xl" onBlur={(event) => { if (event.target.value !== (selectedCollection.state?.notes || "")) void updateCollectionState(selectedCollection, { notes: event.target.value || null }); }} /></div><div><label className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">Note for this collection event</label><Textarea value={collectionNotes[selectedCollection.purchaseOrderId] ?? ""} onChange={(event) => setCollectionNotes((current) => ({ ...current, [selectedCollection.purchaseOrderId]: event.target.value }))} placeholder="Short boxes, back-order, damaged carton…" className="min-h-24 resize-none rounded-2xl" /></div></section>
+              <section className="grid gap-3 sm:grid-cols-2"><div><label className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">Persistent pickup instructions</label><RecoverableNote key={selectedCollection.purchaseOrderId} recordKey={selectedCollection.purchaseOrderId} value={selectedCollection.state?.notes||null} version={selectedCollection.state?.updated_at||null} onSave={(body,base)=>updateCollectionState(selectedCollection,{notes:body||null},base)}/></div><div><label className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">Note for this collection event</label><Textarea disabled={!!receiptAttempts[selectedCollection.purchaseOrderId]} value={collectionNotes[selectedCollection.purchaseOrderId] ?? ""} onChange={(event) => setCollectionNotes((current) => ({ ...current, [selectedCollection.purchaseOrderId]: event.target.value }))} placeholder="Short boxes, back-order, damaged carton…" className="min-h-24 resize-none rounded-2xl" /></div></section>
               <div className="flex flex-col gap-3 rounded-2xl border border-primary/15 bg-primary/[0.045] p-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-2xl font-black text-primary">{selectedCollectionDraftTotal}</p><p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">units received now</p></div><Button className="rounded-xl" disabled={collectingId === selectedCollection.purchaseOrderId || selectedCollectionDraftTotal <= 0} onClick={() => void markCollected(selectedCollection)}><PackageCheck className="mr-1.5 h-4 w-4" />{collectingId === selectedCollection.purchaseOrderId ? "Saving atomically…" : selectedCollection.state?.collection_method === "supplier-delivery" ? "Mark supplier delivery received" : "Record collection"}</Button></div>
             </div>
           </>}
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={Boolean(confirmDeliveryId)} onOpenChange={(open) => !open && setConfirmDeliveryId(null)}>
-        <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Confirm customer handover</AlertDialogTitle><AlertDialogDescription>This will complete every currently invoiced quantity on {deliveryOrders.find((order) => order.id === confirmDeliveryId)?.order_number || "this order"}. The operation is saved as one transaction and will appear in Delivery History.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Not yet</AlertDialogCancel><AlertDialogAction disabled={Boolean(completingDeliveryId)} onClick={(event) => { event.preventDefault(); const order = deliveryOrders.find((candidate) => candidate.id === confirmDeliveryId); if (order) void completeDelivery(order); }}>{completingDeliveryId ? "Completing…" : "Confirm delivered"}</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
-      </AlertDialog>
+      {confirmDeliveryId && deliveryOrders.find(order=>order.id===confirmDeliveryId) && <PartialDeliveryDialog key={confirmDeliveryId} order={deliveryOrders.find(order=>order.id===confirmDeliveryId)!} onClose={()=>setConfirmDeliveryId(null)} onSaved={()=>{void fetchData();setSelectedDeliveryId(null);toast({title:"Handover recorded",description:"Only the selected quantities were completed."});}}/>}
     </div>
   );
 }
@@ -1948,7 +1862,7 @@ function HistoryPanel({
           })}</div>
         )
       ) : deliveries.length === 0 ? <EmptyState icon={Truck} title="No delivery history yet" body="Completed customer deliveries are stored here." /> : (
-        <div className="grid gap-3 lg:grid-cols-2">{deliveries.map((order) => <Card key={order.id} className="rounded-2xl border-border/60"><CardContent className="p-4 sm:p-5"><div className="flex items-start justify-between gap-3"><div><h3 className="font-black text-primary">{order.order_number}</h3><p className="mt-1 text-sm font-semibold">{order.companyName}</p><p className="mt-1 text-xs text-muted-foreground">Assigned to {memberName(order.fulfillment_assigned_to)} · completed {formatWhen(order.completed_date)}</p></div><Badge><CheckCircle2 className="mr-1 h-3 w-3" />Delivered</Badge></div></CardContent></Card>)}</div>
+        <div className="grid gap-3 lg:grid-cols-2">{deliveries.map((order) => <Card key={order.id} className="rounded-2xl border-border/60"><CardContent className="p-4 sm:p-5"><div className="flex items-start justify-between gap-3"><div><h3 className="font-black text-primary">{order.order_number}</h3><p className="mt-1 text-sm font-semibold">{order.companyName}</p><p className="mt-1 text-xs text-muted-foreground">Assigned to {memberName(order.fulfillment_assigned_to)} · completed {formatWhen(order.completed_date)}</p></div><Badge><CheckCircle2 className="mr-1 h-3 w-3" />Delivered</Badge></div><div className="mt-3"><DeliveryReceiptHistory orderId={order.id}/></div></CardContent></Card>)}</div>
       )}
     </section>
   );

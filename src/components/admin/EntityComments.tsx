@@ -3,6 +3,7 @@ import { MessageCircle, Send, Loader2, X, CornerUpLeft, SmilePlus } from "lucide
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { useDraftRecovery } from "@/hooks/useDraftRecovery";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -59,6 +60,8 @@ export default function EntityComments({ entityType, entityId, orderId, classNam
   const [replyTo, setReplyTo] = useState<EntityComment | null>(null);
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [mentionedIds, setMentionedIds] = useState<Map<string, string>>(new Map());
+  const draftRecovery=useDraftRecovery(`entity-comment:${entityType}:${entityId}`,{body,replyTo,mentions:[...mentionedIds.entries()]},!!body.trim(),saved=>{setBody(saved.body);setReplyTo(saved.replyTo);setMentionedIds(new Map(saved.mentions));});
+
   const [count, setCount] = useState(0);
 
   useEffect(() => {
@@ -205,7 +208,7 @@ export default function EntityComments({ entityType, entityId, orderId, classNam
         mentioned_user_ids: mentionIdsToSend,
       });
       if (error) throw error;
-      setBody("");
+      draftRecovery.clear();setBody("");
       setReplyTo(null);
       setMentionedIds(new Map());
       await fetchThread();
@@ -336,7 +339,8 @@ export default function EntityComments({ entityType, entityId, orderId, classNam
                   onSelect={(emoji) => setBody((prev) => prev + emoji)}
                   trigger={<Button type="button" size="icon" variant="ghost" className="h-9 w-9 shrink-0 rounded-xl text-muted-foreground"><SmilePlus className="h-4 w-4" /></Button>}
                 />
-                <Textarea
+                {draftRecovery.banner}
+              <Textarea
                   value={body}
                   onChange={(e) => handleBodyChange(e.target.value)}
                   onKeyDown={(e) => {

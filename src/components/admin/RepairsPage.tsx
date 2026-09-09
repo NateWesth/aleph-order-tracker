@@ -11,6 +11,8 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import EntityComments from "@/components/admin/EntityComments";
+import { useDraftRecovery } from "@/hooks/useDraftRecovery";
+import { useConflictSave } from "@/hooks/useConflictSave";
 import { cn } from "@/lib/utils";
 import { DetailSection, DetailValue, EmptyWorkshop, formatDate, isOverdue, memberLabel, monthLabel, PriorityBadge, PrioritySelect, SERVICE_STATUSES, StatusBadge, TeamMember, WorkshopPanel, WorkshopTabs, WorkshopToolbar } from "@/components/admin/workshop/shared";
 import SharpeningFocusHeader from "@/components/admin/workshop/SharpeningFocusHeader";
@@ -22,9 +24,9 @@ interface RepairTicket {
   assigned_to: string | null; priority: string; status: string; deadline_date: string | null;
   date_received_back_from_supplier: string | null; warranty_months: number | null; warranty_expires_at: string | null;
   is_warranty: boolean; warranty_source_ticket_id: string | null; invoiced: boolean; invoice_number: string | null;
-  notes: string | null; scrap_reason: string | null; scrapped_at: string | null; completed_at: string | null; created_at: string;
+  notes: string | null; scrap_reason: string | null; scrapped_at: string | null; completed_at: string | null; created_at: string; updated_at: string;
 }
-type RepairDraft = Omit<RepairTicket, "id" | "warranty_expires_at" | "is_warranty" | "warranty_source_ticket_id" | "scrapped_at" | "completed_at" | "created_at" | "scrap_reason">;
+type RepairDraft = Omit<RepairTicket, "id" | "warranty_expires_at" | "is_warranty" | "warranty_source_ticket_id" | "scrapped_at" | "completed_at" | "created_at" | "updated_at" | "scrap_reason">;
 const STATUS_BUTTON: Record<string, string> = {
   cyan: "border-logo-cyan bg-logo-cyan text-logo-on",
   teal: "border-logo-teal bg-logo-teal text-white",
@@ -45,6 +47,9 @@ export default function RepairsPage() {
   const [query, setQuery] = useState(""); const [selected, setSelected] = useState<RepairTicket | null>(null);
   const [formOpen, setFormOpen] = useState(false); const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<RepairDraft>(emptyDraft); const [saving, setSaving] = useState(false);
+  const [editBase,setEditBase]=useState<string|null>(null);
+  const conflicts=useConflictSave();
+  const recovery=useDraftRecovery("repair-form",{draft,editingId,editBase},formOpen,value=>{setDraft(value.draft);setEditingId(value.editingId);setEditBase(value.editBase);setFormOpen(true);});
   const [scrapOpen, setScrapOpen] = useState(false); const [scrapReason, setScrapReason] = useState("");
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
@@ -91,19 +96,29 @@ export default function RepairsPage() {
   }, [draft.tool_code, draft.date_received_by_client, editingId, tickets]);
 
   const set = <K extends keyof RepairDraft>(key: K, value: RepairDraft[K]) => setDraft((current) => ({ ...current, [key]: value }));
-  const openCreate = () => { setEditingId(null); setDraft(emptyDraft()); setFormOpen(true); };
-  const openEdit = (ticket: RepairTicket) => { setEditingId(ticket.id); setDraft({ ticket_number: ticket.ticket_number, client: ticket.client, tool_code: ticket.tool_code, tool_information: ticket.tool_information, date_received_by_client: ticket.date_received_by_client, supplier_information: ticket.supplier_information, customer_information: ticket.customer_information, assigned_to: ticket.assigned_to, priority: ticket.priority, status: ticket.status === "scrapped" ? "not_started" : ticket.status, deadline_date: ticket.deadline_date, date_received_back_from_supplier: ticket.date_received_back_from_supplier, warranty_months: ticket.warranty_months, invoiced: ticket.invoiced, invoice_number: ticket.invoice_number, notes: ticket.notes }); setSelected(null); setFormOpen(true); };
+  const openCreate = () => { setEditBase(null); setEditingId(null); setDraft(emptyDraft()); setFormOpen(true); };
+  const openEdit = (ticket: RepairTicket) => { setEditBase(ticket.updated_at); setEditingId(ticket.id); setDraft({ ticket_number: ticket.ticket_number, client: ticket.client, tool_code: ticket.tool_code, tool_information: ticket.tool_information, date_received_by_client: ticket.date_received_by_client, supplier_information: ticket.supplier_information, customer_information: ticket.customer_information, assigned_to: ticket.assigned_to, priority: ticket.priority, status: ticket.status === "scrapped" ? "not_started" : ticket.status, deadline_date: ticket.deadline_date, date_received_back_from_supplier: ticket.date_received_back_from_supplier, warranty_months: ticket.warranty_months, invoiced: ticket.invoiced, invoice_number: ticket.invoice_number, notes: ticket.notes }); setSelected(null); setFormOpen(true); };
   const save = async () => {
     if (!draft.ticket_number.trim() || !draft.client.trim() || !draft.tool_code.trim() || !draft.tool_information.trim()) { toast({ title: "Ticket, client, tool code and tool details are required", variant: "destructive" }); return; }
-    setSaving(true); const payload = { ...draft, ticket_number: draft.ticket_number.trim(), client: draft.client.trim(), tool_code: draft.tool_code.trim().toUpperCase(), tool_information: draft.tool_information.trim(), supplier_information: draft.supplier_information?.trim() || null, customer_information: draft.customer_information?.trim() || null, invoice_number: draft.invoiced ? draft.invoice_number?.trim() || null : null, notes: draft.notes?.trim() || null, created_by: user?.id };
-    const result = editingId ? await db.from("repair_tickets").update(payload).eq("id", editingId) : await db.from("repair_tickets").insert(payload); setSaving(false);
-    if (result.error) { toast({ title: "Repair not saved", description: result.error.message, variant: "destructive" }); return; }
-    setFormOpen(false); toast({ title: editingId ? "Repair updated" : warrantyMatch ? "Warranty repair created" : "Repair added", description: warrantyMatch ? `Matched to ${warrantyMatch.ticket_number}; routed to Warranty Repairs.` : "The live repair queue is updated for everyone." }); await load(true);
+    if(saving)return;
+    setSaving(true);
+    try {
+      const payload = { ...draft, ticket_number: draft.ticket_number.trim(), client: draft.client.trim(), tool_code: draft.tool_code.trim().toUpperCase(), tool_information: draft.tool_information.trim(), supplier_information: draft.supplier_information?.trim() || null, customer_information: draft.customer_information?.trim() || null, invoice_number: draft.invoiced ? draft.invoice_number?.trim() || null : null, notes: draft.notes?.trim() || null };
+      if(editingId) { if(!await conflicts.save("repair_tickets",editingId,payload,editBase))return; }
+      else { const {error}=await db.from("repair_tickets").insert({...payload,created_by:user?.id}); if(error)throw new Error(error.message); }
+      recovery.clear();setFormOpen(false);toast({title:editingId?"Changes saved":"Repair added"});await load(true);
+    } catch(error) {toast({title:"Not saved — your draft is kept",description:error instanceof Error?error.message:"Please try again",variant:"destructive"});}
+    finally {setSaving(false);}
   };
-  const updateStatus = async (ticket: RepairTicket, status: string) => { const previous=tickets; setTickets((current)=>current.map((row)=>row.id===ticket.id?{...row,status}:row)); const {error}=await db.from("repair_tickets").update({status}).eq("id",ticket.id); if(error){setTickets(previous);toast({title:"Status not updated",description:error.message,variant:"destructive"});}else{toast({title:status==="completed"?"Moved to repair history":"Repair status updated"});await load(true);} };
-  const scrap = async () => { if (!selected) return; setSaving(true); const {error}=await db.from("repair_tickets").update({status:"scrapped",scrap_reason:scrapReason.trim()||null,scrapped_by:user?.id}).eq("id",selected.id); setSaving(false); if(error){toast({title:"Repair not scrapped",description:error.message,variant:"destructive"});return;} setScrapOpen(false);setScrapReason("");toast({title:"Tool marked as scrapped",description:"The ticket is retained permanently in Repair History."});await load(true); };
+
+  const updateStatus = async (ticket: RepairTicket, status: string) => {
+    try { if(await conflicts.save("repair_tickets",ticket.id,{status},ticket.updated_at))await load(true); }
+    catch(error){toast({title:"Status not saved",description:error instanceof Error?error.message:"Retry",variant:"destructive"});}
+  };
+  const scrap = async () => { if (!selected) return; setSaving(true); let error:any=null;try{if(!await conflicts.save("repair_tickets",selected.id,{status:"scrapped",scrap_reason:scrapReason.trim()||null,scrapped_by:user?.id},selected.updated_at)){setSaving(false);return;}}catch(failure){error=failure;} setSaving(false); if(error){toast({title:"Repair not scrapped",description:error.message,variant:"destructive"});return;} setScrapOpen(false);setScrapReason("");toast({title:"Tool marked as scrapped",description:"The ticket is retained permanently in Repair History."});await load(true); };
 
   return <div className="workshop-workspace space-y-4 bg-background pb-10 font-sans text-foreground">
+    {conflicts.dialog}{!formOpen&&recovery.banner}
     <SharpeningFocusHeader
       items={tickets.map((ticket) => ({ id: ticket.id, reference: ticket.ticket_number, title: ticket.client, subtitle: ticket.tool_code, date: ticket.date_received_by_client, deadline: ticket.deadline_date, status: ticket.status, priority: ticket.priority }))}
       noun="repair"
@@ -146,14 +161,14 @@ export default function RepairsPage() {
       ]}
     />}
 
-    <Dialog open={formOpen} onOpenChange={setFormOpen}><DialogContent className="max-h-[92dvh] w-[calc(100%-20px)] max-w-3xl overflow-y-auto rounded-[28px] p-0"><div className="border-b border-border/60 bg-primary/[.06] p-5 sm:p-6"><DialogHeader><DialogTitle className="flex items-center gap-2 text-2xl font-black"><span className="grid h-10 w-10 place-items-center rounded-2xl bg-primary text-primary-foreground"><Wrench className="h-5 w-5"/></span>{editingId?"Edit repair ticket":"New repair ticket"}</DialogTitle></DialogHeader><p className="mt-2 text-sm text-muted-foreground">Tool code is the warranty key. Use the same code every time a tool returns.</p></div><div className="space-y-6 p-5 sm:p-6">
+    <Dialog open={formOpen} onOpenChange={open=>{if(!saving)setFormOpen(open);}}><DialogContent className="max-h-[92dvh] w-[calc(100%-20px)] max-w-3xl overflow-y-auto rounded-[28px] p-0"><div className="border-b border-border/60 bg-primary/[.06] p-5 sm:p-6"><DialogHeader><DialogTitle className="flex items-center gap-2 text-2xl font-black"><span className="grid h-10 w-10 place-items-center rounded-2xl bg-primary text-primary-foreground"><Wrench className="h-5 w-5"/></span>{editingId?"Edit repair ticket":"New repair ticket"}</DialogTitle></DialogHeader>{recovery.banner}<p className="mt-2 text-sm text-muted-foreground">Tool code is the warranty key. Use the same code every time a tool returns.</p></div><fieldset disabled={saving} className="min-w-0 space-y-6 p-5 sm:p-6">
       <FormSection title="Ticket & tool"><div className="grid gap-4 sm:grid-cols-2"><Field label="Ticket number *"><Input value={draft.ticket_number} onChange={e=>set("ticket_number",e.target.value)} placeholder="REP-2048"/></Field><Field label="Date received by client *"><Input type="date" value={draft.date_received_by_client} onChange={e=>set("date_received_by_client",e.target.value)}/></Field><Field label="Client *"><Input value={draft.client} onChange={e=>set("client",e.target.value)}/></Field><Field label="Tool code / serial *"><Input value={draft.tool_code} onChange={e=>set("tool_code",e.target.value)} placeholder="Unique code used for warranty matching" className="uppercase"/></Field><Field label="Tool information *" wide><Textarea value={draft.tool_information} onChange={e=>set("tool_information",e.target.value)} className="min-h-20" placeholder="Make, model, serial, fault and accessories received…"/></Field></div>{warrantyMatch&&<div className="mt-4 flex gap-3 rounded-2xl border border-success/25 bg-success/10 p-4 text-success"><ShieldCheck className="mt-0.5 h-5 w-5 shrink-0"/><div><p className="text-sm font-black">Warranty automatically detected</p><p className="mt-0.5 text-xs">Tool code matches {warrantyMatch.ticket_number}. Coverage runs until {formatDate(warrantyMatch.warranty_expires_at)}; this ticket will enter Warranty Repairs.</p></div></div>}</FormSection>
       <FormSection title="Repair workflow"><div className="grid gap-4 sm:grid-cols-2"><Field label="Status"><StatusSelect value={draft.status} onChange={value=>set("status",value)}/></Field><Field label="Priority"><PrioritySelect value={draft.priority} onChange={value=>set("priority",value)} /></Field><Field label="Assigned to"><TeamSelect value={draft.assigned_to} team={team} onChange={value=>set("assigned_to",value)}/></Field><Field label="Deadline"><Input type="date" value={draft.deadline_date||""} onChange={e=>set("deadline_date",e.target.value||null)}/></Field></div></FormSection>
       <FormSection title="People & supplier"><div className="grid gap-4 sm:grid-cols-2"><Field label="Supplier information"><Textarea value={draft.supplier_information||""} onChange={e=>set("supplier_information",e.target.value||null)} className="min-h-24" placeholder="Supplier, contact and reference details…"/></Field><Field label="Customer information"><Textarea value={draft.customer_information||""} onChange={e=>set("customer_information",e.target.value||null)} className="min-h-24" placeholder="Contact person, phone, instructions…"/></Field></div></FormSection>
       <FormSection title="Supplier return & warranty" description="Coverage starts on the supplier-return date—not the ticket creation date."><div className="grid gap-4 sm:grid-cols-2"><Field label="Received back from supplier"><Input type="date" value={draft.date_received_back_from_supplier||""} onChange={e=>set("date_received_back_from_supplier",e.target.value||null)}/></Field>{draft.date_received_back_from_supplier&&<Field label="Warranty length (months)"><Input type="number" min={0} max={120} value={draft.warranty_months??""} onChange={e=>set("warranty_months",e.target.value?Number(e.target.value):null)} placeholder="e.g. 6"/></Field>}</div></FormSection>
       <FormSection title="Invoice & notes"><div className="grid gap-4 sm:grid-cols-2"><label className="flex min-h-11 items-center gap-3 rounded-xl border border-border/60 bg-muted/20 px-3 text-sm font-semibold"><input type="checkbox" checked={draft.invoiced} onChange={e=>set("invoiced",e.target.checked)} className="h-4 w-4 accent-primary"/>Invoice completed</label>{draft.invoiced&&<Field label="Invoice number"><Input value={draft.invoice_number||""} onChange={e=>set("invoice_number",e.target.value||null)}/></Field>}</div><div className="mt-4"><Field label="Repair notes"><Textarea value={draft.notes||""} onChange={e=>set("notes",e.target.value||null)} className="min-h-24" placeholder="Diagnosis, quotation and workshop notes…"/></Field></div></FormSection>
       <div className="flex flex-col-reverse gap-2 border-t pt-4 sm:flex-row sm:justify-end"><Button variant="outline" onClick={()=>setFormOpen(false)}>Cancel</Button><Button onClick={()=>void save()} disabled={saving}>{saving?"Saving…":editingId?"Save changes":"Add repair"}</Button></div>
-    </div></DialogContent></Dialog>
+    </fieldset></DialogContent></Dialog>
 
     <WorkshopPanel
       open={!!selected}
