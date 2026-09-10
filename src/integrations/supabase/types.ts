@@ -671,6 +671,51 @@ export type Database = {
           },
         ]
       }
+      dispatch_receipts: {
+        Row: {
+          actor_id: string
+          created_at: string
+          fully_done: boolean
+          id: string
+          lines: Json
+          notes: string | null
+          order_id: string
+        }
+        Insert: {
+          actor_id: string
+          created_at?: string
+          fully_done: boolean
+          id: string
+          lines: Json
+          notes?: string | null
+          order_id: string
+        }
+        Update: {
+          actor_id?: string
+          created_at?: string
+          fully_done?: boolean
+          id?: string
+          lines?: Json
+          notes?: string | null
+          order_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dispatch_receipts_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dispatch_receipts_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       dispatch_routes: {
         Row: {
           completed_stops: number
@@ -3098,6 +3143,15 @@ export type Database = {
         Args: { p_source_order_id: string; p_target_order_id: string }
         Returns: string
       }
+      record_partial_delivery: {
+        Args: {
+          p_lines: Json
+          p_notes?: string
+          p_order_id: string
+          p_request_id: string
+        }
+        Returns: Json
+      }
       record_po_collection: {
         Args: {
           p_collection_method?: string
@@ -3133,6 +3187,15 @@ export type Database = {
       review_collection_dismissal: {
         Args: { p_action: string; p_id: string; p_signature: Json }
         Returns: undefined
+      }
+      save_workflow_record: {
+        Args: {
+          p_expected_updated_at: string
+          p_id: string
+          p_patch: Json
+          p_table: string
+        }
+        Returns: Json
       }
       split_order_items: {
         Args: {
