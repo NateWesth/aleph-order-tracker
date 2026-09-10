@@ -148,6 +148,60 @@ export type Database = {
           },
         ]
       }
+      collection_dismissals: {
+        Row: {
+          active: boolean
+          current_signature: Json | null
+          dismissed_at: string
+          dismissed_by: string | null
+          dismissed_signature: Json | null
+          purchase_order_id: string
+          purchase_order_number: string
+          review_required: boolean
+          reviewed_at: string | null
+          reviewed_by: string | null
+        }
+        Insert: {
+          active?: boolean
+          current_signature?: Json | null
+          dismissed_at?: string
+          dismissed_by?: string | null
+          dismissed_signature?: Json | null
+          purchase_order_id: string
+          purchase_order_number: string
+          review_required?: boolean
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+        }
+        Update: {
+          active?: boolean
+          current_signature?: Json | null
+          dismissed_at?: string
+          dismissed_by?: string | null
+          dismissed_signature?: Json | null
+          purchase_order_id?: string
+          purchase_order_number?: string
+          review_required?: boolean
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "collection_dismissals_dismissed_by_fkey"
+            columns: ["dismissed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "collection_dismissals_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       commission_adjustments: {
         Row: {
           adjustment_type: string
@@ -3076,6 +3130,10 @@ export type Database = {
           commission_rate: number
         }[]
       }
+      review_collection_dismissal: {
+        Args: { p_action: string; p_id: string; p_signature: Json }
+        Returns: undefined
+      }
       split_order_items: {
         Args: {
           p_item_ids: string[]
@@ -3092,6 +3150,7 @@ export type Database = {
         Args: { company_code: string }
         Returns: boolean
       }
+      workflow_po_signature: { Args: { po: Json }; Returns: Json }
     }
     Enums: {
       app_role: "admin" | "user"
