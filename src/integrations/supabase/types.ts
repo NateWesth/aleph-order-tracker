@@ -202,41 +202,6 @@ export type Database = {
           },
         ]
       }
-      collection_receipt_requests: {
-        Row: {
-          actor_id: string
-          created_at: string
-          id: string
-          payload: Json
-          purchase_order_id: string
-          result: Json
-        }
-        Insert: {
-          actor_id: string
-          created_at?: string
-          id: string
-          payload: Json
-          purchase_order_id: string
-          result: Json
-        }
-        Update: {
-          actor_id?: string
-          created_at?: string
-          id?: string
-          payload?: Json
-          purchase_order_id?: string
-          result?: Json
-        }
-        Relationships: [
-          {
-            foreignKeyName: "collection_receipt_requests_actor_id_fkey"
-            columns: ["actor_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       commission_adjustments: {
         Row: {
           adjustment_type: string
@@ -1347,45 +1312,6 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "order_activity_log_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      order_draft_requests: {
-        Row: {
-          actor_id: string
-          created_at: string
-          id: string
-          order_id: string
-          payload: Json
-        }
-        Insert: {
-          actor_id: string
-          created_at?: string
-          id: string
-          order_id: string
-          payload: Json
-        }
-        Update: {
-          actor_id?: string
-          created_at?: string
-          id?: string
-          order_id?: string
-          payload?: Json
-        }
-        Relationships: [
-          {
-            foreignKeyName: "order_draft_requests_actor_id_fkey"
-            columns: ["actor_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "order_draft_requests_order_id_fkey"
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
@@ -3164,19 +3090,6 @@ export type Database = {
         Args: { p_order_id: string }
         Returns: Json
       }
-      create_dispatch_route_safe: {
-        Args: { p_changes: Json; p_route: Json }
-        Returns: string
-      }
-      create_order_draft_safe: {
-        Args: {
-          p_items: Json
-          p_order: Json
-          p_purchase_orders: Json
-          p_request_id: string
-        }
-        Returns: string
-      }
       generate_my_overdue_fulfillment_notifications: {
         Args: never
         Returns: number
@@ -3253,14 +3166,6 @@ export type Database = {
         }
         Returns: Json
       }
-      record_po_collection_safe: {
-        Args: {
-          p_expected_event_ids: Json
-          p_payload: Json
-          p_request_id: string
-        }
-        Returns: Json
-      }
       release_zoho_sync_lock: {
         Args: { requested_key: string }
         Returns: undefined
@@ -3283,7 +3188,6 @@ export type Database = {
         Args: { p_action: string; p_id: string; p_signature: Json }
         Returns: undefined
       }
-      save_workflow_batch: { Args: { p_changes: Json }; Returns: undefined }
       save_workflow_record: {
         Args: {
           p_expected_updated_at: string
