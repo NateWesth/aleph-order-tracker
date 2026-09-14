@@ -1158,17 +1158,41 @@ export default function FulfillmentPage() {
     if (!targets.length) return;
     setBulkSaving(true);
     try {
-      await saveBatch(targets.map(po=>({table:"po_collection_state",id:po.purchaseOrderId,updated_at:po.state.updated_at||null,
+      // Some POs come from the Zoho cache before a collection record exists (or before it has a version
+      // stamp). Create/refresh those rows first so the batch save never fails on a missing record.
+      const needsRow = targets.filter((po) => !po.state?.updated_at);
+      const versions = new Map<string, string | null>(
+        targets.map((po) => [po.purchaseOrderId, po.state?.updated_at || null]),
+      );
+      if (needsRow.length) {
+        const stamp = new Date().toISOString();
+        const { data, error } = await supabase.from("po_collection_state").upsert(
+          needsRow.map((po) => ({
+            purchase_order_id: po.purchaseOrderId,
+            purchase_order_number: po.purchaseOrderNumber,
+            vendor_id: po.vendorId || null,
+            vendor_name: po.vendorName || "Unknown supplier",
+            status: po.state?.status || "pending",
+            last_seen_at: stamp,
+            updated_at: stamp,
+          })) as any,
+          { onConflict: "purchase_order_id" },
+        ).select("purchase_order_id, updated_at");
+        if (error) throw error;
+        (data || []).forEach((row: any) => versions.set(row.purchase_order_id, row.updated_at || null));
+      }
+      await saveBatch(targets.map(po=>({table:"po_collection_state",id:po.purchaseOrderId,updated_at:versions.get(po.purchaseOrderId)??null,
         patch:{status,...(status==="pending"?{scheduled_for:null}:{})}})));
       await fetchData();
       toast({ title: "Collections moved", description: `${targets.length} collection${targets.length === 1 ? "" : "s"} moved.` });
       setCollectionSelection(new Set());
     } catch(error:any) {
-      toast({title:"Collections not moved",description:error.message,variant:"destructive"});
+      toast({title:"Collections not moved",description:error?.message||"Refresh the board and try again. No collections were moved.",variant:"destructive"});
     } finally {
       setBulkSaving(false);
     }
   };
+
 
   const removeSelectedStops = async () => {
     const orderIds = [...deliverySelection];
