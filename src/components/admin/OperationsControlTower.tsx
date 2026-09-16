@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { queryActiveDispatch } from "@/services/dispatchDocuments";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -54,6 +55,7 @@ export default function OperationsControlTower() {
   const [readyCollectionCount, setReadyCollectionCount] = useState(0);
   const [unassignedDeliveryCount, setUnassignedDeliveryCount] = useState(0);
   const [unassignedCollectionCount, setUnassignedCollectionCount] = useState(0);
+  const [dispatchError,setDispatchError]=useState("");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [offlineCount, setOfflineCount] = useState(pendingOfflineOperationCount());
@@ -88,10 +90,9 @@ export default function OperationsControlTower() {
       supabase.from("team_action_items").select("id,title,priority,status,assigned_to,due_at,workspace").neq("status", "done").order("created_at", { ascending: false }).limit(80),
       supabase.from("profiles").select("id,full_name,email").eq("approved", true).order("full_name"),
       supabase.from("orders").select("id,order_number,status,completed_date,fulfillment_method,fulfillment_status,fulfillment_assigned_to,fulfillment_scheduled_for").is("completed_date", null).limit(5000),
-      supabase.from("po_tracking_cache").select("payload").eq("id", "00000000-0000-0000-0000-000000000003").maybeSingle(),
-      supabase.from("po_collection_state").select("purchase_order_id,status,completed_at,assigned_to,scheduled_for,dismissed_at"),
+      queryActiveDispatch(),
     ]);
-    const [routeRes, exceptionRes, timelineRes, activityRes, taskRes, memberRes, activeOrderRes, poCacheRes, poStateRes] = result;
+    const [routeRes, exceptionRes, timelineRes, activityRes, taskRes, memberRes, activeOrderRes, freshDispatchRes] = result;
     const firstError = result.find((entry) => entry.error)?.error;
     if (firstError) toast({ title: "Some dispatch data could not load", description: firstError.message, variant: "destructive" });
 
@@ -110,45 +111,28 @@ export default function OperationsControlTower() {
     );
     if (activeOrders.length) {
       const itemRes = await supabase.from("order_items").select("id,order_id,name,code,quantity,qty_on_po,qty_received,qty_invoiced,qty_completed").in("order_id", activeOrders.map((order: any) => order.id));
-      const readyIds = new Set<string>();
-      (itemRes.data || []).forEach((item: any) => {
-        const quantity = Number(item.quantity || 0);
-        const ready = Math.max(0, Math.min(Number(item.qty_invoiced || 0), quantity) - Math.min(Number(item.qty_completed || 0), quantity));
-        if (ready > 0) readyIds.add(item.order_id);
-      });
-      setReadyDeliveryCount(readyIds.size);
-      setUnassignedDeliveryCount(activeOrders.filter((order: any) => readyIds.has(order.id) && !order.fulfillment_assigned_to).length);
       const itemIds = (itemRes.data || []).map((item: any) => item.id);
       const allocationRes = itemIds.length
         ? await supabase.from("order_item_po_allocations").select("order_item_id,quantity_ordered,quantity_received").in("order_item_id", itemIds)
         : { data: [], error: null };
       setIssues(buildReconciliationIssues((itemRes.data || []) as OrderItemRow[], (allocationRes.data || []) as AllocationRow[], activeOrders as OrderRef[]));
     } else {
-      setReadyDeliveryCount(0);
-      setUnassignedDeliveryCount(0);
       setIssues([]);
     }
 
-    const completedPOs = new Set((poStateRes.data || []).filter((row: any) => row.status === "collected" || row.completed_at || row.dismissed_at).map((row: any) => row.purchase_order_id));
-    const poPayload = Array.isArray(poCacheRes.data?.payload) ? poCacheRes.data.payload as any[] : [];
-    const closedStatus = new Set(["cancelled","closed","rejected","draft","void"]);
-    const closedReceived = new Set(["received","fully_received"]);
-    const activePOs = poPayload.filter((po: any) => {
-      if (!po?.purchaseOrderId || completedPOs.has(po.purchaseOrderId)) return false;
-      const poDate = new Date(po.date).getTime();
-      if (!Number.isFinite(poDate) || poDate < Date.now() - 21 * 86_400_000) return false;
-      if (closedStatus.has(String(po.status || "").toLowerCase())) return false;
-      if (closedReceived.has(String(po.receivedStatus || "").toLowerCase())) return false;
-      return Array.isArray(po.lines) && po.lines.some((line: any) => Number(line.outstanding || 0) > 0);
-    });
-    setReadyCollectionCount(activePOs.length);
-    const stateByPO = new Map((poStateRes.data || []).map((state: any) => [state.purchase_order_id, state]));
-    setUnassignedCollectionCount(activePOs.filter((po: any) => !stateByPO.get(po.purchaseOrderId)?.assigned_to).length);
+    setDispatchError(freshDispatchRes.error?.message||"");
+    if(!freshDispatchRes.error){
+      const documents=freshDispatchRes.data||[];
+      setReadyDeliveryCount(documents.filter(doc=>doc.kind==="delivery").length);
+      setUnassignedDeliveryCount(documents.filter(doc=>doc.kind==="delivery"&&!doc.assigned_to).length);
+      setReadyCollectionCount(documents.filter(doc=>doc.kind==="collection").length);
+      setUnassignedCollectionCount(documents.filter(doc=>doc.kind==="collection"&&!doc.assigned_to).length);
+    }
     setLoading(false); setRefreshing(false);
   }, [toast]);
 
   useEffect(() => { void fetchData(); return subscribeOfflineQueue(() => setOfflineCount(pendingOfflineOperationCount())); }, [fetchData]);
-  useLiveData(["dispatch_routes", "operations_exceptions", "fulfillment_timeline_events", "order_activity_log", "team_action_items", "order_items", "order_item_po_allocations", "operational_saved_views", "po_tracking_cache", "po_collection_state"], () => void fetchData(true), { channelName: "operations-command-centre" });
+  useLiveData(["dispatch_routes", "operations_exceptions", "fulfillment_timeline_events", "order_activity_log", "team_action_items", "order_items", "order_item_po_allocations", "operational_saved_views", "po_tracking_cache", "dispatch_documents"], () => void fetchData(true), { channelName: "operations-command-centre" });
 
   const activeRoutes = useMemo(() => {
     const yesterday = new Date(); yesterday.setHours(0,0,0,0); yesterday.setDate(yesterday.getDate() - 1);
@@ -189,6 +173,7 @@ export default function OperationsControlTower() {
 
   return (
     <div className="space-y-4 pb-8">
+      {dispatchError&&<p role="alert" className="rounded-xl border border-destructive/40 p-3 text-sm">Dispatch counts are unavailable or stale: {dispatchError}. Open Collections & deliveries to retry.</p>}
       <section className="overflow-hidden rounded-[28px] border border-border/60 bg-card shadow-sm">
         <div className="h-1.5 w-full bg-gradient-to-r from-[hsl(var(--ribbon-1))] via-[hsl(var(--ribbon-3))] to-[hsl(var(--ribbon-5))]" />
         <div className="flex flex-col gap-4 p-5 sm:p-6 lg:flex-row lg:items-end lg:justify-between">

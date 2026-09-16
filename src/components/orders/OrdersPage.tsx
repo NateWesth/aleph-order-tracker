@@ -12,7 +12,7 @@ import SavedFiltersBar, { type OrderFilter } from "./components/SavedFiltersBar"
 import {
   DndContext,
   closestCenter,
-  PointerSensor,
+  MouseSensor,
   useSensor,
   useSensors,
   type DragEndEvent,
@@ -336,7 +336,7 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
   );
 
   const sensors = useSensors(
-    useSensor(PointerSensor, {
+    useSensor(MouseSensor, {
       activationConstraint: {
         distance: 8,
       },

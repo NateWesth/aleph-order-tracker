@@ -18,6 +18,9 @@ verify_jwt = false
 [functions.zoho-auth]
 verify_jwt = false
 
+[functions.dispatch-sync]
+verify_jwt = false
+
 [functions.zoho-sync]
 verify_jwt = false
 

@@ -159,13 +159,13 @@ function DraggableItem({
     <div
       ref={setNodeRef}
       style={style}
-      className={`p-2 bg-muted/50 rounded text-xs space-y-1 hover:bg-muted hover:ring-2 hover:ring-primary/30 transition-all touch-none ${
+      className={`p-2 bg-muted/50 rounded text-xs space-y-1 hover:bg-muted hover:ring-2 hover:ring-primary/30 transition-all ${
         isDragging ? 'opacity-50 ring-2 ring-primary' : ''
       } ${isUpdating ? 'opacity-50 pointer-events-none' : ''}`}
     >
       <div className="flex items-start justify-between gap-2">
         <div
-          className="flex items-center gap-1.5 min-w-0 cursor-grab active:cursor-grabbing"
+          className="flex items-center gap-1.5 min-w-0 cursor-grab active:cursor-grabbing touch-none"
           {...attributes}
           {...listeners}
         >
