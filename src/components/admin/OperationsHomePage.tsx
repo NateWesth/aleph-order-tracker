@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { AlertTriangle, ArrowRight, CheckCircle2, Package, Truck, UserRoundCheck, Warehouse } from "lucide-react";
+import { queryActiveDispatch } from "@/services/dispatchDocuments";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLiveData } from "@/hooks/useLiveData";
@@ -13,6 +14,7 @@ interface Brief { activeOrders: number; urgent: number; readyDeliveries: number;
 export default function OperationsHomePage({ onNavigate }: OperationsHomePageProps) {
   const { user } = useAuth();
   const [brief, setBrief] = useState<Brief>({ activeOrders: 0, urgent: 0, readyDeliveries: 0, openCollections: 0, myTasks: 0, completedToday: 0 });
+  const [dispatchError,setDispatchError]=useState("");
   const [loading, setLoading] = useState(true);
 
   const fetchBrief = useCallback(async () => {
@@ -20,35 +22,37 @@ export default function OperationsHomePage({ onNavigate }: OperationsHomePagePro
     const s = supabase as any;
     const [orders, readyItems, collections, tasks, completed] = await Promise.all([
       s.from("orders").select("id,urgency,status").neq("status", "delivered"),
-      s.from("order_items").select("id,qty_invoiced,qty_completed").gt("qty_invoiced", 0),
-      s.from("po_collection_state").select("purchase_order_id,status"),
+      queryActiveDispatch("delivery"),
+      queryActiveDispatch("collection"),
       user?.id ? s.from("team_action_items").select("id,status").eq("assigned_to", user.id).neq("status", "done") : Promise.resolve({ data: [] }),
       s.from("orders").select("id,completed_date").eq("status", "delivered").gte("completed_date", today.toISOString()),
     ]);
+    setDispatchError(readyItems.error?.message||collections.error?.message||"");
     const openOrders = orders.data || [];
-    setBrief({
+    setBrief(previous=>({
       activeOrders: openOrders.length,
       urgent: openOrders.filter((o: any) => o.urgency === "urgent").length,
-      readyDeliveries: (readyItems.data || []).filter((i: any) => Number(i.qty_invoiced || 0) > Number(i.qty_completed || 0)).length,
-      openCollections: (collections.data || []).filter((c: any) => c.status !== "collected").length,
+      readyDeliveries: readyItems.error?previous.readyDeliveries:(readyItems.data || []).length,
+      openCollections: collections.error?previous.openCollections:(collections.data || []).length,
       myTasks: (tasks.data || []).length,
       completedToday: (completed.data || []).length,
-    });
+    }));
     setLoading(false);
   }, [user?.id]);
 
   useEffect(() => { void fetchBrief(); }, [fetchBrief]);
-  useLiveData(["orders", "order_items", "po_collection_state", "team_action_items"], () => void fetchBrief(), { channelName: "operations-home-live" });
+  useLiveData(["orders", "order_items", "dispatch_documents", "team_action_items"], () => void fetchBrief(), { channelName: "operations-home-live" });
 
   const cards = [
     { label: "Open orders", value: brief.activeOrders, icon: Package, go: "orders", note: brief.urgent ? `${brief.urgent} urgent` : "No urgent orders" },
-    { label: "Ready to dispatch", value: brief.readyDeliveries, icon: Truck, go: "fulfillment", note: "Delivery-ready line items" },
+    { label: "Deliveries", value: brief.readyDeliveries, icon: Truck, go: "fulfillment", note: "Outstanding customer invoices" },
     { label: "Collections", value: brief.openCollections, icon: Warehouse, go: "fulfillment", note: "Open supplier collections" },
     { label: "My work", value: brief.myTasks, icon: UserRoundCheck, go: "my-work", note: "Assigned action items" },
   ];
 
   return (
     <div className="space-y-5 animate-in fade-in duration-300">
+      {dispatchError&&<p role="alert" className="text-sm text-destructive">Dispatch counts are unavailable or stale: {dispatchError}</p>}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <Badge variant="secondary" className="rounded-full">Today</Badge>

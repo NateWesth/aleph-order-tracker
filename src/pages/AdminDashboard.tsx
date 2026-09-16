@@ -47,7 +47,7 @@ const loadPOTrackingPage = () => import("@/components/admin/POTrackingPage");
 const loadBuyingSheetPage = () => import("@/components/admin/BuyingSheetPage");
 const loadCommissionPage = () => import("@/components/admin/CommissionPage");
 const loadControlTower = () => import("@/components/admin/OperationsControlTower");
-const loadFulfillmentPage = () => import("@/components/admin/FulfillmentPage");
+const loadFulfillmentPage = () => import("@/components/admin/FreshDispatchPage");
 const loadSharpeningPage = () => import("@/components/admin/SharpeningPage");
 const loadRepairsPage = () => import("@/components/admin/RepairsPage");
 const loadServiceDeskPage = () => import("@/components/admin/ServiceDeskPage");
