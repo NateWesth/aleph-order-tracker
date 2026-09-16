@@ -706,6 +706,143 @@ export type Database = {
           },
         ]
       }
+      dispatch_document_receipts: {
+        Row: {
+          actor_id: string
+          created_at: string
+          document_id: string
+          id: string
+          notes: string
+          quantities: Json
+          result: Json
+        }
+        Insert: {
+          actor_id: string
+          created_at?: string
+          document_id: string
+          id: string
+          notes?: string
+          quantities: Json
+          result: Json
+        }
+        Update: {
+          actor_id?: string
+          created_at?: string
+          document_id?: string
+          id?: string
+          notes?: string
+          quantities?: Json
+          result?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dispatch_document_receipts_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dispatch_document_receipts_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "dispatch_documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dispatch_documents: {
+        Row: {
+          address: string | null
+          assigned_to: string | null
+          completed_quantities: Json
+          contact_name: string
+          document_date: string | null
+          fetched_at: string
+          id: string
+          kind: string
+          lines: Json
+          method: string
+          notes: string
+          organization_id: string
+          reference: string
+          review_required: boolean
+          revision: number
+          scheduled_for: string | null
+          source_closed: boolean
+          source_created_at: string
+          source_id: string
+          source_modified_at: string | null
+          source_payload: Json
+          source_status: string
+          status: string
+          updated_at: string
+          urgent: boolean
+        }
+        Insert: {
+          address?: string | null
+          assigned_to?: string | null
+          completed_quantities?: Json
+          contact_name: string
+          document_date?: string | null
+          fetched_at?: string
+          id: string
+          kind: string
+          lines: Json
+          method?: string
+          notes?: string
+          organization_id: string
+          reference: string
+          review_required?: boolean
+          revision?: number
+          scheduled_for?: string | null
+          source_closed?: boolean
+          source_created_at: string
+          source_id: string
+          source_modified_at?: string | null
+          source_payload: Json
+          source_status: string
+          status?: string
+          updated_at?: string
+          urgent?: boolean
+        }
+        Update: {
+          address?: string | null
+          assigned_to?: string | null
+          completed_quantities?: Json
+          contact_name?: string
+          document_date?: string | null
+          fetched_at?: string
+          id?: string
+          kind?: string
+          lines?: Json
+          method?: string
+          notes?: string
+          organization_id?: string
+          reference?: string
+          review_required?: boolean
+          revision?: number
+          scheduled_for?: string | null
+          source_closed?: boolean
+          source_created_at?: string
+          source_id?: string
+          source_modified_at?: string | null
+          source_payload?: Json
+          source_status?: string
+          status?: string
+          updated_at?: string
+          urgent?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dispatch_documents_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       dispatch_receipts: {
         Row: {
           actor_id: string
@@ -813,6 +950,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      dispatch_sync_state: {
+        Row: {
+          cycle_started_at: string | null
+          error: string | null
+          kind: string
+          last_attempt_at: string | null
+          last_success_at: string | null
+          next_page: number
+          scanned: number
+        }
+        Insert: {
+          cycle_started_at?: string | null
+          error?: string | null
+          kind: string
+          last_attempt_at?: string | null
+          last_success_at?: string | null
+          next_page?: number
+          scanned?: number
+        }
+        Update: {
+          cycle_started_at?: string | null
+          error?: string | null
+          kind?: string
+          last_attempt_at?: string | null
+          last_success_at?: string | null
+          next_page?: number
+          scanned?: number
+        }
+        Relationships: []
       }
       entity_comment_reactions: {
         Row: {
@@ -3177,6 +3344,10 @@ export type Database = {
         }
         Returns: string
       }
+      dispatch_remaining: {
+        Args: { d: Database["public"]["Tables"]["dispatch_documents"]["Row"] }
+        Returns: number
+      }
       generate_my_overdue_fulfillment_notifications: {
         Args: never
         Returns: number
@@ -3220,6 +3391,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      ingest_dispatch_document: {
+        Args: { p_doc: Json; p_org: string; p_type: string }
+        Returns: Json
+      }
       is_admin: { Args: never; Returns: boolean }
       is_user_approved: { Args: { user_uuid: string }; Returns: boolean }
       mark_order_update_as_read: {
@@ -3229,6 +3404,16 @@ export type Database = {
       merge_orders: {
         Args: { p_source_order_id: string; p_target_order_id: string }
         Returns: string
+      }
+      record_dispatch_receipt: {
+        Args: {
+          p_id: string
+          p_notes?: string
+          p_quantities: Json
+          p_request_id: string
+          p_revision: number
+        }
+        Returns: Json
       }
       record_partial_delivery: {
         Args: {
@@ -3281,6 +3466,10 @@ export type Database = {
       }
       review_collection_dismissal: {
         Args: { p_action: string; p_id: string; p_signature: Json }
+        Returns: undefined
+      }
+      save_dispatch_document: {
+        Args: { p_id: string; p_patch: Json; p_revision: number }
         Returns: undefined
       }
       save_workflow_batch: { Args: { p_changes: Json }; Returns: undefined }
