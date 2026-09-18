@@ -25,7 +25,7 @@ export default function PredictiveInsights() {
     try {
       // Gather data for analysis
       const [ordersRes, itemsRes, completedRes] = await Promise.all([
-        supabase.from("orders").select("id, order_number, status, urgency, created_at, updated_at, company_id, description").neq("status", "delivered").order("created_at", { ascending: false }),
+        supabase.from("orders").select("id, order_number, status, urgency, created_at, updated_at, company_id, description").or("status.is.null,status.neq.delivered").order("created_at", { ascending: false }),
         supabase.from("order_items").select("id, name, code, quantity, stock_status, order_id, created_at"),
         supabase.from("orders").select("id, order_number, status, created_at, completed_date, company_id, description").eq("status", "delivered").order("completed_date", { ascending: false }).limit(50),
       ]);

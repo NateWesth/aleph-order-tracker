@@ -52,7 +52,7 @@ export default function DashboardHome({ userName, onNavigate }: DashboardHomePro
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
       const [ordersRes, completedRes, clientsRes, suppliersRes, activityRes] = await Promise.all([
-        supabase.from("orders").select("id, status, urgency").neq("status", "delivered"),
+        supabase.from("orders").select("id, status, urgency").or("status.is.null,status.neq.delivered"),
         supabase.from("orders").select("id").eq("status", "delivered").gte("completed_date", startOfMonth),
         supabase.from("companies").select("id", { count: "exact", head: true }),
         supabase.from("suppliers").select("id", { count: "exact", head: true }),
