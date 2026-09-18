@@ -21,7 +21,7 @@ export default function OperationsHomePage({ onNavigate }: OperationsHomePagePro
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const s = supabase as any;
     const [orders, readyItems, collections, tasks, completed] = await Promise.all([
-      s.from("orders").select("id,urgency,status").neq("status", "delivered"),
+      s.from("orders").select("id,urgency,status").or("status.is.null,status.neq.delivered"),
       queryActiveDispatch("delivery"),
       queryActiveDispatch("collection"),
       user?.id ? s.from("team_action_items").select("id,status").eq("assigned_to", user.id).neq("status", "done") : Promise.resolve({ data: [] }),

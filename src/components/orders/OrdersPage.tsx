@@ -355,7 +355,7 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
         .select(
           "id, order_number, description, status, urgency, company_id, user_id, created_at, supplier_id, purchase_order_number",
         )
-        .neq("status", "delivered")
+        .or("status.is.null,status.neq.delivered")
         .order("created_at", { ascending: false });
 
       if (error) throw error;

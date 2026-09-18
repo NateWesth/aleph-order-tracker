@@ -266,12 +266,12 @@ export default function CustomizableDashboard({ userName, onNavigate }: Customiz
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
       const [ordersRes, completedRes, clientsRes, suppliersRes, activityRes, urgentRes] = await Promise.all([
-        supabase.from("orders").select("id, status, urgency").neq("status", "delivered"),
+        supabase.from("orders").select("id, status, urgency").or("status.is.null,status.neq.delivered"),
         supabase.from("orders").select("id").eq("status", "delivered").gte("completed_date", startOfMonth),
         supabase.from("companies").select("id", { count: "exact", head: true }),
         supabase.from("suppliers").select("id", { count: "exact", head: true }),
         supabase.from("order_activity_log").select("id, title, description, activity_type, created_at, order_id").order("created_at", { ascending: false }).limit(8),
-        supabase.from("orders").select("id, order_number, urgency, status, created_at").in("urgency", ["urgent", "high"]).neq("status", "delivered").order("created_at", { ascending: false }).limit(5),
+        supabase.from("orders").select("id, order_number, urgency, status, created_at").in("urgency", ["urgent", "high"]).or("status.is.null,status.neq.delivered").order("created_at", { ascending: false }).limit(5),
       ]);
 
       const activeOrders = ordersRes.data || [];

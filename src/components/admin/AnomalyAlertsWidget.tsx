@@ -36,7 +36,7 @@ export default function AnomalyAlertsWidget() {
         supabase.from("orders").select("id, total_amount, company_id, companies(name)").gte("created_at", week),
         supabase.from("orders").select("id, total_amount, company_id, companies(name)").gte("created_at", twoWeek).lt("created_at", week),
         supabase.from("orders").select("id").gte("created_at", today),
-        supabase.from("orders").select("id, order_number, created_at, status").neq("status", "delivered").lt("created_at", new Date(now.getTime() - 21 * 86400000).toISOString()),
+        supabase.from("orders").select("id, order_number, created_at, status").or("status.is.null,status.neq.delivered").lt("created_at", new Date(now.getTime() - 21 * 86400000).toISOString()),
         supabase.from("order_items").select("id, name, stock_status, created_at").eq("stock_status", "awaiting"),
         supabase.from("orders").select("id, total_amount, company_id, companies(name)").gte("created_at", month),
         supabase.from("orders").select("id, total_amount, company_id, companies(name)").gte("created_at", twoMonth).lt("created_at", month),

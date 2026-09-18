@@ -13,7 +13,7 @@ export default function OperationsPulseBar({ onNavigate }: Props) {
   const load=useCallback(async()=>{
     const s=supabase as any;
     const [orders,items,collections,exceptions]=await Promise.all([
-      s.from("orders").select("id,status").neq("status","delivered"),
+      s.from("orders").select("id,status").or("status.is.null,status.neq.delivered"),
       s.from("order_items").select("id,qty_on_po,qty_invoiced,qty_completed,quantity"),
       queryActiveDispatch(),
       s.from("operations_exceptions").select("id,status").neq("status","resolved"),
