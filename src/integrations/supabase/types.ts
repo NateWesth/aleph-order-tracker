@@ -888,6 +888,42 @@ export type Database = {
           },
         ]
       }
+      dispatch_route_requests: {
+        Row: {
+          actor_id: string
+          id: string
+          payload: Json
+          route_id: string
+        }
+        Insert: {
+          actor_id: string
+          id: string
+          payload: Json
+          route_id: string
+        }
+        Update: {
+          actor_id?: string
+          id?: string
+          payload?: Json
+          route_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dispatch_route_requests_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dispatch_route_requests_route_id_fkey"
+            columns: ["route_id"]
+            isOneToOne: false
+            referencedRelation: "dispatch_routes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       dispatch_routes: {
         Row: {
           completed_stops: number
@@ -3403,6 +3439,10 @@ export type Database = {
       }
       merge_orders: {
         Args: { p_source_order_id: string; p_target_order_id: string }
+        Returns: string
+      }
+      plan_source_dispatch: {
+        Args: { p_plan: Json; p_request_id: string }
         Returns: string
       }
       record_dispatch_receipt: {
