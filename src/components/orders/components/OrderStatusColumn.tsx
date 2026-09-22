@@ -407,6 +407,14 @@ function OrderStatusColumn({
             {/* Order Header */}
 
             <div className="flex items-start justify-between gap-2">
+              {onToggleOrderSelection && (
+                <span
+                  className="mt-0.5 shrink-0"
+                  onClick={(e) => { e.stopPropagation(); onToggleOrderSelection(order.id); }}
+                >
+                  <Checkbox checked={isSelected} aria-label={`Select order ${order.order_number}`} />
+                </span>
+              )}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5"><span className="truncate text-sm font-black text-foreground">{order.order_number}</span>{(order.commentCount || 0) > 0 && <span className="relative inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-blue-500/12 px-1.5 text-[9px] font-black text-blue-600"><MessageCircle className="mr-0.5 h-2.5 w-2.5" />{order.commentCount}<span className="absolute -right-0.5 -top-0.5 h-1.5 w-1.5 animate-pulse rounded-full bg-blue-500" /></span>}</div>
                 <span className="mt-0.5 block truncate text-[11px] font-medium text-muted-foreground">
