@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Trash2, ArrowRight, Package, ChevronDown, Undo2, MessageCircle, MoreHorizontal, Eye, CheckSquare } from "lucide-react";
+import { Trash2, ArrowRight, Package, ChevronDown, Undo2, MessageCircle, MoreHorizontal, Eye, CheckSquare, Users } from "lucide-react";
 
 import {
   AlertDialog,
@@ -25,6 +25,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -82,6 +89,7 @@ interface OrderStatusColumnProps {
   onToggleExpand?: () => void;
   selectedOrderIds?: Set<string>;
   onToggleOrderSelection?: (orderId: string) => void;
+  onSelectOrderGroup?: (orderIds: string[]) => void;
   groupByClient?: boolean;
   allTags?: { id: string; name: string; color: string }[];
   tagAssignments?: Map<string, string[]>;
@@ -124,6 +132,7 @@ function OrderStatusColumn({
   onToggleExpand,
   selectedOrderIds,
   onToggleOrderSelection,
+  onSelectOrderGroup,
   groupByClient = false,
   allTags = [],
   tagAssignments,
@@ -140,6 +149,7 @@ function OrderStatusColumn({
   const [collapsedClients, setCollapsedClients] = useState<Set<string>>(new Set());
 
   const [detailsOrder, setDetailsOrder] = useState<Order | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<Order | null>(null);
 
   const [detailsTab, setDetailsTab] = useState<"details" | "pos" | "activity">("pos");
 
@@ -377,6 +387,23 @@ function OrderStatusColumn({
           defaultTab={detailsTab}
         />
       )}
+      <AlertDialog open={Boolean(pendingDelete)} onOpenChange={(open) => { if (!open) setPendingDelete(null); }}>
+        <AlertDialogContent className="rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Order?</AlertDialogTitle>
+            <AlertDialogDescription>This will permanently delete order {pendingDelete?.order_number}.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-lg">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="rounded-lg bg-destructive hover:bg-destructive/90"
+              onClick={() => { if (pendingDelete) onDeleteOrder(pendingDelete); setPendingDelete(null); }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 
@@ -475,23 +502,44 @@ function OrderStatusColumn({
      * LAYOUT
      * ================================================================ */
 
+    const orderCard = isMobile ? (
+      <SwipeableCard
+        onSwipeLeft={() => onDeleteOrder(order)}
+        onSwipeRight={config.nextStatus ? () => onMoveOrder(order, config.nextStatus) : undefined}
+        leftLabel="Delete"
+        rightLabel={config.nextLabel || "Next"}
+        rightIcon={<ArrowRight className="h-4 w-4" />}
+      >
+        {cardContent}
+      </SwipeableCard>
+    ) : (
+      <DraggableCard id={`${order.id}::${order.boardStage || config.key}`}>
+        {cardContent}
+      </DraggableCard>
+    );
+
     return (
       <div key={`${order.id}-${config.key}`} className="space-y-2">
-        {isMobile ? (
-          <SwipeableCard
-            onSwipeLeft={() => onDeleteOrder(order)}
-            onSwipeRight={config.nextStatus ? () => onMoveOrder(order, config.nextStatus!) : undefined}
-            leftLabel="Delete"
-            rightLabel={config.nextLabel || "Next"}
-            rightIcon={<ArrowRight className="h-4 w-4" />}
-          >
-            {cardContent}
-          </SwipeableCard>
-        ) : (
-          <DraggableCard id={`${order.id}::${order.boardStage || config.key}`}>
-            {cardContent}
-          </DraggableCard>
-        )}
+        <ContextMenu>
+          <ContextMenuTrigger asChild>
+            <div className="min-w-0">{orderCard}</div>
+          </ContextMenuTrigger>
+          <ContextMenuContent className="w-60">
+            <ContextMenuItem onSelect={() => { setDetailsTab("details"); setDetailsOrder(order); }}>
+              <Eye className="mr-2 h-4 w-4" />Open order
+            </ContextMenuItem>
+            <ContextMenuItem onSelect={() => onToggleOrderSelection?.(order.id)}>
+              <CheckSquare className="mr-2 h-4 w-4" />{isSelected ? "Deselect this order" : "Select this order"}
+            </ContextMenuItem>
+            <ContextMenuItem onSelect={() => onSelectOrderGroup?.(orders.map((item) => item.id))}>
+              <Users className="mr-2 h-4 w-4" />Select this group ({orders.length})
+            </ContextMenuItem>
+            <ContextMenuSeparator />
+            <ContextMenuItem className="text-destructive focus:text-destructive" onSelect={() => setPendingDelete(order)}>
+              <Trash2 className="mr-2 h-4 w-4" />Delete this order
+            </ContextMenuItem>
+          </ContextMenuContent>
+        </ContextMenu>
       </div>
     );
   }
