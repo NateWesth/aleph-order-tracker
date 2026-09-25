@@ -126,11 +126,14 @@ Deno.serve(async (req) => {
       console.log(`Synced ${contactsSynced} contacts`)
     }
 
-    // Sync Purchase Orders
-    if (syncType === 'full' || syncType === 'purchase_orders') {
-      const posSynced = await syncPurchaseOrders(supabase, accessToken, orgId)
-      totalSynced += posSynced
-      console.log(`Synced ${posSynced} purchase orders`)
+    // The Orders board represents customer sales orders. The previous full
+    // recovery imported supplier purchase orders into public.orders, which
+    // made real sales orders appear to be missing. Delegate to the canonical
+    // sales-order importer used by live webhooks instead.
+    if (syncType === 'full' || syncType === 'sales_orders') {
+      const ordersSynced = await syncSalesOrdersViaWebhook()
+      totalSynced += ordersSynced
+      console.log(`Checked ${ordersSynced} sales orders`)
     }
 
     // Update sync log
@@ -177,6 +180,30 @@ Deno.serve(async (req) => {
     }
   }
 })
+
+async function syncSalesOrdersViaWebhook(): Promise<number> {
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')
+  const anonKey = Deno.env.get('SUPABASE_ANON_KEY')
+  const webhookSecret = Deno.env.get('ZOHO_WEBHOOK_SECRET')
+  if (!supabaseUrl || !anonKey || !webhookSecret) {
+    throw new Error('Zoho sales-order recovery is not configured')
+  }
+  const response = await fetch(`${supabaseUrl}/functions/v1/zoho-webhook`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${anonKey}`,
+      'apikey': anonKey,
+      'Content-Type': 'application/json',
+      'x-zoho-webhook-secret': webhookSecret,
+    },
+    body: JSON.stringify({ action: 'sync_sales_orders', since_days: 120 }),
+  })
+  const body = await response.json()
+  if (!response.ok || !body.success) {
+    throw new Error(body.error || `${body.failed || 0} sales orders failed to import`)
+  }
+  return Number(body.scanned || 0)
+}
 
 // Get a valid access token, refreshing if needed
 async function getValidAccessToken(supabase: any, clientId: string, clientSecret: string): Promise<string> {

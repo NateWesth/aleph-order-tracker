@@ -68,6 +68,26 @@ export default function BulkActionsBar({ selectedOrders, onClearSelection, onAct
     });
   }, [showAssignDialog, team.length]);
 
+  useEffect(() => {
+    const openAssign = () => setShowAssignDialog(true);
+    const openStatus = () => setShowStatusDialog(true);
+    const openUrgency = () => setShowUrgencyDialog(true);
+    const openTag = () => setShowTagDialog(true);
+    const openDelete = () => setShowDeleteDialog(true);
+    window.addEventListener("aleph:bulk-orders-assign", openAssign);
+    window.addEventListener("aleph:bulk-orders-status", openStatus);
+    window.addEventListener("aleph:bulk-orders-urgency", openUrgency);
+    window.addEventListener("aleph:bulk-orders-tag", openTag);
+    window.addEventListener("aleph:bulk-orders-delete", openDelete);
+    return () => {
+      window.removeEventListener("aleph:bulk-orders-assign", openAssign);
+      window.removeEventListener("aleph:bulk-orders-status", openStatus);
+      window.removeEventListener("aleph:bulk-orders-urgency", openUrgency);
+      window.removeEventListener("aleph:bulk-orders-tag", openTag);
+      window.removeEventListener("aleph:bulk-orders-delete", openDelete);
+    };
+  }, []);
+
   if (selectedOrders.length === 0) return null;
 
   const ids = selectedOrders.map((o) => o.id);

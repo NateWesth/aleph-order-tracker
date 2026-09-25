@@ -109,6 +109,13 @@ Deno.serve(async (req) => {
       return await handleBulkResyncItems(supabase, clientId, clientSecret)
     }
 
+    // Recover any sales-order webhooks that were missed. This deliberately
+    // uses the same importer as live webhooks so manual refresh and live sync
+    // cannot produce different order records.
+    if (payload.action === 'sync_sales_orders') {
+      return await handleSyncSalesOrders(supabase, clientId, clientSecret, Number(payload.since_days) || 120)
+    }
+
     // Support lookup by salesorder_number (e.g. "SO-00005") for manual re-sync
     const salesOrderNumber = payload.salesorder_number
     if (salesOrderNumber) {
@@ -877,6 +884,76 @@ async function handleScanAllInvoices(
 
 // ─── SALES ORDER WEBHOOK HANDLER ───────────────────────────────────────────────
 
+async function handleSyncSalesOrders(
+  supabase: any,
+  clientId: string,
+  clientSecret: string,
+  sinceDays: number,
+) {
+  const safeSinceDays = Math.max(1, Math.min(365, Math.floor(sinceDays)))
+  const accessToken = await getValidAccessToken(supabase, clientId, clientSecret)
+  const orgId = await getOrgId(supabase)
+  const cutoff = new Date(Date.now() - safeSinceDays * 24 * 60 * 60 * 1000)
+  let page = 1
+  let hasMore = true
+  let scanned = 0
+  let imported = 0
+  const failures: string[] = []
+
+  while (hasMore && page <= 20) {
+    const response = await fetch(
+      `${ZOHO_API_URL}/books/v3/salesorders?organization_id=${orgId}&page=${page}&per_page=200&sort_column=date&sort_order=D`,
+      { headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` } },
+    )
+    const body = await response.json()
+    if (body.code !== 0) throw new Error(`Failed to list sales orders: ${body.message || 'Unknown error'}`)
+
+    const salesOrders = body.salesorders || []
+    for (const salesOrder of salesOrders) {
+      const documentDate = salesOrder.date ? new Date(`${salesOrder.date}T00:00:00Z`) : null
+      if (documentDate && documentDate < cutoff) {
+        hasMore = false
+        break
+      }
+
+      const salesOrderId = String(salesOrder.salesorder_id || '')
+      if (!salesOrderId) continue
+      scanned++
+      try {
+        const result = await importSalesOrder(supabase, salesOrderId, clientId, clientSecret)
+        if (!result.unchanged) imported++
+      } catch (error) {
+        console.error(`Failed to import sales order ${salesOrderId}:`, error)
+        failures.push(String(salesOrder.salesorder_number || salesOrderId))
+      }
+    }
+
+    if (!hasMore) break
+    hasMore = body.page_context?.has_more_page === true
+    page++
+  }
+
+  return new Response(JSON.stringify({
+    success: failures.length === 0,
+    scanned,
+    imported,
+    failed: failures.length,
+    failures: failures.slice(0, 10),
+  }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: failures.length ? 207 : 200 })
+}
+
+async function importSalesOrder(
+  supabase: any,
+  salesOrderId: string,
+  clientId: string,
+  clientSecret: string,
+): Promise<{ unchanged: boolean; orderId?: string }> {
+  const response = await handleSalesOrderWebhook(supabase, {}, salesOrderId, clientId, clientSecret)
+  const body = await response.json()
+  if (!response.ok) throw new Error(body.error || `Sales order import failed (${response.status})`)
+  return { unchanged: body.unchanged === true, orderId: body.order_id }
+}
+
 async function handleSalesOrderWebhook(
   supabase: any, payload: any, salesOrderId: string,
   clientId: string, clientSecret: string
@@ -899,8 +976,17 @@ async function handleSalesOrderWebhook(
   }
 
   const salesOrder = soData.salesorder
+  const zohoSONumber = salesOrder.salesorder_number || `SO-${salesOrderId}`
+  const { data: existingOrder } = await supabase
+    .from('orders')
+    .select('id, company_id')
+    .eq('reference', zohoSONumber)
+    .maybeSingle()
   const salesOrderCache = await cacheZohoDocument(supabase, orgId, 'sales_order', String(salesOrderId), salesOrder)
-  if (salesOrderCache.unchanged) {
+  // A cache entry can be written by another workflow before the order itself
+  // exists. Only short-circuit when both the cached document and local order
+  // are present.
+  if (salesOrderCache.unchanged && existingOrder) {
     return new Response(JSON.stringify({ success: true, unchanged: true, salesorder_id: salesOrderId }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
@@ -928,15 +1014,7 @@ async function handleSalesOrderWebhook(
   }
 
   // 2. Map Zoho fields
-  const zohoSONumber = salesOrder.salesorder_number || `SO-${salesOrderId}`
   const orderNumber = salesOrder.reference_number || zohoSONumber
-
-  // Check if this order already exists (by reference = SO number)
-  const { data: existingOrder } = await supabase
-    .from('orders')
-    .select('id, company_id')
-    .eq('reference', zohoSONumber)
-    .maybeSingle()
 
   if (existingOrder) {
     console.log('Order already exists for SO:', zohoSONumber, '- updating items and company')
