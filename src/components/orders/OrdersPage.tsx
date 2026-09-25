@@ -312,14 +312,6 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
     });
   }, []);
 
-  const selectOrderGroup = useCallback((orderIds: string[]) => {
-    setSelectedOrderIds((current) => {
-      const next = new Set(current);
-      orderIds.forEach((id) => next.add(id));
-      return next;
-    });
-  }, []);
-
   const selectedOrders = useMemo(
     () =>
       orders
@@ -856,6 +848,8 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
       ready: [],
     };
 
+    const placedOrderIds = new Set<string>();
+
     filteredOrders.forEach((order) => {
       const items = order.items || [];
 
@@ -884,7 +878,40 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
             items: stageItems,
             boardStage: stage,
           });
+          placedOrderIds.add(order.id);
         }
+      });
+    });
+
+    // Safety net: an order's items might not land in any of the 4 tracked
+    // stage buckets above (e.g. every item is already fully processed but
+    // the order hasn't been marked delivered yet, or it's a brand-new order
+    // with no items and a status that doesn't exactly match a column key).
+    // Rather than silently vanishing from the board, place it somewhere
+    // sensible so it's never lost from view.
+    filteredOrders.forEach((order) => {
+      if (placedOrderIds.has(order.id)) {
+        return;
+      }
+
+      const items = order.items || [];
+      const allItemsFullyProcessed =
+        items.length > 0 &&
+        items.every((item) => {
+          const qty = item.totalQuantity ?? item.quantity ?? 0;
+          return (item.qty_completed ?? 0) >= qty && qty > 0;
+        });
+
+      const fallbackColumn = allItemsFullyProcessed
+        ? "ready"
+        : order.status && order.status in buckets
+          ? order.status
+          : "ordered";
+
+      buckets[fallbackColumn].push({
+        ...order,
+        items,
+        boardStage: COLUMN_STAGE[fallbackColumn],
       });
     });
 
@@ -1111,7 +1138,6 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
                       canEditItems={true}
                       selectedOrderIds={selectedOrderIds}
                       onToggleOrderSelection={toggleOrderSelection}
-                      onSelectOrderGroup={selectOrderGroup}
                       groupByClient={groupByClient}
                       allTags={allTags}
                       tagAssignments={tagAssignments}
