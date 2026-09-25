@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { CheckSquare, Loader2, Tag as TagIcon, Flame } from "lucide-react";
+import { CheckSquare, Loader2, Tag as TagIcon, Flame, UserRound } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -41,10 +41,14 @@ export default function BulkActionsBar({ selectedOrders, onClearSelection, onAct
   const [showStatusDialog, setShowStatusDialog] = useState(false);
   const [showUrgencyDialog, setShowUrgencyDialog] = useState(false);
   const [showTagDialog, setShowTagDialog] = useState(false);
+  const [showAssignDialog, setShowAssignDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [newStatus, setNewStatus] = useState("");
   const [newUrgency, setNewUrgency] = useState("");
   const [selectedTagId, setSelectedTagId] = useState("");
   const [allTags, setAllTags] = useState<OrderTag[]>([]);
+  const [team, setTeam] = useState<Array<{ id: string; full_name: string | null; email: string | null }>>([]);
+  const [assignee, setAssignee] = useState("unassigned");
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
@@ -56,6 +60,13 @@ export default function BulkActionsBar({ selectedOrders, onClearSelection, onAct
       });
     }
   }, [showTagDialog, allTags.length]);
+
+  useEffect(() => {
+    if (!showAssignDialog || team.length) return;
+    supabase.from("profiles").select("id,full_name,email").order("full_name").then(({ data }) => {
+      if (data) setTeam(data);
+    });
+  }, [showAssignDialog, team.length]);
 
   if (selectedOrders.length === 0) return null;
 
@@ -138,10 +149,27 @@ export default function BulkActionsBar({ selectedOrders, onClearSelection, onAct
       const { error } = await supabase.from("orders").delete().in("id", ids);
       if (error) throw error;
       toast({ title: "Deleted", description: `${ids.length} orders deleted.` });
+      setShowDeleteDialog(false);
       onClearSelection();
       onActionComplete();
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleBulkAssignment = async () => {
+    setLoading(true);
+    try {
+      const { error } = await supabase.from("orders").update({ assigned_to: assignee === "unassigned" ? null : assignee, updated_at: new Date().toISOString() } as any).in("id", ids);
+      if (error) throw error;
+      toast({ title: "Orders assigned", description: `${ids.length} order${ids.length === 1 ? "" : "s"} updated.` });
+      setShowAssignDialog(false);
+      onClearSelection();
+      onActionComplete();
+    } catch (error: any) {
+      toast({ title: "Assignment failed", description: error.message, variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -182,8 +210,9 @@ export default function BulkActionsBar({ selectedOrders, onClearSelection, onAct
           <Button size="sm" variant="outline" onClick={() => setShowUrgencyDialog(true)}>
             <Flame className="h-3 w-3 mr-1" /> Urgency
           </Button>
+          <Button size="sm" variant="outline" onClick={() => setShowAssignDialog(true)}><UserRound className="mr-1 h-3 w-3" />Assign</Button>
           <Button size="sm" onClick={() => setShowStatusDialog(true)}>Update Status</Button>
-          <Button size="sm" variant="destructive" onClick={handleBulkDelete} disabled={loading}>Delete</Button>
+          <Button size="sm" variant="destructive" onClick={() => setShowDeleteDialog(true)} disabled={loading}>Delete</Button>
           <Button size="sm" variant="ghost" onClick={onClearSelection}>Clear</Button>
         </div>
       </div>
@@ -261,6 +290,12 @@ export default function BulkActionsBar({ selectedOrders, onClearSelection, onAct
             </Button>
           </DialogFooter>
         </DialogContent>
+      </Dialog>
+      <Dialog open={showAssignDialog} onOpenChange={setShowAssignDialog}>
+        <DialogContent className="max-w-sm"><DialogHeader><DialogTitle>Assign {selectedOrders.length} orders</DialogTitle></DialogHeader><Select value={assignee} onValueChange={setAssignee}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="unassigned">Unassigned</SelectItem>{team.map((member) => <SelectItem key={member.id} value={member.id}>{member.full_name || member.email || "Team member"}</SelectItem>)}</SelectContent></Select><DialogFooter><Button variant="outline" onClick={() => setShowAssignDialog(false)}>Cancel</Button><Button onClick={() => void handleBulkAssignment()} disabled={loading}>{loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Assign</Button></DialogFooter></DialogContent>
+      </Dialog>
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent className="max-w-sm"><DialogHeader><DialogTitle>Delete {selectedOrders.length} orders?</DialogTitle></DialogHeader><p className="text-sm text-muted-foreground">This permanently deletes the selected orders and cannot be undone.</p><DialogFooter><Button variant="outline" onClick={() => setShowDeleteDialog(false)}>Cancel</Button><Button variant="destructive" onClick={() => void handleBulkDelete()} disabled={loading}>{loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Delete orders</Button></DialogFooter></DialogContent>
       </Dialog>
     </>
   );
