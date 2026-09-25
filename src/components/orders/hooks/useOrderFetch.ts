@@ -63,7 +63,7 @@ export function useOrderFetch() {
       const { data, error } = await supabase
         .from('orders')
         .select('*')
-        .neq('status', 'completed')
+        .or('status.is.null,status.not.in.(completed,delivered)')
         .order('created_at', { ascending: false });
 
       if (error) {

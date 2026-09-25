@@ -553,6 +553,10 @@ function OrderStatusColumn({
         onContextMenuCapture={(event) => {
           event.preventDefault();
           event.stopPropagation();
+          // Select the card as soon as its menu opens. This guarantees the
+          // bulk toolbar and its dialogs already exist before a menu command
+          // dispatches, including when this is the first selected order.
+          if (!selectedOrderIds?.has(order.id)) onSelectOrderGroup?.([order.id]);
           setContextOrder({ order, x: event.clientX, y: event.clientY });
         }}
       >
