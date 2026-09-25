@@ -1829,34 +1829,34 @@ function DispatchLane({ label, hint, icon: Icon, count, tone, children }: { labe
   );
 }
 
-function DeliveryDispatchCard({ order, selected, onToggle, onToggleUrgent, onOpen, onClaim, onAdvance }: { order: FulfillmentOrder; selected: boolean; onToggle: () => void; onToggleUrgent: () => void; onOpen: () => void; onClaim: () => void; onAdvance: () => void }) {
+function DeliveryDispatchCard({ order, selected, groupSize, team, onToggle, onSelectGroup, onAssign, onRemove, onToggleUrgent, onOpen, onClaim, onAdvance }: { order: FulfillmentOrder; selected: boolean; groupSize: number; team: TeamMember[]; onToggle: () => void; onSelectGroup: () => void; onAssign: (id: string | null) => void; onRemove: () => void; onToggleUrgent: () => void; onOpen: () => void; onClaim: () => void; onAdvance: () => void }) {
   const visibleItems = order.items.filter((item) => readyUnits(item) > 0);
   const units = visibleItems.reduce((sum, item) => sum + readyUnits(item), 0);
   const overdue = isOverdue(order.fulfillment_scheduled_for);
   const actionLabel = order.fulfillment_status === "scheduled" ? "Send on route" : order.fulfillment_status === "out-for-delivery" ? "Complete" : "Plan route";
   const progress = order.fulfillment_status === "out-for-delivery" ? 2 : order.fulfillment_status === "scheduled" ? 1 : 0;
   return (
-    <article onClick={onOpen} className={cn("group relative cursor-pointer overflow-hidden rounded-[22px] border bg-background/82 p-3.5 pt-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-lg", selected ? "border-primary/35 ring-2 ring-primary/10" : "border-border/55", order.urgency === "urgent" && "border-l-4 border-l-destructive")}>
+    <ContextMenu><ContextMenuTrigger asChild><article onClick={onOpen} className={cn("group relative cursor-pointer overflow-hidden rounded-[22px] border bg-background/82 p-3.5 pt-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-lg", selected ? "border-primary/35 ring-2 ring-primary/10" : "border-border/55", order.urgency === "urgent" && "border-l-4 border-l-destructive")}>
       <div className="ribbon-bar absolute inset-x-0 top-0 h-1 opacity-85" aria-hidden />
       <div className="flex items-start gap-3"><span className="mt-1 shrink-0" onClick={(event) => { event.stopPropagation(); onToggle(); }}><Checkbox checked={selected} aria-label={`Select ${order.order_number}`} /></span><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-1.5"><h3 className="font-black text-primary">{order.order_number}</h3>{order.urgency === "urgent" && <Badge variant="destructive" className="h-5 text-[9px]">Urgent</Badge>}{overdue && <Badge variant="destructive" className="h-5 text-[9px]">Late</Badge>}</div><p className="mt-1 truncate text-sm font-semibold">{order.companyName}</p></div><ChevronRight className="mt-1 h-4 w-4 text-muted-foreground/25 transition-transform group-hover:translate-x-0.5 group-hover:text-primary" /></div>
       <DispatchProgress labels={[`${units} ready`, "Assigned", "On route"]} active={progress} />
       <div className="mt-4 flex gap-2 border-t border-border/50 pt-3"><Button size="sm" className="h-10 flex-1 rounded-xl text-xs" onClick={(event) => { event.stopPropagation(); onAdvance(); }}>{actionLabel}<ArrowRight className="ml-1.5 h-3.5 w-3.5" /></Button><DispatchCardMenu selected={selected} urgent={order.urgency === "urgent"} unassigned={!order.fulfillment_assigned_to} onToggle={onToggle} onToggleUrgent={onToggleUrgent} onOpen={onOpen} onClaim={onClaim} /></div>
-    </article>
+    </article></ContextMenuTrigger><DispatchContextMenu selected={selected} groupSize={groupSize} team={team} onOpen={onOpen} onToggle={onToggle} onSelectGroup={onSelectGroup} onAssign={onAssign} onRemove={onRemove} /></ContextMenu>
   );
 }
 
-function CollectionDispatchCard({ po, selected, onToggle, onToggleUrgent, onOpen, onClaim, onAdvance }: { po: CollectionPOView; selected: boolean; onToggle: () => void; onToggleUrgent: () => void; onOpen: () => void; onClaim: () => void; onAdvance: () => void }) {
+function CollectionDispatchCard({ po, selected, groupSize, team, onToggle, onSelectGroup, onAssign, onRemove, onToggleUrgent, onOpen, onClaim, onAdvance }: { po: CollectionPOView; selected: boolean; groupSize: number; team: TeamMember[]; onToggle: () => void; onSelectGroup: () => void; onAssign: (id: string | null) => void; onRemove: () => void; onToggleUrgent: () => void; onOpen: () => void; onClaim: () => void; onAdvance: () => void }) {
   const overdue = isOverdue(po.state?.scheduled_for || po.expectedDeliveryDate);
   const status = po.state?.status || "pending";
   const progress = status === "collecting" ? 2 : status === "scheduled" ? 1 : 0;
   const actionLabel = status === "collecting" ? "Record quantities" : po.state?.collection_method === "supplier-delivery" ? "Receive delivery" : "Start pickup";
   return (
-    <article onClick={onOpen} className={cn("group relative cursor-pointer overflow-hidden rounded-[22px] border bg-background/82 p-3.5 pt-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-lg", selected ? "border-primary/40 ring-2 ring-primary/10" : "border-border/55", po.state?.is_urgent && "border-l-4 border-l-destructive")}>
+    <ContextMenu><ContextMenuTrigger asChild><article onClick={onOpen} className={cn("group relative cursor-pointer overflow-hidden rounded-[22px] border bg-background/82 p-3.5 pt-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-lg", selected ? "border-primary/40 ring-2 ring-primary/10" : "border-border/55", po.state?.is_urgent && "border-l-4 border-l-destructive")}>
       <div className="ribbon-bar absolute inset-x-0 top-0 h-1 opacity-85" aria-hidden />
       <div className="flex items-start gap-3"><span className="mt-1 shrink-0" onClick={(event) => { event.stopPropagation(); onToggle(); }}><Checkbox checked={selected} aria-label={`Select ${po.purchaseOrderNumber}`} /></span><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-1.5"><h3 className="font-black text-primary">{po.purchaseOrderNumber}</h3>{po.state?.is_urgent && <Badge variant="destructive" className="h-5 text-[9px]">Urgent</Badge>}{overdue && <Badge variant="destructive" className="h-5 text-[9px]">Late</Badge>}</div><p className="mt-1 truncate text-sm font-semibold">{po.vendorName}</p></div><ChevronRight className="mt-1 h-4 w-4 text-muted-foreground/25 transition-transform group-hover:translate-x-0.5 group-hover:text-primary" /></div>
       <DispatchProgress labels={[`${po.remainingUnits} remaining`, "Scheduled", "Collecting"]} active={progress} />
       <div className="mt-4 flex gap-2 border-t border-border/50 pt-3"><Button size="sm" className="h-10 flex-1 rounded-xl text-xs" onClick={(event) => { event.stopPropagation(); onAdvance(); }}>{actionLabel}<ArrowRight className="ml-1.5 h-3.5 w-3.5" /></Button><DispatchCardMenu selected={selected} urgent={Boolean(po.state?.is_urgent)} unassigned={!po.state?.assigned_to} onToggle={onToggle} onToggleUrgent={onToggleUrgent} onOpen={onOpen} onClaim={onClaim} /></div>
-    </article>
+    </article></ContextMenuTrigger><DispatchContextMenu selected={selected} groupSize={groupSize} team={team} onOpen={onOpen} onToggle={onToggle} onSelectGroup={onSelectGroup} onAssign={onAssign} onRemove={onRemove} /></ContextMenu>
   );
 }
 
@@ -1866,6 +1866,10 @@ function DispatchProgress({ labels, active }: { labels: string[]; active: number
 
 function DispatchCardMenu({ selected, urgent, unassigned, onToggle, onToggleUrgent, onOpen, onClaim }: { selected: boolean; urgent: boolean; unassigned: boolean; onToggle: () => void; onToggleUrgent: () => void; onOpen: () => void; onClaim: () => void }) {
   return <DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" size="icon" className="h-10 w-10 shrink-0 rounded-xl" onClick={(event) => event.stopPropagation()} aria-label="More actions"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-52" onClick={(event) => event.stopPropagation()}><DropdownMenuItem onSelect={onOpen}><MessageSquareText className="mr-2 h-4 w-4" />Open details & comments</DropdownMenuItem>{unassigned && <DropdownMenuItem onSelect={onClaim}><UserCheck className="mr-2 h-4 w-4" />Claim this work</DropdownMenuItem>}<DropdownMenuItem onSelect={onToggleUrgent}><CircleAlert className="mr-2 h-4 w-4" />{urgent ? "Remove urgent flag" : "Mark as urgent"}</DropdownMenuItem><DropdownMenuSeparator /><DropdownMenuItem onSelect={onToggle}><Checkbox checked={selected} className="mr-2 h-4 w-4" />{selected ? "Remove from route selection" : "Add to route selection"}</DropdownMenuItem></DropdownMenuContent></DropdownMenu>;
+}
+
+function DispatchContextMenu({ selected, groupSize, team, onOpen, onToggle, onSelectGroup, onAssign, onRemove }: { selected: boolean; groupSize: number; team: TeamMember[]; onOpen: () => void; onToggle: () => void; onSelectGroup: () => void; onAssign: (id: string | null) => void; onRemove: () => void }) {
+  return <ContextMenuContent className="w-60"><ContextMenuItem onSelect={onOpen}><Eye className="mr-2 h-4 w-4" />Open details</ContextMenuItem><ContextMenuItem onSelect={onToggle}><CheckCircle2 className="mr-2 h-4 w-4" />{selected ? "Deselect this stop" : "Select this stop"}</ContextMenuItem><ContextMenuItem onSelect={onSelectGroup}><Users className="mr-2 h-4 w-4" />Select this group ({groupSize})</ContextMenuItem><ContextMenuSeparator /><ContextMenuSub><ContextMenuSubTrigger><UserRound className="mr-2 h-4 w-4" />Assign selected</ContextMenuSubTrigger><ContextMenuSubContent className="w-56"><ContextMenuItem onSelect={() => onAssign(null)}>Unassigned</ContextMenuItem>{team.map((member) => <ContextMenuItem key={member.id} onSelect={() => onAssign(member.id)}>{member.full_name || member.email || "Team member"}</ContextMenuItem>)}</ContextMenuSubContent></ContextMenuSub><ContextMenuSeparator /><ContextMenuItem className="text-destructive focus:text-destructive" onSelect={onRemove}><Trash2 className="mr-2 h-4 w-4" />Remove selected</ContextMenuItem></ContextMenuContent>;
 }
 
 function Field({ label, icon: Icon, children }: { label: string; icon: any; children: React.ReactNode }) {
