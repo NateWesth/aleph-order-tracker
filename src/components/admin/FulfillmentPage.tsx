@@ -22,6 +22,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger, ContextMenuTrigger } from "@/components/ui/context-menu";
 import EntityComments from "@/components/admin/EntityComments";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { readAllRows } from "@/lib/readAllRows";
@@ -39,6 +40,7 @@ import {
   ClipboardCheck,
   Clock3,
   FileCheck2,
+  Eye,
   History,
   ListFilter,
   MapPinned,
@@ -1193,6 +1195,27 @@ export default function FulfillmentPage() {
     }
   };
 
+  const assignSelectedStops = async (assigneeId: string | null) => {
+    const orderIds = [...deliverySelection];
+    const collections = collectionQueue.filter((po) => collectionSelection.has(po.purchaseOrderId));
+    if (!orderIds.length && !collections.length) return;
+    setBulkSaving(true);
+    try {
+      if (orderIds.length) {
+        await saveBatch(orderIds.map((id) => ({ table: "orders", id, patch: { fulfillment_assigned_to: assigneeId }, updated_at: deliveryOrders.find((row) => row.id === id)?.updated_at || null })));
+      }
+      for (const po of collections) await updateCollectionState(po, { assigned_to: assigneeId });
+      await fetchData();
+      toast({ title: "Assignment updated", description: `${orderIds.length + collections.length} stop${orderIds.length + collections.length === 1 ? "" : "s"} assigned.` });
+      setDeliverySelection(new Set());
+      setCollectionSelection(new Set());
+    } catch (error) {
+      toast({ title: "Assignment failed", description: error instanceof Error ? error.message : "Refresh and retry.", variant: "destructive" });
+    } finally {
+      setBulkSaving(false);
+    }
+  };
+
 
   const removeSelectedStops = async () => {
     const orderIds = [...deliverySelection];
@@ -1578,6 +1601,10 @@ export default function FulfillmentPage() {
                 </Select>
               )}
               {activeMode === "delivery" && deliverySelection.size > 0 && <Button variant="outline" className="h-10 rounded-xl" onClick={() => void applyBulkDeliveryPlan()} disabled={bulkSaving || (bulkAssignee === "keep" && !bulkSchedule)}><Route className="mr-1.5 h-4 w-4" />Quick schedule deliveries</Button>}
+              <Select onValueChange={(value) => void assignSelectedStops(value === "unassigned" ? null : value)} disabled={bulkSaving}>
+                <SelectTrigger className="h-10 w-[190px] rounded-xl"><SelectValue placeholder="Assign selected…" /></SelectTrigger>
+                <SelectContent><SelectItem value="unassigned">Unassigned</SelectItem>{team.map((member) => <SelectItem key={member.id} value={member.id}>{member.full_name || member.email || "Team member"}</SelectItem>)}</SelectContent>
+              </Select>
               <Button variant="outline" className="h-10 rounded-xl text-destructive hover:text-destructive" onClick={() => setBulkRemoveOpen(true)} disabled={bulkSaving}><Trash2 className="mr-1.5 h-4 w-4" />Remove</Button>
               <Button className="h-10 rounded-xl" onClick={() => setRoutePlannerOpen(true)}><WandSparkles className="mr-1.5 h-4 w-4" />Plan mixed dispatch run</Button>
             </div>
@@ -1619,7 +1646,7 @@ export default function FulfillmentPage() {
             {deliveryLanes.map((lane) => (
               <DispatchLane key={lane.id} label={lane.label} hint={lane.hint} icon={lane.icon} count={lane.items.length} tone={lane.id === "route" ? "route" : lane.id === "scheduled" ? "planned" : "ready"}>
                 {lane.items.map((order) => (
-                  <DeliveryDispatchCard key={order.id} order={order} selected={deliverySelection.has(order.id)} onToggle={() => toggleDeliverySelection(order.id)} onToggleUrgent={() => void updateDelivery(order.id, { urgency: order.urgency === "urgent" ? "normal" : "urgent" })} onOpen={() => setSelectedDeliveryId(order.id)} onClaim={() => void updateDelivery(order.id, { fulfillment_assigned_to: user?.id || null })} onAdvance={() => order.fulfillment_status === "scheduled" ? void updateDelivery(order.id, { fulfillment_status: "out-for-delivery" }) : order.fulfillment_status === "out-for-delivery" ? setConfirmDeliveryId(order.id) : setSelectedDeliveryId(order.id)} />
+                  <DeliveryDispatchCard key={order.id} order={order} selected={deliverySelection.has(order.id)} groupSize={lane.items.length} team={team} onToggle={() => toggleDeliverySelection(order.id)} onSelectGroup={() => setDeliverySelection(new Set(lane.items.map((item) => item.id)))} onAssign={(id) => { const ids = deliverySelection.has(order.id) ? deliverySelection : new Set([order.id]); setDeliverySelection(ids); setCollectionSelection(new Set()); void saveBatch([...ids].map((orderId) => ({ table: "orders", id: orderId, patch: { fulfillment_assigned_to: id }, updated_at: deliveryOrders.find((row) => row.id === orderId)?.updated_at || null }))).then(() => fetchData()); }} onRemove={() => { if (!deliverySelection.has(order.id)) setDeliverySelection(new Set([order.id])); setCollectionSelection(new Set()); setBulkRemoveOpen(true); }} onToggleUrgent={() => void updateDelivery(order.id, { urgency: order.urgency === "urgent" ? "normal" : "urgent" })} onOpen={() => setSelectedDeliveryId(order.id)} onClaim={() => void updateDelivery(order.id, { fulfillment_assigned_to: user?.id || null })} onAdvance={() => order.fulfillment_status === "scheduled" ? void updateDelivery(order.id, { fulfillment_status: "out-for-delivery" }) : order.fulfillment_status === "out-for-delivery" ? setConfirmDeliveryId(order.id) : setSelectedDeliveryId(order.id)} />
                 ))}
               </DispatchLane>
             ))}
@@ -1627,7 +1654,7 @@ export default function FulfillmentPage() {
         )
       ) : collectionFiltered.length === 0 ? <EmptyState icon={Warehouse} title="No collections match this view" body="Open Zoho purchase orders appear automatically. Try All if a focus filter is active." /> : (
         <div className="fulfillment-board-grid grid min-w-0 gap-4 xl:grid-cols-3">
-          {collectionLanes.map((lane) => <DispatchLane key={lane.id} label={lane.label} hint={lane.hint} icon={lane.icon} count={lane.items.length} tone={lane.id === "collecting" ? "route" : lane.id === "scheduled" ? "planned" : "ready"}>{lane.items.map((po) => <CollectionDispatchCard key={po.purchaseOrderId} po={po} selected={collectionSelection.has(po.purchaseOrderId)} onToggle={() => toggleCollectionSelection(po.purchaseOrderId)} onToggleUrgent={() => void updateCollectionState(po, { is_urgent: !po.state?.is_urgent })} onOpen={() => setSelectedCollectionId(po.purchaseOrderId)} onClaim={() => void updateCollectionState(po, { assigned_to: user?.id || null })} onAdvance={() => po.state?.status === "scheduled" || po.state?.status === "pending" ? void updateCollectionState(po, { status: "collecting" }) : setSelectedCollectionId(po.purchaseOrderId)} />)}</DispatchLane>)}
+          {collectionLanes.map((lane) => <DispatchLane key={lane.id} label={lane.label} hint={lane.hint} icon={lane.icon} count={lane.items.length} tone={lane.id === "collecting" ? "route" : lane.id === "scheduled" ? "planned" : "ready"}>{lane.items.map((po) => <CollectionDispatchCard key={po.purchaseOrderId} po={po} selected={collectionSelection.has(po.purchaseOrderId)} groupSize={lane.items.length} team={team} onToggle={() => toggleCollectionSelection(po.purchaseOrderId)} onSelectGroup={() => setCollectionSelection(new Set(lane.items.map((item) => item.purchaseOrderId)))} onAssign={(id) => { const targets = collectionSelection.has(po.purchaseOrderId) ? collectionQueue.filter((item) => collectionSelection.has(item.purchaseOrderId)) : [po]; setCollectionSelection(new Set(targets.map((item) => item.purchaseOrderId))); setDeliverySelection(new Set()); void Promise.all(targets.map((item) => updateCollectionState(item, { assigned_to: id }))); }} onRemove={() => { if (!collectionSelection.has(po.purchaseOrderId)) setCollectionSelection(new Set([po.purchaseOrderId])); setDeliverySelection(new Set()); setBulkRemoveOpen(true); }} onToggleUrgent={() => void updateCollectionState(po, { is_urgent: !po.state?.is_urgent })} onOpen={() => setSelectedCollectionId(po.purchaseOrderId)} onClaim={() => void updateCollectionState(po, { assigned_to: user?.id || null })} onAdvance={() => po.state?.status === "scheduled" || po.state?.status === "pending" ? void updateCollectionState(po, { status: "collecting" }) : setSelectedCollectionId(po.purchaseOrderId)} />)}</DispatchLane>)}
         </div>
       )}
 
@@ -1803,34 +1830,34 @@ function DispatchLane({ label, hint, icon: Icon, count, tone, children }: { labe
   );
 }
 
-function DeliveryDispatchCard({ order, selected, onToggle, onToggleUrgent, onOpen, onClaim, onAdvance }: { order: FulfillmentOrder; selected: boolean; onToggle: () => void; onToggleUrgent: () => void; onOpen: () => void; onClaim: () => void; onAdvance: () => void }) {
+function DeliveryDispatchCard({ order, selected, groupSize, team, onToggle, onSelectGroup, onAssign, onRemove, onToggleUrgent, onOpen, onClaim, onAdvance }: { order: FulfillmentOrder; selected: boolean; groupSize: number; team: TeamMember[]; onToggle: () => void; onSelectGroup: () => void; onAssign: (id: string | null) => void; onRemove: () => void; onToggleUrgent: () => void; onOpen: () => void; onClaim: () => void; onAdvance: () => void }) {
   const visibleItems = order.items.filter((item) => readyUnits(item) > 0);
   const units = visibleItems.reduce((sum, item) => sum + readyUnits(item), 0);
   const overdue = isOverdue(order.fulfillment_scheduled_for);
   const actionLabel = order.fulfillment_status === "scheduled" ? "Send on route" : order.fulfillment_status === "out-for-delivery" ? "Complete" : "Plan route";
   const progress = order.fulfillment_status === "out-for-delivery" ? 2 : order.fulfillment_status === "scheduled" ? 1 : 0;
   return (
-    <article onClick={onOpen} className={cn("group relative cursor-pointer overflow-hidden rounded-[22px] border bg-background/82 p-3.5 pt-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-lg", selected ? "border-primary/35 ring-2 ring-primary/10" : "border-border/55", order.urgency === "urgent" && "border-l-4 border-l-destructive")}>
+    <ContextMenu><ContextMenuTrigger asChild><article onClick={onOpen} className={cn("group relative cursor-pointer overflow-hidden rounded-[22px] border bg-background/82 p-3.5 pt-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-lg", selected ? "border-primary/35 ring-2 ring-primary/10" : "border-border/55", order.urgency === "urgent" && "border-l-4 border-l-destructive")}>
       <div className="ribbon-bar absolute inset-x-0 top-0 h-1 opacity-85" aria-hidden />
       <div className="flex items-start gap-3"><span className="mt-1 shrink-0" onClick={(event) => { event.stopPropagation(); onToggle(); }}><Checkbox checked={selected} aria-label={`Select ${order.order_number}`} /></span><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-1.5"><h3 className="font-black text-primary">{order.order_number}</h3>{order.urgency === "urgent" && <Badge variant="destructive" className="h-5 text-[9px]">Urgent</Badge>}{overdue && <Badge variant="destructive" className="h-5 text-[9px]">Late</Badge>}</div><p className="mt-1 truncate text-sm font-semibold">{order.companyName}</p></div><ChevronRight className="mt-1 h-4 w-4 text-muted-foreground/25 transition-transform group-hover:translate-x-0.5 group-hover:text-primary" /></div>
       <DispatchProgress labels={[`${units} ready`, "Assigned", "On route"]} active={progress} />
       <div className="mt-4 flex gap-2 border-t border-border/50 pt-3"><Button size="sm" className="h-10 flex-1 rounded-xl text-xs" onClick={(event) => { event.stopPropagation(); onAdvance(); }}>{actionLabel}<ArrowRight className="ml-1.5 h-3.5 w-3.5" /></Button><DispatchCardMenu selected={selected} urgent={order.urgency === "urgent"} unassigned={!order.fulfillment_assigned_to} onToggle={onToggle} onToggleUrgent={onToggleUrgent} onOpen={onOpen} onClaim={onClaim} /></div>
-    </article>
+    </article></ContextMenuTrigger><DispatchContextMenu selected={selected} groupSize={groupSize} team={team} onOpen={onOpen} onToggle={onToggle} onSelectGroup={onSelectGroup} onAssign={onAssign} onRemove={onRemove} /></ContextMenu>
   );
 }
 
-function CollectionDispatchCard({ po, selected, onToggle, onToggleUrgent, onOpen, onClaim, onAdvance }: { po: CollectionPOView; selected: boolean; onToggle: () => void; onToggleUrgent: () => void; onOpen: () => void; onClaim: () => void; onAdvance: () => void }) {
+function CollectionDispatchCard({ po, selected, groupSize, team, onToggle, onSelectGroup, onAssign, onRemove, onToggleUrgent, onOpen, onClaim, onAdvance }: { po: CollectionPOView; selected: boolean; groupSize: number; team: TeamMember[]; onToggle: () => void; onSelectGroup: () => void; onAssign: (id: string | null) => void; onRemove: () => void; onToggleUrgent: () => void; onOpen: () => void; onClaim: () => void; onAdvance: () => void }) {
   const overdue = isOverdue(po.state?.scheduled_for || po.expectedDeliveryDate);
   const status = po.state?.status || "pending";
   const progress = status === "collecting" ? 2 : status === "scheduled" ? 1 : 0;
   const actionLabel = status === "collecting" ? "Record quantities" : po.state?.collection_method === "supplier-delivery" ? "Receive delivery" : "Start pickup";
   return (
-    <article onClick={onOpen} className={cn("group relative cursor-pointer overflow-hidden rounded-[22px] border bg-background/82 p-3.5 pt-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-lg", selected ? "border-primary/40 ring-2 ring-primary/10" : "border-border/55", po.state?.is_urgent && "border-l-4 border-l-destructive")}>
+    <ContextMenu><ContextMenuTrigger asChild><article onClick={onOpen} className={cn("group relative cursor-pointer overflow-hidden rounded-[22px] border bg-background/82 p-3.5 pt-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-lg", selected ? "border-primary/40 ring-2 ring-primary/10" : "border-border/55", po.state?.is_urgent && "border-l-4 border-l-destructive")}>
       <div className="ribbon-bar absolute inset-x-0 top-0 h-1 opacity-85" aria-hidden />
       <div className="flex items-start gap-3"><span className="mt-1 shrink-0" onClick={(event) => { event.stopPropagation(); onToggle(); }}><Checkbox checked={selected} aria-label={`Select ${po.purchaseOrderNumber}`} /></span><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-1.5"><h3 className="font-black text-primary">{po.purchaseOrderNumber}</h3>{po.state?.is_urgent && <Badge variant="destructive" className="h-5 text-[9px]">Urgent</Badge>}{overdue && <Badge variant="destructive" className="h-5 text-[9px]">Late</Badge>}</div><p className="mt-1 truncate text-sm font-semibold">{po.vendorName}</p></div><ChevronRight className="mt-1 h-4 w-4 text-muted-foreground/25 transition-transform group-hover:translate-x-0.5 group-hover:text-primary" /></div>
       <DispatchProgress labels={[`${po.remainingUnits} remaining`, "Scheduled", "Collecting"]} active={progress} />
       <div className="mt-4 flex gap-2 border-t border-border/50 pt-3"><Button size="sm" className="h-10 flex-1 rounded-xl text-xs" onClick={(event) => { event.stopPropagation(); onAdvance(); }}>{actionLabel}<ArrowRight className="ml-1.5 h-3.5 w-3.5" /></Button><DispatchCardMenu selected={selected} urgent={Boolean(po.state?.is_urgent)} unassigned={!po.state?.assigned_to} onToggle={onToggle} onToggleUrgent={onToggleUrgent} onOpen={onOpen} onClaim={onClaim} /></div>
-    </article>
+    </article></ContextMenuTrigger><DispatchContextMenu selected={selected} groupSize={groupSize} team={team} onOpen={onOpen} onToggle={onToggle} onSelectGroup={onSelectGroup} onAssign={onAssign} onRemove={onRemove} /></ContextMenu>
   );
 }
 
@@ -1840,6 +1867,10 @@ function DispatchProgress({ labels, active }: { labels: string[]; active: number
 
 function DispatchCardMenu({ selected, urgent, unassigned, onToggle, onToggleUrgent, onOpen, onClaim }: { selected: boolean; urgent: boolean; unassigned: boolean; onToggle: () => void; onToggleUrgent: () => void; onOpen: () => void; onClaim: () => void }) {
   return <DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" size="icon" className="h-10 w-10 shrink-0 rounded-xl" onClick={(event) => event.stopPropagation()} aria-label="More actions"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-52" onClick={(event) => event.stopPropagation()}><DropdownMenuItem onSelect={onOpen}><MessageSquareText className="mr-2 h-4 w-4" />Open details & comments</DropdownMenuItem>{unassigned && <DropdownMenuItem onSelect={onClaim}><UserCheck className="mr-2 h-4 w-4" />Claim this work</DropdownMenuItem>}<DropdownMenuItem onSelect={onToggleUrgent}><CircleAlert className="mr-2 h-4 w-4" />{urgent ? "Remove urgent flag" : "Mark as urgent"}</DropdownMenuItem><DropdownMenuSeparator /><DropdownMenuItem onSelect={onToggle}><Checkbox checked={selected} className="mr-2 h-4 w-4" />{selected ? "Remove from route selection" : "Add to route selection"}</DropdownMenuItem></DropdownMenuContent></DropdownMenu>;
+}
+
+function DispatchContextMenu({ selected, groupSize, team, onOpen, onToggle, onSelectGroup, onAssign, onRemove }: { selected: boolean; groupSize: number; team: TeamMember[]; onOpen: () => void; onToggle: () => void; onSelectGroup: () => void; onAssign: (id: string | null) => void; onRemove: () => void }) {
+  return <ContextMenuContent className="w-60"><ContextMenuItem onSelect={onOpen}><Eye className="mr-2 h-4 w-4" />Open details</ContextMenuItem><ContextMenuItem onSelect={onToggle}><CheckCircle2 className="mr-2 h-4 w-4" />{selected ? "Deselect this stop" : "Select this stop"}</ContextMenuItem><ContextMenuItem onSelect={onSelectGroup}><Users className="mr-2 h-4 w-4" />Select this group ({groupSize})</ContextMenuItem><ContextMenuSeparator /><ContextMenuSub><ContextMenuSubTrigger><UserRound className="mr-2 h-4 w-4" />Assign selected</ContextMenuSubTrigger><ContextMenuSubContent className="w-56"><ContextMenuItem onSelect={() => onAssign(null)}>Unassigned</ContextMenuItem>{team.map((member) => <ContextMenuItem key={member.id} onSelect={() => onAssign(member.id)}>{member.full_name || member.email || "Team member"}</ContextMenuItem>)}</ContextMenuSubContent></ContextMenuSub><ContextMenuSeparator /><ContextMenuItem className="text-destructive focus:text-destructive" onSelect={onRemove}><Trash2 className="mr-2 h-4 w-4" />Remove selected</ContextMenuItem></ContextMenuContent>;
 }
 
 function Field({ label, icon: Icon, children }: { label: string; icon: any; children: React.ReactNode }) {

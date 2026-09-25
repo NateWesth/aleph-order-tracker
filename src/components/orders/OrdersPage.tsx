@@ -312,6 +312,14 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
     });
   }, []);
 
+  const selectOrderGroup = useCallback((orderIds: string[]) => {
+    setSelectedOrderIds((current) => {
+      const next = new Set(current);
+      orderIds.forEach((id) => next.add(id));
+      return next;
+    });
+  }, []);
+
   const selectedOrders = useMemo(
     () =>
       orders
@@ -1103,6 +1111,7 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
                       canEditItems={true}
                       selectedOrderIds={selectedOrderIds}
                       onToggleOrderSelection={toggleOrderSelection}
+                      onSelectOrderGroup={selectOrderGroup}
                       groupByClient={groupByClient}
                       allTags={allTags}
                       tagAssignments={tagAssignments}
