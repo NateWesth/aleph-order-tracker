@@ -3552,44 +3552,37 @@ html[data-density="dense"] .app-page-stage .rounded-\[24px\] { border-radius: 1r
     -webkit-overflow-scrolling: touch;
   }
 
-  /* Orders become four full-width, horizontally swipeable workflow screens. */
+  /* Orders board columns stack vertically on phones - each one is already a
+     click-to-expand dropdown (see OrderStatusColumn's mobile header), so no
+     horizontal swiping is needed or wanted here. */
   .orders-mobile-swipe {
-    display: flex !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
     gap: .65rem !important;
-    overflow-x: auto !important;
-    overflow-y: hidden !important;
-    scroll-snap-type: x mandatory;
-    scroll-padding-inline: .1rem;
-    scrollbar-width: none;
+    overflow: visible !important;
   }
 
   .orders-mobile-swipe > .order-board-lane-frame {
-    flex: 0 0 calc(100vw - 1.35rem);
-    width: calc(100vw - 1.35rem) !important;
-    height: calc(100dvh - var(--aleph-header-height, 70px) - 7rem);
-    min-height: 30rem;
-    scroll-snap-align: start;
-    scroll-snap-stop: always;
+    flex: none;
+    width: 100% !important;
+    height: auto;
+    min-height: 0;
   }
 
-  /* Dispatch uses the same one-lane-at-a-time swipe model on phones. */
+  /* Dispatch lanes stack vertically on phones the same way - each lane is a
+     click-to-expand dropdown, not a horizontally-swiped screen. */
   .fulfillment-board-grid {
-    display: flex !important;
-    grid-template-columns: none !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
     gap: .65rem !important;
-    overflow-x: auto !important;
-    overflow-y: hidden !important;
-    scroll-snap-type: x mandatory;
-    scrollbar-width: none;
+    overflow: visible !important;
   }
 
   .fulfillment-board-grid > .fulfillment-lane {
-    flex: 0 0 calc(100vw - 1.35rem) !important;
-    width: calc(100vw - 1.35rem) !important;
-    min-height: 30rem;
-    max-height: calc(100dvh - var(--aleph-header-height, 70px) - 8.25rem);
-    scroll-snap-align: start;
-    scroll-snap-stop: always;
+    flex: none !important;
+    width: 100% !important;
+    min-height: 0;
+    max-height: none;
   }
 
   .fulfillment-v3 > section.sticky {

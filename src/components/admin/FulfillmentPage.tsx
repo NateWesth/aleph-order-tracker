@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { useLiveData } from "@/hooks/useLiveData";
 import { useConflictSave } from "@/hooks/useConflictSave";
 import { useDraftRecovery } from "@/hooks/useDraftRecovery";
@@ -35,6 +36,7 @@ import {
   CalendarClock,
   CalendarDays,
   CheckCircle2,
+  ChevronDown,
   ChevronRight,
   CircleAlert,
   ClipboardCheck,
@@ -1816,16 +1818,28 @@ function EntityTimeline({ events, memberName }: { events: FulfillmentTimelineEve
   );
 }
 
-function DispatchLane({ label, hint, icon: Icon, count, tone, children }: { label: string; hint: string; icon: any; count: number; tone: "ready" | "planned" | "route"; children: React.ReactNode }) {
+function DispatchLane({ label, hint, icon: Icon, count, tone, defaultOpen, children }: { label: string; hint: string; icon: any; count: number; tone: "ready" | "planned" | "route"; defaultOpen?: boolean; children: React.ReactNode }) {
+  const isMobile = useIsMobile();
+  const [open, setOpen] = useState(defaultOpen ?? false);
   const toneClass = tone === "route" ? "bg-emerald-500" : tone === "planned" ? "bg-violet-500" : "bg-cyan-500";
+  const isExpanded = !isMobile || open;
   return (
-    <section className="fulfillment-lane flex min-h-[460px] min-w-0 flex-col overflow-hidden rounded-[28px] border border-border/60 bg-card/72 shadow-sm">
-      <header className="shrink-0 border-b border-border/55 px-4 py-4">
-        <div className="flex items-center justify-between gap-3"><div className="flex min-w-0 items-center gap-3"><span className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-2xl text-white shadow-lg", toneClass)}><Icon className="h-4 w-4" /></span><div className="min-w-0"><h2 className="truncate text-sm font-black">{label}</h2><p className="truncate text-[10px] text-muted-foreground">{hint}</p></div></div><Badge variant="secondary" className="rounded-full">{count}</Badge></div>
+    <section className="fulfillment-lane flex min-w-0 flex-col overflow-hidden rounded-[28px] border border-border/60 bg-card/72 shadow-sm">
+      <header className="shrink-0 border-b border-border/55">
+        <button
+          type="button"
+          onClick={() => isMobile && setOpen((v) => !v)}
+          className={cn("flex w-full items-center justify-between gap-3 px-4 py-4 text-left", isMobile && "active:bg-muted/40")}
+        >
+          <div className="flex min-w-0 items-center gap-3"><span className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-2xl text-white shadow-lg", toneClass)}><Icon className="h-4 w-4" /></span><div className="min-w-0"><h2 className="truncate text-sm font-black">{label}</h2><p className="truncate text-[10px] text-muted-foreground">{hint}</p></div></div>
+          <div className="flex shrink-0 items-center gap-2"><Badge variant="secondary" className="rounded-full">{count}</Badge>{isMobile && <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform", open && "rotate-180")} />}</div>
+        </button>
       </header>
-      <div className="fulfillment-lane-scroll min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
-        {count ? children : <div className="grid min-h-56 place-items-center rounded-3xl border border-dashed border-border/60 bg-muted/20 p-6 text-center"><div><CheckCircle2 className="mx-auto h-7 w-7 text-emerald-500/55" /><p className="mt-3 text-xs font-bold">Lane clear</p><p className="mt-1 text-[10px] text-muted-foreground">New work appears here live.</p></div></div>}
-      </div>
+      {isExpanded && (
+        <div className={cn("fulfillment-lane-scroll min-h-0 flex-1 space-y-3 overflow-y-auto p-3", !isMobile && "min-h-[420px]")}>
+          {count ? children : <div className="grid min-h-56 place-items-center rounded-3xl border border-dashed border-border/60 bg-muted/20 p-6 text-center"><div><CheckCircle2 className="mx-auto h-7 w-7 text-emerald-500/55" /><p className="mt-3 text-xs font-bold">Lane clear</p><p className="mt-1 text-[10px] text-muted-foreground">New work appears here live.</p></div></div>}
+        </div>
+      )}
     </section>
   );
 }
@@ -1839,7 +1853,7 @@ function DeliveryDispatchCard({ order, selected, groupSize, team, onToggle, onSe
   return (
     <ContextMenu><ContextMenuTrigger asChild><article onClick={onOpen} className={cn("group relative cursor-pointer overflow-hidden rounded-[22px] border bg-background/82 p-3.5 pt-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-lg", selected ? "border-primary/35 ring-2 ring-primary/10" : "border-border/55", order.urgency === "urgent" && "border-l-4 border-l-destructive")}>
       <div className="ribbon-bar absolute inset-x-0 top-0 h-1 opacity-85" aria-hidden />
-      <div className="flex items-start gap-3"><span className="mt-1 shrink-0" onClick={(event) => { event.stopPropagation(); onToggle(); }}><Checkbox checked={selected} aria-label={`Select ${order.order_number}`} /></span><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-1.5"><h3 className="font-black text-primary">{order.order_number}</h3>{order.urgency === "urgent" && <Badge variant="destructive" className="h-5 text-[9px]">Urgent</Badge>}{overdue && <Badge variant="destructive" className="h-5 text-[9px]">Late</Badge>}</div><p className="mt-1 truncate text-sm font-semibold">{order.companyName}</p></div><ChevronRight className="mt-1 h-4 w-4 text-muted-foreground/25 transition-transform group-hover:translate-x-0.5 group-hover:text-primary" /></div>
+      <div className="flex items-start gap-3"><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-1.5"><h3 className="font-black text-primary">{order.order_number}</h3>{order.urgency === "urgent" && <Badge variant="destructive" className="h-5 text-[9px]">Urgent</Badge>}{overdue && <Badge variant="destructive" className="h-5 text-[9px]">Late</Badge>}</div><p className="mt-1 truncate text-sm font-semibold">{order.companyName}</p></div><ChevronRight className="mt-1 h-4 w-4 text-muted-foreground/25 transition-transform group-hover:translate-x-0.5 group-hover:text-primary" /></div>
       <DispatchProgress labels={[`${units} ready`, "Assigned", "On route"]} active={progress} />
       <div className="mt-4 flex gap-2 border-t border-border/50 pt-3"><Button size="sm" className="h-10 flex-1 rounded-xl text-xs" onClick={(event) => { event.stopPropagation(); onAdvance(); }}>{actionLabel}<ArrowRight className="ml-1.5 h-3.5 w-3.5" /></Button><DispatchCardMenu selected={selected} urgent={order.urgency === "urgent"} unassigned={!order.fulfillment_assigned_to} onToggle={onToggle} onToggleUrgent={onToggleUrgent} onOpen={onOpen} onClaim={onClaim} /></div>
     </article></ContextMenuTrigger><DispatchContextMenu selected={selected} groupSize={groupSize} team={team} onOpen={onOpen} onToggle={onToggle} onSelectGroup={onSelectGroup} onAssign={onAssign} onRemove={onRemove} /></ContextMenu>
@@ -1854,7 +1868,7 @@ function CollectionDispatchCard({ po, selected, groupSize, team, onToggle, onSel
   return (
     <ContextMenu><ContextMenuTrigger asChild><article onClick={onOpen} className={cn("group relative cursor-pointer overflow-hidden rounded-[22px] border bg-background/82 p-3.5 pt-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-lg", selected ? "border-primary/40 ring-2 ring-primary/10" : "border-border/55", po.state?.is_urgent && "border-l-4 border-l-destructive")}>
       <div className="ribbon-bar absolute inset-x-0 top-0 h-1 opacity-85" aria-hidden />
-      <div className="flex items-start gap-3"><span className="mt-1 shrink-0" onClick={(event) => { event.stopPropagation(); onToggle(); }}><Checkbox checked={selected} aria-label={`Select ${po.purchaseOrderNumber}`} /></span><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-1.5"><h3 className="font-black text-primary">{po.purchaseOrderNumber}</h3>{po.state?.is_urgent && <Badge variant="destructive" className="h-5 text-[9px]">Urgent</Badge>}{overdue && <Badge variant="destructive" className="h-5 text-[9px]">Late</Badge>}</div><p className="mt-1 truncate text-sm font-semibold">{po.vendorName}</p></div><ChevronRight className="mt-1 h-4 w-4 text-muted-foreground/25 transition-transform group-hover:translate-x-0.5 group-hover:text-primary" /></div>
+      <div className="flex items-start gap-3"><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-1.5"><h3 className="font-black text-primary">{po.purchaseOrderNumber}</h3>{po.state?.is_urgent && <Badge variant="destructive" className="h-5 text-[9px]">Urgent</Badge>}{overdue && <Badge variant="destructive" className="h-5 text-[9px]">Late</Badge>}</div><p className="mt-1 truncate text-sm font-semibold">{po.vendorName}</p></div><ChevronRight className="mt-1 h-4 w-4 text-muted-foreground/25 transition-transform group-hover:translate-x-0.5 group-hover:text-primary" /></div>
       <DispatchProgress labels={[`${po.remainingUnits} remaining`, "Scheduled", "Collecting"]} active={progress} />
       <div className="mt-4 flex gap-2 border-t border-border/50 pt-3"><Button size="sm" className="h-10 flex-1 rounded-xl text-xs" onClick={(event) => { event.stopPropagation(); onAdvance(); }}>{actionLabel}<ArrowRight className="ml-1.5 h-3.5 w-3.5" /></Button><DispatchCardMenu selected={selected} urgent={Boolean(po.state?.is_urgent)} unassigned={!po.state?.assigned_to} onToggle={onToggle} onToggleUrgent={onToggleUrgent} onOpen={onOpen} onClaim={onClaim} /></div>
     </article></ContextMenuTrigger><DispatchContextMenu selected={selected} groupSize={groupSize} team={team} onOpen={onOpen} onToggle={onToggle} onSelectGroup={onSelectGroup} onAssign={onAssign} onRemove={onRemove} /></ContextMenu>
