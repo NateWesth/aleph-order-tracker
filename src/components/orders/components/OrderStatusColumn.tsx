@@ -521,7 +521,9 @@ function OrderStatusColumn({
     return (
       <div key={`${order.id}-${config.key}`} className="space-y-2">
         <ContextMenu>
-          <ContextMenuTrigger asChild>{orderCard}</ContextMenuTrigger>
+          <ContextMenuTrigger asChild>
+            <div className="min-w-0">{orderCard}</div>
+          </ContextMenuTrigger>
           <ContextMenuContent className="w-60">
             <ContextMenuItem onSelect={() => { setDetailsTab("details"); setDetailsOrder(order); }}>
               <Eye className="mr-2 h-4 w-4" />Open order
