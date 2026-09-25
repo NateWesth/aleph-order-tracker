@@ -22,6 +22,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger, ContextMenuTrigger } from "@/components/ui/context-menu";
 import EntityComments from "@/components/admin/EntityComments";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { readAllRows } from "@/lib/readAllRows";
@@ -1193,6 +1194,27 @@ export default function FulfillmentPage() {
     }
   };
 
+  const assignSelectedStops = async (assigneeId: string | null) => {
+    const orderIds = [...deliverySelection];
+    const collections = collectionQueue.filter((po) => collectionSelection.has(po.purchaseOrderId));
+    if (!orderIds.length && !collections.length) return;
+    setBulkSaving(true);
+    try {
+      if (orderIds.length) {
+        await saveBatch(orderIds.map((id) => ({ table: "orders", id, patch: { fulfillment_assigned_to: assigneeId }, updated_at: deliveryOrders.find((row) => row.id === id)?.updated_at || null })));
+      }
+      for (const po of collections) await updateCollectionState(po, { assigned_to: assigneeId });
+      await fetchData();
+      toast({ title: "Assignment updated", description: `${orderIds.length + collections.length} stop${orderIds.length + collections.length === 1 ? "" : "s"} assigned.` });
+      setDeliverySelection(new Set());
+      setCollectionSelection(new Set());
+    } catch (error) {
+      toast({ title: "Assignment failed", description: error instanceof Error ? error.message : "Refresh and retry.", variant: "destructive" });
+    } finally {
+      setBulkSaving(false);
+    }
+  };
+
 
   const removeSelectedStops = async () => {
     const orderIds = [...deliverySelection];
@@ -1578,6 +1600,10 @@ export default function FulfillmentPage() {
                 </Select>
               )}
               {activeMode === "delivery" && deliverySelection.size > 0 && <Button variant="outline" className="h-10 rounded-xl" onClick={() => void applyBulkDeliveryPlan()} disabled={bulkSaving || (bulkAssignee === "keep" && !bulkSchedule)}><Route className="mr-1.5 h-4 w-4" />Quick schedule deliveries</Button>}
+              <Select onValueChange={(value) => void assignSelectedStops(value === "unassigned" ? null : value)} disabled={bulkSaving}>
+                <SelectTrigger className="h-10 w-[190px] rounded-xl"><SelectValue placeholder="Assign selected…" /></SelectTrigger>
+                <SelectContent><SelectItem value="unassigned">Unassigned</SelectItem>{team.map((member) => <SelectItem key={member.id} value={member.id}>{member.full_name || member.email || "Team member"}</SelectItem>)}</SelectContent>
+              </Select>
               <Button variant="outline" className="h-10 rounded-xl text-destructive hover:text-destructive" onClick={() => setBulkRemoveOpen(true)} disabled={bulkSaving}><Trash2 className="mr-1.5 h-4 w-4" />Remove</Button>
               <Button className="h-10 rounded-xl" onClick={() => setRoutePlannerOpen(true)}><WandSparkles className="mr-1.5 h-4 w-4" />Plan mixed dispatch run</Button>
             </div>
@@ -1619,7 +1645,7 @@ export default function FulfillmentPage() {
             {deliveryLanes.map((lane) => (
               <DispatchLane key={lane.id} label={lane.label} hint={lane.hint} icon={lane.icon} count={lane.items.length} tone={lane.id === "route" ? "route" : lane.id === "scheduled" ? "planned" : "ready"}>
                 {lane.items.map((order) => (
-                  <DeliveryDispatchCard key={order.id} order={order} selected={deliverySelection.has(order.id)} onToggle={() => toggleDeliverySelection(order.id)} onToggleUrgent={() => void updateDelivery(order.id, { urgency: order.urgency === "urgent" ? "normal" : "urgent" })} onOpen={() => setSelectedDeliveryId(order.id)} onClaim={() => void updateDelivery(order.id, { fulfillment_assigned_to: user?.id || null })} onAdvance={() => order.fulfillment_status === "scheduled" ? void updateDelivery(order.id, { fulfillment_status: "out-for-delivery" }) : order.fulfillment_status === "out-for-delivery" ? setConfirmDeliveryId(order.id) : setSelectedDeliveryId(order.id)} />
+                  <DeliveryDispatchCard key={order.id} order={order} selected={deliverySelection.has(order.id)} groupSize={lane.items.length} team={team} onToggle={() => toggleDeliverySelection(order.id)} onSelectGroup={() => setDeliverySelection(new Set(lane.items.map((item) => item.id)))} onAssign={(id) => { const ids = deliverySelection.has(order.id) ? deliverySelection : new Set([order.id]); setDeliverySelection(ids); setCollectionSelection(new Set()); void saveBatch([...ids].map((orderId) => ({ table: "orders", id: orderId, patch: { fulfillment_assigned_to: id }, updated_at: deliveryOrders.find((row) => row.id === orderId)?.updated_at || null }))).then(() => fetchData()); }} onRemove={() => { setDeliverySelection(new Set([order.id])); setCollectionSelection(new Set()); setBulkRemoveOpen(true); }} onToggleUrgent={() => void updateDelivery(order.id, { urgency: order.urgency === "urgent" ? "normal" : "urgent" })} onOpen={() => setSelectedDeliveryId(order.id)} onClaim={() => void updateDelivery(order.id, { fulfillment_assigned_to: user?.id || null })} onAdvance={() => order.fulfillment_status === "scheduled" ? void updateDelivery(order.id, { fulfillment_status: "out-for-delivery" }) : order.fulfillment_status === "out-for-delivery" ? setConfirmDeliveryId(order.id) : setSelectedDeliveryId(order.id)} />
                 ))}
               </DispatchLane>
             ))}
@@ -1627,7 +1653,7 @@ export default function FulfillmentPage() {
         )
       ) : collectionFiltered.length === 0 ? <EmptyState icon={Warehouse} title="No collections match this view" body="Open Zoho purchase orders appear automatically. Try All if a focus filter is active." /> : (
         <div className="fulfillment-board-grid grid min-w-0 gap-4 xl:grid-cols-3">
-          {collectionLanes.map((lane) => <DispatchLane key={lane.id} label={lane.label} hint={lane.hint} icon={lane.icon} count={lane.items.length} tone={lane.id === "collecting" ? "route" : lane.id === "scheduled" ? "planned" : "ready"}>{lane.items.map((po) => <CollectionDispatchCard key={po.purchaseOrderId} po={po} selected={collectionSelection.has(po.purchaseOrderId)} onToggle={() => toggleCollectionSelection(po.purchaseOrderId)} onToggleUrgent={() => void updateCollectionState(po, { is_urgent: !po.state?.is_urgent })} onOpen={() => setSelectedCollectionId(po.purchaseOrderId)} onClaim={() => void updateCollectionState(po, { assigned_to: user?.id || null })} onAdvance={() => po.state?.status === "scheduled" || po.state?.status === "pending" ? void updateCollectionState(po, { status: "collecting" }) : setSelectedCollectionId(po.purchaseOrderId)} />)}</DispatchLane>)}
+          {collectionLanes.map((lane) => <DispatchLane key={lane.id} label={lane.label} hint={lane.hint} icon={lane.icon} count={lane.items.length} tone={lane.id === "collecting" ? "route" : lane.id === "scheduled" ? "planned" : "ready"}>{lane.items.map((po) => <CollectionDispatchCard key={po.purchaseOrderId} po={po} selected={collectionSelection.has(po.purchaseOrderId)} groupSize={lane.items.length} team={team} onToggle={() => toggleCollectionSelection(po.purchaseOrderId)} onSelectGroup={() => setCollectionSelection(new Set(lane.items.map((item) => item.purchaseOrderId)))} onAssign={(id) => { const targets = collectionSelection.has(po.purchaseOrderId) ? collectionQueue.filter((item) => collectionSelection.has(item.purchaseOrderId)) : [po]; setCollectionSelection(new Set(targets.map((item) => item.purchaseOrderId))); setDeliverySelection(new Set()); void Promise.all(targets.map((item) => updateCollectionState(item, { assigned_to: id }))); }} onRemove={() => { setCollectionSelection(new Set([po.purchaseOrderId])); setDeliverySelection(new Set()); setBulkRemoveOpen(true); }} onToggleUrgent={() => void updateCollectionState(po, { is_urgent: !po.state?.is_urgent })} onOpen={() => setSelectedCollectionId(po.purchaseOrderId)} onClaim={() => void updateCollectionState(po, { assigned_to: user?.id || null })} onAdvance={() => po.state?.status === "scheduled" || po.state?.status === "pending" ? void updateCollectionState(po, { status: "collecting" }) : setSelectedCollectionId(po.purchaseOrderId)} />)}</DispatchLane>)}
         </div>
       )}
 
