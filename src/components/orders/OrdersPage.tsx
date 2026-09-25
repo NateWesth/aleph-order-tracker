@@ -5,7 +5,7 @@ import { PullToRefresh } from "@/components/ui/PullToRefresh";
 import { useOrderCelebration, ConfettiOverlay } from "@/components/ui/OrderCelebration";
 import { playClick, playSuccess } from "@/utils/ambientSounds";
 import { Button } from "@/components/ui/button";
-import { Plus, Filter, Users } from "lucide-react";
+import { Plus, Filter, Users, RefreshCw } from "lucide-react";
 import OrderTemplatesDialog from "./components/OrderTemplatesDialog";
 import OverdueAlerts from "./components/OverdueAlerts";
 import SavedFiltersBar, { type OrderFilter } from "./components/SavedFiltersBar";
@@ -237,6 +237,7 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [templatePrefill, setTemplatePrefill] = useState<any>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [syncingOrders, setSyncingOrders] = useState(false);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>("all");
   const [activeFilter, setActiveFilter] = useState<OrderFilter | null>(null);
   const [activeOrderId, setActiveOrderId] = useState<string | null>(null);
@@ -395,8 +396,12 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
           : Promise.resolve({ data: [], error: null }),
       ]);
 
-      const relationshipError = companiesResult.error || itemsResult.error || posResult.error || profilesResult.error;
-      if (relationshipError) throw relationshipError;
+      // Keep the order cards visible even if one optional relationship is
+      // temporarily unavailable. Previously any profile, supplier, comment,
+      // or PO lookup error blanked the entire board.
+      [companiesResult.error, itemsResult.error, posResult.error, profilesResult.error]
+        .filter(Boolean)
+        .forEach((relationshipError) => console.error("Optional order data could not load:", relationshipError));
 
       const poSupplierIds = [...new Set((posResult.data || []).map((po) => po.supplier_id))];
       const suppliersPromise = poSupplierIds.length > 0
@@ -526,6 +531,32 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
       setLoading(false);
     }
   }, [toast]);
+
+  const syncOrdersFromZoho = useCallback(async () => {
+    setSyncingOrders(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("zoho-webhook", {
+        body: { action: "sync_sales_orders", since_days: 120 },
+      });
+      if (error) throw error;
+      if (!data?.success && data?.failed) {
+        throw new Error(`${data.failed} Zoho order${data.failed === 1 ? "" : "s"} could not be imported.`);
+      }
+      await fetchOrders();
+      toast({
+        title: "Orders refreshed",
+        description: `${data?.scanned || 0} Zoho sales orders checked; ${data?.imported || 0} updated.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Order refresh failed",
+        description: error instanceof Error ? error.message : "Could not refresh orders from Zoho.",
+        variant: "destructive",
+      });
+    } finally {
+      setSyncingOrders(false);
+    }
+  }, [fetchOrders, toast]);
 
   useLiveData(["orders", "order_items", "order_item_comments", "order_purchase_orders", "order_files"], () => fetchOrders(), {
     channelName: "orders-board-live-data",
@@ -1065,6 +1096,19 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
 
                 <span className="hidden sm:inline">Group</span>
               </Button>
+
+              {isAdmin && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 shrink-0 gap-1 px-2 text-xs"
+                  onClick={() => void syncOrdersFromZoho()}
+                  disabled={syncingOrders}
+                >
+                  <RefreshCw className={cn("h-3.5 w-3.5", syncingOrders && "animate-spin")} />
+                  <span className="hidden sm:inline">{syncingOrders ? "Refreshing" : "Refresh orders"}</span>
+                </Button>
+              )}
 
               <OrderTemplatesDialog
                 companies={companies}

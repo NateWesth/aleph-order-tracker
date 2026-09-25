@@ -25,13 +25,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuSeparator,
-  ContextMenuTrigger,
-} from "@/components/ui/context-menu";
 
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -150,6 +143,7 @@ function OrderStatusColumn({
 
   const [detailsOrder, setDetailsOrder] = useState<Order | null>(null);
   const [pendingDelete, setPendingDelete] = useState<Order | null>(null);
+  const [contextOrder, setContextOrder] = useState<{ order: Order; x: number; y: number } | null>(null);
 
   const [detailsTab, setDetailsTab] = useState<"details" | "pos" | "activity">("pos");
 
@@ -404,6 +398,40 @@ function OrderStatusColumn({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      {contextOrder && (
+        <div className="fixed inset-0 z-[90]" onMouseDown={() => setContextOrder(null)}>
+          <div
+            role="menu"
+            aria-label={`Actions for ${contextOrder.order.order_number}`}
+            className="fixed z-[91] w-64 rounded-lg border border-border bg-popover p-1.5 text-popover-foreground shadow-xl"
+            style={{ left: Math.min(contextOrder.x, window.innerWidth - 272), top: Math.min(contextOrder.y, window.innerHeight - 360) }}
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <Button variant="ghost" className="h-9 w-full justify-start px-2" onClick={() => { setDetailsTab("details"); setDetailsOrder(contextOrder.order); setContextOrder(null); }}><Eye className="mr-2 h-4 w-4" />Open order</Button>
+            <Button variant="ghost" className="h-9 w-full justify-start px-2" onClick={() => { onToggleOrderSelection?.(contextOrder.order.id); setContextOrder(null); }}><CheckSquare className="mr-2 h-4 w-4" />{selectedOrderIds?.has(contextOrder.order.id) ? "Deselect this order" : "Select this order"}</Button>
+            <Button variant="ghost" className="h-9 w-full justify-start px-2" onClick={() => { onSelectOrderGroup?.(orders.map((item) => item.id)); setContextOrder(null); }}><Users className="mr-2 h-4 w-4" />Select this group ({orders.length})</Button>
+            <div className="my-1 h-px bg-border" />
+            {[
+              ["Assign selected", "aleph:bulk-orders-assign"],
+              ["Change status", "aleph:bulk-orders-status"],
+              ["Change urgency", "aleph:bulk-orders-urgency"],
+              ["Add tag", "aleph:bulk-orders-tag"],
+            ].map(([label, eventName]) => (
+              <Button key={eventName} variant="ghost" className="h-9 w-full justify-start px-2" onClick={() => {
+                onSelectOrderGroup?.([contextOrder.order.id]);
+                setContextOrder(null);
+                window.setTimeout(() => window.dispatchEvent(new Event(eventName)), 0);
+              }}>{label}</Button>
+            ))}
+            <div className="my-1 h-px bg-border" />
+            <Button variant="ghost" className="h-9 w-full justify-start px-2 text-destructive hover:text-destructive" onClick={() => {
+              onSelectOrderGroup?.([contextOrder.order.id]);
+              setContextOrder(null);
+              window.setTimeout(() => window.dispatchEvent(new Event("aleph:bulk-orders-delete")), 0);
+            }}><Trash2 className="mr-2 h-4 w-4" />Delete selected</Button>
+          </div>
+        </div>
+      )}
     </>
   );
 
@@ -519,27 +547,16 @@ function OrderStatusColumn({
     );
 
     return (
-      <div key={`${order.id}-${config.key}`} className="space-y-2">
-        <ContextMenu>
-          <ContextMenuTrigger asChild>
-            <div className="min-w-0">{orderCard}</div>
-          </ContextMenuTrigger>
-          <ContextMenuContent className="w-60">
-            <ContextMenuItem onSelect={() => { setDetailsTab("details"); setDetailsOrder(order); }}>
-              <Eye className="mr-2 h-4 w-4" />Open order
-            </ContextMenuItem>
-            <ContextMenuItem onSelect={() => onToggleOrderSelection?.(order.id)}>
-              <CheckSquare className="mr-2 h-4 w-4" />{isSelected ? "Deselect this order" : "Select this order"}
-            </ContextMenuItem>
-            <ContextMenuItem onSelect={() => onSelectOrderGroup?.(orders.map((item) => item.id))}>
-              <Users className="mr-2 h-4 w-4" />Select this group ({orders.length})
-            </ContextMenuItem>
-            <ContextMenuSeparator />
-            <ContextMenuItem className="text-destructive focus:text-destructive" onSelect={() => setPendingDelete(order)}>
-              <Trash2 className="mr-2 h-4 w-4" />Delete this order
-            </ContextMenuItem>
-          </ContextMenuContent>
-        </ContextMenu>
+      <div
+        key={`${order.id}-${config.key}`}
+        className="space-y-2"
+        onContextMenuCapture={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          setContextOrder({ order, x: event.clientX, y: event.clientY });
+        }}
+      >
+        <div className="min-w-0">{orderCard}</div>
       </div>
     );
   }
