@@ -40,6 +40,7 @@ import {
   ClipboardCheck,
   Clock3,
   FileCheck2,
+  Eye,
   History,
   ListFilter,
   MapPinned,
