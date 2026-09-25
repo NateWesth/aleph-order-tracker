@@ -4,7 +4,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Trash2, ArrowRight, Package, ChevronDown, Undo2, MessageCircle, MoreHorizontal, Eye, CheckSquare } from "lucide-react";
+import { Trash2, ArrowRight, Package, ChevronDown, Undo2, MessageCircle, MoreHorizontal, Eye, CheckSquare, Users } from "lucide-react";
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from "@/components/ui/context-menu";
 
 import {
   AlertDialog,
@@ -82,6 +83,7 @@ interface OrderStatusColumnProps {
   onToggleExpand?: () => void;
   selectedOrderIds?: Set<string>;
   onToggleOrderSelection?: (orderId: string) => void;
+  onSelectOrderGroup?: (orderIds: string[]) => void;
   groupByClient?: boolean;
   allTags?: { id: string; name: string; color: string }[];
   tagAssignments?: Map<string, string[]>;
@@ -124,6 +126,7 @@ function OrderStatusColumn({
   onToggleExpand,
   selectedOrderIds,
   onToggleOrderSelection,
+  onSelectOrderGroup,
   groupByClient = false,
   allTags = [],
   tagAssignments,
@@ -140,6 +143,8 @@ function OrderStatusColumn({
   const [collapsedClients, setCollapsedClients] = useState<Set<string>>(new Set());
 
   const [detailsOrder, setDetailsOrder] = useState<Order | null>(null);
+
+  const [pendingDelete, setPendingDelete] = useState<Order | null>(null);
 
   const [detailsTab, setDetailsTab] = useState<"details" | "pos" | "activity">("pos");
 
@@ -377,6 +382,12 @@ function OrderStatusColumn({
           defaultTab={detailsTab}
         />
       )}
+      <AlertDialog open={Boolean(pendingDelete)} onOpenChange={(open) => !open && setPendingDelete(null)}>
+        <AlertDialogContent className="rounded-2xl">
+          <AlertDialogHeader><AlertDialogTitle>Delete order?</AlertDialogTitle><AlertDialogDescription>This permanently deletes order {pendingDelete?.order_number} and cannot be undone.</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction className="bg-destructive hover:bg-destructive/90" onClick={() => { if (pendingDelete) onDeleteOrder(pendingDelete); setPendingDelete(null); }}>Delete</AlertDialogAction></AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 
@@ -485,7 +496,8 @@ function OrderStatusColumn({
 
     return (
       <div key={`${order.id}-${config.key}`} className="space-y-2">
-        {isMobile ? (
+        <ContextMenu>
+          <ContextMenuTrigger asChild><div>{isMobile ? (
           <SwipeableCard
             onSwipeLeft={() => onDeleteOrder(order)}
             onSwipeRight={config.nextStatus ? () => onMoveOrder(order, config.nextStatus!) : undefined}
@@ -499,7 +511,18 @@ function OrderStatusColumn({
           <DraggableCard id={`${order.id}::${order.boardStage || config.key}`}>
             {cardContent}
           </DraggableCard>
-        )}
+          )}</div></ContextMenuTrigger>
+          <ContextMenuContent className="w-56">
+            <ContextMenuItem onSelect={() => hasItems ? onOpenItemsBubble?.(order.id) : (setDetailsTab("details"), setDetailsOrder(order))}><Eye className="mr-2 h-4 w-4" />Open order</ContextMenuItem>
+            {onToggleOrderSelection && <ContextMenuItem onSelect={() => onToggleOrderSelection(order.id)}><CheckSquare className="mr-2 h-4 w-4" />{isSelected ? "Deselect this order" : "Select this order"}</ContextMenuItem>}
+            {onSelectOrderGroup && <ContextMenuItem onSelect={() => onSelectOrderGroup(orders.map((item) => item.id))}><Users className="mr-2 h-4 w-4" />Select this group ({orders.length})</ContextMenuItem>}
+            <ContextMenuSeparator />
+            {config.nextStatus && <ContextMenuItem onSelect={() => onMoveOrder(order, config.nextStatus!)}><ArrowRight className="mr-2 h-4 w-4" />{config.nextLabel || "Move forward"}</ContextMenuItem>}
+            {config.prevStatus && <ContextMenuItem onSelect={() => onMoveOrder(order, config.prevStatus!)}><Undo2 className="mr-2 h-4 w-4" />{config.prevLabel || "Move back"}</ContextMenuItem>}
+            <ContextMenuSeparator />
+            <ContextMenuItem className="text-destructive focus:text-destructive" onSelect={() => setPendingDelete(order)}><Trash2 className="mr-2 h-4 w-4" />Delete this order</ContextMenuItem>
+          </ContextMenuContent>
+        </ContextMenu>
       </div>
     );
   }
