@@ -118,14 +118,20 @@ export default function FreshDispatchPage(){
    <Button variant={history?"default":"outline"} onClick={()=>setHistory(value=>!value)}>{history?"Show outstanding":"History / excluded"}</Button>
   </div>
   {loading?<p role="status">Loading dispatch records…</p>:visible.length===0?<div className="rounded-2xl border border-dashed p-8 text-center"><p className="font-semibold">{shownError?"Records could not be verified":history?"No matching history":"No matching outstanding documents"}</p><p className="mt-2 text-sm text-muted-foreground">Check Source health before assuming everything is complete. Draft/void documents do not require dispatch; paid invoices can still require delivery.</p></div>:
-  <div className="grid min-w-0 gap-3 md:grid-cols-2 xl:grid-cols-3">{visible.map(doc=><button type="button" key={doc.id} onClick={()=>setSelected(doc)} className="min-w-0 rounded-2xl border bg-card p-4 text-left shadow-sm transition hover:border-primary/50 focus-visible:outline-primary">
-   <div className="flex flex-wrap justify-between gap-2"><span className="font-bold text-primary">{doc.reference}</span>{doc.urgent&&<span className="rounded-full bg-destructive/10 px-2 py-1 text-xs font-semibold text-destructive">Urgent</span>}</div>
-   <p className="mt-2 break-words text-base font-semibold">{doc.contact_name}</p>
-   <p className="mt-2 text-sm text-muted-foreground">{remainingUnits(doc)} units remaining · {doc.lines.length} lines</p>
-   <p className="mt-1 text-xs text-muted-foreground">{memberName(doc.assigned_to)} · {doc.scheduled_for?displayDate(doc.scheduled_for):"Not scheduled"}</p>
-   {history&&<p className="mt-2 text-xs">{doc.source_closed?doc.source_status:doc.status}{doc.review_required?" · source changed, review required":""}</p>}
-   <span className="mt-4 flex items-center justify-between border-t pt-3 text-sm font-semibold">{history?"View record":doc.kind==="collection"?"Open collection":"Open delivery"}<ArrowRight className="h-4 w-4"/></span>
-  </button>)}</div>}
+   <div className="overflow-x-auto rounded-2xl border bg-card shadow-sm"><table className="w-full min-w-[760px] border-collapse text-sm">
+    <thead className="bg-muted/50 text-left text-xs uppercase tracking-wide text-muted-foreground"><tr>
+     <th className="px-4 py-3 font-semibold">Reference</th><th className="px-4 py-3 font-semibold">{mode==="collection"?"Supplier":"Customer"}</th><th className="px-4 py-3 font-semibold">Remaining</th><th className="px-4 py-3 font-semibold">Assigned to</th><th className="px-4 py-3 font-semibold">Scheduled</th>{history&&<th className="px-4 py-3 font-semibold">Status</th>}<th className="px-4 py-3 text-right font-semibold">Action</th>
+    </tr></thead>
+    <tbody className="divide-y">{visible.map(doc=><tr key={doc.id} onClick={()=>setSelected(doc)} className="cursor-pointer hover:bg-muted/40">
+     <td className="px-4 py-3"><span className="font-bold text-primary">{doc.reference}</span>{doc.urgent&&<span className="ml-2 rounded-full bg-destructive/10 px-2 py-1 text-xs font-semibold text-destructive">Urgent</span>}</td>
+     <td className="break-words px-4 py-3 font-medium">{doc.contact_name}</td>
+     <td className="px-4 py-3">{remainingUnits(doc)} units · {doc.lines.length} lines</td>
+     <td className="px-4 py-3">{memberName(doc.assigned_to)}</td>
+     <td className="px-4 py-3">{displayDate(doc.scheduled_for)}</td>
+     {history&&<td className="px-4 py-3">{doc.source_closed?doc.source_status:doc.status}{doc.review_required?" · review required":""}</td>}
+     <td className="px-4 py-3 text-right"><Button type="button" variant="ghost" size="sm" onClick={e=>{e.stopPropagation();setSelected(doc);}}>Open <ArrowRight className="ml-1 h-4 w-4"/></Button></td>
+    </tr>)}</tbody>
+   </table></div>}
   {selected&&<DispatchDocumentDialog key={selected.id} doc={selected} members={members} onClose={()=>setSelected(null)} onSaved={async()=>{await load();}}/>}
   {planner&&<SourceDispatchPlanner docs={docs} members={members} onClose={()=>setPlanner(false)} onSaved={load}/>}
  </div>;

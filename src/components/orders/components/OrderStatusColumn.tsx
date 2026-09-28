@@ -550,6 +550,13 @@ function OrderStatusColumn({
       <div
         key={`${order.id}-${config.key}`}
         className="space-y-2"
+        onPointerDownCapture={(event) => {
+          // Keep the drag sensor from swallowing right-clicks.
+          if (event.button === 2) event.stopPropagation();
+        }}
+        onMouseDownCapture={(event) => {
+          if (event.button === 2) event.stopPropagation();
+        }}
         onContextMenuCapture={(event) => {
           event.preventDefault();
           event.stopPropagation();
