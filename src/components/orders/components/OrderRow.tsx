@@ -24,6 +24,9 @@ interface OrderRowProps {
   onDeleteOrder: (orderId: string, orderNumber: string) => void;
   onOrderClick?: (order: OrderWithCompany) => void;
   compact?: boolean;
+  selected?: boolean;
+  onToggleSelect?: (orderId: string) => void;
+  onRowContextMenu?: (order: OrderWithCompany, x: number, y: number) => void;
 }
 
 interface StockStatusCounts {
@@ -226,6 +229,7 @@ export default function OrderRow({
         <div
           className={`cursor-pointer order-row-hover rounded-lg transition-all duration-200 select-none ${compact ? 'p-2' : ''}`}
           onClick={handleRowClick}
+          onContextMenu={onRowContextMenu ? (e) => { e.preventDefault(); onRowContextMenu(order, e.clientX, e.clientY); } : undefined}
           {...longPress}
           {...swipeRef}
         >
@@ -234,6 +238,9 @@ export default function OrderRow({
             <div className="flex justify-between items-start gap-2">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5">
+                  {onToggleSelect && (
+                    <input type="checkbox" aria-label={`Select ${order.order_number}`} className="h-4 w-4 shrink-0 accent-primary" checked={!!selected} onClick={(e) => e.stopPropagation()} onChange={() => onToggleSelect(order.id)} />
+                  )}
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); setDetailsTab("pos"); setShowDetails(true); }}
@@ -430,8 +437,15 @@ export default function OrderRow({
     <>
       <TableRow 
         className="order-row-hover"
+        data-state={selected ? "selected" : undefined}
         onClick={handleRowClick}
+        onContextMenu={onRowContextMenu ? (e) => { e.preventDefault(); onRowContextMenu(order, e.clientX, e.clientY); } : undefined}
       >
+        {onToggleSelect && (
+          <TableCell className="w-10" onClick={(e) => e.stopPropagation()}>
+            <input type="checkbox" aria-label={`Select ${order.order_number}`} className="h-4 w-4 accent-primary" checked={!!selected} onChange={() => onToggleSelect(order.id)} />
+          </TableCell>
+        )}
         <TableCell className={compact ? 'py-2' : ''}>
           <div>
             <div className="flex items-center gap-1.5">
