@@ -10,6 +10,10 @@ interface OrderTableProps {
   onDeleteOrder: (orderId: string, orderNumber: string) => void;
   onOrderClick?: (order: OrderWithCompany) => void;
   compact?: boolean;
+  selectedIds?: Set<string>;
+  onToggleSelect?: (orderId: string) => void;
+  onToggleAll?: () => void;
+  onRowContextMenu?: (order: OrderWithCompany, x: number, y: number) => void;
 }
 
 export default function OrderTable({
@@ -19,6 +23,10 @@ export default function OrderTable({
   onDeleteOrder,
   onOrderClick,
   compact = false,
+  selectedIds,
+  onToggleSelect,
+  onToggleAll,
+  onRowContextMenu,
 }: OrderTableProps) {
   const isMobile = useIsMobile();
 
@@ -58,6 +66,11 @@ export default function OrderTable({
         <Table>
           <TableHeader>
             <TableRow>
+              {onToggleSelect && (
+                <TableHead className="w-10">
+                  <input type="checkbox" aria-label="Select all orders" className="h-4 w-4 accent-primary" checked={orders.length > 0 && orders.every((o) => selectedIds?.has(o.id))} onChange={() => onToggleAll?.()} />
+                </TableHead>
+              )}
               <TableHead className="whitespace-nowrap">Order Number</TableHead>
               <TableHead className="whitespace-nowrap">Company</TableHead>
               <TableHead className="whitespace-nowrap">Status</TableHead>
@@ -69,7 +82,7 @@ export default function OrderTable({
           <TableBody>
             {orders.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={compact ? 4 : 6} className="text-center py-8">
+                <TableCell colSpan={(compact ? 4 : 6) + (onToggleSelect ? 1 : 0)} className="text-center py-8">
                   No orders found.
                 </TableCell>
               </TableRow>
@@ -83,6 +96,9 @@ export default function OrderTable({
                   onDeleteOrder={onDeleteOrder}
                   onOrderClick={onOrderClick}
                   compact={compact}
+                  selected={selectedIds?.has(order.id)}
+                  onToggleSelect={onToggleSelect}
+                  onRowContextMenu={onRowContextMenu}
                 />
               ))
             )}

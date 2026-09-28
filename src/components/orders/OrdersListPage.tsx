@@ -14,6 +14,8 @@ import { useCompanyData } from "@/components/admin/hooks/useCompanyData";
 import { getUserRole } from "@/utils/auth";
 import OrderTable from "./components/OrderTable";
 import OrdersHeader from "./components/OrdersHeader";
+import BulkActionsBar from "./components/BulkActionsBar";
+import { Trash2, Users, CheckSquare } from "lucide-react";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 
 interface Company {
@@ -49,6 +51,9 @@ export const OrdersListPage: React.FC = () => {
   const [orders, setOrders] = useState<OrderWithCompanyLocal[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [menu, setMenu] = useState<{ id: string; label: string; x: number; y: number } | null>(null);
+  const toggleSelect = (id: string) => setSelectedIds((cur) => { const next = new Set(cur); next.has(id) ? next.delete(id) : next.add(id); return next; });
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -157,6 +162,14 @@ export const OrdersListPage: React.FC = () => {
     order.company_name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const selectedOrders = filteredOrders.filter((o) => selectedIds.has(o.id));
+  const toggleAll = () => setSelectedIds(selectedOrders.length === filteredOrders.length && filteredOrders.length > 0 ? new Set() : new Set(filteredOrders.map((o) => o.id)));
+  const runBulk = (eventName: string) => {
+    if (menu && !selectedIds.has(menu.id)) setSelectedIds(new Set([menu.id]));
+    setMenu(null);
+    window.setTimeout(() => window.dispatchEvent(new Event(eventName)), 0);
+  };
+
   const selectedCompany = companies.find(c => c.id === selectedCompanyId);
 
   if (!user || userRole === null) {
@@ -201,6 +214,22 @@ export const OrdersListPage: React.FC = () => {
         )}
       </div>
 
+      {menu && (
+        <div className="fixed inset-0 z-[90]" onMouseDown={() => setMenu(null)} onContextMenu={(e) => { e.preventDefault(); setMenu(null); }}>
+          <div role="menu" aria-label={`Actions for ${menu.label}`} className="fixed z-[91] w-60 rounded-lg border border-border bg-popover p-1.5 text-popover-foreground shadow-xl"
+            style={{ left: Math.min(menu.x, window.innerWidth - 250), top: Math.min(menu.y, window.innerHeight - 320) }} onMouseDown={(e) => e.stopPropagation()}>
+            <Button variant="ghost" className="h-9 w-full justify-start px-2" onClick={() => { toggleSelect(menu.id); setMenu(null); }}><CheckSquare className="mr-2 h-4 w-4" />{selectedIds.has(menu.id) ? "Deselect this order" : "Select this order"}</Button>
+            <Button variant="ghost" className="h-9 w-full justify-start px-2" onClick={() => { setSelectedIds(new Set(filteredOrders.map((o) => o.id))); setMenu(null); }}><Users className="mr-2 h-4 w-4" />Select all ({filteredOrders.length})</Button>
+            <div className="my-1 h-px bg-border" />
+            {[["Assign selected", "aleph:bulk-orders-assign"], ["Change status", "aleph:bulk-orders-status"], ["Change urgency", "aleph:bulk-orders-urgency"], ["Add tag", "aleph:bulk-orders-tag"]].map(([label, ev]) => (
+              <Button key={ev} variant="ghost" className="h-9 w-full justify-start px-2" onClick={() => runBulk(ev)}>{label}</Button>
+            ))}
+            <div className="my-1 h-px bg-border" />
+            <Button variant="ghost" className="h-9 w-full justify-start px-2 text-destructive hover:text-destructive" onClick={() => runBulk("aleph:bulk-orders-delete")}><Trash2 className="mr-2 h-4 w-4" />Delete selected</Button>
+          </div>
+        </div>
+      )}
+
       {selectedCompanyId ? (
         <Card>
           <CardHeader>
@@ -223,12 +252,21 @@ export const OrdersListPage: React.FC = () => {
               {loading ? (
                 <div className="text-center py-8">Loading orders...</div>
               ) : (
-                <OrderTable
-                  orders={filteredOrders}
-                  isAdmin={userRole === 'admin'}
-                  onReceiveOrder={() => {}}
-                  onDeleteOrder={() => {}}
-                />
+                <>
+                  {selectedOrders.length > 0 && (
+                    <BulkActionsBar selectedOrders={selectedOrders as any} onClearSelection={() => setSelectedIds(new Set())} onActionComplete={() => { setSelectedIds(new Set()); void fetchOrders(); }} />
+                  )}
+                  <OrderTable
+                    orders={filteredOrders}
+                    isAdmin={userRole === 'admin'}
+                    onReceiveOrder={() => {}}
+                    onDeleteOrder={() => {}}
+                    selectedIds={userRole === 'admin' ? selectedIds : undefined}
+                    onToggleSelect={userRole === 'admin' ? toggleSelect : undefined}
+                    onToggleAll={toggleAll}
+                    onRowContextMenu={userRole === 'admin' ? (order, x, y) => setMenu({ id: order.id, label: order.order_number, x, y }) : undefined}
+                  />
+                </>
               )}
             </div>
           </CardContent>
