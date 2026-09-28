@@ -155,7 +155,10 @@ export default function OrderRow({
   onReceiveOrder,
   onDeleteOrder,
   onOrderClick,
-  compact = false
+  compact = false,
+  selected = false,
+  onToggleSelect,
+  onRowContextMenu,
 }: OrderRowProps) {
   const [showDetails, setShowDetails] = useState(false);
   const [detailsTab, setDetailsTab] = useState<"details" | "pos" | "activity">("details");
