@@ -1,4 +1,5 @@
 import {useCallback,useEffect,useRef,useState} from "react";
+import {createPortal} from "react-dom";
 import {supabase} from "@/integrations/supabase/client";
 import {useAuth} from "@/contexts/AuthContext";
 import {useLiveData} from "@/hooks/useLiveData";
@@ -8,10 +9,9 @@ import {DISPATCH_FIELDS,DISPATCH_START,isActiveDispatch,lineRemaining,remainingU
 import {Button} from "@/components/ui/button";
 import {Input} from "@/components/ui/input";
 import {Textarea} from "@/components/ui/textarea";
-import {Dialog,DialogContent,DialogHeader,DialogTitle,DialogDescription} from "@/components/ui/dialog";
 import EntityComments from "./EntityComments";
 import SourceDispatchPlanner from "./SourceDispatchPlanner";
-import {PackageCheck,Truck,RefreshCw,Search,AlertTriangle,ArrowRight,CalendarDays,Navigation,Warehouse,CheckCircle2} from "lucide-react";
+import {PackageCheck,Truck,RefreshCw,Search,AlertTriangle,ArrowRight,CalendarDays,Navigation,Warehouse,CheckCircle2,X} from "lucide-react";
 const db=supabase as any;
 type Member={id:string;full_name:string|null};
 type Health={kind:string;last_success_at:string|null;error:string|null;next_page:number};
@@ -188,28 +188,77 @@ function DispatchDocumentDialog({doc,members,onClose,onSaved}:{doc:DispatchDocum
   }catch(e:any){setError(confirmed?"Receipt saved successfully, but the refreshed view could not load. Reload latest before recording more.":e.message+" Your draft is kept. If the connection failed, retry the same receipt.");}
   finally{setSaving(false);}
  };
- return <Dialog open onOpenChange={open=>{if(!open&&!saving)onClose();}}><DialogContent className="dispatch-document-dialog max-w-3xl">
-  <DialogHeader><DialogTitle className="pr-8">{snapshot.reference} · {snapshot.kind==="collection"?"Collection":"Delivery"}</DialogTitle><DialogDescription>{snapshot.contact_name} · Created {displayDate(snapshot.source_created_at)} · Source: Zoho {snapshot.kind==="collection"?"purchase order":"customer invoice"}</DialogDescription></DialogHeader>
-  {recovery.banner}
-  {error&&<p role="alert" className="rounded-xl bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
-  {snapshot.address&&<p className="break-words rounded-xl bg-muted p-3 text-sm">{snapshot.address}</p>}
-  <fieldset disabled={saving||!!attempt} className="min-w-0 space-y-3">
-   <details open><summary className="cursor-pointer text-sm font-semibold">Assignment & instructions</summary><div className="mt-3 grid min-w-0 gap-3 sm:grid-cols-2">
-    <label className="text-sm">Assigned to<select aria-label="Assigned to" className="mt-1 h-11 w-full rounded-lg border bg-background px-2" value={form.assigned_to} onChange={e=>change("assigned_to",e.target.value)}><option value="">Unassigned</option>{members.map(member=><option key={member.id} value={member.id}>{member.full_name||"Team member"}</option>)}</select></label>
-    <label className="text-sm">Scheduled date<Input aria-label="Scheduled date" type="date" value={form.scheduled_for} onChange={e=>change("scheduled_for",e.target.value)}/></label>
-    <label className="text-sm">Method<select aria-label="Dispatch method" className="mt-1 h-11 w-full rounded-lg border bg-background px-2" value={form.method} onChange={e=>change("method",e.target.value)}>{(snapshot.kind==="collection"?[["pickup","Collect from supplier"],["supplier-delivery","Supplier delivers to us"]]:[["delivery","Deliver to customer"],["customer-collection","Customer collects"]]).map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>
-    <label className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" checked={form.urgent} onChange={e=>change("urgent",e.target.checked)}/> Urgent</label>
-    <label className="text-sm sm:col-span-2">Instructions<Textarea aria-label="Dispatch instructions" value={form.notes} onChange={e=>change("notes",e.target.value)}/></label>
-   </div><Button className="mt-3" variant="outline" onClick={savePlan}>Save assignment & instructions</Button></details>
-   <h3 className="pt-2 text-sm font-bold">{active?"Enter quantities completed now":"Line details"}</h3>
-   <div className="space-y-3">{snapshot.lines.map(line=><div key={line.id} className="grid min-w-0 grid-cols-[minmax(0,1fr)_5rem] items-center gap-3 rounded-xl border p-3"><div className="min-w-0"><p className="whitespace-pre-wrap break-words text-sm font-semibold">{line.name}</p><p className="mt-1 text-xs text-muted-foreground">{line.sku||"No SKU"} · {lineRemaining(snapshot,line)} of {line.quantity} remaining</p></div>{active?<Input aria-label={"Complete quantity for "+line.name} type="number" min="0" max={lineRemaining(snapshot,line)} step="any" value={quantities[line.id]||0} onChange={e=>{setDirty(true);setQuantities(current=>({...current,[line.id]:Math.max(0,Math.min(lineRemaining(snapshot,line),Number(e.target.value)||0))}));}}/>:<span className="text-right text-sm">{line.quantity}</span>}</div>)}</div>
-   {active&&<><Button variant="outline" className="w-full" onClick={()=>{setDirty(true);setQuantities(Object.fromEntries(snapshot.lines.filter(line=>lineRemaining(snapshot,line)>0).map(line=>[line.id,lineRemaining(snapshot,line)])));}}>Select all remaining quantities</Button><Textarea aria-label="Receipt note" placeholder="Optional receipt / handover note" value={receiptNote} onChange={e=>{setDirty(true);setReceiptNote(e.target.value);}}/></>}
-  </fieldset>
-  {planChanged&&!attempt&&<p className="text-xs text-muted-foreground">Save assignment & instructions before recording quantities.</p>}
-  {(active||attempt)&&<div className="flex flex-wrap gap-2"><Button className="min-h-11 flex-1" disabled={saving||(planChanged&&!attempt)} onClick={record}>{saving?"Saving…":attempt?"Check / retry same receipt":"Confirm selected quantities"}</Button><Button variant="outline" disabled={saving||!!attempt} onClick={async()=>{try{const latest=await refresh();setForm({assigned_to:latest.assigned_to||"",scheduled_for:latest.scheduled_for||"",urgent:latest.urgent,method:latest.method,notes:latest.notes});setQuantities(current=>Object.fromEntries(latest.lines.map(line=>[line.id,Math.min(current[line.id]||0,lineRemaining(latest,line))])));setError("");}catch(e:any){setError(e.message);}}}>Reload latest / reset edits</Button></div>}
-  {!active&&<p className="rounded-xl bg-muted p-3 text-sm">This record is {snapshot.source_closed?snapshot.source_status:snapshot.status}. It is retained in history.</p>}
-  <details onToggle={async e=>{if(!e.currentTarget.open)return;const {data,error}=await db.from("dispatch_document_receipts").select("*").eq("document_id",doc.id).order("created_at",{ascending:false});if(error)setError(error.message);else setReceipts(data||[]);}}><summary className="cursor-pointer text-sm font-semibold">Receipt history</summary>{receipts===null?<p className="mt-2 text-sm">Open to load receipts.</p>:receipts.map(receipt=><div key={receipt.id} className="mt-2 rounded-lg border p-3 text-sm"><p>{new Date(receipt.created_at).toLocaleString("en-ZA")} · {receipt.result.units} units · {members.find(member=>member.id===receipt.actor_id)?.full_name||"Team member"}</p><p className="text-xs text-muted-foreground">{receipt.notes}</p></div>)}</details>
-  <EntityComments entityType={snapshot.kind} entityId={doc.id}/>
-  <Button className="w-full" variant="outline" disabled={saving} onClick={onClose}>Close details</Button>
- </DialogContent></Dialog>;
+ const KindIcon=snapshot.kind==="collection"?PackageCheck:Truck;
+ if(typeof document==="undefined")return null;
+ return createPortal(
+  <div className="fulfillment-modal-backdrop fixed inset-0 z-[120] flex items-center justify-center p-2.5 sm:p-6" role="presentation">
+   <button type="button" className="absolute inset-0 bg-black/45" onClick={()=>{if(!saving)onClose();}} aria-label="Close details"/>
+   <section className="fulfillment-detail-modal animate-order-floating-bubble relative flex max-h-[calc(100dvh-1.25rem)] w-full max-w-5xl flex-col overflow-hidden rounded-[28px] border border-border bg-background shadow-[0_24px_60px_-20px_hsl(var(--foreground)/0.35)] sm:max-h-[calc(100dvh-3rem)]" role="dialog" aria-modal="true" aria-label={"Dispatch "+snapshot.reference}>
+    <div className="ribbon-bar h-1.5 shrink-0" aria-hidden/>
+    <header className="shrink-0 border-b border-border bg-background p-4 sm:p-5">
+     <div className="flex items-start gap-3">
+      <span className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-2xl bg-muted p-1 shadow-sm ring-1 ring-border"><img src="/lovable-uploads/e1088147-889e-43f6-bdf0-271189b88913.png" alt="" className="h-full w-full object-contain"/></span>
+      <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-primary/10 text-primary"><KindIcon className="h-5 w-5"/></span>
+      <div className="min-w-0 flex-1">
+       <div className="flex flex-wrap items-center gap-2"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary">Dispatch management</p><span className="rounded-full border border-primary/30 bg-primary/10 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-tighter text-primary">{snapshot.kind==="collection"?"Collection":"Delivery"}</span><span className={"rounded-full border px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-tighter "+(active?"border-success/30 bg-success/10 text-success":"border-border bg-muted text-muted-foreground")}>{active?"Active":snapshot.source_closed?snapshot.source_status:snapshot.status}</span>{snapshot.urgent&&<span className="rounded-full border border-destructive/30 bg-destructive/10 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-tighter text-destructive">Urgent</span>}</div>
+       <h2 className="mt-1 truncate font-display text-xl font-black tracking-tight sm:text-2xl">{snapshot.reference}</h2>
+       <p className="mt-0.5 truncate text-sm font-semibold text-muted-foreground">{snapshot.contact_name} · Created {displayDate(snapshot.source_created_at)} · Zoho {snapshot.kind==="collection"?"purchase order":"customer invoice"}</p>
+      </div>
+      <button type="button" onClick={()=>{if(!saving)onClose();}} className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-muted text-muted-foreground transition-all hover:scale-105 hover:bg-destructive/10 hover:text-destructive" aria-label="Close details"><X className="h-4 w-4"/></button>
+     </div>
+    </header>
+    <div className="flex-1 space-y-6 overflow-y-auto p-4 sm:p-6">
+     {recovery.banner}
+     {error&&<p role="alert" className="rounded-xl bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
+     <div className="grid grid-cols-2 gap-4 rounded-xl border border-border/60 bg-muted/30 p-4 md:grid-cols-4">
+      <div><p className="text-[10px] font-bold uppercase text-muted-foreground">Reference</p><p className="mt-0.5 text-sm font-medium">{snapshot.reference}</p></div>
+      <div><p className="text-[10px] font-bold uppercase text-muted-foreground">Contact</p><p className="mt-0.5 truncate text-sm font-medium">{snapshot.contact_name}</p></div>
+      <div><p className="text-[10px] font-bold uppercase text-muted-foreground">Created</p><p className="mt-0.5 text-sm font-medium">{displayDate(snapshot.source_created_at)}</p></div>
+      <div><p className="text-[10px] font-bold uppercase text-muted-foreground">Source</p><p className="mt-0.5 text-sm font-medium">Zoho {snapshot.kind==="collection"?"purchase order":"customer invoice"}</p></div>
+      {snapshot.address&&<div className="col-span-full border-t border-border/60 pt-3"><p className="text-[10px] font-bold uppercase text-muted-foreground">{snapshot.kind==="collection"?"Pickup address":"Delivery address"}</p><p className="mt-0.5 break-words text-sm">{snapshot.address}</p></div>}
+     </div>
+     <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+      <div className="lg:col-span-5">
+       <h3 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider"><span className="h-1.5 w-1.5 rounded-full bg-logo-cyan"/>Assignment & instructions</h3>
+       <fieldset disabled={saving||!!attempt} className="mt-4 min-w-0 space-y-4 rounded-xl border border-border/60 bg-muted/20 p-5">
+        <div className="grid grid-cols-2 gap-4">
+         <label className="space-y-1.5 text-[11px] font-bold uppercase text-muted-foreground">Assignee<select aria-label="Assigned to" className="h-10 w-full rounded-lg border bg-background px-2 text-sm font-normal normal-case text-foreground" value={form.assigned_to} onChange={e=>change("assigned_to",e.target.value)}><option value="">Unassigned</option>{members.map(member=><option key={member.id} value={member.id}>{member.full_name||"Team member"}</option>)}</select></label>
+         <label className="space-y-1.5 text-[11px] font-bold uppercase text-muted-foreground">Scheduled date<Input aria-label="Scheduled date" type="date" className="h-10" value={form.scheduled_for} onChange={e=>change("scheduled_for",e.target.value)}/></label>
+        </div>
+        <label className="block space-y-1.5 text-[11px] font-bold uppercase text-muted-foreground">Method<select aria-label="Dispatch method" className="h-10 w-full rounded-lg border bg-background px-2 text-sm font-normal normal-case text-foreground" value={form.method} onChange={e=>change("method",e.target.value)}>{(snapshot.kind==="collection"?[["pickup","Collect from supplier"],["supplier-delivery","Supplier delivers to us"]]:[["delivery","Deliver to customer"],["customer-collection","Customer collects"]]).map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>
+        <label className="flex items-center gap-3 py-1 text-xs font-bold uppercase text-foreground"><input type="checkbox" className="h-4 w-4" checked={form.urgent} onChange={e=>change("urgent",e.target.checked)}/> Mark as urgent</label>
+        <label className="block space-y-1.5 text-[11px] font-bold uppercase text-muted-foreground">Instructions<Textarea aria-label="Dispatch instructions" rows={3} value={form.notes} onChange={e=>change("notes",e.target.value)} placeholder="Additional instructions for the carrier…"/></label>
+        <Button className="w-full" onClick={savePlan} disabled={saving||!!attempt}>Save assignment & instructions</Button>
+       </fieldset>
+      </div>
+      <div className="space-y-6 lg:col-span-7">
+       <div className="space-y-4">
+        <div className="flex items-center justify-between gap-3">
+         <h3 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider"><span className="h-1.5 w-1.5 rounded-full bg-logo-magenta"/>{active?"Line items · quantities completed now":"Line items"}</h3>
+         {active&&<button type="button" className="text-[11px] font-bold uppercase text-primary hover:underline" onClick={()=>{setDirty(true);setQuantities(Object.fromEntries(snapshot.lines.filter(line=>lineRemaining(snapshot,line)>0).map(line=>[line.id,lineRemaining(snapshot,line)])));}}>Select all remaining</button>}
+        </div>
+        <fieldset disabled={saving||!!attempt} className="min-w-0 space-y-2">
+         {snapshot.lines.map(line=><div key={line.id} className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-muted/20 p-3 transition-colors hover:border-border"><div className="min-w-0 flex-1"><p className="whitespace-pre-wrap break-words text-sm font-semibold">{line.name}</p><p className="mt-1 text-xs text-muted-foreground">{line.sku||"No SKU"} · Remaining: <span className="text-foreground">{lineRemaining(snapshot,line)} of {line.quantity}</span></p></div>{active?<Input aria-label={"Complete quantity for "+line.name} type="number" min="0" max={lineRemaining(snapshot,line)} step="any" className="w-20 text-center" value={quantities[line.id]||0} onChange={e=>{setDirty(true);setQuantities(current=>({...current,[line.id]:Math.max(0,Math.min(lineRemaining(snapshot,line),Number(e.target.value)||0))}));}}/>:<span className="text-right text-sm font-semibold">{line.quantity}</span>}</div>)}
+        </fieldset>
+        {planChanged&&!attempt&&<p className="text-xs text-muted-foreground">Save assignment & instructions before recording quantities.</p>}
+        {!active&&<p className="rounded-xl bg-muted p-3 text-sm">This record is {snapshot.source_closed?snapshot.source_status:snapshot.status}. It is retained in history.</p>}
+        <details onToggle={async e=>{if(!e.currentTarget.open)return;const {data,error}=await db.from("dispatch_document_receipts").select("*").eq("document_id",doc.id).order("created_at",{ascending:false});if(error)setError(error.message);else setReceipts(data||[]);}}><summary className="cursor-pointer text-[11px] font-bold uppercase text-muted-foreground">Receipt history</summary>{receipts===null?<p className="mt-2 text-sm">Open to load receipts.</p>:<div className="mt-3 space-y-3">{receipts.map(receipt=><div key={receipt.id} className="flex gap-3 border-l-2 border-border pl-4 text-xs"><div className="whitespace-nowrap text-muted-foreground">{new Date(receipt.created_at).toLocaleString("en-ZA")}</div><div className="text-foreground">{receipt.result.units} units · {members.find(member=>member.id===receipt.actor_id)?.full_name||"Team member"}{receipt.notes?" — "+receipt.notes:""}</div></div>)}</div>}</details>
+       </div>
+       <EntityComments entityType={snapshot.kind} entityId={doc.id}/>
+      </div>
+     </div>
+    </div>
+    {(active||attempt)&&<footer className="shrink-0 border-t border-border bg-muted/30 p-4 sm:p-5">
+     <div className="flex flex-col gap-3 md:flex-row md:items-center">
+      <div className="min-w-0 flex-1"><Input aria-label="Receipt note" placeholder="Add a receipt note for this action…" value={receiptNote} onChange={e=>{setDirty(true);setReceiptNote(e.target.value);}} disabled={saving||!!attempt}/></div>
+      <div className="flex gap-3">
+       <Button variant="outline" disabled={saving||!!attempt} onClick={async()=>{try{const latest=await refresh();setForm({assigned_to:latest.assigned_to||"",scheduled_for:latest.scheduled_for||"",urgent:latest.urgent,method:latest.method,notes:latest.notes});setQuantities(current=>Object.fromEntries(latest.lines.map(line=>[line.id,Math.min(current[line.id]||0,lineRemaining(latest,line))])));setError("");}catch(e:any){setError(e.message);}}}>Reload</Button>
+       <Button className="min-h-11" disabled={saving||(planChanged&&!attempt)} onClick={record}>{saving?"Saving…":attempt?"Check / retry same receipt":"Confirm selected quantities"}</Button>
+      </div>
+     </div>
+    </footer>}
+   </section>
+  </div>,
+  document.body,
+ );
 }
