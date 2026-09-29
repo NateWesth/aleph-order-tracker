@@ -244,7 +244,8 @@ export default function ProgressOrderDetailsDialog({
 
   return (
     <AlertDialog open={isOpen} onOpenChange={onClose}>
-      <AlertDialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+      <AlertDialogContent className="order-bubble-dialog max-w-5xl max-h-[90vh] overflow-y-auto rounded-[28px]">
+        <div className="ribbon-bar -mx-6 -mt-6 h-1.5" aria-hidden />
         <AlertDialogHeader>
           <AlertDialogTitle>Order #{order?.order_number || 'Unknown'} Details</AlertDialogTitle>
         </AlertDialogHeader>
