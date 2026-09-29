@@ -11,7 +11,7 @@ import {Textarea} from "@/components/ui/textarea";
 import {Dialog,DialogContent,DialogHeader,DialogTitle,DialogDescription} from "@/components/ui/dialog";
 import EntityComments from "./EntityComments";
 import SourceDispatchPlanner from "./SourceDispatchPlanner";
-import {PackageCheck,Truck,RefreshCw,Search,AlertTriangle,ArrowRight} from "lucide-react";
+import {PackageCheck,Truck,RefreshCw,Search,AlertTriangle,ArrowRight,CalendarDays,Navigation,Warehouse,CheckCircle2} from "lucide-react";
 const db=supabase as any;
 type Member={id:string;full_name:string|null};
 type Health={kind:string;last_success_at:string|null;error:string|null;next_page:number};
@@ -20,7 +20,7 @@ const displayDate=(value:string|null)=>value?new Date(value).toLocaleDateString(
 export default function FreshDispatchPage(){
  const {user}=useAuth();
  const [docs,setDocs]=useState<DispatchDocument[]>([]),[members,setMembers]=useState<Member[]>([]),[health,setHealth]=useState<Health[]>([]);
- const [mode,setMode]=useState<"collection"|"delivery">("collection"),[query,setQuery]=useState(""),[mine,setMine]=useState(false);
+ const [mode,setMode]=useState<"collection"|"delivery">("collection"),[history,setHistory]=useState(false),[query,setQuery]=useState(""),[mine,setMine]=useState(false);
  const [loading,setLoading]=useState(true),[error,setError]=useState(""),[syncing,setSyncing]=useState(false),[progress,setProgress]=useState("");
  const [selected,setSelected]=useState<DispatchDocument|null>(null);
  const [planner,setPlanner]=useState(false);
@@ -93,12 +93,16 @@ export default function FreshDispatchPage(){
   window.addEventListener("aleph:open-collection",collection);window.addEventListener("aleph:open-delivery",delivery);
   return()=>{window.removeEventListener("aleph:open-collection",collection);window.removeEventListener("aleph:open-delivery",delivery);};
  },[docs]);
- const visible=docs.filter(doc=>(!mine||doc.assigned_to===user?.id)&&[doc.reference,doc.contact_name,doc.notes,...doc.lines.map(line=>line.name+" "+line.sku)].join(" ").toLowerCase().includes(query.toLowerCase()))
+ const visible=docs.filter(doc=>doc.kind===mode&&(history?!isActiveDispatch(doc):isActiveDispatch(doc))&&(!mine||doc.assigned_to===user?.id)&&[doc.reference,doc.contact_name,doc.notes,...doc.lines.map(line=>line.name+" "+line.sku)].join(" ").toLowerCase().includes(query.toLowerCase()))
  .sort((a,b)=>Number(b.urgent)-Number(a.urgent)||a.source_created_at.localeCompare(b.source_created_at));
- const columns=[
-  {id:"collection",label:"Collections",description:"Supplier purchase orders",icon:PackageCheck,docs:visible.filter(doc=>doc.kind==="collection"&&isActiveDispatch(doc))},
-  {id:"delivery",label:"Deliveries",description:"Customer invoices",icon:Truck,docs:visible.filter(doc=>doc.kind==="delivery"&&isActiveDispatch(doc))},
-  {id:"history",label:"History",description:"Completed, dismissed or excluded",icon:ArrowRight,docs:visible.filter(doc=>!isActiveDispatch(doc))},
+ const lanes=mode==="collection"?[
+  {id:"pending",label:"Ready to plan",description:"Pickup or supplier delivery",icon:Warehouse,docs:visible.filter(doc=>doc.status==="pending")},
+  {id:"scheduled",label:"Arrival planned",description:"Upcoming stock movements",icon:CalendarDays,docs:visible.filter(doc=>doc.status==="scheduled")},
+  {id:"in-progress",label:"Receiving now",description:"Record actual quantities",icon:PackageCheck,docs:visible.filter(doc=>doc.status==="in-progress")},
+ ]:[
+  {id:"pending",label:"Ready to plan",description:"Assign and schedule",icon:PackageCheck,docs:visible.filter(doc=>doc.status==="pending")},
+  {id:"scheduled",label:"Route planned",description:"Upcoming dispatches",icon:CalendarDays,docs:visible.filter(doc=>doc.status==="scheduled")},
+  {id:"in-progress",label:"Out on route",description:"Complete on handover",icon:Navigation,docs:visible.filter(doc=>doc.status==="in-progress")},
  ];
  const memberName=(id:string|null)=>members.find(member=>member.id===id)?.full_name||"Unassigned";
  const shownError=error||health.filter(row=>row.error).map(row=>row.kind+": "+row.error).join(" · ");
@@ -106,11 +110,11 @@ export default function FreshDispatchPage(){
   <header className="rounded-2xl border bg-card p-4 sm:p-6">
    <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-wider text-primary">Zoho dispatch · fresh start</p><h1 className="mt-1 text-2xl font-bold">Collections & deliveries</h1><p className="mt-2 text-sm text-muted-foreground">Only documents created from 14 September 2026 (South African time). Older work is excluded.</p></div>
    <Button variant="outline" disabled={syncing} onClick={()=>void sync(true)}><RefreshCw className={"mr-2 h-4 w-4 "+(syncing?"animate-spin":"")}/>{syncing?"Checking Zoho…":"Refresh sources"}</Button></div>
-    <div className="mt-4 grid grid-cols-2 gap-2" aria-label="Dispatch source totals">
-     {(["collection","delivery"] as const).map(kind=><div key={kind} className="min-h-14 rounded-xl border bg-background p-3 text-left">
+    <div className="mt-4 grid grid-cols-2 gap-2" role="tablist" aria-label="Dispatch source">
+     {(["collection","delivery"] as const).map(kind=><button type="button" key={kind} role="tab" aria-selected={mode===kind} onClick={()=>{setMode(kind);setHistory(false);}} className={"min-h-14 rounded-xl border p-3 text-left "+(mode===kind?"border-primary bg-primary/10":"bg-background")}>
      <span className="flex items-center gap-2 text-sm font-semibold">{kind==="collection"?<PackageCheck className="h-4 w-4"/>:<Truck className="h-4 w-4"/>}{kind==="collection"?"Collections":"Deliveries"} <span className="ml-auto">{docs.filter(doc=>doc.kind===kind&&isActiveDispatch(doc)).length}</span></span>
      <span className="mt-1 block text-xs text-muted-foreground">{kind==="collection"?"Zoho purchase orders":"Zoho customer invoices"}</span>
-     </div>)}
+     </button>)}
    </div>
    <details className="mt-3 text-xs text-muted-foreground"><summary className="cursor-pointer">Source health & last checked</summary><div className="mt-2 space-y-2">{["collection","delivery"].map(kind=>{const state=health.find(row=>row.kind===kind);return <p key={kind}>{kind==="collection"?"Purchase orders":"Invoices"}: {state?.error|| (state?.last_success_at?"Last complete source scan "+new Date(state.last_success_at).toLocaleString("en-ZA"):"No successful source scan yet")}{state&&state.next_page>1?" · import continues at page "+state.next_page:""}</p>;})}</div></details>
   </header>
@@ -120,11 +124,13 @@ export default function FreshDispatchPage(){
    <Button variant="outline" onClick={()=>setPlanner(true)}>Plan dispatch run</Button>
    <div className="relative min-w-0 flex-1 basis-48"><Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground"/><Input aria-label="Search dispatch documents" placeholder="Search number, customer or item…" className="pl-9" value={query} onChange={e=>setQuery(e.target.value)}/></div>
    <label className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" checked={mine} onChange={e=>setMine(e.target.checked)}/> Assigned to me</label>
+    <Button variant={history?"default":"outline"} onClick={()=>setHistory(value=>!value)}>{history?"Show outstanding":"History / excluded"}</Button>
   </div>
-    {loading?<p role="status">Loading dispatch records…</p>:visible.length===0?<div className="rounded-2xl border border-dashed p-8 text-center"><p className="font-semibold">{shownError?"Records could not be verified":"No matching dispatch documents"}</p><p className="mt-2 text-sm text-muted-foreground">Check Source health before assuming everything is complete. Draft and void documents do not require dispatch.</p></div>:
-    <div className="grid min-w-0 gap-4 xl:grid-cols-3">{columns.map((column,index)=>{const Icon=column.icon;return <section key={column.id} className="min-w-0 overflow-hidden rounded-2xl border bg-card shadow-sm">
-     <div className="border-b bg-muted/35 p-4"><div className="flex items-center justify-between gap-3"><div className="flex min-w-0 items-center gap-3"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border bg-background"><Icon className="h-4 w-4"/></span><div className="min-w-0"><h2 className="font-bold">{column.label}</h2><p className="truncate text-xs text-muted-foreground">{column.description}</p></div></div><span className="grid h-8 min-w-8 place-items-center rounded-full border bg-background px-2 text-sm font-bold">{column.docs.length}</span></div><div className={"mt-3 h-1 rounded-full "+(index===0?"bg-primary":index===1?"bg-warning":"bg-success")}/></div>
-     <div className="space-y-3 p-3">{column.docs.length?column.docs.map(doc=><DispatchCard key={doc.id} doc={doc} memberName={memberName} history={column.id==="history"} onOpen={()=>{setMode(doc.kind);setSelected(doc);}}/>):<div className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">No matching {column.label.toLowerCase()}</div>}</div>
+    {loading?<p role="status">Loading dispatch records…</p>:visible.length===0?<div className="rounded-2xl border border-dashed p-8 text-center"><p className="font-semibold">{shownError?"Records could not be verified":history?"No matching history":"No matching outstanding documents"}</p><p className="mt-2 text-sm text-muted-foreground">Check Source health before assuming everything is complete. Draft and void documents do not require dispatch.</p></div>:history?
+    <div className="grid min-w-0 gap-3 md:grid-cols-2 xl:grid-cols-3">{visible.map(doc=><DispatchCard key={doc.id} doc={doc} memberName={memberName} history onOpen={()=>setSelected(doc)}/>)}</div>:
+    <div className="fulfillment-board-grid grid min-w-0 gap-4 xl:grid-cols-3">{lanes.map((lane,index)=>{const Icon=lane.icon;return <section key={lane.id} className="flex min-w-0 flex-col overflow-hidden rounded-[28px] border border-border/60 bg-card/70 shadow-sm">
+     <header className="shrink-0 border-b border-border/55"><div className="flex w-full items-center justify-between gap-3 px-4 py-4 text-left"><div className="flex min-w-0 items-center gap-3"><span className={"grid h-9 w-9 shrink-0 place-items-center rounded-2xl text-primary-foreground shadow-lg "+(index===0?"bg-primary":index===1?"bg-warning":"bg-success")}><Icon className="h-4 w-4"/></span><div className="min-w-0"><h2 className="truncate text-sm font-black">{lane.label}</h2><p className="truncate text-[10px] text-muted-foreground">{lane.description}</p></div></div><span className="grid h-7 min-w-7 place-items-center rounded-full bg-muted px-2 text-xs font-bold">{lane.docs.length}</span></div></header>
+     <div className="min-h-[420px] flex-1 space-y-3 overflow-y-auto p-3">{lane.docs.length?lane.docs.map(doc=><DispatchCard key={doc.id} doc={doc} memberName={memberName} onOpen={()=>setSelected(doc)}/>):<div className="grid min-h-56 place-items-center rounded-3xl border border-dashed border-border/60 bg-muted/20 p-6 text-center"><div><CheckCircle2 className="mx-auto h-7 w-7 text-success opacity-60"/><p className="mt-3 text-xs font-bold">Lane clear</p><p className="mt-1 text-[10px] text-muted-foreground">New work appears here live.</p></div></div>}</div>
     </section>})}</div>}
   {selected&&<DispatchDocumentDialog key={selected.id} doc={selected} members={members} onClose={()=>setSelected(null)} onSaved={async()=>{await load();}}/>}
   {planner&&<SourceDispatchPlanner docs={docs} members={members} onClose={()=>setPlanner(false)} onSaved={load}/>}
