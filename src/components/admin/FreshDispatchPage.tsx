@@ -95,6 +95,11 @@ export default function FreshDispatchPage(){
  },[docs]);
  const visible=docs.filter(doc=>doc.kind===mode&&(history?!isActiveDispatch(doc):isActiveDispatch(doc))&&(!mine||doc.assigned_to===user?.id)&&[doc.reference,doc.contact_name,doc.notes,...doc.lines.map(line=>line.name+" "+line.sku)].join(" ").toLowerCase().includes(query.toLowerCase()))
  .sort((a,b)=>Number(b.urgent)-Number(a.urgent)||a.source_created_at.localeCompare(b.source_created_at));
+ const lanes=[
+  {id:"pending",label:"Ready",description:mode==="collection"?"Ready to collect":"Ready to deliver",docs:visible.filter(doc=>doc.status==="pending")},
+  {id:"scheduled",label:"Planned",description:"Assigned or scheduled",docs:visible.filter(doc=>doc.status==="scheduled")},
+  {id:"in-progress",label:"In progress",description:mode==="collection"?"Collection underway":"Delivery underway",docs:visible.filter(doc=>doc.status==="in-progress")},
+ ];
  const memberName=(id:string|null)=>members.find(member=>member.id===id)?.full_name||"Unassigned";
  const shownError=error||health.filter(row=>row.error).map(row=>row.kind+": "+row.error).join(" · ");
  return <div className="fresh-dispatch space-y-4">
@@ -117,18 +122,26 @@ export default function FreshDispatchPage(){
    <label className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" checked={mine} onChange={e=>setMine(e.target.checked)}/> Assigned to me</label>
    <Button variant={history?"default":"outline"} onClick={()=>setHistory(value=>!value)}>{history?"Show outstanding":"History / excluded"}</Button>
   </div>
-   {loading?<p role="status">Loading dispatch records…</p>:visible.length===0?<div className="rounded-2xl border border-dashed p-8 text-center"><p className="font-semibold">{shownError?"Records could not be verified":history?"No matching history":"No matching outstanding documents"}</p><p className="mt-2 text-sm text-muted-foreground">Check Source health before assuming everything is complete. Draft/void documents do not require dispatch; paid invoices can still require delivery.</p></div>:
-   <div className="grid min-w-0 gap-3 md:grid-cols-2 xl:grid-cols-3">{visible.map(doc=><button type="button" key={doc.id} onClick={()=>setSelected(doc)} className="min-w-0 rounded-2xl border bg-card p-4 text-left shadow-sm transition hover:border-primary/50 focus-visible:outline-primary">
-    <div className="flex flex-wrap justify-between gap-2"><span className="font-bold text-primary">{doc.reference}</span>{doc.urgent&&<span className="rounded-full bg-destructive/10 px-2 py-1 text-xs font-semibold text-destructive">Urgent</span>}</div>
-    <p className="mt-2 break-words text-base font-semibold">{doc.contact_name}</p>
-    <p className="mt-2 text-sm text-muted-foreground">{remainingUnits(doc)} units remaining · {doc.lines.length} lines</p>
-    <p className="mt-1 text-xs text-muted-foreground">{memberName(doc.assigned_to)} · {doc.scheduled_for?displayDate(doc.scheduled_for):"Not scheduled"}</p>
-    {history&&<p className="mt-2 text-xs">{doc.source_closed?doc.source_status:doc.status}{doc.review_required?" · source changed, review required":""}</p>}
-    <span className="mt-4 flex items-center justify-between border-t pt-3 text-sm font-semibold">{history?"View record":doc.kind==="collection"?"Open collection":"Open delivery"}<ArrowRight className="h-4 w-4"/></span>
-   </button>)}</div>}
+    {loading?<p role="status">Loading dispatch records…</p>:visible.length===0?<div className="rounded-2xl border border-dashed p-8 text-center"><p className="font-semibold">{shownError?"Records could not be verified":history?"No matching history":"No matching outstanding documents"}</p><p className="mt-2 text-sm text-muted-foreground">Check Source health before assuming everything is complete. Draft/void documents do not require dispatch; paid invoices can still require delivery.</p></div>:history?
+    <div className="grid min-w-0 gap-3 md:grid-cols-2 xl:grid-cols-3">{visible.map(doc=><DispatchCard key={doc.id} doc={doc} memberName={memberName} history onOpen={()=>setSelected(doc)}/>)}</div>:
+    <div className="grid min-w-0 gap-4 xl:grid-cols-3">{lanes.map((lane,index)=><section key={lane.id} className="min-w-0 overflow-hidden rounded-2xl border bg-card shadow-sm">
+     <div className="border-b bg-muted/35 p-4"><div className="flex items-center justify-between gap-3"><div><h2 className="font-bold">{lane.label}</h2><p className="mt-1 text-xs text-muted-foreground">{lane.description}</p></div><span className="grid h-8 min-w-8 place-items-center rounded-full border bg-background px-2 text-sm font-bold">{lane.docs.length}</span></div><div className={"mt-3 h-1 rounded-full "+(index===0?"bg-primary":index===1?"bg-warning":"bg-success")}/></div>
+     <div className="space-y-3 p-3">{lane.docs.length?lane.docs.map(doc=><DispatchCard key={doc.id} doc={doc} memberName={memberName} onOpen={()=>setSelected(doc)}/>):<div className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">No {lane.label.toLowerCase()} {mode}s</div>}</div>
+    </section>)}</div>}
   {selected&&<DispatchDocumentDialog key={selected.id} doc={selected} members={members} onClose={()=>setSelected(null)} onSaved={async()=>{await load();}}/>}
   {planner&&<SourceDispatchPlanner docs={docs} members={members} onClose={()=>setPlanner(false)} onSaved={load}/>}
  </div>;
+}
+
+function DispatchCard({doc,memberName,history=false,onOpen}:{doc:DispatchDocument;memberName:(id:string|null)=>string;history?:boolean;onOpen:()=>void}){
+ return <button type="button" onClick={onOpen} className="w-full min-w-0 rounded-xl border bg-background p-4 text-left shadow-sm transition hover:border-primary/50 focus-visible:outline-primary">
+  <div className="flex flex-wrap justify-between gap-2"><span className="font-bold text-primary">{doc.reference}</span>{doc.urgent&&<span className="rounded-full bg-destructive/10 px-2 py-1 text-xs font-semibold text-destructive">Urgent</span>}</div>
+  <p className="mt-2 break-words text-base font-semibold">{doc.contact_name}</p>
+  <p className="mt-2 text-sm text-muted-foreground">{remainingUnits(doc)} units remaining · {doc.lines.length} lines</p>
+  <p className="mt-1 text-xs text-muted-foreground">{memberName(doc.assigned_to)} · {doc.scheduled_for?displayDate(doc.scheduled_for):"Not scheduled"}</p>
+  {history&&<p className="mt-2 text-xs">{doc.source_closed?doc.source_status:doc.status}{doc.review_required?" · source changed, review required":""}</p>}
+  <span className="mt-4 flex items-center justify-between border-t pt-3 text-sm font-semibold">{history?"View record":doc.kind==="collection"?"Open collection":"Open delivery"}<ArrowRight className="h-4 w-4"/></span>
+ </button>;
 }
 
 function DispatchDocumentDialog({doc,members,onClose,onSaved}:{doc:DispatchDocument;members:Member[];onClose:()=>void;onSaved:()=>Promise<void>}){
