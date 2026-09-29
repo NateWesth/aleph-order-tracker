@@ -1158,12 +1158,10 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
         >
           <div className="relative w-full overflow-visible">
             {itemsBubble && (
-              <div className="relative z-50 mb-4 flex w-full justify-center px-1 sm:px-2 lg:mb-5">
-                <OrderItemsFloatingBubble
-                  order={orders.find((order) => order.id === itemsBubble.orderId) || null}
-                  onClose={() => setItemsBubble(null)}
-                />
-              </div>
+              <OrderItemsFloatingBubble
+                order={orders.find((order) => order.id === itemsBubble.orderId) || null}
+                onClose={() => setItemsBubble(null)}
+              />
             )}
 
             <div
