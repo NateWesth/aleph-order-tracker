@@ -3642,3 +3642,12 @@ html[data-density="dense"] .app-page-stage .rounded-\[24px\] { border-radius: 1r
     min-height: 3.45rem;
   }
 }
+
+/* Shared order bubble entrance for centered Radix dialogs */
+@keyframes order-bubble-center {
+  0% { opacity: 0; transform: translate(-50%, calc(-50% + 14px)) scale(0.97); }
+  100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+.order-bubble-dialog[data-state="open"] {
+  animation: order-bubble-center 0.28s cubic-bezier(0.16, 1, 0.3, 1) both !important;
+}

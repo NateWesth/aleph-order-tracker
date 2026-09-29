@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetFooter,
-} from "@/components/ui/sheet";
+  Dialog as Sheet,
+  DialogContent as SheetContent,
+  DialogHeader as SheetHeader,
+  DialogTitle as SheetTitle,
+  DialogFooter as SheetFooter,
+} from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -425,7 +425,8 @@ export default function OrderDetailsDialog({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full overflow-y-auto p-0 sm:max-w-2xl lg:max-w-3xl">
+      <SheetContent className="order-bubble-dialog block max-h-[calc(100dvh-1.25rem)] w-[calc(100%-1.25rem)] max-w-5xl overflow-y-auto rounded-[28px] p-0 sm:max-h-[calc(100dvh-3rem)]">
+        <div className="ribbon-bar h-1.5" aria-hidden />
         <div className="p-5 sm:p-6">
         <SheetHeader className="text-left">
           <div className="flex items-center justify-between">
