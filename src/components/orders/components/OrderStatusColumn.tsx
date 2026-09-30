@@ -271,8 +271,18 @@ function OrderStatusColumn({
           </button>
         ) : (
           <div
+            onClick={onToggleActive}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onToggleActive?.();
+              }
+            }}
+            title={isActive ? "Release column scroll" : "Scroll this column independently"}
             className={cn(
-              "order-lane-header w-full rounded-t-[22px] px-3 py-2.5 text-left",
+              "order-lane-header w-full cursor-pointer select-none rounded-t-[22px] px-3 py-2.5 text-left transition hover:brightness-110",
               !config.customColor && config.bgColor,
             )}
             style={config.customColor ? { backgroundColor: config.customColor } : undefined}
@@ -294,9 +304,17 @@ function OrderStatusColumn({
         )}
 
         {effectiveIsExpanded && (
-          <div className="order-lane-body min-h-0 flex-1 overflow-hidden rounded-b-[26px] border border-t-0 border-border bg-muted/30 dark:bg-muted/10 animate-fade-in">
+          <div
+            className={cn(
+              "order-lane-body min-h-0 flex-1 overflow-hidden rounded-b-[26px] border border-t-0 border-border bg-muted/30 dark:bg-muted/10 animate-fade-in transition",
+              isActive && "border-primary/60 ring-2 ring-primary/50 shadow-[0_12px_32px_-12px_hsl(var(--primary)/0.45)]",
+            )}
+          >
             <div
-              className="order-column-scroll h-full min-w-0 w-full overflow-y-auto overscroll-contain"
+              className={cn(
+                "order-column-scroll min-w-0 w-full overscroll-contain",
+                isActive ? "max-h-[70vh] overflow-y-auto" : "overflow-visible",
+              )}
               data-order-column-scroll
               data-global-scroll-ignore="true"
               tabIndex={0}
