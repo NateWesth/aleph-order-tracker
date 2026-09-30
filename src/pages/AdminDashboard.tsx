@@ -2,6 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { PageTransition } from "@/components/ui/PageTransition";
 import AuroraBackground from "@/components/ui/AuroraBackground";
 import OnboardingTour from "@/components/ui/OnboardingTour";
+import PushNotificationsBridge from "@/components/PushNotificationsBridge";
 import { lazy, Suspense, useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -380,6 +381,7 @@ const AdminDashboard = () => {
               >
                 <Command className="h-[18px] w-[18px]" />
               </Button>
+              <PushNotificationsBridge />
               <NotificationCenter
                 onNavigateToOrder={(orderId) => {
                   setActiveView("orders");
