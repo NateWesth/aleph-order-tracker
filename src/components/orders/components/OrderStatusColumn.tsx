@@ -31,6 +31,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { MenuPortal, useViewportMenuPosition } from "@/hooks/useViewportMenuPosition";
 import SwipeableCard from "@/components/ui/SwipeableCard";
 import OrderDetailsDialog from "./OrderDetailsDialog";
+import { hasUnread, useCommentsSeen } from "@/lib/commentStyles";
 
 interface OrderItem {
   id: string;
@@ -138,6 +139,7 @@ function OrderStatusColumn({
   activeItemsOrderId,
   onOpenItemsBubble,
 }: OrderStatusColumnProps) {
+  const commentsSeen = useCommentsSeen();
   const { setNodeRef, isOver } = useDroppable({
     id: config.key,
   });
@@ -488,7 +490,7 @@ function OrderStatusColumn({
 
             <div className="flex items-start justify-between gap-2">
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-1.5"><span className="truncate text-sm font-black text-foreground">{order.order_number}</span>{(order.commentCount || 0) > 0 && <span className="relative inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-blue-500/12 px-1.5 text-[9px] font-black text-blue-600"><MessageCircle className="mr-0.5 h-2.5 w-2.5" />{order.commentCount}<span className="absolute -right-0.5 -top-0.5 h-1.5 w-1.5 animate-pulse rounded-full bg-blue-500" /></span>}</div>
+                <div className="flex items-center gap-1.5"><span className="truncate text-sm font-black text-foreground">{order.order_number}</span>{(order.commentCount || 0) > 0 && <span className="relative inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-blue-500/12 px-1.5 text-[9px] font-black text-blue-600"><MessageCircle className="mr-0.5 h-2.5 w-2.5" />{order.commentCount}{hasUnread(commentsSeen, `order:${order.id}`, order.commentCount || 0) && <span title="New comments" className="absolute -right-1 -top-1 h-2 w-2 animate-pulse rounded-full bg-logo-cyan shadow-[0_0_6px_2px_hsl(var(--logo-cyan)/0.8)]" />}</span>}</div>
                 <span className="mt-0.5 block truncate text-[11px] font-medium text-muted-foreground">
                   {order.companyName}
                 </span>

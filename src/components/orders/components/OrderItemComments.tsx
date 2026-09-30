@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useDraftRecovery } from "@/hooks/useDraftRecovery";
 import { cn } from "@/lib/utils";
+import { bubbleClass, bubbleTime, nameColorClass, markCommentsSeen } from "@/lib/commentStyles";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import EmojiPicker, { QUICK_REACTIONS } from "./EmojiPicker";
@@ -372,15 +373,11 @@ export default function OrderItemComments({ orderItemId, className, initialCount
                 <div key={comment.id} className={cn("group flex flex-col", mine ? "items-end" : "items-start")}>
                   <div
                     className={cn(
-                      "max-w-[85%] rounded-md px-1.5 py-0.5 text-[10px] leading-tight break-words shadow-sm bg-white dark:bg-card border",
-                      mine
-                        ? "border-primary/30 rounded-tr-sm"
-                        : "border-border text-foreground rounded-tl-sm"
+                      "max-w-[80%] rounded-md px-1 py-px text-[9px] leading-tight break-words border text-foreground",
+                       bubbleClass(mine)
                     )}
                   >
-                    <div className={cn("text-[8px] font-semibold leading-tight", mine ? "text-primary" : "text-primary/90")}>
-                      {nameFor(comment)}
-                    </div>
+                    <div className="flex items-baseline gap-1.5 text-[7.5px] leading-tight"><span className={cn("font-semibold", nameColorClass(comment.user_id))}>{nameFor(comment)}</span><span className="ml-auto text-muted-foreground/80">{bubbleTime(comment.created_at)}</span></div>
                     {parent && (
                       <div className="my-px rounded border-l-2 border-primary/40 bg-primary/5 px-1 py-0 text-[8px] leading-tight opacity-80">
                         <div className="font-semibold">{nameFor(parent)}</div>
