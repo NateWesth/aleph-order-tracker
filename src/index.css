@@ -2080,11 +2080,19 @@ html.toolbar-glass .aleph-toolbar-search-input {
 }
 
 .app-page-stage {
-  background-image: radial-gradient(circle at 50% 0, hsl(var(--primary) / .035), transparent 34rem);
+  background-image:
+    radial-gradient(circle at 12% 0, hsl(var(--logo-cyan) / .07), transparent 26rem),
+    radial-gradient(circle at 55% 0, hsl(var(--logo-violet) / .07), transparent 30rem),
+    radial-gradient(circle at 90% 0, hsl(var(--logo-magenta) / .06), transparent 26rem);
 }
 
 .aleph-command-header {
   margin-bottom: .35rem;
+  border: 1px solid transparent !important;
+  background:
+    linear-gradient(hsl(var(--card) / .94), hsl(var(--card) / .94)) padding-box,
+    linear-gradient(120deg, hsl(var(--logo-cyan) / .65), hsl(var(--logo-violet) / .65), hsl(var(--logo-magenta) / .65)) border-box !important;
+  box-shadow: 0 18px 55px -30px hsl(var(--logo-violet) / .45), 0 28px 75px -48px hsl(var(--foreground) / .5) !important;
 }
 
 .aleph-page-command-dock input,
