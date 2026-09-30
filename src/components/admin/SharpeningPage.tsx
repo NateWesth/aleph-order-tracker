@@ -242,6 +242,45 @@ export default function SharpeningPage() {
       </div>}
     </WorkshopPanel>
 
+    {menu && (() => {
+      const targets = menuTargets(menu.job);
+      const many = targets.length > 1;
+      return (
+        <div className="fixed inset-0 z-[90]" onMouseDown={() => setMenu(null)} onContextMenu={(event) => { event.preventDefault(); setMenu(null); }}>
+          <div
+            className="absolute max-h-[80dvh] w-64 overflow-y-auto rounded-xl border border-border bg-popover shadow-xl"
+            style={{ left: Math.min(menu.x, window.innerWidth - 270), top: Math.min(menu.y, window.innerHeight - 440) }}
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <p className="border-b border-border/60 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+              {many ? `${targets.length} jobs selected` : `Job ${menu.job.job_number}`}
+            </p>
+            {!many && <button className={menuItemCls} onClick={() => { setSelected(menu.job); setMenu(null); }}>Open details</button>}
+            <button className={menuItemCls} onClick={() => { setSelectMode(true); togglePick(menu.job.id); setMenu(null); }}>{picked.has(menu.job.id) ? "Deselect" : "Select"}</button>
+            <p className="border-t border-border/60 px-3 pb-1 pt-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Set status</p>
+            {SERVICE_STATUSES.map(([value, label]) => (
+              <button key={value} className={menuItemCls} onClick={() => void bulkUpdate(targets, { status: value }, "Status")}>
+                <span className={cn("h-2.5 w-2.5 rounded-full", STATUS_BUTTON[statusTone(value)].split(" ")[1])} />{label}
+              </button>
+            ))}
+            <p className="border-t border-border/60 px-3 pb-1 pt-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Set priority</p>
+            {PRIORITIES.map(([value, label]) => (
+              <button key={value} className={menuItemCls} onClick={() => void bulkUpdate(targets, { priority: value }, "Priority")}>{label}</button>
+            ))}
+            <p className="border-t border-border/60 px-3 pb-1 pt-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Assign to</p>
+            {team.map((member) => (
+              <button key={member.id} className={menuItemCls} onClick={() => void bulkUpdate(targets, { assigned_to: member.id }, "Assigned")}>{memberLabel(member)}</button>
+            ))}
+            <button className={menuItemCls} onClick={() => void bulkUpdate(targets, { assigned_to: null }, "Unassigned")}>Unassign</button>
+            <div className="border-t border-border/60">
+              <button className={menuItemCls} onClick={() => void bulkUpdate(targets, { status: "completed" }, "Completed")}><CheckCircle2 className="h-3.5 w-3.5 text-logo-cyan" />Complete & archive</button>
+              <button className={cn(menuItemCls, "text-destructive hover:bg-destructive/10")} onClick={() => void bulkDelete(targets)}><X className="h-3.5 w-3.5" />Delete permanently</button>
+            </div>
+          </div>
+        </div>
+      );
+    })()}
+
   </div>;
 }
 
