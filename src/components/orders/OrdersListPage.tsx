@@ -17,7 +17,7 @@ import OrdersHeader from "./components/OrdersHeader";
 import BulkActionsBar from "./components/BulkActionsBar";
 import { Trash2, Users, CheckSquare } from "lucide-react";
 import { format, startOfMonth, endOfMonth } from "date-fns";
-import { useViewportMenuPosition } from "@/hooks/useViewportMenuPosition";
+import { MenuPortal, useViewportMenuPosition } from "@/hooks/useViewportMenuPosition";
 
 interface Company {
   id: string;
@@ -217,7 +217,7 @@ export const OrdersListPage: React.FC = () => {
       </div>
 
       {menu && (
-        <div className="fixed inset-0 z-[90]" onMouseDown={() => setMenu(null)} onContextMenu={(e) => { e.preventDefault(); setMenu(null); }}>
+        <MenuPortal><div className="fixed inset-0 z-[90]" onMouseDown={() => setMenu(null)} onContextMenu={(e) => { e.preventDefault(); setMenu(null); }}>
           <div ref={menuPosition.ref} role="menu" aria-label={`Actions for ${menu.label}`} className="fixed z-[91] max-h-[calc(100dvh-16px)] w-60 max-w-[calc(100vw-16px)] overflow-y-auto rounded-lg border border-border bg-popover p-1.5 text-popover-foreground shadow-xl"
             style={menuPosition.style} onMouseDown={(e) => e.stopPropagation()}>
             <Button variant="ghost" className="h-9 w-full justify-start px-2" onClick={() => { toggleSelect(menu.id); setMenu(null); }}><CheckSquare className="mr-2 h-4 w-4" />{selectedIds.has(menu.id) ? "Deselect this order" : "Select this order"}</Button>
@@ -229,7 +229,7 @@ export const OrdersListPage: React.FC = () => {
             <div className="my-1 h-px bg-border" />
             <Button variant="ghost" className="h-9 w-full justify-start px-2 text-destructive hover:text-destructive" onClick={() => runBulk("aleph:bulk-orders-delete")}><Trash2 className="mr-2 h-4 w-4" />Delete selected</Button>
           </div>
-        </div>
+        </div></MenuPortal>
       )}
 
       {selectedCompanyId ? (

@@ -28,7 +28,7 @@ import {
 
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { useViewportMenuPosition } from "@/hooks/useViewportMenuPosition";
+import { MenuPortal, useViewportMenuPosition } from "@/hooks/useViewportMenuPosition";
 import SwipeableCard from "@/components/ui/SwipeableCard";
 import OrderDetailsDialog from "./OrderDetailsDialog";
 
@@ -423,7 +423,7 @@ function OrderStatusColumn({
         </AlertDialogContent>
       </AlertDialog>
       {contextOrder && (
-        <div className="fixed inset-0 z-[90]" onMouseDown={() => setContextOrder(null)}>
+        <MenuPortal><div className="fixed inset-0 z-[90]" onMouseDown={() => setContextOrder(null)}>
           <div
             ref={menuPosition.ref}
             role="menu"
@@ -455,7 +455,7 @@ function OrderStatusColumn({
               window.setTimeout(() => window.dispatchEvent(new Event("aleph:bulk-orders-delete")), 0);
             }}><Trash2 className="mr-2 h-4 w-4" />Delete selected</Button>
           </div>
-        </div>
+        </div></MenuPortal>
       )}
     </>
   );
