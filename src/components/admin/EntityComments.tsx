@@ -239,7 +239,7 @@ export default function EntityComments({ entityType, entityId, orderId, classNam
 
       {open && (
         <div className="border-t border-border/60">
-          <div className="h-[clamp(18rem,46dvh,34rem)] overflow-y-auto overscroll-contain p-2.5 space-y-2 bg-background/40 [-webkit-overflow-scrolling:touch]">
+          <div className="h-[clamp(18rem,46dvh,34rem)] overflow-y-auto overscroll-contain p-2 space-y-1.5 bg-background/40 [-webkit-overflow-scrolling:touch]">
             {loading && comments.length === 0 ? (
               <div className="flex items-center justify-center py-6 text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /></div>
             ) : comments.length === 0 ? (
@@ -256,20 +256,20 @@ export default function EntityComments({ entityType, entityId, orderId, classNam
                 return (
                   <div key={comment.id} className={cn("group flex flex-col", mine ? "items-end" : "items-start")}>
                     <div className={cn(
-                       "max-w-[78%] rounded-lg px-2 py-1 text-[11px] leading-snug break-words shadow-sm bg-white dark:bg-card border",
+                       "max-w-[85%] rounded-md px-1.5 py-0.5 text-[10px] leading-tight break-words shadow-sm bg-white dark:bg-card border",
                        mine ? "border-primary/30 rounded-tr-sm" : "border-border text-foreground rounded-tl-sm"
                     )}>
-                       <div className={cn("text-[9px] font-semibold", mine ? "text-primary" : "text-primary/90")}>
-                        {nameFor(comment)}
-                      </div>
-                      {parent && (
-                         <div className="mb-0.5 mt-0.5 rounded border-l-2 border-primary/40 bg-primary/5 px-1 py-0 text-[9px] leading-tight opacity-80">
-                          <div className="font-semibold">{nameFor(parent)}</div>
-                          <div className="line-clamp-2">{parent.body}</div>
-                        </div>
-                      )}
-                      <p className="whitespace-pre-wrap break-words text-foreground">{comment.body}</p>
-                    </div>
+                       <div className={cn("text-[8px] font-semibold leading-tight", mine ? "text-primary" : "text-primary/90")}>
+                         {nameFor(comment)}
+                       </div>
+                       {parent && (
+                          <div className="my-px rounded border-l-2 border-primary/40 bg-primary/5 px-1 py-0 text-[8px] leading-tight opacity-80">
+                           <div className="font-semibold">{nameFor(parent)}</div>
+                           <div className="line-clamp-2">{parent.body}</div>
+                         </div>
+                       )}
+                       <p className="whitespace-pre-wrap break-words text-foreground">{comment.body}</p>
+                     </div>
 
                      {summary.length > 0 && (
                        <div className="mt-0.5 flex flex-wrap gap-1">
