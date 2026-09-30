@@ -110,9 +110,13 @@ interface BoardTableProps<T> {
   onRowClick?: (row: T) => void;
   activeKey?: string | null;
   noun?: string;
+  selectMode?: boolean;
+  selectedKeys?: ReadonlySet<string>;
+  onToggleSelect?: (key: string) => void;
+  onRowContextMenu?: (row: T, x: number, y: number) => void;
 }
 
-export default function BoardTable<T>({ groups, columns, collapsed, onToggle, rowKey, onRowClick, activeKey, noun = "job" }: BoardTableProps<T>) {
+export default function BoardTable<T>({ groups, columns, collapsed, onToggle, rowKey, onRowClick, activeKey, noun = "job", selectMode = false, selectedKeys, onToggleSelect, onRowContextMenu }: BoardTableProps<T>) {
   const mobile = useIsMobile();
   if (groups.length === 0) {
     return (
