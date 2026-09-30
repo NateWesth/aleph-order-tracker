@@ -188,6 +188,9 @@ export default function BoardTable<T>({ groups, columns, collapsed, onToggle, ro
                 <table className="w-full min-w-[960px] border-separate border-spacing-0 text-sm">
                   <thead>
                     <tr>
+                      {selectMode && (
+                        <th className="sticky top-0 z-10 w-10 border-b border-border/70 bg-muted/60 px-2 py-2 backdrop-blur" aria-label="Select" />
+                      )}
                       {columns.map((column) => (
                         <th
                           key={column.key}
