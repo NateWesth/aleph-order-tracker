@@ -3470,19 +3470,45 @@ html, body, .aleph-content-scroll { scrollbar-width: thin !important; }
 }
 
 /* ─── Workspace density + operations polish ───────────────────────────── */
-html[data-density="compact"] .app-page-stage { --aleph-space-scale: .82; }
-html[data-density="compact"] .app-page-stage .p-6 { padding: 1rem; }
-html[data-density="compact"] .app-page-stage .p-5 { padding: .85rem; }
-html[data-density="compact"] .app-page-stage .gap-4 { gap: .75rem; }
-html[data-density="compact"] .app-page-stage .space-y-4 > :not([hidden]) ~ :not([hidden]) { margin-top: .75rem; }
-html[data-density="dense"] .app-page-stage .p-6 { padding: .7rem; }
-html[data-density="dense"] .app-page-stage .p-5,
-html[data-density="dense"] .app-page-stage .p-4 { padding: .65rem; }
-html[data-density="dense"] .app-page-stage .gap-4,
-html[data-density="dense"] .app-page-stage .gap-3 { gap: .5rem; }
-html[data-density="dense"] .app-page-stage .space-y-4 > :not([hidden]) ~ :not([hidden]) { margin-top: .5rem; }
-html[data-density="dense"] .app-page-stage .rounded-\[28px\],
-html[data-density="dense"] .app-page-stage .rounded-\[24px\] { border-radius: 1rem; }
+/* Compact: noticeably tighter spacing, smaller type and controls. Dense: tighter still. */
+html[data-density="compact"] .app-page-stage { --aleph-space-scale: .7; }
+html[data-density="compact"] .app-page-stage :is(.p-8,.p-7,.p-6) { padding: .75rem !important; }
+html[data-density="compact"] .app-page-stage :is(.p-5,.p-4) { padding: .6rem !important; }
+html[data-density="compact"] .app-page-stage .p-3 { padding: .45rem !important; }
+html[data-density="compact"] .app-page-stage :is(.px-6,.px-5,.px-4) { padding-left: .6rem !important; padding-right: .6rem !important; }
+html[data-density="compact"] .app-page-stage :is(.py-6,.py-5,.py-4) { padding-top: .45rem !important; padding-bottom: .45rem !important; }
+html[data-density="compact"] .app-page-stage .py-3 { padding-top: .35rem !important; padding-bottom: .35rem !important; }
+html[data-density="compact"] .app-page-stage :is(.gap-6,.gap-5,.gap-4) { gap: .5rem !important; }
+html[data-density="compact"] .app-page-stage .gap-3 { gap: .4rem !important; }
+html[data-density="compact"] .app-page-stage :is(.space-y-6,.space-y-5,.space-y-4) > :not([hidden]) ~ :not([hidden]) { margin-top: .5rem !important; }
+html[data-density="compact"] .app-page-stage .space-y-3 > :not([hidden]) ~ :not([hidden]) { margin-top: .35rem !important; }
+html[data-density="compact"] .app-page-stage :is(.text-4xl,.text-3xl) { font-size: 1.4rem !important; line-height: 1.8rem !important; }
+html[data-density="compact"] .app-page-stage .text-2xl { font-size: 1.2rem !important; line-height: 1.6rem !important; }
+html[data-density="compact"] .app-page-stage .text-xl { font-size: 1.05rem !important; line-height: 1.4rem !important; }
+html[data-density="compact"] .app-page-stage .text-lg { font-size: .95rem !important; line-height: 1.3rem !important; }
+html[data-density="compact"] .app-page-stage .text-base { font-size: .85rem !important; line-height: 1.2rem !important; }
+html[data-density="compact"] .app-page-stage .text-sm { font-size: .78rem !important; line-height: 1.1rem !important; }
+html[data-density="compact"] .app-page-stage .text-xs { font-size: .68rem !important; line-height: 1rem !important; }
+html[data-density="compact"] .app-page-stage :is(.h-12,.h-11,.h-10) { height: 2rem !important; }
+html[data-density="compact"] .app-page-stage .h-9 { height: 1.8rem !important; }
+html[data-density="compact"] .app-page-stage :is(td,th) { padding-top: .3rem !important; padding-bottom: .3rem !important; }
+html[data-density="compact"] .app-page-stage :is(.rounded-\[28px\],.rounded-\[26px\],.rounded-\[24px\],.rounded-3xl,.rounded-2xl) { border-radius: .85rem !important; }
+
+html[data-density="dense"] .app-page-stage { --aleph-space-scale: .55; }
+html[data-density="dense"] .app-page-stage :is(.p-8,.p-7,.p-6,.p-5,.p-4) { padding: .4rem !important; }
+html[data-density="dense"] .app-page-stage .p-3 { padding: .3rem !important; }
+html[data-density="dense"] .app-page-stage :is(.px-6,.px-5,.px-4,.px-3) { padding-left: .4rem !important; padding-right: .4rem !important; }
+html[data-density="dense"] .app-page-stage :is(.py-6,.py-5,.py-4,.py-3) { padding-top: .25rem !important; padding-bottom: .25rem !important; }
+html[data-density="dense"] .app-page-stage :is(.gap-6,.gap-5,.gap-4,.gap-3) { gap: .3rem !important; }
+html[data-density="dense"] .app-page-stage :is(.space-y-6,.space-y-5,.space-y-4,.space-y-3) > :not([hidden]) ~ :not([hidden]) { margin-top: .3rem !important; }
+html[data-density="dense"] .app-page-stage :is(.text-4xl,.text-3xl,.text-2xl) { font-size: 1.1rem !important; line-height: 1.45rem !important; }
+html[data-density="dense"] .app-page-stage :is(.text-xl,.text-lg) { font-size: .9rem !important; line-height: 1.2rem !important; }
+html[data-density="dense"] .app-page-stage .text-base { font-size: .78rem !important; line-height: 1.1rem !important; }
+html[data-density="dense"] .app-page-stage .text-sm { font-size: .72rem !important; line-height: 1rem !important; }
+html[data-density="dense"] .app-page-stage .text-xs { font-size: .64rem !important; line-height: .9rem !important; }
+html[data-density="dense"] .app-page-stage :is(.h-12,.h-11,.h-10,.h-9) { height: 1.65rem !important; }
+html[data-density="dense"] .app-page-stage :is(td,th) { padding-top: .15rem !important; padding-bottom: .15rem !important; }
+html[data-density="dense"] .app-page-stage :is(.rounded-\[28px\],.rounded-\[26px\],.rounded-\[24px\],.rounded-3xl,.rounded-2xl) { border-radius: .6rem !important; }
 
 @keyframes aleph-complete-pop {
   0% { transform: scale(.985); opacity: .75; }
