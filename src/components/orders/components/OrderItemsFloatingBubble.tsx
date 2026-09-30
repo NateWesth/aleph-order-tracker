@@ -1,9 +1,21 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { PackageCheck, X } from "lucide-react";
+import { PackageCheck, Send, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getItemDisplayName, getItemSecondaryDescription, isMiscellaneousItem } from "@/lib/itemDisplay";
 import OrderItemComments from "./OrderItemComments";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { format } from "date-fns";
+
+interface OrderUpdate {
+  id: string;
+  order_id: string;
+  user_id: string;
+  message: string;
+  created_at: string;
+  author_name?: string | null;
+}
 
 interface OrderItem {
   id: string;
@@ -78,6 +90,92 @@ function getStockStatusStyle(status: string) {
 export default function OrderItemsFloatingBubble({ order, onClose }: OrderItemsFloatingBubbleProps) {
   const [visibleOrder, setVisibleOrder] = useState<Order | null>(order);
   const [isSwitching, setIsSwitching] = useState(false);
+  const { user } = useAuth();
+  const [updates, setUpdates] = useState<OrderUpdate[]>([]);
+  const [updatesLoading, setUpdatesLoading] = useState(false);
+  const [newNote, setNewNote] = useState("");
+  const [postingNote, setPostingNote] = useState(false);
+
+  useEffect(() => {
+    if (!visibleOrder?.id) {
+      setUpdates([]);
+      return;
+    }
+
+    let cancelled = false;
+    setUpdatesLoading(true);
+
+    const fetchUpdates = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("order_updates")
+          .select("id, order_id, user_id, message, created_at, profiles!inner(full_name, email)")
+          .eq("order_id", visibleOrder.id)
+          .order("created_at", { ascending: true });
+
+        if (error) throw error;
+        if (cancelled) return;
+
+        setUpdates(
+          (data || []).map((row: any) => {
+            const profile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
+            return {
+              id: row.id,
+              order_id: row.order_id,
+              user_id: row.user_id,
+              message: row.message,
+              created_at: row.created_at,
+              author_name: profile?.full_name || profile?.email || null,
+            };
+          }),
+        );
+      } catch (error) {
+        console.error("Failed to load order notes:", error);
+        if (!cancelled) setUpdates([]);
+      } finally {
+        if (!cancelled) setUpdatesLoading(false);
+      }
+    };
+
+    fetchUpdates();
+    return () => {
+      cancelled = true;
+    };
+  }, [visibleOrder?.id]);
+
+  const submitNote = async () => {
+    const message = newNote.trim();
+    if (!message || !user?.id || !visibleOrder) return;
+
+    setPostingNote(true);
+    try {
+      const { data, error } = await supabase
+        .from("order_updates")
+        .insert({ order_id: visibleOrder.id, user_id: user.id, message })
+        .select("id, order_id, user_id, message, created_at, profiles!inner(full_name, email)")
+        .single();
+
+      if (error) throw error;
+
+      const profile = Array.isArray((data as any).profiles) ? (data as any).profiles[0] : (data as any).profiles;
+      setUpdates((prev) => [
+        ...prev,
+        {
+          id: data.id,
+          order_id: data.order_id,
+          user_id: data.user_id,
+          message: data.message,
+          created_at: data.created_at,
+          author_name: profile?.full_name || profile?.email || null,
+        },
+      ]);
+      setNewNote("");
+    } catch (error) {
+      console.error("Failed to post note:", error);
+    } finally {
+      setPostingNote(false);
+    }
+  };
 
   useEffect(() => {
     if (!order) return;
@@ -178,12 +276,67 @@ export default function OrderItemsFloatingBubble({ order, onClose }: OrderItemsF
                 <span className="text-sm text-muted-foreground">Priority</span>
                 <span className={cn("text-sm font-medium capitalize", urgent && "text-destructive")}>{visibleOrder.urgency || "Normal"}</span>
               </div>
-              {visibleOrder.description && (
-                <div>
-                  <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Description</p>
-                  <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-muted-foreground">{visibleOrder.description}</p>
+              <div>
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Notes & comments</p>
+                  <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-bold text-muted-foreground">{updates.length}</span>
                 </div>
-              )}
+                <div className="max-h-52 space-y-3 overflow-y-auto pr-1">
+                  {updatesLoading ? (
+                    <p className="text-xs text-muted-foreground">Loading notes…</p>
+                  ) : updates.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">No notes yet. Start the conversation below.</p>
+                  ) : (
+                    updates.map((update) => {
+                      const initials = (update.author_name || "?")
+                        .split(" ")
+                        .map((part) => part[0])
+                        .join("")
+                        .toUpperCase()
+                        .slice(0, 2);
+                      return (
+                        <div key={update.id} className="flex gap-2.5">
+                          <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">{initials}</span>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-x-2 text-[11px]">
+                              <span className="truncate font-semibold">
+                                {update.author_name || "Unknown"}
+                                {update.user_id === user?.id && <span className="ml-1 text-[10px] font-bold uppercase text-primary">you</span>}
+                              </span>
+                              <span className="text-[10px] text-muted-foreground">{format(new Date(update.created_at), "dd MMM HH:mm")}</span>
+                            </div>
+                            <p className="mt-0.5 whitespace-pre-wrap break-words rounded-lg bg-muted/50 px-2.5 py-1.5 text-xs leading-relaxed">{update.message}</p>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+                <div className="mt-3 flex items-end gap-2">
+                  <textarea
+                    value={newNote}
+                    onChange={(e) => setNewNote(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        submitNote();
+                      }
+                    }}
+                    placeholder="Add a note…"
+                    rows={2}
+                    className="min-h-[2.5rem] flex-1 resize-none rounded-xl border border-border bg-background px-3 py-2 text-xs outline-none transition-colors placeholder:text-muted-foreground focus:border-primary/50"
+                  />
+                  <button
+                    type="button"
+                    onClick={submitNote}
+                    disabled={!newNote.trim() || postingNote}
+                    className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground transition-all hover:scale-105 disabled:cursor-not-allowed disabled:opacity-50"
+                    aria-label="Post note"
+                  >
+                    <Send className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
             </div>
           </aside>
           <section className="flex min-h-0 flex-col lg:col-span-7">
