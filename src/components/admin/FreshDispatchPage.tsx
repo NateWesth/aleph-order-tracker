@@ -12,6 +12,7 @@ import {Textarea} from "@/components/ui/textarea";
 import EntityComments from "./EntityComments";
 import SourceDispatchPlanner from "./SourceDispatchPlanner";
 import {PackageCheck,Truck,RefreshCw,Search,AlertTriangle,ArrowRight,CalendarDays,Navigation,Warehouse,CheckCircle2,X} from "lucide-react";
+import {useIsMobile} from "@/hooks/use-mobile";
 const db=supabase as any;
 type Member={id:string;full_name:string|null};
 type Health={kind:string;last_success_at:string|null;error:string|null;next_page:number};
@@ -24,6 +25,8 @@ export default function FreshDispatchPage(){
  const [loading,setLoading]=useState(true),[error,setError]=useState(""),[syncing,setSyncing]=useState(false),[progress,setProgress]=useState("");
  const [selected,setSelected]=useState<DispatchDocument|null>(null);
  const [planner,setPlanner]=useState(false);
+ const isMobile=useIsMobile();
+ const [mobileLane,setMobileLane]=useState<string>("pending");
  useEffect(()=>{
   const open=()=>{sessionStorage.removeItem("aleph:open-dispatch-planner");setPlanner(true);};
   if(sessionStorage.getItem("aleph:open-dispatch-planner"))open();
@@ -128,14 +131,15 @@ export default function FreshDispatchPage(){
   </div>
     {loading?<p role="status">Loading dispatch records…</p>:visible.length===0?<div className="rounded-2xl border border-dashed p-8 text-center"><p className="font-semibold">{shownError?"Records could not be verified":history?"No matching history":"No matching outstanding documents"}</p><p className="mt-2 text-sm text-muted-foreground">Check Source health before assuming everything is complete. Draft and void documents do not require dispatch.</p></div>:history?
     <div className="grid min-w-0 gap-3 md:grid-cols-2 xl:grid-cols-3">{visible.map(doc=><DispatchCard key={doc.id} doc={doc} memberName={memberName} history onOpen={()=>setSelected(doc)}/>)}</div>:
-    <div className="fulfillment-board-grid grid min-w-0 gap-4 xl:grid-cols-3">{lanes.map((lane,index)=>{const Icon=lane.icon;const tone=[
+    <>{isMobile&&<div className="grid grid-cols-3 gap-2" role="tablist" aria-label="Dispatch lanes">{lanes.map((lane,index)=>{const tone=[{active:"border-logo-cyan bg-logo-cyan/10 text-logo-cyan"},{active:"border-logo-violet bg-logo-violet/10 text-logo-violet"},{active:"border-logo-magenta bg-logo-magenta/10 text-logo-magenta"}][index];const active=mobileLane===lane.id;return <button type="button" key={lane.id} role="tab" aria-selected={active} onClick={()=>setMobileLane(lane.id)} className={"min-h-12 rounded-xl border p-2 text-center "+(active?tone.active:"border-border/60 bg-card/70 text-muted-foreground")}><span className="block truncate text-[11px] font-bold">{lane.label}</span><span className="mt-0.5 block text-xs font-black">{lane.docs.length}</span></button>;})}</div>}
+    <div className="fulfillment-board-grid grid min-w-0 gap-4 xl:grid-cols-3">{lanes.filter(lane=>!isMobile||lane.id===mobileLane).map((lane)=>{const index=lanes.findIndex(l=>l.id===lane.id);const Icon=lane.icon;const tone=[
      {icon:"bg-logo-cyan",selected:"border-logo-cyan ring-2 ring-logo-cyan/50 shadow-lg",hover:"hover:border-logo-cyan/40",header:"border-logo-cyan/40 bg-logo-cyan/10",pill:"bg-logo-cyan text-logo-on"},
      {icon:"bg-logo-violet",selected:"border-logo-violet ring-2 ring-logo-violet/50 shadow-lg",hover:"hover:border-logo-violet/40",header:"border-logo-violet/40 bg-logo-violet/10",pill:"bg-logo-violet text-logo-on"},
      {icon:"bg-logo-magenta",selected:"border-logo-magenta ring-2 ring-logo-magenta/50 shadow-lg",hover:"hover:border-logo-magenta/40",header:"border-logo-magenta/40 bg-logo-magenta/10",pill:"bg-logo-magenta text-logo-on"},
     ][index];const selected=activeLane===lane.id;return <section key={lane.id} onClick={()=>setActiveLane(selected?null:lane.id)} className={"fulfillment-lane flex min-w-0 cursor-pointer flex-col overflow-hidden rounded-[28px] border bg-card/70 shadow-sm transition "+(selected?tone.selected:"border-border/60 "+tone.hover)}>
      <header className={"shrink-0 border-b "+(selected?tone.header:"border-border/55")}><div className="flex w-full items-center justify-between gap-3 px-4 py-4 text-left"><div className="flex min-w-0 items-center gap-3"><span className={"grid h-9 w-9 shrink-0 place-items-center rounded-2xl text-logo-on shadow-lg "+tone.icon}><Icon className="h-4 w-4"/></span><div className="min-w-0"><h2 className="truncate text-sm font-black">{lane.label}</h2><p className="truncate text-[10px] text-muted-foreground">{lane.description}</p></div></div><span className={"grid h-7 min-w-7 place-items-center rounded-full px-2 text-xs font-bold "+(selected?tone.pill:"bg-muted")}>{lane.docs.length}</span></div></header>
-     <div className={"min-h-[420px] flex-1 space-y-3 p-3 "+(selected?"max-h-[70vh] overflow-y-auto":"overflow-visible")}>{lane.docs.length?lane.docs.map(doc=><DispatchCard key={doc.id} doc={doc} memberName={memberName} onOpen={()=>setSelected(doc)}/>):<div className="grid min-h-56 place-items-center rounded-3xl border border-dashed border-border/60 bg-muted/20 p-6 text-center"><div><CheckCircle2 className="mx-auto h-7 w-7 text-success opacity-60"/><p className="mt-3 text-xs font-bold">Lane clear</p><p className="mt-1 text-[10px] text-muted-foreground">New work appears here live.</p></div></div>}</div>
-    </section>})}</div>}
+     <div className={"min-h-0 flex-1 space-y-3 p-3 sm:min-h-[420px] "+(selected?"max-h-[70vh] overflow-y-auto":"overflow-visible")}>{lane.docs.length?lane.docs.map(doc=><DispatchCard key={doc.id} doc={doc} memberName={memberName} onOpen={()=>setSelected(doc)}/>):<div className="grid min-h-56 place-items-center rounded-3xl border border-dashed border-border/60 bg-muted/20 p-6 text-center"><div><CheckCircle2 className="mx-auto h-7 w-7 text-success opacity-60"/><p className="mt-3 text-xs font-bold">Lane clear</p><p className="mt-1 text-[10px] text-muted-foreground">New work appears here live.</p></div></div>}</div>
+    </section>})}</div></>}
   {selected&&<DispatchDocumentDialog key={selected.id} doc={selected} members={members} onClose={()=>setSelected(null)} onSaved={async()=>{await load();}}/>}
   {planner&&<SourceDispatchPlanner docs={docs} members={members} onClose={()=>setPlanner(false)} onSaved={load}/>}
  </div>;
