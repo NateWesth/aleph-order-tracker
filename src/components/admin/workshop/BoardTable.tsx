@@ -159,7 +159,16 @@ export default function BoardTable<T>({ groups, columns, collapsed, onToggle, ro
                 const key = rowKey(row);
                 const primary = columns.filter((column, index) => index < 3 || /status|priority/.test(column.key));
                 const secondary = columns.filter(column => !primary.includes(column));
-                return <article key={key} className={cn("min-w-0 rounded-xl border bg-background p-3", activeKey === key && "border-primary ring-1 ring-primary")}>
+                const picked = !!selectedKeys?.has(key);
+                return <article key={key} onContextMenu={onRowContextMenu ? (event) => { event.preventDefault(); onRowContextMenu(row, event.clientX, event.clientY); } : undefined} className={cn("relative min-w-0 rounded-xl border bg-background p-3", activeKey === key && "border-primary ring-1 ring-primary", picked && "border-logo-violet ring-2 ring-logo-violet/50")}>
+                  {selectMode && (
+                    <button
+                      type="button"
+                      aria-label={picked ? "Deselect" : "Select"}
+                      onClick={(event) => { event.stopPropagation(); onToggleSelect?.(key); }}
+                      className={cn("absolute right-2.5 top-2.5 grid h-6 w-6 place-items-center rounded-md border text-[11px] font-bold", picked ? "border-logo-violet bg-logo-violet text-white" : "border-border bg-background text-transparent")}
+                    >✓</button>
+                  )}
                   <dl className="grid grid-cols-2 gap-3">
                     {primary.map((column, index) => <div key={column.key} className={cn("min-w-0", index === 0 && "col-span-2")}>
                       <dt className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{column.label}</dt>
