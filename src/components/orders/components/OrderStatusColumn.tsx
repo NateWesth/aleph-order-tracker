@@ -139,6 +139,7 @@ function OrderStatusColumn({
   activeItemsOrderId,
   onOpenItemsBubble,
 }: OrderStatusColumnProps) {
+  const commentsSeen = useCommentsSeen();
   const { setNodeRef, isOver } = useDroppable({
     id: config.key,
   });

@@ -14,6 +14,7 @@ import SourceDispatchPlanner from "./SourceDispatchPlanner";
 import {PackageCheck,Truck,RefreshCw,Search,AlertTriangle,ArrowRight,CalendarDays,Navigation,Warehouse,CheckCircle2,X,UserRound,Flame,Eye,Trash2,CheckSquare,Square} from "lucide-react";
 import {useIsMobile} from "@/hooks/use-mobile";
 import { MenuPortal, useViewportMenuPosition } from "@/hooks/useViewportMenuPosition";
+import { hasUnread, useCommentsSeen } from "@/lib/commentStyles";
 const db=supabase as any;
 type Member={id:string;full_name:string|null};
 type Health={kind:string;last_success_at:string|null;error:string|null;next_page:number};
@@ -39,6 +40,8 @@ export default function FreshDispatchPage(){
   return()=>window.removeEventListener("aleph:open-dispatch-planner",open);
  },[]);
  const mounted=useRef(true),syncLock=useRef(false),readVersion=useRef(0);
+ const [commentCounts,setCommentCounts]=useState<Record<string,number>>({});const commentsSeen=useCommentsSeen();
+ useEffect(()=>{const ids=docs.map(d=>d.id);if(!ids.length)return;let on=true;void supabase.from("entity_comments").select("entity_type,entity_id").in("entity_id",ids).then(({data})=>{if(!on||!data)return;const m:Record<string,number>={};for(const r of data as {entity_type:string;entity_id:string}[]){const k=r.entity_type+":"+r.entity_id;m[k]=(m[k]||0)+1;}setCommentCounts(m);});return()=>{on=false;};},[docs,selected]);
  const load=useCallback(async()=>{
   const version=++readVersion.current;
   try{
@@ -204,9 +207,9 @@ export default function FreshDispatchPage(){
  </div>;
 }
 
-function DispatchCard({doc,memberName,history=false,onOpen,onContextMenu,selectMode=false,picked=false}:{doc:DispatchDocument;memberName:(id:string|null)=>string;history?:boolean;onOpen:()=>void;onContextMenu?:(x:number,y:number)=>void;selectMode?:boolean;picked?:boolean}){
+function DispatchCard({doc,unread=false,memberName,history=false,onOpen,onContextMenu,selectMode=false,picked=false}:{doc:DispatchDocument;unread?:boolean;memberName:(id:string|null)=>string;history?:boolean;onOpen:()=>void;onContextMenu?:(x:number,y:number)=>void;selectMode?:boolean;picked?:boolean}){
  return <button type="button" aria-pressed={selectMode?picked:undefined} onClick={(e)=>{e.stopPropagation();onOpen();}} onContextMenu={onContextMenu?(e)=>{e.preventDefault();onContextMenu(e.clientX,e.clientY);}:undefined} className={"w-full min-w-0 rounded-xl border bg-background p-4 text-left shadow-sm transition hover:border-primary/50 focus-visible:outline-primary "+(picked?"border-logo-violet ring-2 ring-logo-violet/50":"")}>
-  <div className="flex flex-wrap justify-between gap-2"><span className="flex items-center gap-2 font-bold text-primary">{selectMode&&(picked?<CheckSquare className="h-4 w-4 text-logo-violet"/>:<Square className="h-4 w-4 text-muted-foreground"/>)}{doc.reference}</span>{doc.urgent&&<span className="rounded-full bg-destructive/10 px-2 py-1 text-xs font-semibold text-destructive">Urgent</span>}</div>
+  <div className="flex flex-wrap justify-between gap-2"><span className="flex items-center gap-2 font-bold text-primary">{selectMode&&(picked?<CheckSquare className="h-4 w-4 text-logo-violet"/>:<Square className="h-4 w-4 text-muted-foreground"/>)}{doc.reference}{unread&&<span title="New comments" className="h-2 w-2 animate-pulse rounded-full bg-logo-cyan shadow-[0_0_6px_2px_hsl(var(--logo-cyan)/0.8)]"/>}</span>{doc.urgent&&<span className="rounded-full bg-destructive/10 px-2 py-1 text-xs font-semibold text-destructive">Urgent</span>}</div>
   <p className="mt-2 break-words text-base font-semibold">{doc.contact_name}</p>
   <p className="mt-2 text-sm text-muted-foreground">{remainingUnits(doc)} units remaining · {doc.lines.length} lines</p>
   <p className="mt-1 text-xs text-muted-foreground">{memberName(doc.assigned_to)} · {doc.scheduled_for?displayDate(doc.scheduled_for):"Not scheduled"}</p>
