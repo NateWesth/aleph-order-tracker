@@ -179,7 +179,7 @@ export default function BoardTable<T>({ groups, columns, collapsed, onToggle, ro
                     <summary className="cursor-pointer py-2 text-xs font-semibold text-muted-foreground">More details</summary>
                     <dl className="space-y-3 py-2">{secondary.map(column => <div key={column.key}><dt className="mb-1 text-[10px] uppercase text-muted-foreground">{column.label}</dt><dd className="break-words text-sm">{column.cell(row)}</dd></div>)}</dl>
                   </details>}
-                  {onRowClick && <button type="button" onClick={() => onRowClick(row)} className="mt-3 flex min-h-11 w-full items-center justify-between rounded-lg bg-primary/10 px-3 text-sm font-semibold text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">Open {noun}<ChevronRight className="h-4 w-4" /></button>}
+                  {onRowClick && !selectMode && <button type="button" onClick={() => onRowClick(row)} className="mt-3 flex min-h-11 w-full items-center justify-between rounded-lg bg-primary/10 px-3 text-sm font-semibold text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">Open {noun}<ChevronRight className="h-4 w-4" /></button>}
                 </article>;
               })}
             </div>}
