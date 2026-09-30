@@ -276,12 +276,67 @@ export default function OrderItemsFloatingBubble({ order, onClose }: OrderItemsF
                 <span className="text-sm text-muted-foreground">Priority</span>
                 <span className={cn("text-sm font-medium capitalize", urgent && "text-destructive")}>{visibleOrder.urgency || "Normal"}</span>
               </div>
-              {visibleOrder.description && (
-                <div>
-                  <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Description</p>
-                  <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-muted-foreground">{visibleOrder.description}</p>
+              <div>
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Notes & comments</p>
+                  <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-bold text-muted-foreground">{updates.length}</span>
                 </div>
-              )}
+                <div className="max-h-52 space-y-3 overflow-y-auto pr-1">
+                  {updatesLoading ? (
+                    <p className="text-xs text-muted-foreground">Loading notes…</p>
+                  ) : updates.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">No notes yet. Start the conversation below.</p>
+                  ) : (
+                    updates.map((update) => {
+                      const initials = (update.author_name || "?")
+                        .split(" ")
+                        .map((part) => part[0])
+                        .join("")
+                        .toUpperCase()
+                        .slice(0, 2);
+                      return (
+                        <div key={update.id} className="flex gap-2.5">
+                          <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">{initials}</span>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-x-2 text-[11px]">
+                              <span className="truncate font-semibold">
+                                {update.author_name || "Unknown"}
+                                {update.user_id === user?.id && <span className="ml-1 text-[10px] font-bold uppercase text-primary">you</span>}
+                              </span>
+                              <span className="text-[10px] text-muted-foreground">{format(new Date(update.created_at), "dd MMM HH:mm")}</span>
+                            </div>
+                            <p className="mt-0.5 whitespace-pre-wrap break-words rounded-lg bg-muted/50 px-2.5 py-1.5 text-xs leading-relaxed">{update.message}</p>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+                <div className="mt-3 flex items-end gap-2">
+                  <textarea
+                    value={newNote}
+                    onChange={(e) => setNewNote(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        submitNote();
+                      }
+                    }}
+                    placeholder="Add a note…"
+                    rows={2}
+                    className="min-h-[2.5rem] flex-1 resize-none rounded-xl border border-border bg-background px-3 py-2 text-xs outline-none transition-colors placeholder:text-muted-foreground focus:border-primary/50"
+                  />
+                  <button
+                    type="button"
+                    onClick={submitNote}
+                    disabled={!newNote.trim() || postingNote}
+                    className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground transition-all hover:scale-105 disabled:cursor-not-allowed disabled:opacity-50"
+                    aria-label="Post note"
+                  >
+                    <Send className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
             </div>
           </aside>
           <section className="flex min-h-0 flex-col lg:col-span-7">
