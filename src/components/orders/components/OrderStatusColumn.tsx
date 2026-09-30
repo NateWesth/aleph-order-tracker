@@ -80,6 +80,8 @@ interface OrderStatusColumnProps {
   canEditItems?: boolean;
   isExpanded?: boolean;
   onToggleExpand?: () => void;
+  isActive?: boolean;
+  onToggleActive?: () => void;
   selectedOrderIds?: Set<string>;
   onToggleOrderSelection?: (orderId: string) => void;
   onSelectOrderGroup?: (orderIds: string[]) => void;
@@ -123,6 +125,8 @@ function OrderStatusColumn({
   canEditItems = false,
   isExpanded = true,
   onToggleExpand,
+  isActive = false,
+  onToggleActive,
   selectedOrderIds,
   onToggleOrderSelection,
   onSelectOrderGroup,
