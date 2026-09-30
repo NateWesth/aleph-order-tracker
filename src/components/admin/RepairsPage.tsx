@@ -52,6 +52,9 @@ export default function RepairsPage() {
   const recovery=useDraftRecovery("repair-form",{draft,editingId,editBase},formOpen,value=>{setDraft(value.draft);setEditingId(value.editingId);setEditBase(value.editBase);setFormOpen(true);});
   const [scrapOpen, setScrapOpen] = useState(false); const [scrapReason, setScrapReason] = useState("");
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [selectMode, setSelectMode] = useState(false);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [menu, setMenu] = useState<{ ticket: RepairTicket; x: number; y: number } | null>(null);
 
   const load = useCallback(async (quiet = false) => {
     if (!quiet) setLoading(true);
@@ -115,6 +118,17 @@ export default function RepairsPage() {
     try { if(await conflicts.save("repair_tickets",ticket.id,{status},ticket.updated_at))await load(true); }
     catch(error){toast({title:"Status not saved",description:error instanceof Error?error.message:"Retry",variant:"destructive"});}
   };
+
+  const togglePick = (id: string) => setPicked((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next; });
+  const menuTargets = (ticket: RepairTicket) => (picked.has(ticket.id) ? tickets.filter((candidate) => picked.has(candidate.id)) : [ticket]);
+  const bulkUpdate = async (targets: RepairTicket[], patch: Record<string, unknown>, label: string) => {
+    let failed = 0;
+    for (const target of targets) { try { if (!(await conflicts.save("repair_tickets", target.id, patch, target.updated_at))) failed++; } catch { failed++; } }
+    await load(true);
+    toast({ title: failed ? `${label}: ${targets.length - failed} updated, ${failed} failed` : `${label}: ${targets.length} updated`, variant: failed ? "destructive" : undefined });
+    setPicked(new Set()); setSelectMode(false); setMenu(null);
+  };
+  const menuItemCls = "flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold hover:bg-accent/60";
   const scrap = async () => { if (!selected) return; setSaving(true); let error:any=null;try{if(!await conflicts.save("repair_tickets",selected.id,{status:"scrapped",scrap_reason:scrapReason.trim()||null,scrapped_by:user?.id},selected.updated_at)){setSaving(false);return;}}catch(failure){error=failure;} setSaving(false); if(error){toast({title:"Repair not scrapped",description:error.message,variant:"destructive"});return;} setScrapOpen(false);setScrapReason("");toast({title:"Tool marked as scrapped",description:"The ticket is retained permanently in Repair History."});await load(true); };
 
   return <div className="workshop-workspace space-y-4 bg-background pb-10 font-sans text-foreground">
