@@ -257,6 +257,7 @@ export default function BoardTable<T>({ groups, columns, collapsed, onToggle, ro
                     })}
                     {columns.some((column) => column.summary) && (
                       <tr className="bg-muted/40">
+                        {selectMode && <td className="px-3 py-2" />}
                         {columns.map((column) => (
                           <td
                             key={column.key}
