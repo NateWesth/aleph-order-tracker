@@ -11,7 +11,7 @@ import {Input} from "@/components/ui/input";
 import {Textarea} from "@/components/ui/textarea";
 import EntityComments from "./EntityComments";
 import SourceDispatchPlanner from "./SourceDispatchPlanner";
-import {PackageCheck,Truck,RefreshCw,Search,AlertTriangle,ArrowRight,CalendarDays,Navigation,Warehouse,CheckCircle2,X} from "lucide-react";
+import {PackageCheck,Truck,RefreshCw,Search,AlertTriangle,ArrowRight,CalendarDays,Navigation,Warehouse,CheckCircle2,X,UserRound,Flame,Eye} from "lucide-react";
 import {useIsMobile} from "@/hooks/use-mobile";
 const db=supabase as any;
 type Member={id:string;full_name:string|null};
@@ -27,6 +27,7 @@ export default function FreshDispatchPage(){
  const [planner,setPlanner]=useState(false);
  const isMobile=useIsMobile();
  const [mobileLane,setMobileLane]=useState<string>("pending");
+ const [menu,setMenu]=useState<{doc:DispatchDocument;x:number;y:number}|null>(null);
  useEffect(()=>{
   const open=()=>{sessionStorage.removeItem("aleph:open-dispatch-planner");setPlanner(true);};
   if(sessionStorage.getItem("aleph:open-dispatch-planner"))open();
@@ -108,6 +109,12 @@ export default function FreshDispatchPage(){
   {id:"in-progress",label:"Out on route",description:"Complete on handover",icon:Navigation,docs:visible.filter(doc=>doc.status==="in-progress")},
  ];
  const memberName=(id:string|null)=>members.find(member=>member.id===id)?.full_name||"Unassigned";
+ const openMenu=(doc:DispatchDocument,x:number,y:number)=>setMenu({doc,x,y});
+ const updateDoc=async(doc:DispatchDocument,patch:Record<string,unknown>)=>{
+  setMenu(null);
+  const {error:updateError}=await db.from("dispatch_documents").update(patch).eq("id",doc.id);
+  if(updateError)setError(updateError.message);else await load();
+ };
  const shownError=error||health.filter(row=>row.error).map(row=>row.kind+": "+row.error).join(" · ");
  return <div className="fresh-dispatch space-y-4">
   <header className="rounded-2xl border bg-card p-4 sm:p-6">
@@ -130,7 +137,7 @@ export default function FreshDispatchPage(){
     <Button variant={history?"default":"outline"} onClick={()=>setHistory(value=>!value)}>{history?"Show outstanding":"History / excluded"}</Button>
   </div>
     {loading?<p role="status">Loading dispatch records…</p>:visible.length===0?<div className="rounded-2xl border border-dashed p-8 text-center"><p className="font-semibold">{shownError?"Records could not be verified":history?"No matching history":"No matching outstanding documents"}</p><p className="mt-2 text-sm text-muted-foreground">Check Source health before assuming everything is complete. Draft and void documents do not require dispatch.</p></div>:history?
-    <div className="grid min-w-0 gap-3 md:grid-cols-2 xl:grid-cols-3">{visible.map(doc=><DispatchCard key={doc.id} doc={doc} memberName={memberName} history onOpen={()=>setSelected(doc)}/>)}</div>:
+    <div className="grid min-w-0 gap-3 md:grid-cols-2 xl:grid-cols-3">{visible.map(doc=><DispatchCard key={doc.id} doc={doc} memberName={memberName} history onOpen={()=>setSelected(doc)} onContextMenu={(x,y)=>openMenu(doc,x,y)}/>)}</div>:
     <>{isMobile&&<div className="grid grid-cols-3 gap-2" role="tablist" aria-label="Dispatch lanes">{lanes.map((lane,index)=>{const tone=[{active:"border-logo-cyan bg-logo-cyan/10 text-logo-cyan"},{active:"border-logo-violet bg-logo-violet/10 text-logo-violet"},{active:"border-logo-magenta bg-logo-magenta/10 text-logo-magenta"}][index];const active=mobileLane===lane.id;return <button type="button" key={lane.id} role="tab" aria-selected={active} onClick={()=>setMobileLane(lane.id)} className={"min-h-12 rounded-xl border p-2 text-center "+(active?tone.active:"border-border/60 bg-card/70 text-muted-foreground")}><span className="block truncate text-[11px] font-bold">{lane.label}</span><span className="mt-0.5 block text-xs font-black">{lane.docs.length}</span></button>;})}</div>}
     <div className="fulfillment-board-grid grid min-w-0 gap-4 xl:grid-cols-3">{lanes.filter(lane=>!isMobile||lane.id===mobileLane).map((lane)=>{const index=lanes.findIndex(l=>l.id===lane.id);const Icon=lane.icon;const tone=[
      {icon:"bg-logo-cyan",selected:"border-logo-cyan ring-2 ring-logo-cyan/50 shadow-lg",hover:"hover:border-logo-cyan/40",header:"border-logo-cyan/40 bg-logo-cyan/10",pill:"bg-logo-cyan text-logo-on"},
@@ -138,15 +145,28 @@ export default function FreshDispatchPage(){
      {icon:"bg-logo-magenta",selected:"border-logo-magenta ring-2 ring-logo-magenta/50 shadow-lg",hover:"hover:border-logo-magenta/40",header:"border-logo-magenta/40 bg-logo-magenta/10",pill:"bg-logo-magenta text-logo-on"},
     ][index];const selected=activeLane===lane.id;return <section key={lane.id} onClick={()=>setActiveLane(selected?null:lane.id)} className={"fulfillment-lane flex min-w-0 cursor-pointer flex-col overflow-hidden rounded-[28px] border bg-card/70 shadow-sm transition "+(selected?tone.selected:"border-border/60 "+tone.hover)}>
      <header className={"shrink-0 border-b "+(selected?tone.header:"border-border/55")}><div className="flex w-full items-center justify-between gap-3 px-4 py-4 text-left"><div className="flex min-w-0 items-center gap-3"><span className={"grid h-9 w-9 shrink-0 place-items-center rounded-2xl text-logo-on shadow-lg "+tone.icon}><Icon className="h-4 w-4"/></span><div className="min-w-0"><h2 className="truncate text-sm font-black">{lane.label}</h2><p className="truncate text-[10px] text-muted-foreground">{lane.description}</p></div></div><span className={"grid h-7 min-w-7 place-items-center rounded-full px-2 text-xs font-bold "+(selected?tone.pill:"bg-muted")}>{lane.docs.length}</span></div></header>
-     <div className={"min-h-0 flex-1 space-y-3 p-3 sm:min-h-[420px] "+(selected?"max-h-[70vh] overflow-y-auto":"overflow-visible")}>{lane.docs.length?lane.docs.map(doc=><DispatchCard key={doc.id} doc={doc} memberName={memberName} onOpen={()=>setSelected(doc)}/>):<div className="grid min-h-56 place-items-center rounded-3xl border border-dashed border-border/60 bg-muted/20 p-6 text-center"><div><CheckCircle2 className="mx-auto h-7 w-7 text-success opacity-60"/><p className="mt-3 text-xs font-bold">Lane clear</p><p className="mt-1 text-[10px] text-muted-foreground">New work appears here live.</p></div></div>}</div>
+     <div className={"min-h-0 flex-1 space-y-3 p-3 sm:min-h-[420px] "+(selected?"max-h-[70vh] overflow-y-auto":"overflow-visible")}>{lane.docs.length?lane.docs.map(doc=><DispatchCard key={doc.id} doc={doc} memberName={memberName} onOpen={()=>setSelected(doc)} onContextMenu={(x,y)=>openMenu(doc,x,y)}/>):<div className="grid min-h-56 place-items-center rounded-3xl border border-dashed border-border/60 bg-muted/20 p-6 text-center"><div><CheckCircle2 className="mx-auto h-7 w-7 text-success opacity-60"/><p className="mt-3 text-xs font-bold">Lane clear</p><p className="mt-1 text-[10px] text-muted-foreground">New work appears here live.</p></div></div>}</div>
     </section>})}</div></>}
   {selected&&<DispatchDocumentDialog key={selected.id} doc={selected} members={members} onClose={()=>setSelected(null)} onSaved={async()=>{await load();}}/>}
   {planner&&<SourceDispatchPlanner docs={docs} members={members} onClose={()=>setPlanner(false)} onSaved={load}/>}
+  {menu&&<div className="fixed inset-0 z-[90]" onMouseDown={()=>setMenu(null)} onContextMenu={(e)=>{e.preventDefault();setMenu(null);}}>
+   <div role="menu" aria-label={"Actions for "+menu.doc.reference} className="fixed z-[91] w-60 rounded-lg border border-border bg-popover p-1.5 text-popover-foreground shadow-xl" style={{left:Math.min(menu.x,window.innerWidth-250),top:Math.min(menu.y,window.innerHeight-360)}} onMouseDown={(e)=>e.stopPropagation()}>
+    <Button variant="ghost" className="h-9 w-full justify-start px-2" onClick={()=>{setSelected(menu.doc);setMenu(null);}}><Eye className="mr-2 h-4 w-4"/>Open details</Button>
+    <Button variant="ghost" className="h-9 w-full justify-start px-2" onClick={()=>void updateDoc(menu.doc,{urgent:!menu.doc.urgent})}><Flame className="mr-2 h-4 w-4"/>{menu.doc.urgent?"Remove urgent flag":"Mark as urgent"}</Button>
+    <div className="my-1 h-px bg-border"/>
+    <p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Move to</p>
+    {lanes.filter(lane=>lane.id!==menu.doc.status).map(lane=><Button key={lane.id} variant="ghost" className="h-9 w-full justify-start px-2" onClick={()=>void updateDoc(menu.doc,{status:lane.id})}><ArrowRight className="mr-2 h-4 w-4"/>{lane.label}</Button>)}
+    <div className="my-1 h-px bg-border"/>
+    <p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Assign to</p>
+    <Button variant="ghost" className="h-9 w-full justify-start px-2" onClick={()=>void updateDoc(menu.doc,{assigned_to:null})}><UserRound className="mr-2 h-4 w-4"/>Unassigned</Button>
+    {members.map(member=><Button key={member.id} variant="ghost" className="h-9 w-full justify-start px-2" onClick={()=>void updateDoc(menu.doc,{assigned_to:member.id})}><UserRound className="mr-2 h-4 w-4"/>{member.full_name||"Team member"}</Button>)}
+   </div>
+  </div>}
  </div>;
 }
 
-function DispatchCard({doc,memberName,history=false,onOpen}:{doc:DispatchDocument;memberName:(id:string|null)=>string;history?:boolean;onOpen:()=>void}){
- return <button type="button" onClick={onOpen} className="w-full min-w-0 rounded-xl border bg-background p-4 text-left shadow-sm transition hover:border-primary/50 focus-visible:outline-primary">
+function DispatchCard({doc,memberName,history=false,onOpen,onContextMenu}:{doc:DispatchDocument;memberName:(id:string|null)=>string;history?:boolean;onOpen:()=>void;onContextMenu?:(x:number,y:number)=>void}){
+ return <button type="button" onClick={onOpen} onContextMenu={onContextMenu?(e)=>{e.preventDefault();onContextMenu(e.clientX,e.clientY);}:undefined} className="w-full min-w-0 rounded-xl border bg-background p-4 text-left shadow-sm transition hover:border-primary/50 focus-visible:outline-primary">
   <div className="flex flex-wrap justify-between gap-2"><span className="font-bold text-primary">{doc.reference}</span>{doc.urgent&&<span className="rounded-full bg-destructive/10 px-2 py-1 text-xs font-semibold text-destructive">Urgent</span>}</div>
   <p className="mt-2 break-words text-base font-semibold">{doc.contact_name}</p>
   <p className="mt-2 text-sm text-muted-foreground">{remainingUnits(doc)} units remaining · {doc.lines.length} lines</p>
