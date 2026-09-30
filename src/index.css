@@ -2449,6 +2449,55 @@ html.toolbar-glass .aleph-toolbar-search-input {
     hsl(var(--card));
 }
 
+/* Shared order-action entrance used by every centred operational bubble. */
+@keyframes order-floating-bubble-in {
+  0% {
+    opacity: 0;
+    transform: translateY(-18px) scale(.94);
+    filter: blur(4px);
+  }
+  55% {
+    opacity: 1;
+    transform: translateY(3px) scale(1.012);
+    filter: blur(0);
+  }
+  78% {
+    transform: translateY(-1px) scale(.997);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes order-floating-bubble-content {
+  0% {
+    opacity: 0;
+    transform: translateX(26px) scale(.985);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+.animate-order-floating-bubble {
+  animation: order-floating-bubble-in 420ms cubic-bezier(.22, 1, .36, 1) both;
+  transform-origin: center top;
+}
+
+.animate-order-floating-bubble-content {
+  animation: order-floating-bubble-content 360ms cubic-bezier(.22, 1, .36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-order-floating-bubble,
+  .animate-order-floating-bubble-content {
+    animation: none !important;
+  }
+}
+
 @media (max-width: 1279px) {
   .fulfillment-board-grid {
     display: flex !important;
