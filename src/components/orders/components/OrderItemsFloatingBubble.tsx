@@ -98,6 +98,10 @@ export default function OrderItemsFloatingBubble({ order, onClose }: OrderItemsF
   const [postingNote, setPostingNote] = useState(false);
 
   useEffect(() => {
+    if (order?.id) markCommentsSeen(`order:${order.id}`, order.commentCount || 0);
+  }, [order?.id, order?.commentCount]);
+
+  useEffect(() => {
     if (!visibleOrder?.id) {
       setUpdates([]);
       return;

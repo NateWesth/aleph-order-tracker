@@ -78,6 +78,10 @@ export default function EntityComments({ entityType, entityId, orderId, classNam
     return () => { active = false; };
   }, [entityType, entityId]);
 
+  useEffect(() => {
+    if (open) markCommentsSeen(`${entityType}:${entityId}`, Math.max(count, comments.length));
+  }, [open, count, comments.length, entityType, entityId]);
+
   const fetchThread = useCallback(async () => {
     setLoading(true);
     try {
