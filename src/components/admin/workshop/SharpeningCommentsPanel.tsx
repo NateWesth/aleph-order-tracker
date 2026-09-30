@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { bubbleClass, bubbleTime, nameColorClass } from "@/lib/commentStyles";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import EmojiPicker, { QUICK_REACTIONS } from "@/components/orders/components/EmojiPicker";
@@ -217,7 +218,7 @@ export default function SharpeningCommentsPanel({ entityType, title, subtitle, r
           const mine = comment.user_id === user?.id;
           const summary = reactionSummary(comment.id);
           return (
-            <div key={comment.id} className="group rounded-md border border-border bg-card px-1.5 py-0.5 shadow-sm">
+            <div key={comment.id} className={cn("group rounded-md border px-1 py-px", bubbleClass(mine))}>
               <div className="flex items-center gap-1">
                 <button
                   type="button"
@@ -226,8 +227,8 @@ export default function SharpeningCommentsPanel({ entityType, title, subtitle, r
                 >
                   {ref ? ref.reference : "Item"}
                 </button>
-                <span className="truncate text-[9px] font-semibold">{mine ? "You" : comment.author}</span>
-                <span className="ml-auto shrink-0 text-[8px] text-muted-foreground">{relative(comment.created_at)}</span>
+                <span className={cn("truncate text-[8px] font-semibold", nameColorClass(comment.user_id))}>{mine ? "You" : comment.author}</span>
+                <span className="ml-auto shrink-0 text-[8px] text-muted-foreground">{bubbleTime(comment.created_at)}</span>
               </div>
               {parent && (
                 <div className="mt-px rounded border-l-2 border-logo-cyan/40 bg-muted/40 px-1 py-0 text-[8px] leading-tight opacity-80">
