@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { Package, PackageCheck, X } from "lucide-react";
+import { PackageCheck, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getItemDisplayName, getItemSecondaryDescription, isMiscellaneousItem } from "@/lib/itemDisplay";
 import OrderItemComments from "./OrderItemComments";
@@ -131,78 +131,98 @@ export default function OrderItemsFloatingBubble({ order, onClose }: OrderItemsF
         aria-label={`Order ${visibleOrder.order_number}`}
       >
         <div className="ribbon-bar h-1.5 shrink-0" aria-hidden />
-        <header className="shrink-0 border-b border-border bg-background p-4 sm:p-5">
-          <div className="flex items-start gap-3">
-            <span className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-2xl bg-muted p-1 shadow-sm ring-1 ring-border"><img src="/lovable-uploads/e1088147-889e-43f6-bdf0-271189b88913.png" alt="" className="h-full w-full object-contain" /></span>
-            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-primary/10 text-primary"><Package className="h-5 w-5" /></span>
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary">Order management</p>
-                <span className="rounded-full border border-primary/30 bg-primary/10 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-tighter text-primary">{stage}</span>
-                {urgent && <span className="rounded-full border border-destructive/30 bg-destructive/10 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-tighter text-destructive">Urgent</span>}
+        <header className="shrink-0 border-b border-border bg-background p-4 sm:px-6 sm:py-5">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-4">
+              <span className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-2xl bg-muted p-1 shadow-sm ring-1 ring-border"><img src="/lovable-uploads/e1088147-889e-43f6-bdf0-271189b88913.png" alt="" className="h-full w-full object-contain" /></span>
+              <div className="min-w-0">
+                <h2 key={visibleOrder.id} className="truncate font-display text-xl font-black tracking-tight sm:text-2xl animate-order-floating-bubble-content">{visibleOrder.order_number}</h2>
+                <div className="mt-1 flex flex-wrap items-center gap-2">
+                  <span className="rounded-full border border-primary/30 bg-primary/10 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-tighter text-primary">{stage}</span>
+                  {urgent && <span className="rounded-full border border-destructive/30 bg-destructive/10 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-tighter text-destructive">Urgent</span>}
+                  <span className="truncate text-xs font-semibold text-muted-foreground">{visibleOrder.companyName || "No client"}</span>
+                </div>
               </div>
-              <h2 key={visibleOrder.id} className="mt-1 truncate font-display text-xl font-black tracking-tight sm:text-2xl animate-order-floating-bubble-content">{visibleOrder.order_number}</h2>
-              <p className="mt-0.5 truncate text-sm font-semibold text-muted-foreground">{visibleOrder.companyName || "No client"} · Created {created}{visibleOrder.creatorName ? ` · ${visibleOrder.creatorName}` : ""}</p>
             </div>
             <button type="button" onClick={onClose} className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-muted text-muted-foreground transition-all hover:scale-105 hover:bg-destructive/10 hover:text-destructive" aria-label="Close order"><X className="h-4 w-4" /></button>
           </div>
         </header>
-        <div key={`body-${visibleOrder.id}`} className="flex-1 space-y-6 overflow-y-auto p-4 sm:p-6 animate-order-floating-bubble-content">
-          <div className="grid grid-cols-2 gap-4 rounded-xl border border-border/60 bg-muted/30 p-4 md:grid-cols-4">
-            <div><p className="text-[10px] font-bold uppercase text-muted-foreground">Order</p><p className="mt-0.5 text-sm font-medium">{visibleOrder.order_number}</p></div>
-            <div><p className="text-[10px] font-bold uppercase text-muted-foreground">Client</p><p className="mt-0.5 truncate text-sm font-medium">{visibleOrder.companyName || "—"}</p></div>
-            <div><p className="text-[10px] font-bold uppercase text-muted-foreground">Created</p><p className="mt-0.5 text-sm font-medium">{created}</p></div>
-            <div><p className="text-[10px] font-bold uppercase text-muted-foreground">Reference</p><p className="mt-0.5 truncate text-sm font-medium">{visibleOrder.reference || "—"}</p></div>
-          </div>
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-            <div className="lg:col-span-5">
-              <h3 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider"><span className="h-1.5 w-1.5 rounded-full bg-logo-cyan" />Order summary</h3>
-              <div className="mt-4 space-y-4 rounded-xl border border-border/60 bg-muted/20 p-5">
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="rounded-xl bg-primary/5 px-3 py-2.5"><p className="text-[10px] font-bold uppercase text-muted-foreground">Items</p><p className="mt-0.5 font-display text-xl font-bold text-primary">{items.length}</p></div>
-                  <div className="rounded-xl bg-logo-violet/10 px-3 py-2.5"><p className="text-[10px] font-bold uppercase text-muted-foreground">Units</p><p className="mt-0.5 font-display text-xl font-bold text-logo-violet">{units}</p></div>
-                  <div className="rounded-xl bg-logo-magenta/10 px-3 py-2.5"><p className="text-[10px] font-bold uppercase text-muted-foreground">Notes</p><p className="mt-0.5 font-display text-xl font-bold text-logo-magenta">{visibleOrder.commentCount || 0}</p></div>
-                </div>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div><p className="text-[11px] font-bold uppercase text-muted-foreground">Status</p><p className="mt-0.5 font-medium capitalize">{visibleOrder.status || "—"}</p></div>
-                  <div><p className="text-[11px] font-bold uppercase text-muted-foreground">Urgency</p><p className="mt-0.5 font-medium capitalize">{visibleOrder.urgency || "Normal"}</p></div>
-                  <div className="col-span-2"><p className="text-[11px] font-bold uppercase text-muted-foreground">Created by</p><p className="mt-0.5 font-medium">{visibleOrder.creatorName || "—"}</p></div>
-                </div>
-                {visibleOrder.description && <div><p className="text-[11px] font-bold uppercase text-muted-foreground">Description</p><p className="mt-1 whitespace-pre-wrap break-words text-sm">{visibleOrder.description}</p></div>}
+        <div className="grid shrink-0 grid-cols-2 gap-x-4 gap-y-3 border-b border-border bg-muted/20 px-4 py-3.5 sm:grid-cols-4 sm:px-6">
+          <div><p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Client</p><p className="mt-0.5 truncate text-sm font-medium">{visibleOrder.companyName || "—"}</p></div>
+          <div><p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Created</p><p className="mt-0.5 truncate text-sm font-medium">{created}</p></div>
+          <div><p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Reference</p><p className="mt-0.5 truncate text-sm font-medium">{visibleOrder.reference || "—"}</p></div>
+          <div><p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Created by</p><p className="mt-0.5 truncate text-sm font-medium">{visibleOrder.creatorName || "—"}</p></div>
+        </div>
+        <div key={`body-${visibleOrder.id}`} className="grid flex-1 grid-cols-1 overflow-y-auto lg:grid-cols-12 animate-order-floating-bubble-content">
+          <aside className="flex flex-col gap-7 border-b border-border/60 p-4 sm:p-6 lg:col-span-5 lg:border-b-0 lg:border-r">
+            <div className="grid grid-cols-3 gap-3">
+              <div className="rounded-2xl border border-border/60 bg-muted/40 p-4">
+                <p className="font-display text-2xl font-bold text-primary">{items.length}</p>
+                <p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Items</p>
+              </div>
+              <div className="rounded-2xl border border-border/60 bg-muted/40 p-4">
+                <p className="font-display text-2xl font-bold text-logo-violet">{units}</p>
+                <p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Units</p>
+              </div>
+              <div className="rounded-2xl border border-border/60 bg-muted/40 p-4">
+                <p className="font-display text-2xl font-bold text-logo-magenta">{visibleOrder.commentCount || 0}</p>
+                <p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Notes</p>
               </div>
             </div>
-            <div className="space-y-4 lg:col-span-7">
+            <div className="space-y-5">
               <div className="flex items-center justify-between gap-3">
-                <h3 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider"><span className="h-1.5 w-1.5 rounded-full bg-logo-magenta" />Line items</h3>
-                <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase text-muted-foreground"><PackageCheck className="h-3.5 w-3.5" />{units} unit{units !== 1 ? "s" : ""}</span>
+                <span className="text-sm text-muted-foreground">Status</span>
+                <span className="flex items-center gap-2 text-sm font-medium capitalize"><span className="h-2 w-2 rounded-full bg-logo-cyan" />{visibleOrder.status || "—"}</span>
               </div>
-              <div className="space-y-2">
-                {items.length === 0 ? (
-                  <p className="rounded-lg bg-muted/40 p-4 text-center text-sm text-muted-foreground">No items on this order.</p>
-                ) : items.map((item) => {
-                  const total = item.totalQuantity ?? item.quantity;
-                  const stockStyle = getStockStatusStyle(item.stock_status);
-                  const secondary = getItemSecondaryDescription(item);
-                  return (
-                    <div key={item.id} className="flex items-center gap-3 rounded-lg border border-border/60 bg-muted/20 p-3 transition-colors hover:border-border">
-                      <div className="flex h-9 min-w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 px-1.5 text-xs font-bold text-primary">×{item.quantity}</div>
-                      <div className="min-w-0 flex-1">
-                        <p className="break-words text-sm font-semibold">{getItemDisplayName(item)}</p>
-                        {secondary && <p className="mt-0.5 break-words text-xs text-muted-foreground">{secondary}</p>}
-                        <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-                          {item.stock_status && <span className={cn("inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold", stockStyle.chip)}><span className={cn("h-1.5 w-1.5 rounded-full", stockStyle.dot)} />{stockStyle.label}</span>}
-                          {total > item.quantity && <span>{item.quantity} of {total}</span>}
-                          <span className="font-mono">{item.code || "No SKU"}</span>
-                          {(isMiscellaneousItem(item.code) || isMiscellaneousItem(item.name)) && <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">custom line</span>}
-                        </div>
-                      </div>
-                      <OrderItemComments orderItemId={item.id} initialCount={item.commentCount || 0} className="h-9 w-9 border border-border bg-muted/40" />
-                    </div>
-                  );
-                })}
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm text-muted-foreground">Priority</span>
+                <span className={cn("text-sm font-medium capitalize", urgent && "text-destructive")}>{visibleOrder.urgency || "Normal"}</span>
               </div>
+              {visibleOrder.description && (
+                <div>
+                  <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Description</p>
+                  <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-muted-foreground">{visibleOrder.description}</p>
+                </div>
+              )}
             </div>
-          </div>
+          </aside>
+          <section className="flex min-h-0 flex-col lg:col-span-7">
+            <div className="flex items-center justify-between gap-3 border-b border-border/60 px-4 py-3.5 sm:px-6">
+              <h3 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider"><span className="h-1.5 w-1.5 rounded-full bg-logo-magenta" />Line items</h3>
+              <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase text-muted-foreground"><PackageCheck className="h-3.5 w-3.5" />{units} unit{units !== 1 ? "s" : ""}</span>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              {items.length === 0 ? (
+                <p className="p-6 text-center text-sm text-muted-foreground">No items on this order.</p>
+              ) : (
+                <div className="divide-y divide-border/60">
+                  {items.map((item) => {
+                    const total = item.totalQuantity ?? item.quantity;
+                    const stockStyle = getStockStatusStyle(item.stock_status);
+                    const secondary = getItemSecondaryDescription(item);
+                    return (
+                      <div key={item.id} className="group flex items-center gap-4 px-4 py-4 transition-colors hover:bg-muted/30 sm:px-6">
+                        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-muted text-xs font-bold text-muted-foreground transition-colors group-hover:text-primary">×{item.quantity}</div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                            <p className="break-words text-sm font-semibold">{getItemDisplayName(item)}</p>
+                            {item.stock_status && <span className={cn("inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold", stockStyle.chip)}><span className={cn("h-1.5 w-1.5 rounded-full", stockStyle.dot)} />{stockStyle.label}</span>}
+                          </div>
+                          <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                            <span className="font-mono">{item.code || "No SKU"}</span>
+                            {secondary && <span className="break-words">{secondary}</span>}
+                            {total > item.quantity && <span>{item.quantity} of {total}</span>}
+                            {(isMiscellaneousItem(item.code) || isMiscellaneousItem(item.name)) && <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">custom line</span>}
+                          </div>
+                        </div>
+                        <OrderItemComments orderItemId={item.id} initialCount={item.commentCount || 0} className="h-9 w-9 shrink-0 border border-border bg-muted/40" />
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </section>
         </div>
       </section>
     </div>,
