@@ -40,7 +40,7 @@ export function PageHeader({ title, description, icon: Icon, stats, actions, too
             )}
             <div className="min-w-0">
               <p className="mb-1 text-[10px] font-black uppercase tracking-[0.22em] text-logo-violet">Workspace</p>
-              <h1 className="font-display text-2xl font-black leading-none tracking-[-0.045em] text-foreground sm:text-3xl lg:text-[2.15rem]">
+              <h1 className="bg-gradient-to-r from-logo-cyan via-logo-violet to-logo-magenta bg-clip-text font-display text-2xl font-black leading-none tracking-[-0.045em] text-transparent sm:text-3xl lg:text-[2.15rem]">
                 {title}
               </h1>
               {description && <p className="mt-2 max-w-3xl text-xs leading-relaxed text-muted-foreground sm:text-sm">{description}</p>}
