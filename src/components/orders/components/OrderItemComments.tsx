@@ -334,7 +334,7 @@ export default function OrderItemComments({ orderItemId, className, initialCount
         className="w-[min(460px,calc(100vw-24px))] rounded-2xl p-0 overflow-hidden"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="border-b border-border/60 bg-primary/5 px-4 py-3.5">
+        <div className="border-b border-border/60 bg-primary/5 px-3.5 py-2.5">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-sm font-semibold text-foreground">Item comments</p>
@@ -350,7 +350,7 @@ export default function OrderItemComments({ orderItemId, className, initialCount
           </div>
         </div>
 
-        <div className="max-h-[26rem] overflow-y-auto p-3.5 space-y-3 bg-muted/10">
+        <div className="h-[clamp(20rem,52dvh,38rem)] overflow-y-auto overscroll-contain p-2.5 space-y-2 bg-muted/10 [-webkit-overflow-scrolling:touch]">
           {loading && comments.length === 0 ? (
             <div className="flex items-center justify-center py-6 text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -372,17 +372,17 @@ export default function OrderItemComments({ orderItemId, className, initialCount
                 <div key={comment.id} className={cn("group flex flex-col", mine ? "items-end" : "items-start")}>
                   <div
                     className={cn(
-                      "max-w-[88%] rounded-2xl px-3.5 py-2.5 text-sm break-words shadow-sm bg-white dark:bg-card border",
+                      "max-w-[82%] rounded-xl px-2.5 py-1.5 text-xs leading-relaxed break-words shadow-sm bg-white dark:bg-card border",
                       mine
                         ? "border-primary/30 rounded-tr-sm"
                         : "border-border text-foreground rounded-tl-sm"
                     )}
                   >
-                    <div className={cn("text-[11px] font-semibold mb-0.5", mine ? "text-primary" : "text-primary/90")}>
+                    <div className={cn("text-[10px] font-semibold", mine ? "text-primary" : "text-primary/90")}>
                       {nameFor(comment)}
                     </div>
                     {parent && (
-                      <div className="mb-1.5 rounded-lg border-l-2 border-primary/40 bg-primary/5 px-2 py-1 text-xs opacity-80">
+                      <div className="mb-1 mt-0.5 rounded-md border-l-2 border-primary/40 bg-primary/5 px-1.5 py-0.5 text-[10px] leading-snug opacity-80">
                         <div className="font-semibold">{nameFor(parent)}</div>
                         <div className="line-clamp-2">{parent.body}</div>
                       </div>
@@ -391,13 +391,13 @@ export default function OrderItemComments({ orderItemId, className, initialCount
                   </div>
 
                   {summary.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mt-1">
+                    <div className="mt-0.5 flex flex-wrap gap-1">
                       {summary.map((s) => (
                         <button
                           key={s.emoji}
                           onClick={() => toggleReaction(comment.id, s.emoji)}
                           className={cn(
-                            "flex items-center gap-1 rounded-full border px-2 py-1 text-xs transition-colors",
+                            "flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] transition-colors",
                             s.mine ? "border-primary/40 bg-primary/10 text-primary" : "border-border bg-muted text-muted-foreground hover:bg-muted/70"
                           )}
                         >
@@ -408,7 +408,7 @@ export default function OrderItemComments({ orderItemId, className, initialCount
                     </div>
                   )}
 
-                  <div className="flex items-center gap-2 mt-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                  <div className="mt-0.5 flex min-h-4 items-center gap-1.5 opacity-60 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100 transition-opacity">
                     <span className="text-[10px] text-muted-foreground">{formatCommentTime(comment.created_at)}</span>
                     <button
                       onClick={() => setReplyTo(comment)}
@@ -424,12 +424,12 @@ export default function OrderItemComments({ orderItemId, className, initialCount
                         </button>
                       }
                     />
-                    <div className="flex gap-1">
+                    <div className="flex gap-0.5">
                       {QUICK_REACTIONS.slice(0, 3).map((emoji) => (
                         <button
                           key={emoji}
                           onClick={() => toggleReaction(comment.id, emoji)}
-                          className="text-sm hover:scale-125 transition-transform"
+                          className="text-xs hover:scale-125 transition-transform"
                         >
                           {emoji}
                         </button>
@@ -470,7 +470,7 @@ export default function OrderItemComments({ orderItemId, className, initialCount
               </button>
             </div>
           )}
-          <div className="p-3">
+          <div className="p-2.5">
             <div className="flex items-end gap-2">
               <EmojiPicker
                 onSelect={(emoji) => setBody((prev) => prev + emoji)}
@@ -492,7 +492,7 @@ export default function OrderItemComments({ orderItemId, className, initialCount
                   if (event.key === "Escape") setMentionQuery(null);
                 }}
                 placeholder={replyTo ? "Reply..." : "Add a comment... (@ to mention someone)"}
-                className="min-h-[68px] resize-none rounded-xl text-sm"
+                className="min-h-[48px] resize-none rounded-xl py-2 text-sm"
                 maxLength={1000}
                 disabled={!user || sending}
               />
@@ -507,7 +507,7 @@ export default function OrderItemComments({ orderItemId, className, initialCount
                 {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
               </Button>
             </div>
-            <p className="mt-1.5 text-[9px] text-muted-foreground">Ctrl/Cmd + Enter to send</p>
+            <p className="mt-1 text-[9px] text-muted-foreground">Ctrl/Cmd + Enter to send</p>
           </div>
         </div>
       </PopoverContent>

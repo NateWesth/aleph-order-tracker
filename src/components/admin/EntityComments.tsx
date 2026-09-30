@@ -225,7 +225,7 @@ export default function EntityComments({ entityType, entityId, orderId, classNam
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between gap-3 px-4 py-3 hover:bg-muted/30 transition-colors"
+        className="flex w-full items-center justify-between gap-3 px-3.5 py-2.5 hover:bg-muted/30 transition-colors"
       >
         <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
           <MessageCircle className={cn("h-4 w-4", count > 0 && "text-blue-500")} />
@@ -239,7 +239,7 @@ export default function EntityComments({ entityType, entityId, orderId, classNam
 
       {open && (
         <div className="border-t border-border/60">
-          <div className="max-h-80 overflow-y-auto p-3.5 space-y-3 bg-background/40">
+          <div className="h-[clamp(18rem,46dvh,34rem)] overflow-y-auto overscroll-contain p-2.5 space-y-2 bg-background/40 [-webkit-overflow-scrolling:touch]">
             {loading && comments.length === 0 ? (
               <div className="flex items-center justify-center py-6 text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /></div>
             ) : comments.length === 0 ? (
@@ -256,14 +256,14 @@ export default function EntityComments({ entityType, entityId, orderId, classNam
                 return (
                   <div key={comment.id} className={cn("group flex flex-col", mine ? "items-end" : "items-start")}>
                     <div className={cn(
-                      "max-w-[88%] rounded-2xl px-3.5 py-2.5 text-sm break-words shadow-sm bg-white dark:bg-card border",
-                      mine ? "border-primary/30 rounded-tr-sm" : "border-border text-foreground rounded-tl-sm"
+                       "max-w-[82%] rounded-xl px-2.5 py-1.5 text-xs leading-relaxed break-words shadow-sm bg-white dark:bg-card border",
+                       mine ? "border-primary/30 rounded-tr-sm" : "border-border text-foreground rounded-tl-sm"
                     )}>
-                      <div className={cn("text-[11px] font-semibold mb-0.5", mine ? "text-primary" : "text-primary/90")}>
+                       <div className={cn("text-[10px] font-semibold", mine ? "text-primary" : "text-primary/90")}>
                         {nameFor(comment)}
                       </div>
                       {parent && (
-                        <div className="mb-1.5 rounded-lg border-l-2 border-primary/40 bg-primary/5 px-2 py-1 text-xs opacity-80">
+                         <div className="mb-1 mt-0.5 rounded-md border-l-2 border-primary/40 bg-primary/5 px-1.5 py-0.5 text-[10px] leading-snug opacity-80">
                           <div className="font-semibold">{nameFor(parent)}</div>
                           <div className="line-clamp-2">{parent.body}</div>
                         </div>
@@ -271,14 +271,14 @@ export default function EntityComments({ entityType, entityId, orderId, classNam
                       <p className="whitespace-pre-wrap break-words text-foreground">{comment.body}</p>
                     </div>
 
-                    {summary.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-1">
+                     {summary.length > 0 && (
+                       <div className="mt-0.5 flex flex-wrap gap-1">
                         {summary.map((s) => (
                           <button
                             key={s.emoji}
                             onClick={() => toggleReaction(comment.id, s.emoji)}
                             className={cn(
-                              "flex items-center gap-1 rounded-full border px-2 py-1 text-xs transition-colors",
+                               "flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] transition-colors",
                               s.mine ? "border-primary/40 bg-primary/10 text-primary" : "border-border bg-muted text-muted-foreground hover:bg-muted/70"
                             )}
                           >
@@ -288,7 +288,7 @@ export default function EntityComments({ entityType, entityId, orderId, classNam
                       </div>
                     )}
 
-                    <div className="flex items-center gap-2 mt-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                     <div className="mt-0.5 flex min-h-4 items-center gap-1.5 opacity-60 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100 transition-opacity">
                       <span className="text-[10px] text-muted-foreground">{formatTime(comment.created_at)}</span>
                       <button onClick={() => setReplyTo(comment)} className="text-[10px] text-muted-foreground hover:text-primary flex items-center gap-1">
                         <CornerUpLeft className="h-3 w-3" />Reply
@@ -297,9 +297,9 @@ export default function EntityComments({ entityType, entityId, orderId, classNam
                         onSelect={(emoji) => toggleReaction(comment.id, emoji)}
                         trigger={<button className="text-muted-foreground hover:text-primary"><SmilePlus className="h-3 w-3" /></button>}
                       />
-                      <div className="flex gap-1">
+                         <div className="flex gap-0.5">
                         {QUICK_REACTIONS.slice(0, 3).map((emoji) => (
-                          <button key={emoji} onClick={() => toggleReaction(comment.id, emoji)} className="text-sm hover:scale-125 transition-transform">
+                           <button key={emoji} onClick={() => toggleReaction(comment.id, emoji)} className="text-xs hover:scale-125 transition-transform">
                             {emoji}
                           </button>
                         ))}
@@ -333,7 +333,7 @@ export default function EntityComments({ entityType, entityId, orderId, classNam
                 <button onClick={() => setReplyTo(null)} className="shrink-0 text-muted-foreground hover:text-destructive"><X className="h-3 w-3" /></button>
               </div>
             )}
-            <div className="p-3">
+             <div className="p-2.5">
               <div className="flex items-end gap-2">
                 <EmojiPicker
                   onSelect={(emoji) => setBody((prev) => prev + emoji)}
@@ -348,7 +348,7 @@ export default function EntityComments({ entityType, entityId, orderId, classNam
                     if (e.key === "Escape") setMentionQuery(null);
                   }}
                   placeholder={replyTo ? "Reply..." : "Add a comment... (@ to mention someone)"}
-                  className="min-h-[60px] resize-none rounded-xl text-sm"
+                   className="min-h-[48px] resize-none rounded-xl py-2 text-sm"
                   maxLength={1000}
                   disabled={!user || sending}
                 />
@@ -356,7 +356,7 @@ export default function EntityComments({ entityType, entityId, orderId, classNam
                   {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                 </Button>
               </div>
-              <p className="mt-1.5 text-[10px] text-muted-foreground">Ctrl/Cmd + Enter to send</p>
+               <p className="mt-1 text-[10px] text-muted-foreground">Ctrl/Cmd + Enter to send</p>
             </div>
           </div>
         </div>

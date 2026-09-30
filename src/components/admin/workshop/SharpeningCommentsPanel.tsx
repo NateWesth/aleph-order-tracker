@@ -197,8 +197,8 @@ export default function SharpeningCommentsPanel({ entityType, title, subtitle, r
   });
 
   return (
-    <section className="flex max-h-[360px] flex-col overflow-hidden rounded-lg border border-border bg-card shadow-sm">
-      <div className="flex items-center gap-2 border-b border-border px-4 py-3">
+    <section className="flex h-[clamp(24rem,58dvh,42rem)] flex-col overflow-hidden rounded-lg border border-border bg-card shadow-sm">
+      <div className="flex items-center gap-2 border-b border-border px-3.5 py-2.5">
         <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-logo-cyan/15 text-logo-cyan"><MessageCircle className="h-4 w-4" /></span>
         <div className="min-w-0">
           <h2 className="truncate text-sm font-bold">{title}</h2>
@@ -206,7 +206,7 @@ export default function SharpeningCommentsPanel({ entityType, title, subtitle, r
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-background/40 p-3">
+      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain bg-background/40 p-2.5 [-webkit-overflow-scrolling:touch]">
         {loading && comments.length === 0 ? (
           <div className="flex items-center justify-center py-6 text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /></div>
         ) : comments.length === 0 ? (
@@ -217,7 +217,7 @@ export default function SharpeningCommentsPanel({ entityType, title, subtitle, r
           const mine = comment.user_id === user?.id;
           const summary = reactionSummary(comment.id);
           return (
-            <div key={comment.id} className="group rounded-xl border border-border bg-card px-3 py-2.5 shadow-sm">
+            <div key={comment.id} className="group rounded-lg border border-border bg-card px-2.5 py-1.5 shadow-sm">
               <div className="flex items-center gap-2">
                 <button
                   type="button"
@@ -230,18 +230,18 @@ export default function SharpeningCommentsPanel({ entityType, title, subtitle, r
                 <span className="ml-auto shrink-0 text-[10px] text-muted-foreground">{relative(comment.created_at)}</span>
               </div>
               {parent && (
-                <div className="mt-1.5 rounded-lg border-l-2 border-logo-cyan/40 bg-muted/40 px-2 py-1 text-[11px] opacity-80">
+                <div className="mt-1 rounded-md border-l-2 border-logo-cyan/40 bg-muted/40 px-1.5 py-0.5 text-[10px] leading-snug opacity-80">
                   <div className="font-semibold">{parent.user_id === user?.id ? "You" : parent.author}</div>
                   <div className="line-clamp-2">{parent.body}</div>
                 </div>
               )}
-              <p className="mt-1 whitespace-pre-wrap break-words text-xs text-foreground/90">{renderBody(comment.body)}</p>
+              <p className="mt-0.5 whitespace-pre-wrap break-words text-[11px] leading-relaxed text-foreground/90">{renderBody(comment.body)}</p>
 
               {summary.length > 0 && (
-                <div className="mt-1.5 flex flex-wrap gap-1">
+                <div className="mt-0.5 flex flex-wrap gap-1">
                   {summary.map((s) => (
                     <button key={s.emoji} onClick={() => toggleReaction(comment.id, s.emoji)}
-                      className={cn("flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px]",
+                      className={cn("flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px]",
                         s.mine ? "border-primary/40 bg-primary/10 text-primary" : "border-border bg-muted text-muted-foreground hover:bg-muted/70")}>
                       <span>{s.emoji}</span><span className="font-medium">{s.count}</span>
                     </button>
@@ -249,15 +249,15 @@ export default function SharpeningCommentsPanel({ entityType, title, subtitle, r
                 </div>
               )}
 
-              <div className="mt-1 flex items-center gap-2 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+              <div className="mt-0.5 flex min-h-4 items-center gap-1.5 opacity-60 transition-opacity sm:opacity-0 sm:focus-within:opacity-100 sm:group-hover:opacity-100">
                 <button onClick={() => { setReplyTo(comment); inputRef.current?.focus(); }} className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-primary">
                   <CornerUpLeft className="h-3 w-3" />Reply
                 </button>
                 <EmojiPicker onSelect={(emoji) => toggleReaction(comment.id, emoji)}
                   trigger={<button className="text-muted-foreground hover:text-primary"><SmilePlus className="h-3 w-3" /></button>} />
-                <div className="flex gap-1">
+                <div className="flex gap-0.5">
                   {QUICK_REACTIONS.slice(0, 3).map((emoji) => (
-                    <button key={emoji} onClick={() => toggleReaction(comment.id, emoji)} className="text-sm transition-transform hover:scale-125">{emoji}</button>
+                    <button key={emoji} onClick={() => toggleReaction(comment.id, emoji)} className="text-xs transition-transform hover:scale-125">{emoji}</button>
                   ))}
                 </div>
               </div>
