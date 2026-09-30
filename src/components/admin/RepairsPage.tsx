@@ -154,6 +154,15 @@ export default function RepairsPage() {
       <Button variant={selectMode ? "default" : "outline"} size="sm" onClick={() => { setSelectMode((value) => !value); setPicked(new Set()); }}>
         {selectMode ? `Done (${picked.size})` : "Select"}
       </Button>
+      {selectMode && (() => {
+        const visibleIds = monthGroups.flatMap((group) => group.rows.map((row) => row.id));
+        const allPicked = visibleIds.length > 0 && visibleIds.every((id) => picked.has(id));
+        return (
+          <Button variant="outline" size="sm" onClick={() => setPicked(allPicked ? new Set() : new Set(visibleIds))}>
+            {allPicked ? "Clear all" : `Select all (${visibleIds.length})`}
+          </Button>
+        );
+      })()}
     </WorkshopToolbar>
 
     {loading ? <div className="space-y-2">{[1,2,3].map(n => <div key={n} className="h-24 animate-pulse rounded-lg bg-muted/50" />)}</div> : monthGroups.length === 0 ? <EmptyWorkshop history={tab === "history"} /> : <BoardTable
