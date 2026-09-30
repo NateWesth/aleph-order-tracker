@@ -109,6 +109,12 @@ export default function FreshDispatchPage(){
   {id:"in-progress",label:"Out on route",description:"Complete on handover",icon:Navigation,docs:visible.filter(doc=>doc.status==="in-progress")},
  ];
  const memberName=(id:string|null)=>members.find(member=>member.id===id)?.full_name||"Unassigned";
+ const openMenu=(doc:DispatchDocument,x:number,y:number)=>setMenu({doc,x,y});
+ const updateDoc=async(doc:DispatchDocument,patch:Record<string,unknown>)=>{
+  setMenu(null);
+  const {error:updateError}=await db.from("dispatch_documents").update(patch).eq("id",doc.id);
+  if(updateError)setError(updateError.message);else await load();
+ };
  const shownError=error||health.filter(row=>row.error).map(row=>row.kind+": "+row.error).join(" · ");
  return <div className="fresh-dispatch space-y-4">
   <header className="rounded-2xl border bg-card p-4 sm:p-6">
@@ -143,6 +149,19 @@ export default function FreshDispatchPage(){
     </section>})}</div></>}
   {selected&&<DispatchDocumentDialog key={selected.id} doc={selected} members={members} onClose={()=>setSelected(null)} onSaved={async()=>{await load();}}/>}
   {planner&&<SourceDispatchPlanner docs={docs} members={members} onClose={()=>setPlanner(false)} onSaved={load}/>}
+  {menu&&<div className="fixed inset-0 z-[90]" onMouseDown={()=>setMenu(null)} onContextMenu={(e)=>{e.preventDefault();setMenu(null);}}>
+   <div role="menu" aria-label={"Actions for "+menu.doc.reference} className="fixed z-[91] w-60 rounded-lg border border-border bg-popover p-1.5 text-popover-foreground shadow-xl" style={{left:Math.min(menu.x,window.innerWidth-250),top:Math.min(menu.y,window.innerHeight-360)}} onMouseDown={(e)=>e.stopPropagation()}>
+    <Button variant="ghost" className="h-9 w-full justify-start px-2" onClick={()=>{setSelected(menu.doc);setMenu(null);}}><Eye className="mr-2 h-4 w-4"/>Open details</Button>
+    <Button variant="ghost" className="h-9 w-full justify-start px-2" onClick={()=>void updateDoc(menu.doc,{urgent:!menu.doc.urgent})}><Flame className="mr-2 h-4 w-4"/>{menu.doc.urgent?"Remove urgent flag":"Mark as urgent"}</Button>
+    <div className="my-1 h-px bg-border"/>
+    <p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Move to</p>
+    {lanes.filter(lane=>lane.id!==menu.doc.status).map(lane=><Button key={lane.id} variant="ghost" className="h-9 w-full justify-start px-2" onClick={()=>void updateDoc(menu.doc,{status:lane.id})}><ArrowRight className="mr-2 h-4 w-4"/>{lane.label}</Button>)}
+    <div className="my-1 h-px bg-border"/>
+    <p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Assign to</p>
+    <Button variant="ghost" className="h-9 w-full justify-start px-2" onClick={()=>void updateDoc(menu.doc,{assigned_to:null})}><UserRound className="mr-2 h-4 w-4"/>Unassigned</Button>
+    {members.map(member=><Button key={member.id} variant="ghost" className="h-9 w-full justify-start px-2" onClick={()=>void updateDoc(menu.doc,{assigned_to:member.id})}><UserRound className="mr-2 h-4 w-4"/>{member.full_name||"Team member"}</Button>)}
+   </div>
+  </div>}
  </div>;
 }
 
