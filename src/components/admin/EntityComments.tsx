@@ -244,7 +244,7 @@ export default function EntityComments({ entityType, entityId, orderId, classNam
 
       {open && (
         <div className="border-t border-border/60">
-          <div className="h-[clamp(18rem,46dvh,34rem)] overflow-y-auto overscroll-contain p-2 space-y-1.5 bg-background/40 [-webkit-overflow-scrolling:touch]">
+          <div className="h-[clamp(18rem,46dvh,34rem)] overflow-y-auto overscroll-contain p-1.5 space-y-1 bg-background/40 [-webkit-overflow-scrolling:touch]">
             {loading && comments.length === 0 ? (
               <div className="flex items-center justify-center py-6 text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /></div>
             ) : comments.length === 0 ? (
@@ -261,12 +261,12 @@ export default function EntityComments({ entityType, entityId, orderId, classNam
                 return (
                   <div key={comment.id} className={cn("group flex flex-col", mine ? "items-end" : "items-start")}>
                     <div className={cn(
-                       "max-w-[80%] rounded-md px-1 py-px text-[9px] leading-tight break-words border text-foreground",
+                       "max-w-[75%] rounded px-1 py-0 text-[8px] leading-snug break-words border text-foreground",
                        bubbleClass(mine)
                     )}>
-                       <div className="flex items-baseline gap-1.5 text-[7.5px] leading-tight"><span className={cn("font-semibold", nameColorClass(comment.user_id))}>{nameFor(comment)}</span><span className="ml-auto text-muted-foreground/80">{bubbleTime(comment.created_at)}</span></div>
+                       <div className="flex items-baseline gap-1.5 text-[7px] leading-tight"><span className={cn("font-semibold", nameColorClass(comment.user_id))}>{nameFor(comment)}</span><span className="ml-auto text-muted-foreground/80">{bubbleTime(comment.created_at)}</span></div>
                        {parent && (
-                          <div className="my-px rounded border-l-2 border-primary/40 bg-primary/5 px-1 py-0 text-[8px] leading-tight opacity-80">
+                          <div className="my-px rounded border-l-2 border-primary/40 bg-primary/5 px-1 py-0 text-[7px] leading-tight opacity-80">
                            <div className="font-semibold">{nameFor(parent)}</div>
                            <div className="line-clamp-2">{parent.body}</div>
                          </div>
