@@ -218,31 +218,31 @@ export default function SharpeningCommentsPanel({ entityType, title, subtitle, r
           const mine = comment.user_id === user?.id;
           const summary = reactionSummary(comment.id);
           return (
-            <div key={comment.id} className={cn("group rounded border px-1 py-0", bubbleClass(mine))}>
+            <div key={comment.id} className={cn("group w-fit max-w-[88%] rounded-2xl border px-2 py-px", mine ? "ml-auto" : "mr-auto", bubbleClass(mine))}>
               <div className="flex items-center gap-1">
                 <button
                   type="button"
                   onClick={() => onOpen(comment.entity_id)}
-                  className="truncate rounded bg-logo-cyan/15 px-1 py-0 text-[8px] font-bold text-logo-cyan hover:bg-logo-cyan/25"
+                  className="truncate rounded-full bg-logo-cyan/15 px-1 py-0 text-[7px] font-bold text-logo-cyan hover:bg-logo-cyan/25"
                 >
                   {ref ? ref.reference : "Item"}
                 </button>
-                <span className={cn("truncate text-[7px] font-semibold", nameColorClass(comment.user_id))}>{mine ? "You" : comment.author}</span>
-                <span className="ml-auto shrink-0 text-[7px] text-muted-foreground">{bubbleTime(comment.created_at)}</span>
+                <span className={cn("truncate text-[6.5px] font-semibold", nameColorClass(comment.user_id))}>{mine ? "You" : comment.author}</span>
+                <span className="ml-auto shrink-0 text-[6.5px] text-muted-foreground">{bubbleTime(comment.created_at)}</span>
               </div>
               {parent && (
-                <div className="mt-px rounded border-l-2 border-logo-cyan/40 bg-muted/40 px-1 py-0 text-[7px] leading-tight opacity-80">
+                <div className="mt-px rounded-lg border-l-2 border-logo-cyan/40 bg-muted/40 px-1 py-0 text-[6.5px] leading-tight opacity-80">
                   <div className="font-semibold">{parent.user_id === user?.id ? "You" : parent.author}</div>
                   <div className="line-clamp-2">{parent.body}</div>
                 </div>
               )}
-              <p className="mt-px whitespace-pre-wrap break-words text-[9px] leading-tight text-foreground/90">{renderBody(comment.body)}</p>
+              <p className="mt-px whitespace-pre-wrap break-words text-[7.5px] leading-tight text-foreground/90">{renderBody(comment.body)}</p>
 
               {summary.length > 0 && (
                 <div className="mt-0.5 flex flex-wrap gap-1">
                   {summary.map((s) => (
                     <button key={s.emoji} onClick={() => toggleReaction(comment.id, s.emoji)}
-                      className={cn("flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px]",
+                      className={cn("flex items-center gap-0.5 rounded-full border px-1 py-0 text-[8px]",
                         s.mine ? "border-primary/40 bg-primary/10 text-primary" : "border-border bg-muted text-muted-foreground hover:bg-muted/70")}>
                       <span>{s.emoji}</span><span className="font-medium">{s.count}</span>
                     </button>
@@ -250,7 +250,7 @@ export default function SharpeningCommentsPanel({ entityType, title, subtitle, r
                 </div>
               )}
 
-              <div className="mt-0.5 flex min-h-4 items-center gap-1.5 opacity-60 transition-opacity sm:opacity-0 sm:focus-within:opacity-100 sm:group-hover:opacity-100">
+              <div className="mt-0 flex min-h-3 items-center gap-1 opacity-60 transition-opacity sm:opacity-0 sm:focus-within:opacity-100 sm:group-hover:opacity-100">
                 <button onClick={() => { setReplyTo(comment); inputRef.current?.focus(); }} className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-primary">
                   <CornerUpLeft className="h-3 w-3" />Reply
                 </button>
