@@ -1,9 +1,21 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { PackageCheck, X } from "lucide-react";
+import { PackageCheck, Send, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getItemDisplayName, getItemSecondaryDescription, isMiscellaneousItem } from "@/lib/itemDisplay";
 import OrderItemComments from "./OrderItemComments";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { format } from "date-fns";
+
+interface OrderUpdate {
+  id: string;
+  order_id: string;
+  user_id: string;
+  message: string;
+  created_at: string;
+  author_name?: string | null;
+}
 
 interface OrderItem {
   id: string;
