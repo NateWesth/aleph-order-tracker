@@ -294,6 +294,7 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
   const { showConfetti, streak, celebrate } = useOrderCelebration();
 
   const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
+  const [activeColumn, setActiveColumn] = useState<string | null>(null);
 
   const [allTags, setAllTags] = useState<{ id: string; name: string; color: string }[]>([]);
 
@@ -1113,7 +1114,7 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
             <div
               className={cn(
                 "orders-mobile-swipe grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4 w-full overflow-visible",
-                "items-start lg:items-stretch",
+                "items-start",
               )}
             >
               {STATUS_COLUMNS.map((column) => {
@@ -1152,6 +1153,10 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
                           };
                         });
                       }}
+                      isActive={activeColumn === column.key}
+                      onToggleActive={() =>
+                        setActiveColumn((prev) => (prev === column.key ? null : column.key))
+                      }
                       isExpanded={expandedColumns.has(column.key)}
                       onToggleExpand={() => {
                         setExpandedColumns((prev) => {
