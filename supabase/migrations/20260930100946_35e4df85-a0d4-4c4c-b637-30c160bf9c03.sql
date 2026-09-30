@@ -1,0 +1,1 @@
+REVOKE EXECUTE ON FUNCTION public.dispatch_comment_push() FROM PUBLIC, anon, authenticated;
