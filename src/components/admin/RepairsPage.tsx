@@ -14,7 +14,7 @@ import EntityComments from "@/components/admin/EntityComments";
 import { useDraftRecovery } from "@/hooks/useDraftRecovery";
 import { useConflictSave } from "@/hooks/useConflictSave";
 import { cn } from "@/lib/utils";
-import { useViewportMenuPosition } from "@/hooks/useViewportMenuPosition";
+import { MenuPortal, useViewportMenuPosition } from "@/hooks/useViewportMenuPosition";
 import { DetailSection, DetailValue, EmptyWorkshop, formatDate, isOverdue, memberLabel, monthLabel, PRIORITIES, PriorityBadge, PrioritySelect, SERVICE_STATUSES, StatusBadge, TeamMember, WorkshopPanel, WorkshopTabs, WorkshopToolbar } from "@/components/admin/workshop/shared";
 import SharpeningFocusHeader from "@/components/admin/workshop/SharpeningFocusHeader";
 import BoardTable, { BoardCell, BoardPriorityCell, BoardStatusCell, GROUP_SPINES, statusTone } from "@/components/admin/workshop/BoardTable";
@@ -233,7 +233,7 @@ export default function RepairsPage() {
       const targets = menuTargets(menu.ticket);
       const many = targets.length > 1;
       return (
-        <div className="fixed inset-0 z-[90]" onMouseDown={() => setMenu(null)} onContextMenu={(event) => { event.preventDefault(); setMenu(null); }}>
+        <MenuPortal><div className="fixed inset-0 z-[90]" onMouseDown={() => setMenu(null)} onContextMenu={(event) => { event.preventDefault(); setMenu(null); }}>
           <div
             ref={menuPosition.ref}
             className="fixed max-h-[calc(100dvh-16px)] w-64 max-w-[calc(100vw-16px)] overflow-y-auto rounded-xl border border-border bg-popover shadow-xl"
@@ -265,7 +265,7 @@ export default function RepairsPage() {
               <button className={cn(menuItemCls, "text-destructive hover:bg-destructive/10")} onClick={() => void bulkUpdate(targets, { status: "scrapped", scrapped_by: user?.id }, "Scrapped")}><Trash2 className="h-3.5 w-3.5" />Scrap (kept in history)</button>
             </div>
           </div>
-        </div>
+        </div></MenuPortal>
       );
     })()}
   </div>;
