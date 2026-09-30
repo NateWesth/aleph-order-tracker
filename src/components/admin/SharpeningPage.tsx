@@ -192,6 +192,10 @@ export default function SharpeningPage() {
       onRowClick={(job) => setSelected(job)}
       activeKey={selected?.id}
       noun="job"
+      selectMode={selectMode}
+      selectedKeys={picked}
+      onToggleSelect={togglePick}
+      onRowContextMenu={(job, x, y) => setMenu({ job, x, y })}
       columns={[
         { key: "job", label: "Job", cell: (job) => <span className="whitespace-nowrap px-1 font-semibold">{job.job_number}</span> },
         { key: "received", label: "Received date", align: "center", cell: (job) => <span className="whitespace-nowrap text-xs text-muted-foreground">{formatDate(job.date_received)}</span> },
