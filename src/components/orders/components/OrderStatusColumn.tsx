@@ -28,6 +28,7 @@ import {
 
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useViewportMenuPosition } from "@/hooks/useViewportMenuPosition";
 import SwipeableCard from "@/components/ui/SwipeableCard";
 import OrderDetailsDialog from "./OrderDetailsDialog";
 
@@ -148,6 +149,7 @@ function OrderStatusColumn({
   const [detailsOrder, setDetailsOrder] = useState<Order | null>(null);
   const [pendingDelete, setPendingDelete] = useState<Order | null>(null);
   const [contextOrder, setContextOrder] = useState<{ order: Order; x: number; y: number } | null>(null);
+  const menuPosition = useViewportMenuPosition(contextOrder?.x ?? 0, contextOrder?.y ?? 0);
 
   const [detailsTab, setDetailsTab] = useState<"details" | "pos" | "activity">("pos");
 
@@ -423,10 +425,11 @@ function OrderStatusColumn({
       {contextOrder && (
         <div className="fixed inset-0 z-[90]" onMouseDown={() => setContextOrder(null)}>
           <div
+            ref={menuPosition.ref}
             role="menu"
             aria-label={`Actions for ${contextOrder.order.order_number}`}
-            className="fixed z-[91] w-64 rounded-lg border border-border bg-popover p-1.5 text-popover-foreground shadow-xl"
-            style={{ left: Math.min(contextOrder.x, window.innerWidth - 272), top: Math.min(contextOrder.y, window.innerHeight - 360) }}
+            className="fixed z-[91] max-h-[calc(100dvh-16px)] w-64 max-w-[calc(100vw-16px)] overflow-y-auto rounded-lg border border-border bg-popover p-1.5 text-popover-foreground shadow-xl"
+            style={menuPosition.style}
             onMouseDown={(event) => event.stopPropagation()}
           >
             <Button variant="ghost" className="h-9 w-full justify-start px-2" onClick={() => { setDetailsTab("details"); setDetailsOrder(contextOrder.order); setContextOrder(null); }}><Eye className="mr-2 h-4 w-4" />Open order</Button>

@@ -13,6 +13,7 @@ import EntityComments from "./EntityComments";
 import SourceDispatchPlanner from "./SourceDispatchPlanner";
 import {PackageCheck,Truck,RefreshCw,Search,AlertTriangle,ArrowRight,CalendarDays,Navigation,Warehouse,CheckCircle2,X,UserRound,Flame,Eye,Trash2,CheckSquare,Square} from "lucide-react";
 import {useIsMobile} from "@/hooks/use-mobile";
+import {useViewportMenuPosition} from "@/hooks/useViewportMenuPosition";
 const db=supabase as any;
 type Member={id:string;full_name:string|null};
 type Health={kind:string;last_success_at:string|null;error:string|null;next_page:number};
@@ -28,6 +29,7 @@ export default function FreshDispatchPage(){
  const isMobile=useIsMobile();
  const [mobileLane,setMobileLane]=useState<string>("pending");
  const [menu,setMenu]=useState<{doc:DispatchDocument;x:number;y:number}|null>(null);
+ const menuPosition=useViewportMenuPosition(menu?.x??0,menu?.y??0);
  const [selectMode,setSelectMode]=useState(false),[picked,setPicked]=useState<Set<string>>(new Set()),[bulkBusy,setBulkBusy]=useState(false);
  const togglePick=(id:string)=>setPicked(prev=>{const next=new Set(prev);next.has(id)?next.delete(id):next.add(id);return next;});
  useEffect(()=>{
@@ -184,7 +186,7 @@ export default function FreshDispatchPage(){
   {selected&&<DispatchDocumentDialog key={selected.id} doc={selected} members={members} onClose={()=>setSelected(null)} onSaved={async()=>{await load();}}/>}
   {planner&&<SourceDispatchPlanner docs={docs} members={members} onClose={()=>setPlanner(false)} onSaved={load}/>}
   {menu&&<div className="fixed inset-0 z-[90]" onMouseDown={()=>setMenu(null)} onContextMenu={(e)=>{e.preventDefault();setMenu(null);}}>
-   <div role="menu" aria-label={"Actions for "+menu.doc.reference} className="fixed z-[91] w-60 rounded-lg border border-border bg-popover p-1.5 text-popover-foreground shadow-xl" style={{left:Math.min(menu.x,window.innerWidth-250),top:Math.min(menu.y,window.innerHeight-360)}} onMouseDown={(e)=>e.stopPropagation()}>
+   <div ref={menuPosition.ref} role="menu" aria-label={"Actions for "+menu.doc.reference} className="fixed z-[91] max-h-[calc(100dvh-16px)] w-60 max-w-[calc(100vw-16px)] overflow-y-auto rounded-lg border border-border bg-popover p-1.5 text-popover-foreground shadow-xl" style={menuPosition.style} onMouseDown={(e)=>e.stopPropagation()}>
     <Button variant="ghost" className="h-9 w-full justify-start px-2" onClick={()=>{setSelected(menu.doc);setMenu(null);}}><Eye className="mr-2 h-4 w-4"/>Open details</Button>
     <Button variant="ghost" className="h-9 w-full justify-start px-2" onClick={()=>void updateDoc(menu.doc,{urgent:!menu.doc.urgent})}><Flame className="mr-2 h-4 w-4"/>{menu.doc.urgent?"Remove urgent flag":"Mark as urgent"}</Button>
     <Button variant="ghost" className="h-9 w-full justify-start px-2" onClick={()=>void runBulk(picked.has(menu.doc.id)&&pickedDocs.length>1?pickedDocs:[menu.doc],completeOne,"Mark as complete? Remaining quantities will be filled in and it moves to History.")}><CheckCircle2 className="mr-2 h-4 w-4"/>Complete{picked.has(menu.doc.id)&&pickedDocs.length>1?" "+pickedDocs.length+" selected":""}</Button>
