@@ -208,15 +208,17 @@ export default function BoardTable<T>({ groups, columns, collapsed, onToggle, ro
                   <tbody>
                     {group.rows.map((row, index) => {
                       const key = rowKey(row);
+                      const picked = !!selectedKeys?.has(key);
                       return (
                         <tr
                           key={key}
-                          onClick={() => onRowClick?.(row)}
+                          onClick={() => { if (selectMode) onToggleSelect?.(key); else onRowClick?.(row); }}
+                          onContextMenu={onRowContextMenu ? (event) => { event.preventDefault(); onRowContextMenu(row, event.clientX, event.clientY); } : undefined}
                           tabIndex={onRowClick ? 0 : undefined}
                           onKeyDown={event => {
                             if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) {
                               event.preventDefault();
-                              onRowClick?.(row);
+                              if (selectMode) onToggleSelect?.(key); else onRowClick?.(row);
                             }
                           }}
                           className={cn(
@@ -224,8 +226,14 @@ export default function BoardTable<T>({ groups, columns, collapsed, onToggle, ro
                             index % 2 === 1 && "bg-muted/20",
                             "hover:bg-accent/40",
                             activeKey === key && "bg-accent/60",
+                            picked && "bg-logo-violet/10 hover:bg-logo-violet/15",
                           )}
                         >
+                          {selectMode && (
+                            <td className="border-b border-border/50 px-2 py-2 align-middle">
+                              <span className={cn("grid h-5 w-5 place-items-center rounded-md border text-[10px] font-bold", picked ? "border-logo-violet bg-logo-violet text-white" : "border-border bg-background text-transparent")}>✓</span>
+                            </td>
+                          )}
                           {columns.map((column, columnIndex) => (
                             <td
                               key={column.key}
