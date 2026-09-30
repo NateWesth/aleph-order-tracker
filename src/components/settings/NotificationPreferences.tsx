@@ -6,6 +6,7 @@ import { Bell, Mail, MessageSquare, Package, AlertTriangle, CheckCircle2, Sun, S
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import PushNotificationToggle from "./PushNotificationToggle";
 
 const PREFS_KEY = "notification-preferences";
 
@@ -112,6 +113,7 @@ export default function NotificationPreferences() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-1">
+          <PushNotificationToggle />
           {items.map(item => (
             <div key={item.key} className="flex items-center justify-between py-3 border-b border-border last:border-0">
               <div className="flex items-center gap-3">
