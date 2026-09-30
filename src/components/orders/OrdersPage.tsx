@@ -294,6 +294,7 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
   const { showConfetti, streak, celebrate } = useOrderCelebration();
 
   const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
+  const [activeColumn, setActiveColumn] = useState<string | null>(null);
 
   const [allTags, setAllTags] = useState<{ id: string; name: string; color: string }[]>([]);
 
