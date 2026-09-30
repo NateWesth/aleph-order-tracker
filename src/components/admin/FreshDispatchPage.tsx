@@ -11,7 +11,7 @@ import {Input} from "@/components/ui/input";
 import {Textarea} from "@/components/ui/textarea";
 import EntityComments from "./EntityComments";
 import SourceDispatchPlanner from "./SourceDispatchPlanner";
-import {PackageCheck,Truck,RefreshCw,Search,AlertTriangle,ArrowRight,CalendarDays,Navigation,Warehouse,CheckCircle2,X,UserRound,Flame,Eye} from "lucide-react";
+import {PackageCheck,Truck,RefreshCw,Search,AlertTriangle,ArrowRight,CalendarDays,Navigation,Warehouse,CheckCircle2,X,UserRound,Flame,Eye,Trash2,CheckSquare,Square} from "lucide-react";
 import {useIsMobile} from "@/hooks/use-mobile";
 const db=supabase as any;
 type Member={id:string;full_name:string|null};
@@ -28,6 +28,8 @@ export default function FreshDispatchPage(){
  const isMobile=useIsMobile();
  const [mobileLane,setMobileLane]=useState<string>("pending");
  const [menu,setMenu]=useState<{doc:DispatchDocument;x:number;y:number}|null>(null);
+ const [selectMode,setSelectMode]=useState(false),[picked,setPicked]=useState<Set<string>>(new Set()),[bulkBusy,setBulkBusy]=useState(false);
+ const togglePick=(id:string)=>setPicked(prev=>{const next=new Set(prev);next.has(id)?next.delete(id):next.add(id);return next;});
  useEffect(()=>{
   const open=()=>{sessionStorage.removeItem("aleph:open-dispatch-planner");setPlanner(true);};
   if(sessionStorage.getItem("aleph:open-dispatch-planner"))open();
@@ -115,6 +117,27 @@ export default function FreshDispatchPage(){
   const {error:updateError}=await db.from("dispatch_documents").update(patch).eq("id",doc.id);
   if(updateError)setError(updateError.message);else await load();
  };
+ const completeOne=async(doc:DispatchDocument)=>{
+  const quantities=Object.fromEntries(doc.lines.map(line=>[line.id,lineRemaining(doc,line)]).filter(([,q])=>Number(q)>0));
+  if(Object.keys(quantities).length){
+   const {error:rpcError}=await db.rpc("record_dispatch_receipt",{p_id:doc.id,p_revision:doc.revision,p_request_id:crypto.randomUUID(),p_quantities:quantities,p_notes:"Marked complete — remaining quantities filled automatically"});
+   if(rpcError)throw rpcError;
+  }
+  const {error:e2}=await db.from("dispatch_documents").update({status:"completed"}).eq("id",doc.id);
+  if(e2)throw e2;
+ };
+ const runBulk=async(targets:DispatchDocument[],action:(doc:DispatchDocument)=>Promise<void>,confirmText?:string)=>{
+  if(!targets.length)return;
+  if(confirmText&&!window.confirm(confirmText))return;
+  setMenu(null);setBulkBusy(true);const failed:string[]=[];
+  for(const doc of targets){try{await action(doc);}catch(e:any){failed.push(doc.reference+": "+(e.message||"failed"));}}
+  setBulkBusy(false);setPicked(new Set());await load();
+  if(failed.length)setError(failed.join(" · "));
+ };
+ const patchAction=(patch:Record<string,unknown>)=>async(doc:DispatchDocument)=>{const {error:e}=await db.from("dispatch_documents").update(patch).eq("id",doc.id);if(e)throw e;};
+ const deleteAction=patchAction({status:"dismissed"});
+ const pickedDocs=visible.filter(doc=>picked.has(doc.id));
+ const cardOpen=(doc:DispatchDocument)=>selectMode?()=>togglePick(doc.id):()=>setSelected(doc);
  const shownError=error||health.filter(row=>row.error).map(row=>row.kind+": "+row.error).join(" · ");
  return <div className="fresh-dispatch space-y-4">
   <header className="rounded-2xl border bg-card p-4 sm:p-6">
@@ -134,10 +157,21 @@ export default function FreshDispatchPage(){
    <Button variant="outline" onClick={()=>setPlanner(true)}>Plan dispatch run</Button>
    <div className="relative min-w-0 flex-1 basis-48"><Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground"/><Input aria-label="Search dispatch documents" placeholder="Search number, customer or item…" className="pl-9" value={query} onChange={e=>setQuery(e.target.value)}/></div>
    <label className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" checked={mine} onChange={e=>setMine(e.target.checked)}/> Assigned to me</label>
+    <Button variant={selectMode?"default":"outline"} onClick={()=>{setSelectMode(v=>!v);setPicked(new Set());}}><CheckSquare className="mr-2 h-4 w-4"/>{selectMode?"Done selecting":"Select"}</Button>
     <Button variant={history?"default":"outline"} onClick={()=>setHistory(value=>!value)}>{history?"Show outstanding":"History / excluded"}</Button>
   </div>
+  {selectMode&&<div className="sticky top-2 z-30 flex flex-wrap items-center gap-2 rounded-2xl border border-logo-violet/40 bg-card/95 p-3 shadow-lg backdrop-blur">
+   <span className="text-sm font-bold">{pickedDocs.length} selected</span>
+   <Button size="sm" variant="outline" onClick={()=>setPicked(pickedDocs.length===visible.length?new Set():new Set(visible.map(d=>d.id)))}>{pickedDocs.length===visible.length?"Clear all":"Select all ("+visible.length+")"}</Button>
+   <select aria-label="Move selected" disabled={!pickedDocs.length||bulkBusy} className="h-9 rounded-md border bg-background px-2 text-sm" value="" onChange={e=>{const v=e.target.value;if(v)void runBulk(pickedDocs,patchAction({status:v}));}}><option value="">Move to…</option>{lanes.map(l=><option key={l.id} value={l.id}>{l.label}</option>)}</select>
+   <select aria-label="Assign selected" disabled={!pickedDocs.length||bulkBusy} className="h-9 rounded-md border bg-background px-2 text-sm" value="" onChange={e=>{const v=e.target.value;if(v)void runBulk(pickedDocs,patchAction({assigned_to:v==="none"?null:v}));}}><option value="">Assign to…</option><option value="none">Unassigned</option>{members.map(m=><option key={m.id} value={m.id}>{m.full_name||"Team member"}</option>)}</select>
+   <Button size="sm" variant="outline" disabled={!pickedDocs.length||bulkBusy} onClick={()=>void runBulk(pickedDocs,patchAction({urgent:true}))}><Flame className="mr-1 h-4 w-4"/>Urgent</Button>
+   <Button size="sm" disabled={!pickedDocs.length||bulkBusy} onClick={()=>void runBulk(pickedDocs,completeOne,"Complete "+pickedDocs.length+" document(s)? All remaining quantities will be filled in and they move to History.")}><CheckCircle2 className="mr-1 h-4 w-4"/>Complete</Button>
+   <Button size="sm" variant="destructive" disabled={!pickedDocs.length||bulkBusy} onClick={()=>void runBulk(pickedDocs,deleteAction,"Delete "+pickedDocs.length+" document(s) from the board? They move to History / excluded.")}><Trash2 className="mr-1 h-4 w-4"/>Delete</Button>
+   {bulkBusy&&<span className="text-xs text-muted-foreground">Working…</span>}
+  </div>}
     {loading?<p role="status">Loading dispatch records…</p>:visible.length===0?<div className="rounded-2xl border border-dashed p-8 text-center"><p className="font-semibold">{shownError?"Records could not be verified":history?"No matching history":"No matching outstanding documents"}</p><p className="mt-2 text-sm text-muted-foreground">Check Source health before assuming everything is complete. Draft and void documents do not require dispatch.</p></div>:history?
-    <div className="grid min-w-0 gap-3 md:grid-cols-2 xl:grid-cols-3">{visible.map(doc=><DispatchCard key={doc.id} doc={doc} memberName={memberName} history onOpen={()=>setSelected(doc)} onContextMenu={(x,y)=>openMenu(doc,x,y)}/>)}</div>:
+    <div className="grid min-w-0 gap-3 md:grid-cols-2 xl:grid-cols-3">{visible.map(doc=><DispatchCard key={doc.id} doc={doc} memberName={memberName} history onOpen={cardOpen(doc)} selectMode={selectMode} picked={picked.has(doc.id)} onContextMenu={(x,y)=>openMenu(doc,x,y)}/>)}</div>:
     <>{isMobile&&<div className="grid grid-cols-3 gap-2" role="tablist" aria-label="Dispatch lanes">{lanes.map((lane,index)=>{const tone=[{active:"border-logo-cyan bg-logo-cyan/10 text-logo-cyan"},{active:"border-logo-violet bg-logo-violet/10 text-logo-violet"},{active:"border-logo-magenta bg-logo-magenta/10 text-logo-magenta"}][index];const active=mobileLane===lane.id;return <button type="button" key={lane.id} role="tab" aria-selected={active} onClick={()=>setMobileLane(lane.id)} className={"min-h-12 rounded-xl border p-2 text-center "+(active?tone.active:"border-border/60 bg-card/70 text-muted-foreground")}><span className="block truncate text-[11px] font-bold">{lane.label}</span><span className="mt-0.5 block text-xs font-black">{lane.docs.length}</span></button>;})}</div>}
     <div className="fulfillment-board-grid grid min-w-0 gap-4 xl:grid-cols-3">{lanes.filter(lane=>!isMobile||lane.id===mobileLane).map((lane)=>{const index=lanes.findIndex(l=>l.id===lane.id);const Icon=lane.icon;const tone=[
      {icon:"bg-logo-cyan",selected:"border-logo-cyan ring-2 ring-logo-cyan/50 shadow-lg",hover:"hover:border-logo-cyan/40",header:"border-logo-cyan/40 bg-logo-cyan/10",pill:"bg-logo-cyan text-logo-on"},
@@ -145,7 +179,7 @@ export default function FreshDispatchPage(){
      {icon:"bg-logo-magenta",selected:"border-logo-magenta ring-2 ring-logo-magenta/50 shadow-lg",hover:"hover:border-logo-magenta/40",header:"border-logo-magenta/40 bg-logo-magenta/10",pill:"bg-logo-magenta text-logo-on"},
     ][index];const selected=activeLane===lane.id;return <section key={lane.id} onClick={()=>setActiveLane(selected?null:lane.id)} className={"fulfillment-lane flex min-w-0 cursor-pointer flex-col overflow-hidden rounded-[28px] border bg-card/70 shadow-sm transition "+(selected?tone.selected:"border-border/60 "+tone.hover)}>
      <header className={"shrink-0 border-b "+(selected?tone.header:"border-border/55")}><div className="flex w-full items-center justify-between gap-3 px-4 py-4 text-left"><div className="flex min-w-0 items-center gap-3"><span className={"grid h-9 w-9 shrink-0 place-items-center rounded-2xl text-logo-on shadow-lg "+tone.icon}><Icon className="h-4 w-4"/></span><div className="min-w-0"><h2 className="truncate text-sm font-black">{lane.label}</h2><p className="truncate text-[10px] text-muted-foreground">{lane.description}</p></div></div><span className={"grid h-7 min-w-7 place-items-center rounded-full px-2 text-xs font-bold "+(selected?tone.pill:"bg-muted")}>{lane.docs.length}</span></div></header>
-     <div className={"min-h-0 flex-1 space-y-3 p-3 sm:min-h-[420px] "+(selected?"max-h-[70vh] overflow-y-auto":"overflow-visible")}>{lane.docs.length?lane.docs.map(doc=><DispatchCard key={doc.id} doc={doc} memberName={memberName} onOpen={()=>setSelected(doc)} onContextMenu={(x,y)=>openMenu(doc,x,y)}/>):<div className="grid min-h-56 place-items-center rounded-3xl border border-dashed border-border/60 bg-muted/20 p-6 text-center"><div><CheckCircle2 className="mx-auto h-7 w-7 text-success opacity-60"/><p className="mt-3 text-xs font-bold">Lane clear</p><p className="mt-1 text-[10px] text-muted-foreground">New work appears here live.</p></div></div>}</div>
+     <div className={"min-h-0 flex-1 space-y-3 p-3 sm:min-h-[420px] "+(selected?"max-h-[70vh] overflow-y-auto":"overflow-visible")}>{lane.docs.length?lane.docs.map(doc=><DispatchCard key={doc.id} doc={doc} memberName={memberName} onOpen={cardOpen(doc)} selectMode={selectMode} picked={picked.has(doc.id)} onContextMenu={(x,y)=>openMenu(doc,x,y)}/>):<div className="grid min-h-56 place-items-center rounded-3xl border border-dashed border-border/60 bg-muted/20 p-6 text-center"><div><CheckCircle2 className="mx-auto h-7 w-7 text-success opacity-60"/><p className="mt-3 text-xs font-bold">Lane clear</p><p className="mt-1 text-[10px] text-muted-foreground">New work appears here live.</p></div></div>}</div>
     </section>})}</div></>}
   {selected&&<DispatchDocumentDialog key={selected.id} doc={selected} members={members} onClose={()=>setSelected(null)} onSaved={async()=>{await load();}}/>}
   {planner&&<SourceDispatchPlanner docs={docs} members={members} onClose={()=>setPlanner(false)} onSaved={load}/>}
@@ -153,6 +187,9 @@ export default function FreshDispatchPage(){
    <div role="menu" aria-label={"Actions for "+menu.doc.reference} className="fixed z-[91] w-60 rounded-lg border border-border bg-popover p-1.5 text-popover-foreground shadow-xl" style={{left:Math.min(menu.x,window.innerWidth-250),top:Math.min(menu.y,window.innerHeight-360)}} onMouseDown={(e)=>e.stopPropagation()}>
     <Button variant="ghost" className="h-9 w-full justify-start px-2" onClick={()=>{setSelected(menu.doc);setMenu(null);}}><Eye className="mr-2 h-4 w-4"/>Open details</Button>
     <Button variant="ghost" className="h-9 w-full justify-start px-2" onClick={()=>void updateDoc(menu.doc,{urgent:!menu.doc.urgent})}><Flame className="mr-2 h-4 w-4"/>{menu.doc.urgent?"Remove urgent flag":"Mark as urgent"}</Button>
+    <Button variant="ghost" className="h-9 w-full justify-start px-2" onClick={()=>void runBulk(picked.has(menu.doc.id)&&pickedDocs.length>1?pickedDocs:[menu.doc],completeOne,"Mark as complete? Remaining quantities will be filled in and it moves to History.")}><CheckCircle2 className="mr-2 h-4 w-4"/>Complete{picked.has(menu.doc.id)&&pickedDocs.length>1?" "+pickedDocs.length+" selected":""}</Button>
+    <Button variant="ghost" className="h-9 w-full justify-start px-2 text-destructive" onClick={()=>void runBulk(picked.has(menu.doc.id)&&pickedDocs.length>1?pickedDocs:[menu.doc],deleteAction,"Delete from the board? It moves to History / excluded.")}><Trash2 className="mr-2 h-4 w-4"/>Delete{picked.has(menu.doc.id)&&pickedDocs.length>1?" "+pickedDocs.length+" selected":""}</Button>
+    <Button variant="ghost" className="h-9 w-full justify-start px-2" onClick={()=>{setSelectMode(true);togglePick(menu.doc.id);setMenu(null);}}><CheckSquare className="mr-2 h-4 w-4"/>{picked.has(menu.doc.id)?"Deselect":"Select"}</Button>
     <div className="my-1 h-px bg-border"/>
     <p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Move to</p>
     {lanes.filter(lane=>lane.id!==menu.doc.status).map(lane=><Button key={lane.id} variant="ghost" className="h-9 w-full justify-start px-2" onClick={()=>void updateDoc(menu.doc,{status:lane.id})}><ArrowRight className="mr-2 h-4 w-4"/>{lane.label}</Button>)}
@@ -165,9 +202,9 @@ export default function FreshDispatchPage(){
  </div>;
 }
 
-function DispatchCard({doc,memberName,history=false,onOpen,onContextMenu}:{doc:DispatchDocument;memberName:(id:string|null)=>string;history?:boolean;onOpen:()=>void;onContextMenu?:(x:number,y:number)=>void}){
- return <button type="button" onClick={onOpen} onContextMenu={onContextMenu?(e)=>{e.preventDefault();onContextMenu(e.clientX,e.clientY);}:undefined} className="w-full min-w-0 rounded-xl border bg-background p-4 text-left shadow-sm transition hover:border-primary/50 focus-visible:outline-primary">
-  <div className="flex flex-wrap justify-between gap-2"><span className="font-bold text-primary">{doc.reference}</span>{doc.urgent&&<span className="rounded-full bg-destructive/10 px-2 py-1 text-xs font-semibold text-destructive">Urgent</span>}</div>
+function DispatchCard({doc,memberName,history=false,onOpen,onContextMenu,selectMode=false,picked=false}:{doc:DispatchDocument;memberName:(id:string|null)=>string;history?:boolean;onOpen:()=>void;onContextMenu?:(x:number,y:number)=>void;selectMode?:boolean;picked?:boolean}){
+ return <button type="button" aria-pressed={selectMode?picked:undefined} onClick={(e)=>{e.stopPropagation();onOpen();}} onContextMenu={onContextMenu?(e)=>{e.preventDefault();onContextMenu(e.clientX,e.clientY);}:undefined} className={"w-full min-w-0 rounded-xl border bg-background p-4 text-left shadow-sm transition hover:border-primary/50 focus-visible:outline-primary "+(picked?"border-logo-violet ring-2 ring-logo-violet/50":"")}>
+  <div className="flex flex-wrap justify-between gap-2"><span className="flex items-center gap-2 font-bold text-primary">{selectMode&&(picked?<CheckSquare className="h-4 w-4 text-logo-violet"/>:<Square className="h-4 w-4 text-muted-foreground"/>)}{doc.reference}</span>{doc.urgent&&<span className="rounded-full bg-destructive/10 px-2 py-1 text-xs font-semibold text-destructive">Urgent</span>}</div>
   <p className="mt-2 break-words text-base font-semibold">{doc.contact_name}</p>
   <p className="mt-2 text-sm text-muted-foreground">{remainingUnits(doc)} units remaining · {doc.lines.length} lines</p>
   <p className="mt-1 text-xs text-muted-foreground">{memberName(doc.assigned_to)} · {doc.scheduled_for?displayDate(doc.scheduled_for):"Not scheduled"}</p>
