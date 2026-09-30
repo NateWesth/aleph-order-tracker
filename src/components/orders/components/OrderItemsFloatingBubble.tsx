@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { Package, PackageCheck, X } from "lucide-react";
+import { PackageCheck, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getItemDisplayName, getItemSecondaryDescription, isMiscellaneousItem } from "@/lib/itemDisplay";
 import OrderItemComments from "./OrderItemComments";
