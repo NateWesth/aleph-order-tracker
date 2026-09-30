@@ -373,13 +373,13 @@ export default function OrderItemComments({ orderItemId, className, initialCount
                 <div key={comment.id} className={cn("group flex flex-col", mine ? "items-end" : "items-start")}>
                   <div
                     className={cn(
-                      "max-w-[80%] rounded-md px-1 py-px text-[9px] leading-tight break-words border text-foreground",
+                      "max-w-[75%] rounded px-1 py-0 text-[8px] leading-snug break-words border text-foreground",
                        bubbleClass(mine)
                     )}
                   >
-                    <div className="flex items-baseline gap-1.5 text-[7.5px] leading-tight"><span className={cn("font-semibold", nameColorClass(comment.user_id))}>{nameFor(comment)}</span><span className="ml-auto text-muted-foreground/80">{bubbleTime(comment.created_at)}</span></div>
+                    <div className="flex items-baseline gap-1.5 text-[7px] leading-tight"><span className={cn("font-semibold", nameColorClass(comment.user_id))}>{nameFor(comment)}</span><span className="ml-auto text-muted-foreground/80">{bubbleTime(comment.created_at)}</span></div>
                     {parent && (
-                      <div className="my-px rounded border-l-2 border-primary/40 bg-primary/5 px-1 py-0 text-[8px] leading-tight opacity-80">
+                      <div className="my-px rounded border-l-2 border-primary/40 bg-primary/5 px-1 py-0 text-[7px] leading-tight opacity-80">
                         <div className="font-semibold">{nameFor(parent)}</div>
                         <div className="line-clamp-2">{parent.body}</div>
                       </div>
