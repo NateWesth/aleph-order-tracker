@@ -14,6 +14,7 @@ import EntityComments from "@/components/admin/EntityComments";
 import { useDraftRecovery } from "@/hooks/useDraftRecovery";
 import { useConflictSave } from "@/hooks/useConflictSave";
 import { cn } from "@/lib/utils";
+import { useViewportMenuPosition } from "@/hooks/useViewportMenuPosition";
 import { DetailSection, DetailValue, EmptyWorkshop, formatDate, isOverdue, memberLabel, monthLabel, PRIORITIES, PriorityBadge, PrioritySelect, SERVICE_STATUSES, StatusBadge, TeamMember, WorkshopPanel, WorkshopTabs, WorkshopToolbar } from "@/components/admin/workshop/shared";
 import SharpeningFocusHeader from "@/components/admin/workshop/SharpeningFocusHeader";
 import BoardTable, { BoardCell, BoardPriorityCell, BoardStatusCell, GROUP_SPINES, statusTone } from "@/components/admin/workshop/BoardTable";
@@ -55,6 +56,7 @@ export default function RepairsPage() {
   const [selectMode, setSelectMode] = useState(false);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [menu, setMenu] = useState<{ ticket: RepairTicket; x: number; y: number } | null>(null);
+  const menuPosition = useViewportMenuPosition(menu?.x ?? 0, menu?.y ?? 0);
 
   const load = useCallback(async (quiet = false) => {
     if (!quiet) setLoading(true);
@@ -233,8 +235,9 @@ export default function RepairsPage() {
       return (
         <div className="fixed inset-0 z-[90]" onMouseDown={() => setMenu(null)} onContextMenu={(event) => { event.preventDefault(); setMenu(null); }}>
           <div
-            className="absolute max-h-[80dvh] w-64 overflow-y-auto rounded-xl border border-border bg-popover shadow-xl"
-            style={{ left: Math.min(menu.x, window.innerWidth - 270), top: Math.min(menu.y, window.innerHeight - 440) }}
+            ref={menuPosition.ref}
+            className="fixed max-h-[calc(100dvh-16px)] w-64 max-w-[calc(100vw-16px)] overflow-y-auto rounded-xl border border-border bg-popover shadow-xl"
+            style={menuPosition.style}
             onMouseDown={(event) => event.stopPropagation()}
           >
             <p className="border-b border-border/60 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">

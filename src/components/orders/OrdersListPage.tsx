@@ -17,6 +17,7 @@ import OrdersHeader from "./components/OrdersHeader";
 import BulkActionsBar from "./components/BulkActionsBar";
 import { Trash2, Users, CheckSquare } from "lucide-react";
 import { format, startOfMonth, endOfMonth } from "date-fns";
+import { useViewportMenuPosition } from "@/hooks/useViewportMenuPosition";
 
 interface Company {
   id: string;
@@ -53,6 +54,7 @@ export const OrdersListPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [menu, setMenu] = useState<{ id: string; label: string; x: number; y: number } | null>(null);
+  const menuPosition = useViewportMenuPosition(menu?.x ?? 0, menu?.y ?? 0);
   const toggleSelect = (id: string) => setSelectedIds((cur) => { const next = new Set(cur); next.has(id) ? next.delete(id) : next.add(id); return next; });
 
   useEffect(() => {
@@ -216,8 +218,8 @@ export const OrdersListPage: React.FC = () => {
 
       {menu && (
         <div className="fixed inset-0 z-[90]" onMouseDown={() => setMenu(null)} onContextMenu={(e) => { e.preventDefault(); setMenu(null); }}>
-          <div role="menu" aria-label={`Actions for ${menu.label}`} className="fixed z-[91] w-60 rounded-lg border border-border bg-popover p-1.5 text-popover-foreground shadow-xl"
-            style={{ left: Math.min(menu.x, window.innerWidth - 250), top: Math.min(menu.y, window.innerHeight - 320) }} onMouseDown={(e) => e.stopPropagation()}>
+          <div ref={menuPosition.ref} role="menu" aria-label={`Actions for ${menu.label}`} className="fixed z-[91] max-h-[calc(100dvh-16px)] w-60 max-w-[calc(100vw-16px)] overflow-y-auto rounded-lg border border-border bg-popover p-1.5 text-popover-foreground shadow-xl"
+            style={menuPosition.style} onMouseDown={(e) => e.stopPropagation()}>
             <Button variant="ghost" className="h-9 w-full justify-start px-2" onClick={() => { toggleSelect(menu.id); setMenu(null); }}><CheckSquare className="mr-2 h-4 w-4" />{selectedIds.has(menu.id) ? "Deselect this order" : "Select this order"}</Button>
             <Button variant="ghost" className="h-9 w-full justify-start px-2" onClick={() => { setSelectedIds(new Set(filteredOrders.map((o) => o.id))); setMenu(null); }}><Users className="mr-2 h-4 w-4" />Select all ({filteredOrders.length})</Button>
             <div className="my-1 h-px bg-border" />
