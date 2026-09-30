@@ -47,9 +47,9 @@ export function useDraftRecovery<T>(name: string, value: T, active: boolean, onR
     latest.current.active = false;
     setAvailable(null);
   };
-  const banner = <div className="flex flex-wrap items-center gap-2 rounded-xl border bg-muted/30 px-3 py-2 text-xs" role="status">
-    <span className={failed ? "text-destructive" : "text-muted-foreground"}>{failed ? "Draft not protected — device storage unavailable. Keep this window open." : active ? "Draft saved on this device · not synced to the team" : available ? "An unfinished draft is available on this device." : "Drafts are saved on this device for 7 days."}</span>
+  const banner = failed || (!active && available !== null) ? <div className="flex flex-wrap items-center gap-2 rounded-xl border bg-muted/30 px-3 py-2 text-xs" role="status">
+    <span className={failed ? "text-destructive" : "text-muted-foreground"}>{failed ? "Draft not protected — device storage unavailable. Keep this window open." : "An unfinished draft is available on this device."}</span>
     {!active && available !== null && <><Button size="sm" variant="outline" onClick={() => onRestore(available)}>Resume draft</Button><Button size="sm" variant="ghost" onClick={clear}>Discard draft</Button></>}
-  </div>;
+  </div> : null;
   return { clear, banner, failed };
 }
