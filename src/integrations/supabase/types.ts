@@ -1313,6 +1313,7 @@ export type Database = {
           metadata: Json | null
           order_id: string | null
           order_number: string | null
+          pushed_at: string | null
           read: boolean
           title: string
           type: string
@@ -1325,6 +1326,7 @@ export type Database = {
           metadata?: Json | null
           order_id?: string | null
           order_number?: string | null
+          pushed_at?: string | null
           read?: boolean
           title: string
           type: string
@@ -1337,6 +1339,7 @@ export type Database = {
           metadata?: Json | null
           order_id?: string | null
           order_number?: string | null
+          pushed_at?: string | null
           read?: boolean
           title?: string
           type?: string
