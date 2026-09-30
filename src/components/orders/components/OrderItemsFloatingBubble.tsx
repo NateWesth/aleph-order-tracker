@@ -7,6 +7,7 @@ import OrderItemComments from "./OrderItemComments";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { format } from "date-fns";
+import { bubbleClass, bubbleTime, nameColorClass, markCommentsSeen } from "@/lib/commentStyles";
 
 interface OrderUpdate {
   id: string;
@@ -288,24 +289,14 @@ export default function OrderItemsFloatingBubble({ order, onClose }: OrderItemsF
                     <p className="text-xs text-muted-foreground">No notes yet. Start the conversation below.</p>
                   ) : (
                     updates.map((update) => {
-                      const initials = (update.author_name || "?")
-                        .split(" ")
-                        .map((part) => part[0])
-                        .join("")
-                        .toUpperCase()
-                        .slice(0, 2);
                       return (
-                        <div key={update.id} className="flex gap-2.5">
-                          <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">{initials}</span>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap items-center gap-x-2 text-[11px]">
-                              <span className="truncate font-semibold">
-                                {update.author_name || "Unknown"}
-                                {update.user_id === user?.id && <span className="ml-1 text-[10px] font-bold uppercase text-primary">you</span>}
-                              </span>
-                              <span className="text-[10px] text-muted-foreground">{format(new Date(update.created_at), "dd MMM HH:mm")}</span>
+                        <div key={update.id} className={cn("flex", update.user_id === user?.id ? "justify-end" : "justify-start")}>
+                          <div className={cn("max-w-[80%] rounded-md border px-1 py-px text-[9px] leading-tight", bubbleClass(update.user_id === user?.id))}>
+                            <div className="flex items-baseline gap-1.5 text-[7.5px] leading-tight">
+                              <span className={cn("font-semibold", nameColorClass(update.user_id))}>{update.user_id === user?.id ? "You" : update.author_name || "Unknown"}</span>
+                              <span className="ml-auto text-muted-foreground/80">{bubbleTime(update.created_at)}</span>
                             </div>
-                            <p className="mt-0.5 whitespace-pre-wrap break-words rounded-lg bg-muted/50 px-2.5 py-1.5 text-xs leading-relaxed">{update.message}</p>
+                            <p className="whitespace-pre-wrap break-words text-foreground">{update.message}</p>
                           </div>
                         </div>
                       );
