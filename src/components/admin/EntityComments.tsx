@@ -261,12 +261,12 @@ export default function EntityComments({ entityType, entityId, orderId, classNam
                 return (
                   <div key={comment.id} className={cn("group flex flex-col", mine ? "items-end" : "items-start")}>
                     <div className={cn(
-                       "max-w-[75%] rounded px-1 py-0 text-[8px] leading-snug break-words border text-foreground",
+                       "w-fit max-w-[62%] rounded-2xl px-2 py-px text-[7.5px] leading-tight break-words border text-foreground",
                        bubbleClass(mine)
                     )}>
-                       <div className="flex items-baseline gap-1.5 text-[7px] leading-tight"><span className={cn("font-semibold", nameColorClass(comment.user_id))}>{nameFor(comment)}</span><span className="ml-auto text-muted-foreground/80">{bubbleTime(comment.created_at)}</span></div>
+                       <div className="flex items-baseline gap-1 text-[6.5px] leading-tight"><span className={cn("font-semibold", nameColorClass(comment.user_id))}>{nameFor(comment)}</span><span className="ml-auto text-muted-foreground/80">{bubbleTime(comment.created_at)}</span></div>
                        {parent && (
-                          <div className="my-px rounded border-l-2 border-primary/40 bg-primary/5 px-1 py-0 text-[7px] leading-tight opacity-80">
+                          <div className="my-px rounded-lg border-l-2 border-primary/40 bg-primary/5 px-1 py-0 text-[6.5px] leading-tight opacity-80">
                            <div className="font-semibold">{nameFor(parent)}</div>
                            <div className="line-clamp-2">{parent.body}</div>
                          </div>
@@ -281,7 +281,7 @@ export default function EntityComments({ entityType, entityId, orderId, classNam
                             key={s.emoji}
                             onClick={() => toggleReaction(comment.id, s.emoji)}
                             className={cn(
-                               "flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] transition-colors",
+                               "flex items-center gap-0.5 rounded-full border px-1 py-0 text-[8px] transition-colors",
                               s.mine ? "border-primary/40 bg-primary/10 text-primary" : "border-border bg-muted text-muted-foreground hover:bg-muted/70"
                             )}
                           >
@@ -291,7 +291,7 @@ export default function EntityComments({ entityType, entityId, orderId, classNam
                       </div>
                     )}
 
-                     <div className="mt-0.5 flex min-h-4 items-center gap-1.5 opacity-60 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100 transition-opacity">
+                     <div className="mt-0 flex min-h-3 items-center gap-1 opacity-60 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100 transition-opacity">
                       <span className="text-[10px] text-muted-foreground">{formatTime(comment.created_at)}</span>
                       <button onClick={() => setReplyTo(comment)} className="text-[10px] text-muted-foreground hover:text-primary flex items-center gap-1">
                         <CornerUpLeft className="h-3 w-3" />Reply

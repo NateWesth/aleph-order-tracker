@@ -21,8 +21,8 @@ export function nameColorClass(userId: string | null | undefined) {
 /** Smooth, almost transparent fill: own bubbles cyan tint, others violet tint. */
 export function bubbleClass(mine: boolean) {
   return mine
-    ? "bg-logo-cyan/10 border-logo-cyan/20 rounded-tr-sm"
-    : "bg-logo-violet/10 border-logo-violet/20 rounded-tl-sm";
+    ? "bg-logo-cyan/10 border-logo-cyan/20 rounded-tr-md"
+    : "bg-logo-violet/10 border-logo-violet/20 rounded-tl-md";
 }
 
 export function bubbleTime(value: string) {
