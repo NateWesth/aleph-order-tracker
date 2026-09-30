@@ -12,6 +12,7 @@ import {Textarea} from "@/components/ui/textarea";
 import EntityComments from "./EntityComments";
 import SourceDispatchPlanner from "./SourceDispatchPlanner";
 import {PackageCheck,Truck,RefreshCw,Search,AlertTriangle,ArrowRight,CalendarDays,Navigation,Warehouse,CheckCircle2,X} from "lucide-react";
+import {useIsMobile} from "@/hooks/use-mobile";
 const db=supabase as any;
 type Member={id:string;full_name:string|null};
 type Health={kind:string;last_success_at:string|null;error:string|null;next_page:number};
@@ -24,6 +25,8 @@ export default function FreshDispatchPage(){
  const [loading,setLoading]=useState(true),[error,setError]=useState(""),[syncing,setSyncing]=useState(false),[progress,setProgress]=useState("");
  const [selected,setSelected]=useState<DispatchDocument|null>(null);
  const [planner,setPlanner]=useState(false);
+ const isMobile=useIsMobile();
+ const [mobileLane,setMobileLane]=useState<string>("pending");
  useEffect(()=>{
   const open=()=>{sessionStorage.removeItem("aleph:open-dispatch-planner");setPlanner(true);};
   if(sessionStorage.getItem("aleph:open-dispatch-planner"))open();
