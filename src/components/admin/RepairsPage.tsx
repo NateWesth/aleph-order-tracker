@@ -151,6 +151,9 @@ export default function RepairsPage() {
         { id: "warranty" as const, label: "Warranty", count: warrantyActive.length },
         { id: "history" as const, label: "History", count: history.length },
       ]} />
+      <Button variant={selectMode ? "default" : "outline"} size="sm" onClick={() => { setSelectMode((value) => !value); setPicked(new Set()); }}>
+        {selectMode ? `Done (${picked.size})` : "Select"}
+      </Button>
     </WorkshopToolbar>
 
     {loading ? <div className="space-y-2">{[1,2,3].map(n => <div key={n} className="h-24 animate-pulse rounded-lg bg-muted/50" />)}</div> : monthGroups.length === 0 ? <EmptyWorkshop history={tab === "history"} /> : <BoardTable
@@ -161,6 +164,10 @@ export default function RepairsPage() {
       onRowClick={(ticket) => setSelected(ticket)}
       activeKey={selected?.id}
       noun="ticket"
+      selectMode={selectMode}
+      selectedKeys={picked}
+      onToggleSelect={togglePick}
+      onRowContextMenu={(ticket, x, y) => setMenu({ ticket, x, y })}
       columns={[
         { key: "ticket", label: "Ticket", cell: (ticket) => <span className="whitespace-nowrap px-1 font-semibold">{ticket.ticket_number}</span> },
         { key: "received", label: "Received date", align: "center", cell: (ticket) => <span className="whitespace-nowrap text-xs text-muted-foreground">{formatDate(ticket.date_received_by_client)}</span> },
@@ -210,6 +217,45 @@ export default function RepairsPage() {
     </WorkshopPanel>
 
     <Dialog open={scrapOpen} onOpenChange={setScrapOpen}><DialogContent className="w-[calc(100%-24px)] max-w-md rounded-[26px]"><DialogHeader><DialogTitle className="flex items-center gap-2 text-xl font-black text-destructive"><AlertTriangle className="h-5 w-5"/>Mark this tool as scrapped?</DialogTitle></DialogHeader><p className="text-sm text-muted-foreground">The record is not deleted. It moves to history and receives a permanent red SCRAPPED stamp.</p><div><Label className="mb-1.5 block text-[10px] font-black uppercase tracking-wider text-muted-foreground">Reason (recommended)</Label><Textarea value={scrapReason} onChange={e=>setScrapReason(e.target.value)} placeholder="Unsafe to repair, parts unavailable…" className="min-h-24"/></div><div className="flex justify-end gap-2"><Button variant="outline" onClick={()=>setScrapOpen(false)}>Cancel</Button><Button variant="destructive" disabled={saving} onClick={()=>void scrap()}>{saving?"Saving…":"Confirm scrap"}</Button></div></DialogContent></Dialog>
+
+    {menu && (() => {
+      const targets = menuTargets(menu.ticket);
+      const many = targets.length > 1;
+      return (
+        <div className="fixed inset-0 z-[90]" onMouseDown={() => setMenu(null)} onContextMenu={(event) => { event.preventDefault(); setMenu(null); }}>
+          <div
+            className="absolute max-h-[80dvh] w-64 overflow-y-auto rounded-xl border border-border bg-popover shadow-xl"
+            style={{ left: Math.min(menu.x, window.innerWidth - 270), top: Math.min(menu.y, window.innerHeight - 440) }}
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <p className="border-b border-border/60 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+              {many ? `${targets.length} tickets selected` : `Ticket ${menu.ticket.ticket_number}`}
+            </p>
+            {!many && <button className={menuItemCls} onClick={() => { setSelected(menu.ticket); setMenu(null); }}>Open details</button>}
+            <button className={menuItemCls} onClick={() => { setSelectMode(true); togglePick(menu.ticket.id); setMenu(null); }}>{picked.has(menu.ticket.id) ? "Deselect" : "Select"}</button>
+            <p className="border-t border-border/60 px-3 pb-1 pt-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Set status</p>
+            {SERVICE_STATUSES.map(([value, label]) => (
+              <button key={value} className={menuItemCls} onClick={() => void bulkUpdate(targets, { status: value }, "Status")}>
+                <span className={cn("h-2.5 w-2.5 rounded-full", STATUS_BUTTON[statusTone(value)].split(" ")[1])} />{label}
+              </button>
+            ))}
+            <p className="border-t border-border/60 px-3 pb-1 pt-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Set priority</p>
+            {PRIORITIES.map(([value, label]) => (
+              <button key={value} className={menuItemCls} onClick={() => void bulkUpdate(targets, { priority: value }, "Priority")}>{label}</button>
+            ))}
+            <p className="border-t border-border/60 px-3 pb-1 pt-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Assign to</p>
+            {team.map((member) => (
+              <button key={member.id} className={menuItemCls} onClick={() => void bulkUpdate(targets, { assigned_to: member.id }, "Assigned")}>{memberLabel(member)}</button>
+            ))}
+            <button className={menuItemCls} onClick={() => void bulkUpdate(targets, { assigned_to: null }, "Unassigned")}>Unassign</button>
+            <div className="border-t border-border/60">
+              <button className={menuItemCls} onClick={() => void bulkUpdate(targets, { status: "completed" }, "Completed")}><CheckCircle2 className="h-3.5 w-3.5 text-logo-cyan" />Complete & archive</button>
+              <button className={cn(menuItemCls, "text-destructive hover:bg-destructive/10")} onClick={() => void bulkUpdate(targets, { status: "scrapped", scrapped_by: user?.id }, "Scrapped")}><Trash2 className="h-3.5 w-3.5" />Scrap (kept in history)</button>
+            </div>
+          </div>
+        </div>
+      );
+    })()}
   </div>;
 }
 
