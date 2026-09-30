@@ -256,14 +256,14 @@ export default function EntityComments({ entityType, entityId, orderId, classNam
                 return (
                   <div key={comment.id} className={cn("group flex flex-col", mine ? "items-end" : "items-start")}>
                     <div className={cn(
-                       "max-w-[82%] rounded-xl px-2.5 py-1.5 text-xs leading-relaxed break-words shadow-sm bg-white dark:bg-card border",
+                       "max-w-[78%] rounded-lg px-2 py-1 text-[11px] leading-snug break-words shadow-sm bg-white dark:bg-card border",
                        mine ? "border-primary/30 rounded-tr-sm" : "border-border text-foreground rounded-tl-sm"
                     )}>
-                       <div className={cn("text-[10px] font-semibold", mine ? "text-primary" : "text-primary/90")}>
+                       <div className={cn("text-[9px] font-semibold", mine ? "text-primary" : "text-primary/90")}>
                         {nameFor(comment)}
                       </div>
                       {parent && (
-                         <div className="mb-1 mt-0.5 rounded-md border-l-2 border-primary/40 bg-primary/5 px-1.5 py-0.5 text-[10px] leading-snug opacity-80">
+                         <div className="mb-0.5 mt-0.5 rounded border-l-2 border-primary/40 bg-primary/5 px-1 py-0 text-[9px] leading-tight opacity-80">
                           <div className="font-semibold">{nameFor(parent)}</div>
                           <div className="line-clamp-2">{parent.body}</div>
                         </div>
