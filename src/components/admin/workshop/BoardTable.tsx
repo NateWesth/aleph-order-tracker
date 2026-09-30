@@ -110,9 +110,13 @@ interface BoardTableProps<T> {
   onRowClick?: (row: T) => void;
   activeKey?: string | null;
   noun?: string;
+  selectMode?: boolean;
+  selectedKeys?: ReadonlySet<string>;
+  onToggleSelect?: (key: string) => void;
+  onRowContextMenu?: (row: T, x: number, y: number) => void;
 }
 
-export default function BoardTable<T>({ groups, columns, collapsed, onToggle, rowKey, onRowClick, activeKey, noun = "job" }: BoardTableProps<T>) {
+export default function BoardTable<T>({ groups, columns, collapsed, onToggle, rowKey, onRowClick, activeKey, noun = "job", selectMode = false, selectedKeys, onToggleSelect, onRowContextMenu }: BoardTableProps<T>) {
   const mobile = useIsMobile();
   if (groups.length === 0) {
     return (
@@ -155,7 +159,16 @@ export default function BoardTable<T>({ groups, columns, collapsed, onToggle, ro
                 const key = rowKey(row);
                 const primary = columns.filter((column, index) => index < 3 || /status|priority/.test(column.key));
                 const secondary = columns.filter(column => !primary.includes(column));
-                return <article key={key} className={cn("min-w-0 rounded-xl border bg-background p-3", activeKey === key && "border-primary ring-1 ring-primary")}>
+                const picked = !!selectedKeys?.has(key);
+                return <article key={key} onContextMenu={onRowContextMenu ? (event) => { event.preventDefault(); onRowContextMenu(row, event.clientX, event.clientY); } : undefined} className={cn("relative min-w-0 rounded-xl border bg-background p-3", activeKey === key && "border-primary ring-1 ring-primary", picked && "border-logo-violet ring-2 ring-logo-violet/50")}>
+                  {selectMode && (
+                    <button
+                      type="button"
+                      aria-label={picked ? "Deselect" : "Select"}
+                      onClick={(event) => { event.stopPropagation(); onToggleSelect?.(key); }}
+                      className={cn("absolute right-2.5 top-2.5 grid h-6 w-6 place-items-center rounded-md border text-[11px] font-bold", picked ? "border-logo-violet bg-logo-violet text-white" : "border-border bg-background text-transparent")}
+                    >✓</button>
+                  )}
                   <dl className="grid grid-cols-2 gap-3">
                     {primary.map((column, index) => <div key={column.key} className={cn("min-w-0", index === 0 && "col-span-2")}>
                       <dt className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{column.label}</dt>
@@ -166,7 +179,7 @@ export default function BoardTable<T>({ groups, columns, collapsed, onToggle, ro
                     <summary className="cursor-pointer py-2 text-xs font-semibold text-muted-foreground">More details</summary>
                     <dl className="space-y-3 py-2">{secondary.map(column => <div key={column.key}><dt className="mb-1 text-[10px] uppercase text-muted-foreground">{column.label}</dt><dd className="break-words text-sm">{column.cell(row)}</dd></div>)}</dl>
                   </details>}
-                  {onRowClick && <button type="button" onClick={() => onRowClick(row)} className="mt-3 flex min-h-11 w-full items-center justify-between rounded-lg bg-primary/10 px-3 text-sm font-semibold text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">Open {noun}<ChevronRight className="h-4 w-4" /></button>}
+                  {onRowClick && !selectMode && <button type="button" onClick={() => onRowClick(row)} className="mt-3 flex min-h-11 w-full items-center justify-between rounded-lg bg-primary/10 px-3 text-sm font-semibold text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">Open {noun}<ChevronRight className="h-4 w-4" /></button>}
                 </article>;
               })}
             </div>}
@@ -175,6 +188,9 @@ export default function BoardTable<T>({ groups, columns, collapsed, onToggle, ro
                 <table className="w-full min-w-[960px] border-separate border-spacing-0 text-sm">
                   <thead>
                     <tr>
+                      {selectMode && (
+                        <th className="sticky top-0 z-10 w-10 border-b border-border/70 bg-muted/60 px-2 py-2 backdrop-blur" aria-label="Select" />
+                      )}
                       {columns.map((column) => (
                         <th
                           key={column.key}
@@ -192,15 +208,17 @@ export default function BoardTable<T>({ groups, columns, collapsed, onToggle, ro
                   <tbody>
                     {group.rows.map((row, index) => {
                       const key = rowKey(row);
+                      const picked = !!selectedKeys?.has(key);
                       return (
                         <tr
                           key={key}
-                          onClick={() => onRowClick?.(row)}
+                          onClick={() => { if (selectMode) onToggleSelect?.(key); else onRowClick?.(row); }}
+                          onContextMenu={onRowContextMenu ? (event) => { event.preventDefault(); onRowContextMenu(row, event.clientX, event.clientY); } : undefined}
                           tabIndex={onRowClick ? 0 : undefined}
                           onKeyDown={event => {
                             if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) {
                               event.preventDefault();
-                              onRowClick?.(row);
+                              if (selectMode) onToggleSelect?.(key); else onRowClick?.(row);
                             }
                           }}
                           className={cn(
@@ -208,8 +226,14 @@ export default function BoardTable<T>({ groups, columns, collapsed, onToggle, ro
                             index % 2 === 1 && "bg-muted/20",
                             "hover:bg-accent/40",
                             activeKey === key && "bg-accent/60",
+                            picked && "bg-logo-violet/10 hover:bg-logo-violet/15",
                           )}
                         >
+                          {selectMode && (
+                            <td className="border-b border-border/50 px-2 py-2 align-middle">
+                              <span className={cn("grid h-5 w-5 place-items-center rounded-md border text-[10px] font-bold", picked ? "border-logo-violet bg-logo-violet text-white" : "border-border bg-background text-transparent")}>✓</span>
+                            </td>
+                          )}
                           {columns.map((column, columnIndex) => (
                             <td
                               key={column.key}
@@ -233,6 +257,7 @@ export default function BoardTable<T>({ groups, columns, collapsed, onToggle, ro
                     })}
                     {columns.some((column) => column.summary) && (
                       <tr className="bg-muted/40">
+                        {selectMode && <td className="px-3 py-2" />}
                         {columns.map((column) => (
                           <td
                             key={column.key}

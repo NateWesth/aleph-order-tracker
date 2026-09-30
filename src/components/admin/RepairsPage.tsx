@@ -14,7 +14,7 @@ import EntityComments from "@/components/admin/EntityComments";
 import { useDraftRecovery } from "@/hooks/useDraftRecovery";
 import { useConflictSave } from "@/hooks/useConflictSave";
 import { cn } from "@/lib/utils";
-import { DetailSection, DetailValue, EmptyWorkshop, formatDate, isOverdue, memberLabel, monthLabel, PriorityBadge, PrioritySelect, SERVICE_STATUSES, StatusBadge, TeamMember, WorkshopPanel, WorkshopTabs, WorkshopToolbar } from "@/components/admin/workshop/shared";
+import { DetailSection, DetailValue, EmptyWorkshop, formatDate, isOverdue, memberLabel, monthLabel, PRIORITIES, PriorityBadge, PrioritySelect, SERVICE_STATUSES, StatusBadge, TeamMember, WorkshopPanel, WorkshopTabs, WorkshopToolbar } from "@/components/admin/workshop/shared";
 import SharpeningFocusHeader from "@/components/admin/workshop/SharpeningFocusHeader";
 import BoardTable, { BoardCell, BoardPriorityCell, BoardStatusCell, GROUP_SPINES, statusTone } from "@/components/admin/workshop/BoardTable";
 
@@ -52,6 +52,9 @@ export default function RepairsPage() {
   const recovery=useDraftRecovery("repair-form",{draft,editingId,editBase},formOpen,value=>{setDraft(value.draft);setEditingId(value.editingId);setEditBase(value.editBase);setFormOpen(true);});
   const [scrapOpen, setScrapOpen] = useState(false); const [scrapReason, setScrapReason] = useState("");
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [selectMode, setSelectMode] = useState(false);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [menu, setMenu] = useState<{ ticket: RepairTicket; x: number; y: number } | null>(null);
 
   const load = useCallback(async (quiet = false) => {
     if (!quiet) setLoading(true);
@@ -115,6 +118,17 @@ export default function RepairsPage() {
     try { if(await conflicts.save("repair_tickets",ticket.id,{status},ticket.updated_at))await load(true); }
     catch(error){toast({title:"Status not saved",description:error instanceof Error?error.message:"Retry",variant:"destructive"});}
   };
+
+  const togglePick = (id: string) => setPicked((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next; });
+  const menuTargets = (ticket: RepairTicket) => (picked.has(ticket.id) ? tickets.filter((candidate) => picked.has(candidate.id)) : [ticket]);
+  const bulkUpdate = async (targets: RepairTicket[], patch: Record<string, unknown>, label: string) => {
+    let failed = 0;
+    for (const target of targets) { try { if (!(await conflicts.save("repair_tickets", target.id, patch, target.updated_at))) failed++; } catch { failed++; } }
+    await load(true);
+    toast({ title: failed ? `${label}: ${targets.length - failed} updated, ${failed} failed` : `${label}: ${targets.length} updated`, variant: failed ? "destructive" : undefined });
+    setPicked(new Set()); setSelectMode(false); setMenu(null);
+  };
+  const menuItemCls = "flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold hover:bg-accent/60";
   const scrap = async () => { if (!selected) return; setSaving(true); let error:any=null;try{if(!await conflicts.save("repair_tickets",selected.id,{status:"scrapped",scrap_reason:scrapReason.trim()||null,scrapped_by:user?.id},selected.updated_at)){setSaving(false);return;}}catch(failure){error=failure;} setSaving(false); if(error){toast({title:"Repair not scrapped",description:error.message,variant:"destructive"});return;} setScrapOpen(false);setScrapReason("");toast({title:"Tool marked as scrapped",description:"The ticket is retained permanently in Repair History."});await load(true); };
 
   return <div className="workshop-workspace space-y-4 bg-background pb-10 font-sans text-foreground">
@@ -137,6 +151,9 @@ export default function RepairsPage() {
         { id: "warranty" as const, label: "Warranty", count: warrantyActive.length },
         { id: "history" as const, label: "History", count: history.length },
       ]} />
+      <Button variant={selectMode ? "default" : "outline"} size="sm" onClick={() => { setSelectMode((value) => !value); setPicked(new Set()); }}>
+        {selectMode ? `Done (${picked.size})` : "Select"}
+      </Button>
     </WorkshopToolbar>
 
     {loading ? <div className="space-y-2">{[1,2,3].map(n => <div key={n} className="h-24 animate-pulse rounded-lg bg-muted/50" />)}</div> : monthGroups.length === 0 ? <EmptyWorkshop history={tab === "history"} /> : <BoardTable
@@ -147,6 +164,10 @@ export default function RepairsPage() {
       onRowClick={(ticket) => setSelected(ticket)}
       activeKey={selected?.id}
       noun="ticket"
+      selectMode={selectMode}
+      selectedKeys={picked}
+      onToggleSelect={togglePick}
+      onRowContextMenu={(ticket, x, y) => setMenu({ ticket, x, y })}
       columns={[
         { key: "ticket", label: "Ticket", cell: (ticket) => <span className="whitespace-nowrap px-1 font-semibold">{ticket.ticket_number}</span> },
         { key: "received", label: "Received date", align: "center", cell: (ticket) => <span className="whitespace-nowrap text-xs text-muted-foreground">{formatDate(ticket.date_received_by_client)}</span> },
@@ -196,6 +217,45 @@ export default function RepairsPage() {
     </WorkshopPanel>
 
     <Dialog open={scrapOpen} onOpenChange={setScrapOpen}><DialogContent className="w-[calc(100%-24px)] max-w-md rounded-[26px]"><DialogHeader><DialogTitle className="flex items-center gap-2 text-xl font-black text-destructive"><AlertTriangle className="h-5 w-5"/>Mark this tool as scrapped?</DialogTitle></DialogHeader><p className="text-sm text-muted-foreground">The record is not deleted. It moves to history and receives a permanent red SCRAPPED stamp.</p><div><Label className="mb-1.5 block text-[10px] font-black uppercase tracking-wider text-muted-foreground">Reason (recommended)</Label><Textarea value={scrapReason} onChange={e=>setScrapReason(e.target.value)} placeholder="Unsafe to repair, parts unavailable…" className="min-h-24"/></div><div className="flex justify-end gap-2"><Button variant="outline" onClick={()=>setScrapOpen(false)}>Cancel</Button><Button variant="destructive" disabled={saving} onClick={()=>void scrap()}>{saving?"Saving…":"Confirm scrap"}</Button></div></DialogContent></Dialog>
+
+    {menu && (() => {
+      const targets = menuTargets(menu.ticket);
+      const many = targets.length > 1;
+      return (
+        <div className="fixed inset-0 z-[90]" onMouseDown={() => setMenu(null)} onContextMenu={(event) => { event.preventDefault(); setMenu(null); }}>
+          <div
+            className="absolute max-h-[80dvh] w-64 overflow-y-auto rounded-xl border border-border bg-popover shadow-xl"
+            style={{ left: Math.min(menu.x, window.innerWidth - 270), top: Math.min(menu.y, window.innerHeight - 440) }}
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <p className="border-b border-border/60 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+              {many ? `${targets.length} tickets selected` : `Ticket ${menu.ticket.ticket_number}`}
+            </p>
+            {!many && <button className={menuItemCls} onClick={() => { setSelected(menu.ticket); setMenu(null); }}>Open details</button>}
+            <button className={menuItemCls} onClick={() => { setSelectMode(true); togglePick(menu.ticket.id); setMenu(null); }}>{picked.has(menu.ticket.id) ? "Deselect" : "Select"}</button>
+            <p className="border-t border-border/60 px-3 pb-1 pt-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Set status</p>
+            {SERVICE_STATUSES.map(([value, label]) => (
+              <button key={value} className={menuItemCls} onClick={() => void bulkUpdate(targets, { status: value }, "Status")}>
+                <span className={cn("h-2.5 w-2.5 rounded-full", STATUS_BUTTON[statusTone(value)].split(" ")[1])} />{label}
+              </button>
+            ))}
+            <p className="border-t border-border/60 px-3 pb-1 pt-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Set priority</p>
+            {PRIORITIES.map(([value, label]) => (
+              <button key={value} className={menuItemCls} onClick={() => void bulkUpdate(targets, { priority: value }, "Priority")}>{label}</button>
+            ))}
+            <p className="border-t border-border/60 px-3 pb-1 pt-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Assign to</p>
+            {team.map((member) => (
+              <button key={member.id} className={menuItemCls} onClick={() => void bulkUpdate(targets, { assigned_to: member.id }, "Assigned")}>{memberLabel(member)}</button>
+            ))}
+            <button className={menuItemCls} onClick={() => void bulkUpdate(targets, { assigned_to: null }, "Unassigned")}>Unassign</button>
+            <div className="border-t border-border/60">
+              <button className={menuItemCls} onClick={() => void bulkUpdate(targets, { status: "completed" }, "Completed")}><CheckCircle2 className="h-3.5 w-3.5 text-logo-cyan" />Complete & archive</button>
+              <button className={cn(menuItemCls, "text-destructive hover:bg-destructive/10")} onClick={() => void bulkUpdate(targets, { status: "scrapped", scrapped_by: user?.id }, "Scrapped")}><Trash2 className="h-3.5 w-3.5" />Scrap (kept in history)</button>
+            </div>
+          </div>
+        </div>
+      );
+    })()}
   </div>;
 }
 

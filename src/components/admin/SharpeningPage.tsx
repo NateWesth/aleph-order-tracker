@@ -57,6 +57,9 @@ export default function SharpeningPage() {
   const recovery=useDraftRecovery("sharpening-form",{draft,editingId,editBase},formOpen,value=>{setDraft(value.draft);setEditingId(value.editingId);setEditBase(value.editBase);setFormOpen(true);});
   const [saving, setSaving] = useState(false);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [selectMode, setSelectMode] = useState(false);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [menu, setMenu] = useState<{ job: SharpeningJob; x: number; y: number } | null>(null);
 
   const load = useCallback(async (quiet = false) => {
     if (!quiet) setLoading(true);
@@ -139,6 +142,25 @@ export default function SharpeningPage() {
     try { if(await conflicts.save("sharpening_jobs",job.id,{status},job.updated_at))await load(true); }
     catch(error){toast({title:"Status not saved",description:error instanceof Error?error.message:"Retry",variant:"destructive"});}
   };
+
+  const togglePick = (id: string) => setPicked((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next; });
+  const menuTargets = (job: SharpeningJob) => (picked.has(job.id) ? jobs.filter((candidate) => picked.has(candidate.id)) : [job]);
+  const bulkUpdate = async (targets: SharpeningJob[], patch: Record<string, unknown>, label: string) => {
+    let failed = 0;
+    for (const target of targets) { try { if (!(await conflicts.save("sharpening_jobs", target.id, patch, target.updated_at))) failed++; } catch { failed++; } }
+    await load(true);
+    toast({ title: failed ? `${label}: ${targets.length - failed} updated, ${failed} failed` : `${label}: ${targets.length} updated`, variant: failed ? "destructive" : undefined });
+    setPicked(new Set()); setSelectMode(false); setMenu(null);
+  };
+  const bulkDelete = async (targets: SharpeningJob[]) => {
+    if (!window.confirm(`Delete ${targets.length} job${targets.length === 1 ? "" : "s"} permanently? This cannot be undone.`)) return;
+    let failed = 0;
+    for (const target of targets) { const { error } = await db.from("sharpening_jobs").delete().eq("id", target.id); if (error) failed++; }
+    await load(true);
+    toast({ title: failed ? `Deleted ${targets.length - failed}, ${failed} failed` : `Deleted ${targets.length} job${targets.length === 1 ? "" : "s"}`, variant: failed ? "destructive" : undefined });
+    setPicked(new Set()); setSelectMode(false); setMenu(null);
+  };
+  const menuItemCls = "flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold hover:bg-accent/60";
   return <div className="workshop-workspace space-y-4 bg-background pb-10 font-sans text-foreground">
     {conflicts.dialog}{!formOpen&&recovery.banner}
     <SharpeningFocusHeader
@@ -157,6 +179,9 @@ export default function SharpeningPage() {
         { id: "outstanding" as const, label: "Outstanding", count: outstanding.length },
         { id: "history" as const, label: "History", count: jobs.length - outstanding.length },
       ]} />
+      <Button variant={selectMode ? "default" : "outline"} size="sm" onClick={() => { setSelectMode((value) => !value); setPicked(new Set()); }}>
+        {selectMode ? `Done (${picked.size})` : "Select"}
+      </Button>
     </WorkshopToolbar>
 
     {loading ? <div className="space-y-2">{[1,2,3].map((n) => <div key={n} className="h-24 animate-pulse rounded-lg bg-muted/50" />)}</div> : monthGroups.length === 0 ? <EmptyWorkshop history={tab === "history"} /> : <BoardTable
@@ -167,6 +192,10 @@ export default function SharpeningPage() {
       onRowClick={(job) => setSelected(job)}
       activeKey={selected?.id}
       noun="job"
+      selectMode={selectMode}
+      selectedKeys={picked}
+      onToggleSelect={togglePick}
+      onRowContextMenu={(job, x, y) => setMenu({ job, x, y })}
       columns={[
         { key: "job", label: "Job", cell: (job) => <span className="whitespace-nowrap px-1 font-semibold">{job.job_number}</span> },
         { key: "received", label: "Received date", align: "center", cell: (job) => <span className="whitespace-nowrap text-xs text-muted-foreground">{formatDate(job.date_received)}</span> },
@@ -212,6 +241,45 @@ export default function SharpeningPage() {
         <aside className="space-y-4 rounded-[24px] border border-border bg-muted p-3 sm:p-4"><EntityComments entityType="sharpening" entityId={selected.id} defaultOpen /></aside>
       </div>}
     </WorkshopPanel>
+
+    {menu && (() => {
+      const targets = menuTargets(menu.job);
+      const many = targets.length > 1;
+      return (
+        <div className="fixed inset-0 z-[90]" onMouseDown={() => setMenu(null)} onContextMenu={(event) => { event.preventDefault(); setMenu(null); }}>
+          <div
+            className="absolute max-h-[80dvh] w-64 overflow-y-auto rounded-xl border border-border bg-popover shadow-xl"
+            style={{ left: Math.min(menu.x, window.innerWidth - 270), top: Math.min(menu.y, window.innerHeight - 440) }}
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <p className="border-b border-border/60 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+              {many ? `${targets.length} jobs selected` : `Job ${menu.job.job_number}`}
+            </p>
+            {!many && <button className={menuItemCls} onClick={() => { setSelected(menu.job); setMenu(null); }}>Open details</button>}
+            <button className={menuItemCls} onClick={() => { setSelectMode(true); togglePick(menu.job.id); setMenu(null); }}>{picked.has(menu.job.id) ? "Deselect" : "Select"}</button>
+            <p className="border-t border-border/60 px-3 pb-1 pt-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Set status</p>
+            {SERVICE_STATUSES.map(([value, label]) => (
+              <button key={value} className={menuItemCls} onClick={() => void bulkUpdate(targets, { status: value }, "Status")}>
+                <span className={cn("h-2.5 w-2.5 rounded-full", STATUS_BUTTON[statusTone(value)].split(" ")[1])} />{label}
+              </button>
+            ))}
+            <p className="border-t border-border/60 px-3 pb-1 pt-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Set priority</p>
+            {PRIORITIES.map(([value, label]) => (
+              <button key={value} className={menuItemCls} onClick={() => void bulkUpdate(targets, { priority: value }, "Priority")}>{label}</button>
+            ))}
+            <p className="border-t border-border/60 px-3 pb-1 pt-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Assign to</p>
+            {team.map((member) => (
+              <button key={member.id} className={menuItemCls} onClick={() => void bulkUpdate(targets, { assigned_to: member.id }, "Assigned")}>{memberLabel(member)}</button>
+            ))}
+            <button className={menuItemCls} onClick={() => void bulkUpdate(targets, { assigned_to: null }, "Unassigned")}>Unassign</button>
+            <div className="border-t border-border/60">
+              <button className={menuItemCls} onClick={() => void bulkUpdate(targets, { status: "completed" }, "Completed")}><CheckCircle2 className="h-3.5 w-3.5 text-logo-cyan" />Complete & archive</button>
+              <button className={cn(menuItemCls, "text-destructive hover:bg-destructive/10")} onClick={() => void bulkDelete(targets)}><X className="h-3.5 w-3.5" />Delete permanently</button>
+            </div>
+          </div>
+        </div>
+      );
+    })()}
 
   </div>;
 }
