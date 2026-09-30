@@ -14,7 +14,7 @@ import EntityComments from "@/components/admin/EntityComments";
 import { useDraftRecovery } from "@/hooks/useDraftRecovery";
 import { useConflictSave } from "@/hooks/useConflictSave";
 import { cn } from "@/lib/utils";
-import { DetailSection, DetailValue, EmptyWorkshop, formatDate, isOverdue, memberLabel, monthLabel, PriorityBadge, PrioritySelect, SERVICE_STATUSES, StatusBadge, TeamMember, WorkshopPanel, WorkshopTabs, WorkshopToolbar } from "@/components/admin/workshop/shared";
+import { DetailSection, DetailValue, EmptyWorkshop, formatDate, isOverdue, memberLabel, monthLabel, PRIORITIES, PriorityBadge, PrioritySelect, SERVICE_STATUSES, StatusBadge, TeamMember, WorkshopPanel, WorkshopTabs, WorkshopToolbar } from "@/components/admin/workshop/shared";
 import SharpeningFocusHeader from "@/components/admin/workshop/SharpeningFocusHeader";
 import BoardTable, { BoardCell, BoardPriorityCell, BoardStatusCell, GROUP_SPINES, statusTone } from "@/components/admin/workshop/BoardTable";
 
