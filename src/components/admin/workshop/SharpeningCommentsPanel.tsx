@@ -217,25 +217,25 @@ export default function SharpeningCommentsPanel({ entityType, title, subtitle, r
           const mine = comment.user_id === user?.id;
           const summary = reactionSummary(comment.id);
           return (
-            <div key={comment.id} className="group rounded-lg border border-border bg-card px-2 py-1 shadow-sm">
-              <div className="flex items-center gap-1.5">
+            <div key={comment.id} className="group rounded-md border border-border bg-card px-1.5 py-0.5 shadow-sm">
+              <div className="flex items-center gap-1">
                 <button
                   type="button"
                   onClick={() => onOpen(comment.entity_id)}
-                  className="truncate rounded bg-logo-cyan/15 px-1 py-0 text-[9px] font-bold text-logo-cyan hover:bg-logo-cyan/25"
+                  className="truncate rounded bg-logo-cyan/15 px-1 py-0 text-[8px] font-bold text-logo-cyan hover:bg-logo-cyan/25"
                 >
                   {ref ? ref.reference : "Item"}
                 </button>
-                <span className="truncate text-[10px] font-semibold">{mine ? "You" : comment.author}</span>
-                <span className="ml-auto shrink-0 text-[9px] text-muted-foreground">{relative(comment.created_at)}</span>
+                <span className="truncate text-[9px] font-semibold">{mine ? "You" : comment.author}</span>
+                <span className="ml-auto shrink-0 text-[8px] text-muted-foreground">{relative(comment.created_at)}</span>
               </div>
               {parent && (
-                <div className="mt-0.5 rounded border-l-2 border-logo-cyan/40 bg-muted/40 px-1 py-0 text-[9px] leading-tight opacity-80">
+                <div className="mt-px rounded border-l-2 border-logo-cyan/40 bg-muted/40 px-1 py-0 text-[8px] leading-tight opacity-80">
                   <div className="font-semibold">{parent.user_id === user?.id ? "You" : parent.author}</div>
                   <div className="line-clamp-2">{parent.body}</div>
                 </div>
               )}
-              <p className="mt-0.5 whitespace-pre-wrap break-words text-[11px] leading-snug text-foreground/90">{renderBody(comment.body)}</p>
+              <p className="mt-px whitespace-pre-wrap break-words text-[10px] leading-tight text-foreground/90">{renderBody(comment.body)}</p>
 
               {summary.length > 0 && (
                 <div className="mt-0.5 flex flex-wrap gap-1">
