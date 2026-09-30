@@ -90,6 +90,92 @@ function getStockStatusStyle(status: string) {
 export default function OrderItemsFloatingBubble({ order, onClose }: OrderItemsFloatingBubbleProps) {
   const [visibleOrder, setVisibleOrder] = useState<Order | null>(order);
   const [isSwitching, setIsSwitching] = useState(false);
+  const { user } = useAuth();
+  const [updates, setUpdates] = useState<OrderUpdate[]>([]);
+  const [updatesLoading, setUpdatesLoading] = useState(false);
+  const [newNote, setNewNote] = useState("");
+  const [postingNote, setPostingNote] = useState(false);
+
+  useEffect(() => {
+    if (!visibleOrder?.id) {
+      setUpdates([]);
+      return;
+    }
+
+    let cancelled = false;
+    setUpdatesLoading(true);
+
+    const fetchUpdates = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("order_updates")
+          .select("id, order_id, user_id, message, created_at, profiles!inner(full_name, email)")
+          .eq("order_id", visibleOrder.id)
+          .order("created_at", { ascending: true });
+
+        if (error) throw error;
+        if (cancelled) return;
+
+        setUpdates(
+          (data || []).map((row: any) => {
+            const profile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
+            return {
+              id: row.id,
+              order_id: row.order_id,
+              user_id: row.user_id,
+              message: row.message,
+              created_at: row.created_at,
+              author_name: profile?.full_name || profile?.email || null,
+            };
+          }),
+        );
+      } catch (error) {
+        console.error("Failed to load order notes:", error);
+        if (!cancelled) setUpdates([]);
+      } finally {
+        if (!cancelled) setUpdatesLoading(false);
+      }
+    };
+
+    fetchUpdates();
+    return () => {
+      cancelled = true;
+    };
+  }, [visibleOrder?.id]);
+
+  const submitNote = async () => {
+    const message = newNote.trim();
+    if (!message || !user?.id || !visibleOrder) return;
+
+    setPostingNote(true);
+    try {
+      const { data, error } = await supabase
+        .from("order_updates")
+        .insert({ order_id: visibleOrder.id, user_id: user.id, message })
+        .select("id, order_id, user_id, message, created_at, profiles!inner(full_name, email)")
+        .single();
+
+      if (error) throw error;
+
+      const profile = Array.isArray((data as any).profiles) ? (data as any).profiles[0] : (data as any).profiles;
+      setUpdates((prev) => [
+        ...prev,
+        {
+          id: data.id,
+          order_id: data.order_id,
+          user_id: data.user_id,
+          message: data.message,
+          created_at: data.created_at,
+          author_name: profile?.full_name || profile?.email || null,
+        },
+      ]);
+      setNewNote("");
+    } catch (error) {
+      console.error("Failed to post note:", error);
+    } finally {
+      setPostingNote(false);
+    }
+  };
 
   useEffect(() => {
     if (!order) return;
