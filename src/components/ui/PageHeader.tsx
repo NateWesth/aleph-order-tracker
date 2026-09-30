@@ -26,19 +26,20 @@ export function PageHeader({ title, description, icon: Icon, stats, actions, too
         className,
       )}
     >
-      <div className="absolute inset-y-0 left-0 w-1.5 bg-gradient-to-b from-primary via-primary/45 to-transparent" aria-hidden />
-      <div className="pointer-events-none absolute -right-12 -top-24 h-64 w-64 rounded-full bg-primary/[0.09] blur-3xl" aria-hidden />
+      <div className="absolute inset-y-0 left-0 w-1.5 bg-gradient-to-b from-logo-cyan via-logo-violet to-logo-magenta" aria-hidden />
+      <div className="pointer-events-none absolute -right-12 -top-24 h-64 w-64 rounded-full bg-logo-violet/[0.12] blur-3xl" aria-hidden />
+      <div className="pointer-events-none absolute -left-16 -bottom-28 h-56 w-56 rounded-full bg-logo-cyan/[0.10] blur-3xl" aria-hidden />
 
       <div className="relative">
         <div className="aleph-command-primary grid gap-5 p-5 sm:p-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center lg:p-7">
           <div className="aleph-command-title flex min-w-0 items-center gap-4 sm:gap-5">
             {Icon && (
-              <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[20px] border border-primary/15 bg-gradient-to-br from-primary/18 to-primary/5 text-primary shadow-[0_18px_35px_-24px_hsl(var(--primary))] sm:h-16 sm:w-16">
+              <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[20px] border border-logo-violet/25 bg-gradient-to-br from-logo-cyan/20 via-logo-violet/15 to-logo-magenta/20 text-logo-cyan shadow-[0_18px_35px_-24px_hsl(var(--logo-violet))] sm:h-16 sm:w-16">
                 <Icon className="h-6 w-6 sm:h-7 sm:w-7" />
               </span>
             )}
             <div className="min-w-0">
-              <p className="mb-1 text-[10px] font-black uppercase tracking-[0.22em] text-primary/80">Workspace</p>
+              <p className="mb-1 text-[10px] font-black uppercase tracking-[0.22em] text-logo-violet">Workspace</p>
               <h1 className="font-display text-2xl font-black leading-none tracking-[-0.045em] text-foreground sm:text-3xl lg:text-[2.15rem]">
                 {title}
               </h1>
@@ -50,9 +51,9 @@ export function PageHeader({ title, description, icon: Icon, stats, actions, too
 
         {stats && stats.length > 0 && (
           <div className="aleph-command-stats grid grid-cols-2 gap-px border-y border-border/55 bg-border/55 sm:flex sm:border-b-0">
-            {stats.map((stat) => (
+            {stats.map((stat, statIndex) => (
               <div key={stat.label} className="flex min-w-[145px] items-center gap-3 bg-background/55 px-4 py-3 backdrop-blur sm:flex-1 sm:px-5">
-                {stat.icon && <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/10"><stat.icon className="h-4 w-4 text-primary" /></span>}
+                {stat.icon && <span className={cn("flex h-8 w-8 items-center justify-center rounded-xl", ["bg-logo-cyan/12 text-logo-cyan", "bg-logo-violet/12 text-logo-violet", "bg-logo-magenta/12 text-logo-magenta"][statIndex % 3])}><stat.icon className="h-4 w-4" /></span>}
                 <span className="min-w-0">
                   <span className="block font-display text-lg font-black tabular-nums leading-none text-foreground">{stat.value}</span>
                   <span className="mt-1 block truncate text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{stat.label}</span>
