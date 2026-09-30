@@ -201,13 +201,13 @@ function DispatchDocumentDialog({doc,members,onClose,onSaved}:{doc:DispatchDocum
       <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-primary/10 text-primary"><KindIcon className="h-5 w-5"/></span>
       <div className="min-w-0 flex-1">
        <div className="flex flex-wrap items-center gap-2"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary">Dispatch management</p><span className="rounded-full border border-primary/30 bg-primary/10 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-tighter text-primary">{snapshot.kind==="collection"?"Collection":"Delivery"}</span><span className={"rounded-full border px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-tighter "+(active?"border-success/30 bg-success/10 text-success":"border-border bg-muted text-muted-foreground")}>{active?"Active":snapshot.source_closed?snapshot.source_status:snapshot.status}</span>{snapshot.urgent&&<span className="rounded-full border border-destructive/30 bg-destructive/10 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-tighter text-destructive">Urgent</span>}</div>
-       <h2 className="mt-1 truncate font-display text-xl font-black tracking-tight sm:text-2xl">{snapshot.reference}</h2>
+        <h2 className="mt-1 truncate font-display text-xl font-black tracking-tight sm:text-2xl animate-order-floating-bubble-content">{snapshot.reference}</h2>
        <p className="mt-0.5 truncate text-sm font-semibold text-muted-foreground">{snapshot.contact_name} · Created {displayDate(snapshot.source_created_at)} · Zoho {snapshot.kind==="collection"?"purchase order":"customer invoice"}</p>
       </div>
       <button type="button" onClick={()=>{if(!saving)onClose();}} className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-muted text-muted-foreground transition-all hover:scale-105 hover:bg-destructive/10 hover:text-destructive" aria-label="Close details"><X className="h-4 w-4"/></button>
      </div>
     </header>
-    <div className="flex-1 space-y-6 overflow-y-auto p-4 sm:p-6">
+     <div className="flex-1 space-y-6 overflow-y-auto p-4 sm:p-6 animate-order-floating-bubble-content">
      {recovery.banner}
      {error&&<p role="alert" className="rounded-xl bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
      <div className="grid grid-cols-2 gap-4 rounded-xl border border-border/60 bg-muted/30 p-4 md:grid-cols-4">

@@ -970,60 +970,6 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
     <>
       <ConfettiOverlay show={showConfetti} streak={streak} />
 
-      <style>{`
-        @keyframes order-floating-bubble-in {
-          0% {
-            opacity: 0;
-            transform: translateY(-18px) scale(0.94);
-            filter: blur(4px);
-          }
-
-          55% {
-            opacity: 1;
-            transform: translateY(3px) scale(1.012);
-            filter: blur(0);
-          }
-
-          78% {
-            transform: translateY(-1px) scale(0.997);
-          }
-
-          100% {
-            opacity: 1;
-            transform: translateY(0) scale(1);
-            filter: blur(0);
-          }
-        }
-
-        @keyframes order-floating-bubble-content {
-          0% {
-            opacity: 0;
-            transform: translateX(26px) scale(0.985);
-          }
-
-          100% {
-            opacity: 1;
-            transform: translateX(0) scale(1);
-          }
-        }
-
-        .animate-order-floating-bubble {
-          animation: order-floating-bubble-in 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
-          transform-origin: center top;
-        }
-
-        .animate-order-floating-bubble-content {
-          animation: order-floating-bubble-content 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
-        }
-
-        @media (prefers-reduced-motion: reduce) {
-          .animate-order-floating-bubble,
-          .animate-order-floating-bubble-content {
-            animation: none !important;
-          }
-        }
-      `}</style>
-
       <PullToRefresh onRefresh={fetchOrders} className="aleph-page-workspace aleph-orders-workspace w-full space-y-4 overflow-x-hidden">
         {selectedOrders.length > 0 && (
           <BulkActionsBar
