@@ -294,12 +294,14 @@ const Settings = () => {
                   <div className="space-y-4">
                     {/* Windows/Desktop PWA Install */}
                     <div className="space-y-2">
-                      <Button onClick={handleInstallApp} className="w-full sm:w-auto">
-                        <Download className="h-4 w-4 mr-2" />
-                        Download for Windows
+                      <Button asChild className="w-full sm:w-auto">
+                        <a href="https://github.com/NateWesth/aleph-order-tracker/releases/latest/download/aleph-orders-setup.exe">
+                          <Download className="h-4 w-4 mr-2" />
+                          Download for Windows
+                        </a>
                       </Button>
                       <p className="text-xs text-muted-foreground">
-                        Install Aleph Orders as a desktop application
+                        Downloads the full Windows installer (.exe). Run it to install Aleph Orders with a desktop and Start menu shortcut.
                       </p>
                     </div>
                   </div>
