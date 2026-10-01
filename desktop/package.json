@@ -1,0 +1,33 @@
+{
+  "name": "aleph-orders-desktop",
+  "productName": "Aleph Orders",
+  "version": "1.0.0",
+  "description": "Aleph Orders desktop app",
+  "author": "Aleph Engineering",
+  "main": "main.cjs",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win nsis --x64 --publish never"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "za.co.alepheng.orders",
+    "productName": "Aleph Orders",
+    "directories": { "output": "release", "buildResources": "build" },
+    "files": ["main.cjs", "build/icon.png"],
+    "win": { "target": "nsis", "icon": "build/icon.ico", "artifactName": "aleph-orders-setup.exe" },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Aleph Orders",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico"
+    }
+  }
+}
