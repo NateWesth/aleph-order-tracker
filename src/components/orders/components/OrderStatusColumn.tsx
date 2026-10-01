@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Trash2, ArrowRight, Package, ChevronDown, Undo2, MessageCircle, MoreHorizontal, Eye, CheckSquare, Users } from "lucide-react";
+import { Trash2, ArrowRight, Package, ChevronDown, Undo2, MessageCircle, MoreHorizontal, Eye, CheckSquare, Users, CalendarDays } from "lucide-react";
 
 import {
   AlertDialog,
@@ -494,6 +494,12 @@ function OrderStatusColumn({
                 <span className="mt-0.5 block truncate text-[11px] font-medium text-muted-foreground">
                   {order.companyName}
                 </span>
+                {order.created_at && (
+                  <span className="mt-0.5 flex items-center gap-1 text-[9px] font-medium text-muted-foreground/70">
+                    <CalendarDays className="h-2.5 w-2.5 shrink-0" />
+                    Created {new Date(order.created_at).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" })}
+                  </span>
+                )}
               </div>
               {getUrgencyBadge(order.urgency)}
             </div>
