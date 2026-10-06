@@ -1114,6 +1114,244 @@ export type Database = {
           },
         ]
       }
+      fabrication_files: {
+        Row: {
+          created_at: string
+          file_name: string
+          file_size: number | null
+          id: string
+          mime_type: string | null
+          project_id: string
+          storage_path: string
+          updated_at: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          file_name: string
+          file_size?: number | null
+          id?: string
+          mime_type?: string | null
+          project_id: string
+          storage_path: string
+          updated_at?: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          file_name?: string
+          file_size?: number | null
+          id?: string
+          mime_type?: string | null
+          project_id?: string
+          storage_path?: string
+          updated_at?: string
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fabrication_files_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "fabrication_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fabrication_materials: {
+        Row: {
+          created_at: string
+          id: string
+          material: string
+          notes: string | null
+          project_id: string
+          quantity: number
+          sort_order: number
+          unit: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          material: string
+          notes?: string | null
+          project_id: string
+          quantity?: number
+          sort_order?: number
+          unit?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          material?: string
+          notes?: string | null
+          project_id?: string
+          quantity?: number
+          sort_order?: number
+          unit?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fabrication_materials_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "fabrication_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fabrication_parts: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          project_id: string
+          quantity: number
+          sort_order: number
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          project_id: string
+          quantity?: number
+          sort_order?: number
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          project_id?: string
+          quantity?: number
+          sort_order?: number
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fabrication_parts_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "fabrication_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fabrication_projects: {
+        Row: {
+          assigned_to: string | null
+          client_name: string | null
+          company_id: string | null
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          due_date: string | null
+          id: string
+          name: string
+          notes: string | null
+          priority: string
+          project_number: string | null
+          stage: string
+          start_date: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          client_name?: string | null
+          company_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          priority?: string
+          project_number?: string | null
+          stage?: string
+          start_date?: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          client_name?: string | null
+          company_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          priority?: string
+          project_number?: string | null
+          stage?: string
+          start_date?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fabrication_projects_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fabrication_time_entries: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          hours: number
+          id: string
+          note: string | null
+          project_id: string
+          updated_at: string
+          work_date: string
+          worker_name: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          hours?: number
+          id?: string
+          note?: string | null
+          project_id: string
+          updated_at?: string
+          work_date?: string
+          worker_name?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          hours?: number
+          id?: string
+          note?: string | null
+          project_id?: string
+          updated_at?: string
+          work_date?: string
+          worker_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fabrication_time_entries_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "fabrication_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       fulfillment_settings: {
         Row: {
           auto_assign_enabled: boolean
