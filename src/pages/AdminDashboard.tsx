@@ -51,6 +51,7 @@ const loadControlTower = () => import("@/components/admin/OperationsControlTower
 const loadFulfillmentPage = () => import("@/components/admin/FreshDispatchPage");
 const loadSharpeningPage = () => import("@/components/admin/SharpeningPage");
 const loadRepairsPage = () => import("@/components/admin/RepairsPage");
+const loadFabricationPage = () => import("@/components/admin/FabricationPage");
 const loadServiceDeskPage = () => import("@/components/admin/ServiceDeskPage");
 const loadOrderLabPage = () => import("@/components/admin/OrderLabPage");
 
@@ -69,6 +70,7 @@ const OperationsControlTower = lazy(loadControlTower);
 const FulfillmentPage = lazy(loadFulfillmentPage);
 const SharpeningPage = lazy(loadSharpeningPage);
 const RepairsPage = lazy(loadRepairsPage);
+const FabricationPage = lazy(loadFabricationPage);
 const ServiceDeskPage = lazy(loadServiceDeskPage);
 const OrderLabPage = lazy(loadOrderLabPage);
 const FloatingAIChat = lazy(() => import("@/components/admin/FloatingAIChat"));
@@ -90,13 +92,14 @@ const WORKSPACE_PREFETCHERS: Record<string, () => Promise<unknown>> = {
   fulfillment: loadFulfillmentPage,
   sharpening: loadSharpeningPage,
   repairs: loadRepairsPage,
+  fabrication: loadFabricationPage,
   "service-desk": loadServiceDeskPage,
   "order-lab": loadOrderLabPage,
 };
 
 const RAIL_STORAGE_KEY = "aleph:workspace-rail-expanded";
 const WORKSPACE_STORAGE_KEY = "aleph:last-workspace";
-const RESTORABLE_WORKSPACES = new Set(["home", "my-work", "orders", "fulfillment", "sharpening", "repairs", "service-desk", "order-lab", "scenario-planner", "history", "clients", "suppliers", "stats", "po-tracking", "buying-sheet", "items", "control-tower"]);
+const RESTORABLE_WORKSPACES = new Set(["home", "my-work", "orders", "fulfillment", "sharpening", "repairs", "fabrication", "service-desk", "order-lab", "scenario-planner", "history", "clients", "suppliers", "stats", "po-tracking", "buying-sheet", "items", "control-tower"]);
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -288,6 +291,7 @@ const AdminDashboard = () => {
     { id: "fulfillment", label: "Delivery & Collection", icon: Warehouse, badge: 0 },
     { id: "sharpening", label: "Sharpening", icon: Scissors, badge: 0 },
     { id: "repairs", label: "Repairs", icon: Wrench, badge: 0 },
+    { id: "fabrication", label: "Fabrication", icon: Hammer, badge: 0 },
     { id: "service-desk", label: "Assets & Service", icon: LifeBuoy, badge: 0 },
     { id: "order-lab", label: "Order Lab", icon: FlaskConical, badge: 0 },
     { id: "scenario-planner", label: "Scenario Planner", icon: BrainCircuit, badge: 0 },
@@ -302,7 +306,7 @@ const AdminDashboard = () => {
     ...(canEditCommission ? [{ id: "commission", label: "Commission", icon: Percent, badge: 0 }] : []),
     ...(isAdmin ? [{ id: "users", label: "Users", icon: Users, badge: 0 }] : []),
   ];
-  const primaryIds = new Set(["home", "my-work", "orders", "fulfillment", "sharpening", "repairs", "service-desk", "order-lab", "buying-sheet", "control-tower", "history"]);
+  const primaryIds = new Set(["home", "my-work", "orders", "fulfillment", "sharpening", "repairs", "fabrication", "service-desk", "order-lab", "buying-sheet", "control-tower", "history"]);
   const navItems = allNavItems.filter((item) => primaryIds.has(item.id));
   const filteredNavItems = railQuery.trim()
     ? allNavItems.filter((item) => item.label.toLowerCase().includes(railQuery.trim().toLowerCase()))
@@ -548,6 +552,7 @@ const AdminDashboard = () => {
               {activeView === "fulfillment" && <FulfillmentPage />}
               {activeView === "sharpening" && <SharpeningPage />}
               {activeView === "repairs" && <RepairsPage />}
+              {activeView === "fabrication" && <FabricationPage />}
               {activeView === "service-desk" && <ServiceDeskPage />}
               {activeView === "order-lab" && <OrderLabPage />}
               {activeView === "scenario-planner" && <ScenarioPlannerPage onNavigate={setActiveView} />}

@@ -35,7 +35,7 @@ interface TeamMember {
 }
 
 interface EntityCommentsProps {
-  entityType: "delivery" | "collection" | "sharpening" | "repair";
+  entityType: "delivery" | "collection" | "sharpening" | "repair" | "fabrication";
   entityId: string;
   orderId?: string | null;
   className?: string;
