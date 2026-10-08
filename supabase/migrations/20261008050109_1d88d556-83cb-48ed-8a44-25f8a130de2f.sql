@@ -1,0 +1,1 @@
+REVOKE EXECUTE ON FUNCTION public.protect_fabrication_project_identity() FROM PUBLIC, anon, authenticated;
