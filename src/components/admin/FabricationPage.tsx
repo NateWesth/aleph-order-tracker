@@ -224,6 +224,10 @@ function NewProjectDialog({ open, onClose, team, onCreated }: { open: boolean; o
         <div><Label>Client</Label><Input value={form.client_name} onChange={(e) => set("client_name", e.target.value)} /></div>
         <div><Label>Start date</Label><Input type="date" value={form.start_date} onChange={(e) => set("start_date", e.target.value)} /></div>
         <div><Label>Due date</Label><Input type="date" value={form.due_date} onChange={(e) => set("due_date", e.target.value)} /></div>
+        <div><Label>Type</Label><Select value={form.project_type} onValueChange={(v) => set("project_type", v)}>
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>{PROJECT_TYPES.map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}</SelectContent>
+        </Select></div>
         <div><Label>Priority</Label><PrioritySelect value={form.priority} onChange={(v) => set("priority", v)} /></div>
         <div><Label>Assigned to</Label><Select value={form.assigned_to} onValueChange={(v) => set("assigned_to", v)}>
           <SelectTrigger><SelectValue /></SelectTrigger>
