@@ -185,8 +185,6 @@ export default function FabricationPage() {
       <MenuItem onClick={() => { setSelectMode(true); toggle(menu.id); setMenu(null); }}>Select</MenuItem>
       <MenuLabel>Move to section</MenuLabel>
       {FABRICATION_STAGES.map(([v, l]) => <MenuItem key={v} onClick={() => { update(menuIds, { stage: v }); setMenu(null); }}>{l}</MenuItem>)}
-      <MenuLabel>Project type</MenuLabel>
-      {PROJECT_TYPES.map(([v, l]) => <MenuItem key={v} onClick={() => { update(menuIds, { project_type: v }); setMenu(null); }}>{l}</MenuItem>)}
       <MenuLabel>Assign to</MenuLabel>
       {team.slice(0, 12).map((t) => <MenuItem key={t.id} onClick={() => { update(menuIds, { assigned_to: t.id }); setMenu(null); }}>{memberLabel(t)}</MenuItem>)}
       <div className="my-1 h-px bg-border" />
@@ -334,10 +332,7 @@ function ProjectPanel({ id, team, onClose, onChange, onDelete }: { id: string; t
     <section>
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <p className="font-display text-[10px] font-bold uppercase text-muted-foreground">Currently in · {stageLabel(p.stage)}</p>
-        <div className="flex rounded-lg border border-border bg-muted/40 p-0.5">
-          {PROJECT_TYPES.map(([v, l]) => <button key={v} type="button" onClick={() => patch({ project_type: v })}
-            className={cn("rounded-md px-3 py-1 text-[11px] font-semibold transition", (p.project_type || "new_build") === v ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>{l}</button>)}
-        </div>
+        <TypeChip type={p.project_type} />
       </div>
       <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 lg:grid-cols-5">
         {FABRICATION_STAGES.map(([v, l], i) => <button key={v} type="button" onClick={() => patch({ stage: v })}
@@ -351,7 +346,7 @@ function ProjectPanel({ id, team, onClose, onChange, onDelete }: { id: string; t
         <div><Label className="text-[10px]">Name</Label><Input defaultValue={p.name} onBlur={(e) => e.target.value !== p.name && patch({ name: e.target.value })} /></div>
         <div><Label className="text-[10px]">Project number</Label><Input defaultValue={p.project_number || ""} onBlur={(e) => patch({ project_number: e.target.value || null })} /></div>
         <div><Label className="text-[10px]">Client</Label><Input defaultValue={p.client_name || ""} onBlur={(e) => patch({ client_name: e.target.value || null })} /></div>
-        <div><Label className="text-[10px]">Start date</Label><Input type="date" value={p.start_date} onChange={(e) => patch({ start_date: e.target.value })} /></div>
+        <div><Label className="text-[10px]">Start date</Label><Input type="date" value={p.start_date} disabled className="opacity-70" /></div>
         <div><Label className="text-[10px]">Due date</Label><Input type="date" value={p.due_date || ""} onChange={(e) => patch({ due_date: e.target.value || null })} /></div>
         <div><Label className="text-[10px]">Priority</Label><PrioritySelect value={p.priority} onChange={(v) => patch({ priority: v })} /></div>
         <div><Label className="text-[10px]">Assigned to</Label><Select value={p.assigned_to || "none"} onValueChange={(v) => patch({ assigned_to: v === "none" ? null : v })}>
