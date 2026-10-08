@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 import EntityComments from "@/components/admin/EntityComments";
 import { MenuPortal, useViewportMenuPosition } from "@/hooks/useViewportMenuPosition";
 import { WorkshopHeader, WorkshopToolbar, WorkshopTabs, WorkshopPanel, DetailSection, PrioritySelect, PriorityBadge, formatDate, isOverdue, type TeamMember, memberLabel } from "@/components/admin/workshop/shared";
-import { FABRICATION_STAGES, stageLabel, stageIndex, generateFabricationPdf, type FabProject, type FabMaterial, type FabPart, type FabTime, type FabFile } from "@/lib/fabricationPdf";
+import { FABRICATION_STAGES, stageLabel, stageIndex, generateFabricationPdf, PROJECT_TYPES, typeLabel, type FabProject, type FabMaterial, type FabPart, type FabTime, type FabFile } from "@/lib/fabricationPdf";
 
 const db = supabase as any;
 const BUCKET = "fabrication-files";
@@ -24,9 +24,15 @@ const STAGE_TONE: Record<string, string> = {
   sandblasting: "border-l-logo-violet text-logo-violet bg-logo-violet/10",
   welding: "border-l-logo-magenta text-logo-magenta bg-logo-magenta/10",
   assembly: "border-l-rose-400 text-rose-400 bg-rose-400/10",
+  spray_painting: "border-l-lime-500 text-lime-500 bg-lime-500/10",
   ready_for_collection: "border-l-emerald-500 text-emerald-500 bg-emerald-500/10",
   completed: "border-l-muted-foreground text-muted-foreground bg-muted",
 };
+
+function TypeChip({ type }: { type?: string }) {
+  const repair = type === "repair";
+  return <span className={cn("rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide", repair ? "border-amber-500/40 text-amber-500" : "border-logo-cyan/40 text-logo-cyan")}>{typeLabel(type)}</span>;
+}
 
 function StageChip({ stage }: { stage: string }) {
   return <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide", STAGE_TONE[stage]?.split(" ").slice(1).join(" "))}>{stageLabel(stage)}</span>;
@@ -71,11 +77,12 @@ export default function FabricationPage() {
     return () => { supabase.removeChannel(ch); };
   }, [load]);
 
+  const [typeFilter, setTypeFilter] = useState<"all" | "new_build" | "repair">("all");
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return projects.filter((p) => (tab === "history" ? p.stage === "completed" : p.stage !== "completed"))
+    return projects.filter((p) => typeFilter === "all" || (p.project_type || "new_build") === typeFilter).filter((p) => (tab === "history" ? p.stage === "completed" : p.stage !== "completed"))
       .filter((p) => !q || [p.name, p.client_name, p.project_number].some((v) => v?.toLowerCase().includes(q)));
-  }, [projects, tab, query]);
+  }, [projects, tab, query, typeFilter]);
 
   const history = useMemo(() => [...filtered].sort((a, b) => (a.completed_at || a.start_date).localeCompare(b.completed_at || b.start_date)), [filtered]);
   const active = projects.filter((p) => p.stage !== "completed");
@@ -115,7 +122,7 @@ export default function FabricationPage() {
           <span className="truncate text-sm font-semibold">{p.name}</span>
           {p.client_name && <span className="truncate text-xs text-muted-foreground">{p.client_name}</span>}
         </div>
-        <div className="mt-1 flex flex-wrap items-center gap-1.5"><StageChip stage={p.stage} /><PriorityBadge priority={p.priority} /></div>
+        <div className="mt-1 flex flex-wrap items-center gap-1.5"><TypeChip type={p.project_type} /><StageChip stage={p.stage} /><PriorityBadge priority={p.priority} /></div>
       </div>
       <div className="shrink-0 text-right text-[11px] text-muted-foreground">
         <p>{memberLabel(team.find((t) => t.id === p.assigned_to))}</p>
@@ -142,6 +149,10 @@ export default function FabricationPage() {
     <WorkshopToolbar query={query} onQuery={setQuery} placeholder="Search project, client or number…">
       <div className="flex flex-wrap items-center gap-2">
         <WorkshopTabs value={tab} onChange={(v) => { setTab(v as any); setSelected(new Set()); }} tabs={[{ id: "active", label: "Active", count: active.length }, { id: "history", label: "History", count: projects.length - active.length }]} />
+        <WorkshopTabs value={typeFilter} onChange={(v) => { setTypeFilter(v as any); setSelected(new Set()); }} tabs={[
+          { id: "all", label: "All", count: projects.length },
+          { id: "new_build", label: "New builds", count: projects.filter((p) => (p.project_type || "new_build") === "new_build").length },
+          { id: "repair", label: "Repairs", count: projects.filter((p) => p.project_type === "repair").length }]} />
         <Button variant={selectMode ? "default" : "outline"} size="sm" onClick={() => { setSelectMode((s) => !s); setSelected(new Set()); }}>Select</Button>
         {selectMode && <Button variant="outline" size="sm" onClick={() => setSelected(selected.size === filtered.length ? new Set() : new Set(filtered.map((p) => p.id)))}>
           {selected.size === filtered.length && filtered.length ? "Clear all" : `Select all (${filtered.length})`}</Button>}
@@ -172,8 +183,10 @@ export default function FabricationPage() {
       {menuIds.length > 1 && <MenuLabel>{menuIds.length} selected</MenuLabel>}
       {menuIds.length === 1 && <MenuItem onClick={() => { setOpenId(menu.id); setMenu(null); }}>Open details</MenuItem>}
       <MenuItem onClick={() => { setSelectMode(true); toggle(menu.id); setMenu(null); }}>Select</MenuItem>
-      <MenuLabel>Move to stage</MenuLabel>
+      <MenuLabel>Move to section</MenuLabel>
       {FABRICATION_STAGES.map(([v, l]) => <MenuItem key={v} onClick={() => { update(menuIds, { stage: v }); setMenu(null); }}>{l}</MenuItem>)}
+      <MenuLabel>Project type</MenuLabel>
+      {PROJECT_TYPES.map(([v, l]) => <MenuItem key={v} onClick={() => { update(menuIds, { project_type: v }); setMenu(null); }}>{l}</MenuItem>)}
       <MenuLabel>Assign to</MenuLabel>
       {team.slice(0, 12).map((t) => <MenuItem key={t.id} onClick={() => { update(menuIds, { assigned_to: t.id }); setMenu(null); }}>{memberLabel(t)}</MenuItem>)}
       <div className="my-1 h-px bg-border" />
@@ -187,7 +200,7 @@ export default function FabricationPage() {
 
 function NewProjectDialog({ open, onClose, team, onCreated }: { open: boolean; onClose: () => void; team: TeamMember[]; onCreated: (p: FabProject) => void }) {
   const { toast } = useToast();
-  const blank = { name: "", project_number: "", client_name: "", start_date: new Date().toISOString().slice(0, 10), due_date: "", priority: "medium", assigned_to: "none", description: "" };
+  const blank = { name: "", project_number: "", client_name: "", start_date: new Date().toISOString().slice(0, 10), due_date: "", priority: "medium", assigned_to: "none", description: "", project_type: "new_build" };
   const [form, setForm] = useState(blank);
   const [saving, setSaving] = useState(false);
   const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
@@ -211,6 +224,10 @@ function NewProjectDialog({ open, onClose, team, onCreated }: { open: boolean; o
         <div><Label>Client</Label><Input value={form.client_name} onChange={(e) => set("client_name", e.target.value)} /></div>
         <div><Label>Start date</Label><Input type="date" value={form.start_date} onChange={(e) => set("start_date", e.target.value)} /></div>
         <div><Label>Due date</Label><Input type="date" value={form.due_date} onChange={(e) => set("due_date", e.target.value)} /></div>
+        <div><Label>Type</Label><Select value={form.project_type} onValueChange={(v) => set("project_type", v)}>
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>{PROJECT_TYPES.map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}</SelectContent>
+        </Select></div>
         <div><Label>Priority</Label><PrioritySelect value={form.priority} onChange={(v) => set("priority", v)} /></div>
         <div><Label>Assigned to</Label><Select value={form.assigned_to} onValueChange={(v) => set("assigned_to", v)}>
           <SelectTrigger><SelectValue /></SelectTrigger>
@@ -315,13 +332,17 @@ function ProjectPanel({ id, team, onClose, onChange, onDelete }: { id: string; t
     </>}>
 
     <section>
-      <p className="mb-2 font-display text-[10px] font-bold uppercase text-muted-foreground">Process</p>
-      <div className="flex gap-1 overflow-x-auto pb-1">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <p className="font-display text-[10px] font-bold uppercase text-muted-foreground">Currently in · {stageLabel(p.stage)}</p>
+        <div className="flex rounded-lg border border-border bg-muted/40 p-0.5">
+          {PROJECT_TYPES.map(([v, l]) => <button key={v} type="button" onClick={() => patch({ project_type: v })}
+            className={cn("rounded-md px-3 py-1 text-[11px] font-semibold transition", (p.project_type || "new_build") === v ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>{l}</button>)}
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 lg:grid-cols-5">
         {FABRICATION_STAGES.map(([v, l], i) => <button key={v} type="button" onClick={() => patch({ stage: v })}
-          className={cn("min-w-[92px] flex-1 rounded-lg border px-2 py-2 text-[10px] font-bold uppercase leading-tight transition",
-            i < current && "border-logo-cyan/40 bg-logo-cyan/10 text-logo-cyan",
-            i === current && "border-logo-violet bg-logo-violet/15 text-logo-violet shadow-[0_0_12px_-4px_hsl(var(--logo-violet))]",
-            i > current && "border-border text-muted-foreground hover:bg-accent")}>{l}</button>)}
+          className={cn("rounded-lg border px-2 py-2 text-[10px] font-bold uppercase leading-tight transition",
+            i === current ? cn("border-current shadow-[0_0_12px_-4px_currentColor]", STAGE_TONE[v]?.split(" ").slice(1).join(" ")) : "border-border text-muted-foreground hover:bg-accent")}>{l}</button>)}
       </div>
     </section>
 

@@ -1258,6 +1258,7 @@ export type Database = {
           notes: string | null
           priority: string
           project_number: string | null
+          project_type: string
           stage: string
           start_date: string
           updated_at: string
@@ -1276,6 +1277,7 @@ export type Database = {
           notes?: string | null
           priority?: string
           project_number?: string | null
+          project_type?: string
           stage?: string
           start_date?: string
           updated_at?: string
@@ -1294,6 +1296,7 @@ export type Database = {
           notes?: string | null
           priority?: string
           project_number?: string | null
+          project_type?: string
           stage?: string
           start_date?: string
           updated_at?: string
