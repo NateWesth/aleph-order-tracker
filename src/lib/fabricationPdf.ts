@@ -8,16 +8,19 @@ export const FABRICATION_STAGES = [
   ["sandblasting", "Sandblasting"],
   ["welding", "Welding"],
   ["assembly", "Assembly"],
+  ["spray_painting", "Spray painting"],
   ["ready_for_collection", "Ready for collection"],
   ["completed", "Completed"],
 ] as const;
 
 export const stageLabel = (stage: string) => FABRICATION_STAGES.find(([v]) => v === stage)?.[1] || stage;
+export const PROJECT_TYPES = [["new_build", "New build"], ["repair", "Repair"]] as const;
+export const typeLabel = (t?: string | null) => t === "repair" ? "Repair" : "New build";
 export const stageIndex = (stage: string) => FABRICATION_STAGES.findIndex(([v]) => v === stage);
 
 export interface FabProject {
   id: string; project_number: string | null; name: string; client_name: string | null;
-  start_date: string; due_date: string | null; stage: string; priority: string;
+  start_date: string; due_date: string | null; stage: string; priority: string; project_type?: string;
   assigned_to: string | null; description: string | null; notes: string | null;
   completed_at: string | null; created_at: string;
 }
@@ -70,10 +73,10 @@ export async function generateFabricationPdf(opts: {
 
   // Detail grid
   const details: [string, string][] = [
-    ["Client", project.client_name || "—"], ["Stage", stageLabel(project.stage)],
+    ["Client", project.client_name || "—"], ["Current section", stageLabel(project.stage)],
     ["Start date", fmt(project.start_date)], ["Due date", fmt(project.due_date)],
     ["Priority", project.priority], ["Assigned to", opts.assignee || "Unassigned"],
-    ["Total hours", `${time.reduce((s, t) => s + Number(t.hours || 0), 0).toFixed(1)} h`], ["Completed", fmt(project.completed_at)],
+    ["Total hours", `${time.reduce((s, t) => s + Number(t.hours || 0), 0).toFixed(1)} h`], ["Type", typeLabel(project.project_type)],
   ];
   doc.setFillColor(246, 247, 249); doc.roundedRect(M, y, W - M * 2, 34, 2, 2, "F");
   details.forEach(([k, v], i) => {
@@ -84,20 +87,12 @@ export async function generateFabricationPdf(opts: {
   });
   y += 42;
 
-  // Stage tracker
-  const current = stageIndex(project.stage);
-  const step = (W - M * 2) / FABRICATION_STAGES.length;
-  doc.setDrawColor(220, 222, 228); doc.setLineWidth(0.8); doc.line(M + step / 2, y + 3, W - M - step / 2, y + 3);
-  FABRICATION_STAGES.forEach(([, label], i) => {
-    const cx = M + step * i + step / 2;
-    const done = i <= current;
-    doc.setFillColor(...(done ? (i === current ? VIOLET : CYAN) : ([220, 222, 228] as [number, number, number])));
-    doc.circle(cx, y + 3, 2.6, "F");
-    doc.setFontSize(6.5); doc.setFont("helvetica", i === current ? "bold" : "normal");
-    doc.setTextColor(...(done ? INK : MUTED));
-    doc.text(doc.splitTextToSize(label, step - 2), cx, y + 10, { align: "center" });
-  });
-  y += 20;
+  // Current section banner
+  doc.setFillColor(...VIOLET); doc.roundedRect(M, y, W - M * 2, 11, 2, 2, "F");
+  doc.setTextColor(255, 255, 255); doc.setFont("helvetica", "bold"); doc.setFontSize(7);
+  doc.text(`${typeLabel(project.project_type).toUpperCase()}  ·  CURRENTLY IN`, M + 4, y + 7);
+  doc.setFontSize(11); doc.text(stageLabel(project.stage), W - M - 4, y + 7.3, { align: "right" });
+  y += 18;
 
   const section = (title: string) => {
     if (y > 262) { doc.addPage(); y = 18; }
