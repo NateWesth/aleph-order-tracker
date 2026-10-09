@@ -15,6 +15,7 @@ import { WorkshopHeader, WorkshopToolbar, WorkshopTabs, WorkshopPanel, DetailSec
 import { FABRICATION_STAGES, stageLabel, stageIndex, generateFabricationPdf, PROJECT_TYPES, typeLabel, type FabProject, type FabMaterial, type FabPart, type FabTime, type FabFile } from "@/lib/fabricationPdf";
 
 const db = supabase as any;
+const FIELD_LABEL: Record<string, string> = { due_date: "Due date", priority: "Priority", assigned_to: "Assigned to" };
 const BUCKET = "fabrication-files";
 
 const STAGE_TONE: Record<string, string> = {
@@ -274,6 +275,29 @@ function ProjectPanel({ id, team, onClose, onChange, onDelete }: { id: string; t
     const { error } = await db.from("fabrication_projects").update(full).eq("id", id);
     if (error) toast({ title: "Save failed", description: error.message, variant: "destructive" });
   };
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [requests, setRequests] = useState<any[]>([]);
+  const loadRequests = useCallback(async () => {
+    const { data } = await db.from("fabrication_change_requests").select("*").eq("project_id", id).eq("status", "pending").order("created_at");
+    setRequests(data || []);
+  }, [id]);
+  useEffect(() => { db.rpc("is_admin").then(({ data }: any) => setIsAdmin(!!data)); loadRequests(); }, [loadRequests]);
+  const showVal = (field: string, v: string | null) => !v ? "—" : field === "assigned_to" ? memberLabel(team.find((t) => t.id === v)) : field === "due_date" ? formatDate(v) : v;
+  const guarded = async (field: "due_date" | "priority" | "assigned_to", value: string | null) => {
+    if (!p || (p as any)[field] === value) return;
+    if (isAdmin) return patch({ [field]: value } as any);
+    const { data: u } = await supabase.auth.getUser();
+    const { error } = await db.from("fabrication_change_requests").insert({ project_id: id, field, old_value: (p as any)[field] ?? null, new_value: value, requested_by: u.user?.id });
+    if (error) return toast({ title: "Request failed", description: error.message, variant: "destructive" });
+    toast({ title: "Sent for admin approval", description: `${FIELD_LABEL[field]} will change once an admin approves.` });
+    loadRequests();
+  };
+  const review = async (rid: string, approve: boolean) => {
+    const { error } = await db.rpc("review_fabrication_change", { p_id: rid, p_approve: approve });
+    if (error) return toast({ title: "Review failed", description: error.message, variant: "destructive" });
+    toast({ title: approve ? "Change approved" : "Change rejected" });
+    loadAll(); loadRequests();
+  };
   const addRow = async (table: string, row: any, setter: (fn: (r: any[]) => any[]) => void) => {
     const { data, error } = await db.from(table).insert({ project_id: id, ...row }).select().single();
     if (error) return toast({ title: "Could not add", description: error.message, variant: "destructive" });
@@ -343,16 +367,27 @@ function ProjectPanel({ id, team, onClose, onChange, onDelete }: { id: string; t
 
     <DetailSection title="Project details">
       <div className="grid gap-3 sm:grid-cols-3">
-        <div><Label className="text-[10px]">Name</Label><Input defaultValue={p.name} onBlur={(e) => e.target.value !== p.name && patch({ name: e.target.value })} /></div>
-        <div><Label className="text-[10px]">Project number</Label><Input defaultValue={p.project_number || ""} onBlur={(e) => patch({ project_number: e.target.value || null })} /></div>
-        <div><Label className="text-[10px]">Client</Label><Input defaultValue={p.client_name || ""} onBlur={(e) => patch({ client_name: e.target.value || null })} /></div>
-        <div><Label className="text-[10px]">Start date</Label><Input type="date" value={p.start_date} disabled className="opacity-70" /></div>
-        <div><Label className="text-[10px]">Due date</Label><Input type="date" value={p.due_date || ""} onChange={(e) => patch({ due_date: e.target.value || null })} /></div>
-        <div><Label className="text-[10px]">Priority</Label><PrioritySelect value={p.priority} onChange={(v) => patch({ priority: v })} /></div>
-        <div><Label className="text-[10px]">Assigned to</Label><Select value={p.assigned_to || "none"} onValueChange={(v) => patch({ assigned_to: v === "none" ? null : v })}>
+        <div><Label className="text-[10px]">Name 🔒</Label><Input value={p.name} disabled className="opacity-70" /></div>
+        <div><Label className="text-[10px]">Project number 🔒</Label><Input value={p.project_number || ""} disabled className="opacity-70" /></div>
+        <div><Label className="text-[10px]">Client 🔒</Label><Input value={p.client_name || ""} disabled className="opacity-70" /></div>
+        <div><Label className="text-[10px]">Start date 🔒</Label><Input type="date" value={p.start_date} disabled className="opacity-70" /></div>
+        <div><Label className="text-[10px]">Due date{!isAdmin && " · needs approval"}</Label><Input type="date" value={p.due_date || ""} onChange={(e) => guarded("due_date", e.target.value || null)} /></div>
+        <div><Label className="text-[10px]">Priority{!isAdmin && " · needs approval"}</Label><PrioritySelect value={p.priority} onChange={(v) => guarded("priority", v)} /></div>
+        <div><Label className="text-[10px]">Assigned to{!isAdmin && " · needs approval"}</Label><Select value={p.assigned_to || "none"} onValueChange={(v) => guarded("assigned_to", v === "none" ? null : v)}>
           <SelectTrigger><SelectValue /></SelectTrigger>
           <SelectContent><SelectItem value="none">Unassigned</SelectItem>{team.map((t) => <SelectItem key={t.id} value={t.id}>{memberLabel(t)}</SelectItem>)}</SelectContent>
         </Select></div>
+        {requests.length > 0 && <div className="sm:col-span-3 space-y-1.5 rounded-lg border border-logo-violet/30 bg-logo-violet/5 p-2">
+          <p className="text-[10px] font-semibold uppercase text-logo-violet">Pending approval</p>
+          {requests.map((r) => <div key={r.id} className="flex flex-wrap items-center gap-2 text-xs">
+            <span className="font-semibold">{FIELD_LABEL[r.field]}</span>
+            <span className="text-muted-foreground">{showVal(r.field, r.old_value)} → <b className="text-foreground">{showVal(r.field, r.new_value)}</b></span>
+            <span className="text-[10px] text-muted-foreground">by {memberLabel(team.find((t) => t.id === r.requested_by))}</span>
+            {isAdmin && <span className="ml-auto flex gap-1">
+              <Button size="sm" className="h-6 px-2 text-[10px]" onClick={() => review(r.id, true)}>Approve</Button>
+              <Button size="sm" variant="outline" className="h-6 px-2 text-[10px]" onClick={() => review(r.id, false)}>Reject</Button></span>}
+          </div>)}
+        </div>}
         <div className="sm:col-span-3"><Label className="text-[10px]">Description</Label><Textarea rows={2} defaultValue={p.description || ""} onBlur={(e) => patch({ description: e.target.value || null })} /></div>
         <div className="sm:col-span-3"><Label className="text-[10px]">Notes</Label><Textarea rows={2} defaultValue={p.notes || ""} onBlur={(e) => patch({ notes: e.target.value || null })} /></div>
       </div>
