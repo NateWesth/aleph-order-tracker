@@ -1114,6 +1114,53 @@ export type Database = {
           },
         ]
       }
+      fabrication_change_requests: {
+        Row: {
+          created_at: string
+          field: string
+          id: string
+          new_value: string | null
+          old_value: string | null
+          project_id: string
+          requested_by: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          field: string
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          project_id: string
+          requested_by?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          field?: string
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          project_id?: string
+          requested_by?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fabrication_change_requests_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "fabrication_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       fabrication_files: {
         Row: {
           created_at: string
@@ -3750,6 +3797,10 @@ export type Database = {
       }
       review_collection_dismissal: {
         Args: { p_action: string; p_id: string; p_signature: Json }
+        Returns: undefined
+      }
+      review_fabrication_change: {
+        Args: { p_approve: boolean; p_id: string }
         Returns: undefined
       }
       save_dispatch_document: {
