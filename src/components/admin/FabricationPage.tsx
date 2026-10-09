@@ -186,8 +186,6 @@ export default function FabricationPage() {
       <MenuItem onClick={() => { setSelectMode(true); toggle(menu.id); setMenu(null); }}>Select</MenuItem>
       <MenuLabel>Move to section</MenuLabel>
       {FABRICATION_STAGES.map(([v, l]) => <MenuItem key={v} onClick={() => { update(menuIds, { stage: v }); setMenu(null); }}>{l}</MenuItem>)}
-      <MenuLabel>Assign to</MenuLabel>
-      {team.slice(0, 12).map((t) => <MenuItem key={t.id} onClick={() => { update(menuIds, { assigned_to: t.id }); setMenu(null); }}>{memberLabel(t)}</MenuItem>)}
       <div className="my-1 h-px bg-border" />
       <MenuItem danger onClick={() => { setMenu(null); remove(menuIds); }}><Trash2 className="h-3.5 w-3.5" />Delete</MenuItem>
     </ContextMenu>}
