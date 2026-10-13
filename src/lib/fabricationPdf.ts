@@ -24,7 +24,7 @@ export interface FabProject {
   assigned_to: string | null; description: string | null; notes: string | null;
   completed_at: string | null; created_at: string;
 }
-export interface FabMaterial { id: string; material: string; quantity: number; unit: string | null; notes: string | null }
+export interface FabMaterial { id: string; material: string; quantity: number; unit: string | null; notes: string | null; sku?: string | null; unit_cost?: number | null; stock_deducted_at?: string | null; needs_reorder?: boolean }
 export interface FabPart { id: string; name: string; quantity: number; status: string }
 export interface FabTime { id: string; work_date: string; worker_name: string | null; hours: number; note: string | null }
 export interface FabFile { id: string; file_name: string; storage_path: string; mime_type: string | null; file_size: number | null; created_at: string; url?: string }

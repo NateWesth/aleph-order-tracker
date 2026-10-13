@@ -1,0 +1,3 @@
+ALTER TABLE public.fabrication_projects ADD COLUMN IF NOT EXISTS labour_rate numeric NOT NULL DEFAULT 0, ADD COLUMN IF NOT EXISTS estimated_cost numeric, ADD COLUMN IF NOT EXISTS quoted_price numeric;
+ALTER TABLE public.fabrication_materials ADD COLUMN IF NOT EXISTS sku text, ADD COLUMN IF NOT EXISTS unit_cost numeric NOT NULL DEFAULT 0, ADD COLUMN IF NOT EXISTS stock_deducted_at timestamptz, ADD COLUMN IF NOT EXISTS needs_reorder boolean NOT NULL DEFAULT false;
+CREATE INDEX IF NOT EXISTS fabrication_materials_reorder_idx ON public.fabrication_materials(needs_reorder) WHERE needs_reorder;

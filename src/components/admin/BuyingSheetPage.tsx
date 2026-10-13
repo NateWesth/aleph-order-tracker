@@ -1,3 +1,4 @@
+import FabricationReorderPanel from "@/components/admin/buying-sheet/FabricationReorderPanel";
 import { useState, useEffect, useMemo, useCallback, useRef, Fragment } from "react";
 import { useLiveData } from "@/hooks/useLiveData";
 import { supabase } from "@/integrations/supabase/client";
@@ -1344,6 +1345,7 @@ export default function BuyingSheetPage() {
         )}
 
         <section className="buying-intelligence-grid grid gap-4 2xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,.65fr)]">
+          <FabricationReorderPanel />
           <BuyingSheetSummary totals={totals} avgDaysWaiting={avgDaysWaiting} supplierCount={uniqueSuppliers.length} />
 
           <ProcurementSuggestionsPanel
