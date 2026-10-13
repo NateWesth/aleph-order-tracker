@@ -290,6 +290,9 @@ function ProjectPanel({ id, team, onClose, onChange, onDelete }: { id: string; t
     toast({ title: "Sent for admin approval", description: `${FIELD_LABEL[field]} will change once an admin approves.` });
     loadRequests();
   };
+  const [dueDraft, setDueDraft] = useState<string | null>(null);
+  const [dueConfirm, setDueConfirm] = useState(false);
+  const confirmDue = async () => { setDueConfirm(false); await guarded("due_date", dueDraft || null); setDueDraft(null); };
   const review = async (rid: string, approve: boolean) => {
     const { error } = await db.rpc("review_fabrication_change", { p_id: rid, p_approve: approve });
     if (error) return toast({ title: "Review failed", description: error.message, variant: "destructive" });
@@ -369,7 +372,7 @@ function ProjectPanel({ id, team, onClose, onChange, onDelete }: { id: string; t
         <div><Label className="text-[10px]">Project number 🔒</Label><Input value={p.project_number || ""} disabled className="opacity-70" /></div>
         <div><Label className="text-[10px]">Client 🔒</Label><Input value={p.client_name || ""} disabled className="opacity-70" /></div>
         <div><Label className="text-[10px]">Start date 🔒</Label><Input type="date" value={p.start_date} disabled className="opacity-70" /></div>
-        <div><Label className="text-[10px]">Due date{!isAdmin && " · needs approval"}</Label><Input type="date" value={p.due_date || ""} onChange={(e) => guarded("due_date", e.target.value || null)} /></div>
+        <div><Label className="text-[10px]">Due date{!isAdmin && " · needs approval"}</Label><div className="flex gap-1"><Input type="date" value={dueDraft ?? p.due_date ?? ""} onChange={(e) => setDueDraft(e.target.value)} />{dueDraft !== null && dueDraft !== (p.due_date || "") && <Button size="sm" className="h-10" onClick={() => setDueConfirm(true)}>Save</Button>}</div></div>
         <div><Label className="text-[10px]">Priority{!isAdmin && " · needs approval"}</Label><PrioritySelect value={p.priority} onChange={(v) => guarded("priority", v)} /></div>
         <div><Label className="text-[10px]">Assigned to{!isAdmin && " · needs approval"}</Label><Select value={p.assigned_to || "none"} onValueChange={(v) => guarded("assigned_to", v === "none" ? null : v)}>
           <SelectTrigger><SelectValue /></SelectTrigger>
@@ -391,13 +394,46 @@ function ProjectPanel({ id, team, onClose, onChange, onDelete }: { id: string; t
       </div>
     </DetailSection>
 
+    <DetailSection title="Job costing & profit">
+      {(() => {
+        const rate = Number((p as any).labour_rate || 0), est = (p as any).estimated_cost, quote = (p as any).quoted_price;
+        const matCost = materials.reduce((s, m) => s + Number(m.quantity || 0) * Number(m.unit_cost || 0), 0);
+        const labour = totalHours * rate, actual = matCost + labour;
+        const profit = quote != null ? Number(quote) - actual : null, margin = profit != null && Number(quote) > 0 ? (profit / Number(quote)) * 100 : null;
+        const R = (n: number) => "R " + n.toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const num = (v: string) => v === "" ? null : Number(v);
+        return <div className="space-y-3">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div><Label className="text-[10px]">Labour rate (R / hour)</Label><Input type="number" step="0.01" key={"r" + rate} defaultValue={rate || ""} onBlur={(e) => patch({ labour_rate: Number(e.target.value) || 0 } as any)} /></div>
+            <div><Label className="text-[10px]">Estimated cost (R)</Label><Input type="number" step="0.01" key={"e" + est} defaultValue={est ?? ""} onBlur={(e) => patch({ estimated_cost: num(e.target.value) } as any)} /></div>
+            <div><Label className="text-[10px]">Quoted price to client (R)</Label><Input type="number" step="0.01" key={"q" + quote} defaultValue={quote ?? ""} onBlur={(e) => patch({ quoted_price: num(e.target.value) } as any)} /></div>
+          </div>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {[["Materials", R(matCost), ""], [`Labour · ${totalHours.toFixed(1)} h`, R(labour), ""], ["Actual cost", R(actual), est != null && actual > Number(est) ? "text-destructive" : "text-logo-cyan"],
+              ["Profit", profit == null ? "Add a quote" : `${R(profit)}${margin != null ? ` · ${margin.toFixed(0)}%` : ""}`, profit == null ? "text-muted-foreground" : profit < 0 ? "text-destructive" : "text-emerald-500"]].map(([l, v, c]) =>
+              <div key={l} className="rounded-lg border border-border bg-card/50 p-2"><p className="text-[9px] font-bold uppercase text-muted-foreground">{l}</p><p className={cn("text-sm font-bold tabular-nums", c)}>{v}</p></div>)}
+          </div>
+          {est != null && <p className="text-[11px] text-muted-foreground">Estimated {R(Number(est))} vs actual {R(actual)} — {actual <= Number(est) ? <span className="text-emerald-500">{R(Number(est) - actual)} under estimate</span> : <span className="text-destructive">{R(actual - Number(est))} over estimate</span>}</p>}
+        </div>;
+      })()}
+    </DetailSection>
+
     <DetailSection title={`Material list (${materials.length})`}>
       <div className="space-y-1.5">
-        {materials.map((m) => <div key={m.id} className="grid grid-cols-[1fr_70px_70px_1fr_32px] gap-1.5">
+        {materials.length > 0 && <div className="hidden grid-cols-[1fr_80px_60px_60px_80px_1fr_auto] gap-1.5 px-0.5 text-[9px] font-bold uppercase text-muted-foreground sm:grid"><span>Material</span><span>Stock code</span><span>Qty</span><span>Unit</span><span>Unit cost R</span><span>Notes</span><span>Stock</span></div>}
+        {materials.map((m) => <div key={m.id} className="grid grid-cols-2 gap-1.5 sm:grid-cols-[1fr_80px_60px_60px_80px_1fr_auto]">
           <Input className="h-8 text-xs" defaultValue={m.material} onBlur={(e) => editRow("fabrication_materials", m.id, { material: e.target.value }, setMaterials as any)} />
+          <Input className="h-8 text-xs" placeholder="Stock code" defaultValue={m.sku || ""} onBlur={(e) => editRow("fabrication_materials", m.id, { sku: e.target.value.trim() || null }, setMaterials as any)} />
           <Input className="h-8 text-xs" type="number" defaultValue={m.quantity} onBlur={(e) => editRow("fabrication_materials", m.id, { quantity: Number(e.target.value) || 0 }, setMaterials as any)} />
           <Input className="h-8 text-xs" placeholder="Unit" defaultValue={m.unit || ""} onBlur={(e) => editRow("fabrication_materials", m.id, { unit: e.target.value }, setMaterials as any)} />
+          <Input className="h-8 text-xs" type="number" step="0.01" placeholder="0.00" defaultValue={m.unit_cost ?? 0} onBlur={(e) => editRow("fabrication_materials", m.id, { unit_cost: Number(e.target.value) || 0 }, setMaterials as any)} />
           <Input className="h-8 text-xs" placeholder="Notes" defaultValue={m.notes || ""} onBlur={(e) => editRow("fabrication_materials", m.id, { notes: e.target.value }, setMaterials as any)} />
+          <div className="flex items-center gap-1">
+            {m.stock_deducted_at
+              ? <button type="button" title="Undo stock deduction" onClick={() => editRow("fabrication_materials", m.id, { stock_deducted_at: null }, setMaterials as any)} className="rounded-full bg-emerald-500/15 px-2 py-1 text-[9px] font-bold text-emerald-500">Taken</button>
+              : <button type="button" title="Mark as taken from stock" onClick={() => editRow("fabrication_materials", m.id, { stock_deducted_at: new Date().toISOString() }, setMaterials as any)} className="rounded-full border border-border px-2 py-1 text-[9px] font-bold text-muted-foreground hover:bg-accent">Deduct</button>}
+            <button type="button" title="Flag for the Buying Sheet" onClick={() => editRow("fabrication_materials", m.id, { needs_reorder: !m.needs_reorder }, setMaterials as any)} className={cn("rounded-full px-2 py-1 text-[9px] font-bold", m.needs_reorder ? "bg-logo-magenta/15 text-logo-magenta" : "border border-border text-muted-foreground hover:bg-accent")}>{m.needs_reorder ? "Reorder ✓" : "Reorder"}</button>
+          </div>
           <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => delRow("fabrication_materials", m.id, setMaterials as any)}><Trash2 className="h-3.5 w-3.5" /></Button>
         </div>)}
         <AddInline placeholder="Add material, e.g. 3mm mild steel plate" icon={<Package className="h-4 w-4" />} onAdd={(v) => addRow("fabrication_materials", { material: v }, setMaterials as any)} />
@@ -460,6 +496,10 @@ function ProjectPanel({ id, team, onClose, onChange, onDelete }: { id: string; t
     <DetailSection title="Comments">
       <EntityComments entityType="fabrication" entityId={id} defaultOpen />
     </DetailSection>
+    <Dialog open={dueConfirm} onOpenChange={setDueConfirm}><DialogContent className="max-w-sm"><DialogHeader><DialogTitle>Change due date?</DialogTitle></DialogHeader>
+      <p className="text-sm text-muted-foreground">{formatDate(p.due_date) || "No date"} → <span className="font-semibold text-foreground">{dueDraft ? formatDate(dueDraft) : "No date"}</span>{!isAdmin && " · this will be sent to an admin for approval."}</p>
+      <div className="flex justify-end gap-2"><Button variant="outline" onClick={() => { setDueConfirm(false); setDueDraft(null); }}>Cancel</Button><Button onClick={confirmDue}>{isAdmin ? "Change date" : "Send for approval"}</Button></div>
+    </DialogContent></Dialog>
   </WorkshopPanel>;
 }
 
