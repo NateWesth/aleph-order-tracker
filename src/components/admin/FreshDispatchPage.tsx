@@ -1,3 +1,4 @@
+import DriverRouteLinks from "@/components/admin/DriverRouteLinks";
 import {useCallback,useEffect,useRef,useState} from "react";
 import {createPortal} from "react-dom";
 import {supabase} from "@/integrations/supabase/client";
@@ -26,7 +27,7 @@ export default function FreshDispatchPage(){
  const [mode,setMode]=useState<"collection"|"delivery">("collection"),[history,setHistory]=useState(false),[query,setQuery]=useState(""),[mine,setMine]=useState(false),[activeLane,setActiveLane]=useState<string|null>(null);
  const [loading,setLoading]=useState(true),[error,setError]=useState(""),[syncing,setSyncing]=useState(false),[progress,setProgress]=useState("");
  const [selected,setSelected]=useState<DispatchDocument|null>(null);
- const [planner,setPlanner]=useState(false);
+ const [planner,setPlanner]=useState(false),[routeOpen,setRouteOpen]=useState(false);
  const isMobile=useIsMobile();
  const [mobileLane,setMobileLane]=useState<string>("pending");
  const [menu,setMenu]=useState<{doc:DispatchDocument;x:number;y:number}|null>(null);
@@ -160,6 +161,7 @@ export default function FreshDispatchPage(){
   {syncing&&<p role="status" className="text-sm text-muted-foreground">{progress}</p>}
   <div className="flex flex-wrap items-center gap-3">
    <Button variant="outline" onClick={()=>setPlanner(true)}>Plan dispatch run</Button>
+   <Button variant="outline" onClick={()=>setRouteOpen(true)}>Driver route</Button>
    <div className="relative min-w-0 flex-1 basis-48"><Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground"/><Input aria-label="Search dispatch documents" placeholder="Search number, customer or item…" className="pl-9" value={query} onChange={e=>setQuery(e.target.value)}/></div>
    <label className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" checked={mine} onChange={e=>setMine(e.target.checked)}/> Assigned to me</label>
     <Button variant={selectMode?"default":"outline"} onClick={()=>{setSelectMode(v=>!v);setPicked(new Set());}}><CheckSquare className="mr-2 h-4 w-4"/>{selectMode?"Done selecting":"Select"}</Button>
@@ -187,6 +189,7 @@ export default function FreshDispatchPage(){
      <div className={"min-h-0 flex-1 space-y-3 p-3 sm:min-h-[420px] "+(selected?"max-h-[70vh] overflow-y-auto":"overflow-visible")}>{lane.docs.length?lane.docs.map(doc=><DispatchCard key={doc.id} doc={doc} unread={hasUnread(commentsSeen,doc.kind+":"+doc.id,commentCounts[doc.kind+":"+doc.id]||0)} memberName={memberName} onOpen={cardOpen(doc)} selectMode={selectMode} picked={picked.has(doc.id)} onContextMenu={(x,y)=>openMenu(doc,x,y)}/>):<div className="grid min-h-56 place-items-center rounded-3xl border border-dashed border-border/60 bg-muted/20 p-6 text-center"><div><CheckCircle2 className="mx-auto h-7 w-7 text-success opacity-60"/><p className="mt-3 text-xs font-bold">Lane clear</p><p className="mt-1 text-[10px] text-muted-foreground">New work appears here live.</p></div></div>}</div>
     </section>})}</div></>}
   {selected&&<DispatchDocumentDialog key={selected.id} doc={selected} members={members} onClose={()=>setSelected(null)} onSaved={async()=>{await load();}}/>}
+  <DriverRouteLinks docs={docs} open={routeOpen} onClose={()=>setRouteOpen(false)}/>
   {planner&&<SourceDispatchPlanner docs={docs} members={members} onClose={()=>setPlanner(false)} onSaved={load}/>}
   {menu&&<MenuPortal><div className="fixed inset-0 z-[90]" onMouseDown={()=>setMenu(null)} onContextMenu={(e)=>{e.preventDefault();setMenu(null);}}>
    <div ref={menuPosition.ref} role="menu" aria-label={"Actions for "+menu.doc.reference} className="fixed z-[91] max-h-[calc(100dvh-16px)] w-60 max-w-[calc(100vw-16px)] overflow-y-auto rounded-lg border border-border bg-popover p-1.5 text-popover-foreground shadow-xl" style={menuPosition.style} onMouseDown={(e)=>e.stopPropagation()}>
