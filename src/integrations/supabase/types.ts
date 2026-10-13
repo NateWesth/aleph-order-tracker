@@ -1210,33 +1210,45 @@ export type Database = {
           created_at: string
           id: string
           material: string
+          needs_reorder: boolean
           notes: string | null
           project_id: string
           quantity: number
+          sku: string | null
           sort_order: number
+          stock_deducted_at: string | null
           unit: string | null
+          unit_cost: number
           updated_at: string
         }
         Insert: {
           created_at?: string
           id?: string
           material: string
+          needs_reorder?: boolean
           notes?: string | null
           project_id: string
           quantity?: number
+          sku?: string | null
           sort_order?: number
+          stock_deducted_at?: string | null
           unit?: string | null
+          unit_cost?: number
           updated_at?: string
         }
         Update: {
           created_at?: string
           id?: string
           material?: string
+          needs_reorder?: boolean
           notes?: string | null
           project_id?: string
           quantity?: number
+          sku?: string | null
           sort_order?: number
+          stock_deducted_at?: string | null
           unit?: string | null
+          unit_cost?: number
           updated_at?: string
         }
         Relationships: [
@@ -1300,12 +1312,15 @@ export type Database = {
           created_by: string | null
           description: string | null
           due_date: string | null
+          estimated_cost: number | null
           id: string
+          labour_rate: number
           name: string
           notes: string | null
           priority: string
           project_number: string | null
           project_type: string
+          quoted_price: number | null
           stage: string
           start_date: string
           updated_at: string
@@ -1319,12 +1334,15 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           due_date?: string | null
+          estimated_cost?: number | null
           id?: string
+          labour_rate?: number
           name: string
           notes?: string | null
           priority?: string
           project_number?: string | null
           project_type?: string
+          quoted_price?: number | null
           stage?: string
           start_date?: string
           updated_at?: string
@@ -1338,12 +1356,15 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           due_date?: string | null
+          estimated_cost?: number | null
           id?: string
+          labour_rate?: number
           name?: string
           notes?: string | null
           priority?: string
           project_number?: string | null
           project_type?: string
+          quoted_price?: number | null
           stage?: string
           start_date?: string
           updated_at?: string
