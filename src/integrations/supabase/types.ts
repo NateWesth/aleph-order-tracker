@@ -1423,6 +1423,108 @@ export type Database = {
           },
         ]
       }
+      fleet_logs: {
+        Row: {
+          cost: number | null
+          created_at: string
+          id: string
+          litres: number | null
+          log_type: string
+          logged_by: string | null
+          notes: string | null
+          odometer: number | null
+          route_id: string | null
+          slip_path: string | null
+          vehicle_id: string
+        }
+        Insert: {
+          cost?: number | null
+          created_at?: string
+          id?: string
+          litres?: number | null
+          log_type?: string
+          logged_by?: string | null
+          notes?: string | null
+          odometer?: number | null
+          route_id?: string | null
+          slip_path?: string | null
+          vehicle_id: string
+        }
+        Update: {
+          cost?: number | null
+          created_at?: string
+          id?: string
+          litres?: number | null
+          log_type?: string
+          logged_by?: string | null
+          notes?: string | null
+          odometer?: number | null
+          route_id?: string | null
+          slip_path?: string | null
+          vehicle_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fleet_logs_route_id_fkey"
+            columns: ["route_id"]
+            isOneToOne: false
+            referencedRelation: "dispatch_routes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fleet_logs_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "fleet_vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fleet_vehicles: {
+        Row: {
+          active: boolean
+          created_at: string
+          id: string
+          last_service_date: string | null
+          last_service_odometer: number
+          make_model: string | null
+          name: string
+          next_service_date: string | null
+          odometer: number
+          registration: string | null
+          service_interval_km: number
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          last_service_date?: string | null
+          last_service_odometer?: number
+          make_model?: string | null
+          name: string
+          next_service_date?: string | null
+          odometer?: number
+          registration?: string | null
+          service_interval_km?: number
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          last_service_date?: string | null
+          last_service_odometer?: number
+          make_model?: string | null
+          name?: string
+          next_service_date?: string | null
+          odometer?: number
+          registration?: string | null
+          service_interval_km?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       fulfillment_settings: {
         Row: {
           auto_assign_enabled: boolean
