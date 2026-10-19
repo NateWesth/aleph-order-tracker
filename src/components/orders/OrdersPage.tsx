@@ -314,9 +314,9 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
     });
   }, []);
 
-  const selectOrderGroup = useCallback((orderIds: string[]) => {
+  const selectOrderGroup = useCallback((orderIds: string[], replace = false) => {
     setSelectedOrderIds((previous) => {
-      const next = new Set(previous);
+      const next = replace ? new Set<string>() : new Set(previous);
       orderIds.forEach((orderId) => next.add(orderId));
       return next;
     });
@@ -540,13 +540,12 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
         body: { action: "sync_sales_orders", since_days: 120 },
       });
       if (error) throw error;
-      if (!data?.success && data?.failed) {
-        throw new Error(`${data.failed} Zoho order${data.failed === 1 ? "" : "s"} could not be imported.`);
-      }
       await fetchOrders();
+      const failed = Number(data?.failed || 0);
       toast({
-        title: "Orders refreshed",
-        description: `${data?.scanned || 0} Zoho sales orders checked; ${data?.imported || 0} updated.`,
+        title: failed ? "Orders refreshed with some skipped" : "Orders refreshed",
+        description: `${data?.scanned || 0} Zoho sales orders checked; ${data?.imported || 0} updated.${failed ? ` ${failed} could not be imported.` : ""}`,
+        variant: failed ? "destructive" : undefined,
       });
     } catch (error) {
       toast({

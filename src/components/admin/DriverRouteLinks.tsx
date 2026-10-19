@@ -63,7 +63,7 @@ export default function DriverRouteLinks({ docs, open, onClose, members = [], on
   const filtered = useMemo(() => docs.filter((x) => isActiveDispatch(x)
     && (kind === "all" || x.kind === kind)
     && (driver === "all" || (driver === "none" ? !x.assigned_to : x.assigned_to === driver))
-    && (when === "all" ? (x.scheduled_for || ["scheduled", "in_progress", "out_on_route", "planned"].includes(x.status)) : (x.scheduled_for || "").slice(0, 10) === (when === "today" ? sastToday() : day))
+    && (when === "all" ? (x.scheduled_for || ["scheduled", "in-progress", "in_progress", "out_on_route", "planned"].includes(x.status)) : (x.scheduled_for || "").slice(0, 10) === (when === "today" ? sastToday() : day))
   ), [docs, kind, driver, when, day]);
 
   const groups = useMemo(() => {

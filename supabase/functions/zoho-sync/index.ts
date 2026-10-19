@@ -199,7 +199,7 @@ async function syncSalesOrdersViaWebhook(): Promise<number> {
     body: JSON.stringify({ action: 'sync_sales_orders', since_days: 120 }),
   })
   const body = await response.json()
-  if (!response.ok || !body.success) {
+  if (!response.ok && response.status !== 207) {
     throw new Error(body.error || `${body.failed || 0} sales orders failed to import`)
   }
   return Number(body.scanned || 0)
