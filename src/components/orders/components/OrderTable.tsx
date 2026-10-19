@@ -51,6 +51,9 @@ export default function OrderTable({
                 onDeleteOrder={onDeleteOrder}
                 onOrderClick={onOrderClick}
                 compact={compact}
+                selected={selectedIds?.has(order.id)}
+                onToggleSelect={onToggleSelect}
+                onRowContextMenu={onRowContextMenu}
               />
             </div>
           ))
