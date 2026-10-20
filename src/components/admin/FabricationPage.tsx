@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Hammer, Plus, Printer, Trash2, Upload, FileText, Image as ImageIcon, CheckSquare, Square, Clock3, Package, Puzzle, Download, ExternalLink, RotateCcw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useLiveData } from "@/hooks/useLiveData";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -74,9 +75,8 @@ export default function FabricationPage() {
   useEffect(() => {
     load();
     supabase.from("profiles").select("id, full_name, email").then(({ data }) => setTeam((data as TeamMember[]) || []));
-    const ch = supabase.channel("fabrication-projects").on("postgres_changes", { event: "*", schema: "public", table: "fabrication_projects" }, () => load()).subscribe();
-    return () => { supabase.removeChannel(ch); };
   }, [load]);
+  useLiveData(["fabrication_projects"], load, { channelName: "fabrication-projects" });
 
   const [typeFilter, setTypeFilter] = useState<"all" | "new_build" | "repair">("all");
   const filtered = useMemo(() => {
@@ -264,14 +264,15 @@ function ProjectPanel({ id, team, onClose, onChange, onDelete }: { id: string; t
     setFiles(list);
   }, [id]);
   useEffect(() => { loadAll(); }, [loadAll]);
+  useLiveData(["fabrication_projects", "fabrication_materials", "fabrication_parts", "fabrication_time_entries", "fabrication_files"], loadAll, { channelName: `fabrication-detail-${id}` });
 
   const patch = async (change: Partial<FabProject>) => {
     if (!p) return;
     const full: any = { ...change };
     if (change.stage) full.completed_at = change.stage === "completed" ? new Date().toISOString() : null;
-    const next = { ...p, ...full }; setP(next); onChange(next);
-    const { error } = await db.from("fabrication_projects").update(full).eq("id", id);
-    if (error) toast({ title: "Save failed", description: error.message, variant: "destructive" });
+    const { data, error } = await db.from("fabrication_projects").update(full).eq("id", id).select().single();
+    if (error) return toast({ title: "Save failed — change not saved", description: error.message, variant: "destructive" });
+    setP(data); onChange(data);
   };
   const [isAdmin, setIsAdmin] = useState(false);
   const [requests, setRequests] = useState<any[]>([]);
@@ -280,6 +281,7 @@ function ProjectPanel({ id, team, onClose, onChange, onDelete }: { id: string; t
     setRequests(data || []);
   }, [id]);
   useEffect(() => { db.rpc("is_admin").then(({ data }: any) => setIsAdmin(!!data)); loadRequests(); }, [loadRequests]);
+  useLiveData(["fabrication_change_requests"], loadRequests, { channelName: `fabrication-approvals-${id}` });
   const showVal = (field: string, v: string | null) => !v ? "—" : field === "assigned_to" ? memberLabel(team.find((t) => t.id === v)) : field === "due_date" ? formatDate(v) : v;
   const guarded = async (field: "due_date" | "priority" | "assigned_to", value: string | null) => {
     if (!p || (p as any)[field] === value) return;
@@ -305,12 +307,14 @@ function ProjectPanel({ id, team, onClose, onChange, onDelete }: { id: string; t
     setter((r) => [...r, data]);
   };
   const editRow = async (table: string, rowId: string, change: any, setter: (fn: (r: any[]) => any[]) => void) => {
-    setter((r) => r.map((x) => x.id === rowId ? { ...x, ...change } : x));
-    await db.from(table).update(change).eq("id", rowId);
+    const { data, error } = await db.from(table).update(change).eq("id", rowId).select().single();
+    if (error) return toast({ title: "Change not saved", description: error.message, variant: "destructive" });
+    setter((r) => r.map((x) => x.id === rowId ? data : x));
   };
   const delRow = async (table: string, rowId: string, setter: (fn: (r: any[]) => any[]) => void) => {
+    const { data, error } = await db.from(table).delete().eq("id", rowId).select("id");
+    if (error || !data?.length) return toast({ title: "Item not deleted", description: error?.message || "This item is no longer available to you.", variant: "destructive" });
     setter((r) => r.filter((x) => x.id !== rowId));
-    await db.from(table).delete().eq("id", rowId);
   };
 
   const upload = async (list: FileList | null) => {
