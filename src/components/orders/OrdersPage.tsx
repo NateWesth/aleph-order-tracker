@@ -560,7 +560,7 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
 
   useLiveData(["orders", "order_items", "order_item_comments", "order_purchase_orders", "order_files"], () => fetchOrders(), {
     channelName: "orders-board-live-data",
-    fallbackIntervalMs: 0,
+    fallbackIntervalMs: 15_000,
     debounceMs: 250,
   });
 

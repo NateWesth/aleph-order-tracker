@@ -12,7 +12,7 @@ export function useLiveData(
   options?: {
     enabled?: boolean;
     debounceMs?: number;
-    /** Safety-net polling interval in ms (0 disables). Realtime + focus recovery is the default. */
+    /** Safety-net polling interval in ms (0 disables). Covers missed socket events. */
     fallbackIntervalMs?: number;
     channelName?: string;
   }
@@ -20,7 +20,7 @@ export function useLiveData(
   const {
     enabled = true,
     debounceMs = 400,
-    fallbackIntervalMs = 0,
+    fallbackIntervalMs = 15_000,
     channelName,
   } = options ?? {};
 
@@ -80,6 +80,7 @@ export function useLiveData(
     }
     channel.subscribe((status) => {
       if (disposed) return;
+      if (status === "SUBSCRIBED") fire();
       if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
         // Supabase reconnects the socket internally. Refreshing here prevents
         // a missed event from leaving another user's screen stale meanwhile.
@@ -97,7 +98,9 @@ export function useLiveData(
 
     const interval =
       fallbackIntervalMs > 0
-        ? window.setInterval(() => void run(), fallbackIntervalMs)
+        ? window.setInterval(() => {
+            if (document.visibilityState === "visible" && navigator.onLine) void run();
+          }, fallbackIntervalMs)
         : undefined;
 
     return () => {
