@@ -24,7 +24,7 @@ type Substitution = {id:string;source_item_id:string;alternative_item_id:string;
 type Risk = {key:string;severity:"critical"|"warning"|"info";title:string;detail:string;order?:Order};
 const processed=(item:OrderItem)=>[item.qty_on_po,item.qty_received,item.qty_invoiced,item.qty_completed].some(Number);
 
-export default function OrderLabPage(){
+export default function OrderLabPage({onOpenOrder}:{onOpenOrder?:(orderId:string)=>void}={}){
   const db=supabase as any;const {user}=useAuth();const {toast}=useToast();
   const [orders,setOrders]=useState<Order[]>([]);const [orderItems,setOrderItems]=useState<OrderItem[]>([]);const [catalog,setCatalog]=useState<CatalogItem[]>([]);const [subs,setSubs]=useState<Substitution[]>([]);const [loading,setLoading]=useState(true);
   const [splitOpen,setSplitOpen]=useState(false);const [sourceId,setSourceId]=useState("");const [targetId,setTargetId]=useState("");const [newNumber,setNewNumber]=useState("");const [selectedItems,setSelectedItems]=useState<string[]>([]);const [working,setWorking]=useState(false);
@@ -58,8 +58,10 @@ export default function OrderLabPage(){
   useLiveData(["orders","order_items","items","product_substitutions"],load,{channelName:"order-lab-live",debounceMs:600});
   const itemsByOrder=useMemo(()=>{const map=new Map<string,OrderItem[]>();orderItems.forEach(line=>{const rows=map.get(line.order_id)||[];rows.push(line);map.set(line.order_id,rows)});return map},[orderItems]);
   const orderMap=useMemo(()=>new Map(orders.map(o=>[o.id,o])),[orders]);const catalogMap=useMemo(()=>new Map(catalog.map(i=>[i.id,i])),[catalog]);
-  const source=orders.find(o=>o.id===sourceId);const sourceLines=orderItems.filter(i=>i.order_id===sourceId);const untouchedLines=sourceLines.filter(i=>!processed(i));
-  const mergeTargets=orders.filter(o=>o.id!==sourceId&&o.company_id===source?.company_id);
+  const [mergeSourceId,setMergeSourceId]=useState("");
+  const sourceLines=orderItems.filter(i=>i.order_id===sourceId);const untouchedLines=sourceLines.filter(i=>!processed(i));
+  const mergeSource=orders.find(o=>o.id===mergeSourceId);
+  const mergeTargets=orders.filter(o=>o.id!==mergeSourceId&&o.company_id===mergeSource?.company_id);
 
   const risks=useMemo<Risk[]>(()=>{
     const found:Risk[]=[];const numberCount=new Map<string,number>();orders.forEach(o=>numberCount.set(o.order_number,(numberCount.get(o.order_number)||0)+1));
@@ -74,9 +76,9 @@ export default function OrderLabPage(){
     });return found.sort((a,b)=>({critical:0,warning:1,info:2}[a.severity]-{critical:0,warning:1,info:2}[b.severity]));
   },[orders,itemsByOrder]);
 
-  const split=async()=>{if(!sourceId||!newNumber.trim()||!selectedItems.length){toast({title:"Choose an order, at least one untouched line and a new number",variant:"destructive"});return;}setWorking(true);const {data,error}=await db.rpc("split_order_items",{p_source_order_id:sourceId,p_item_ids:selectedItems,p_new_order_number:newNumber.trim()});setWorking(false);if(error){toast({title:"Order was not split",description:error.message,variant:"destructive"});return;}setSplitOpen(false);toast({title:"Order split safely",description:`New order created: ${newNumber.trim()}`});window.sessionStorage.setItem("aleph:open-order",String(data));await load()};
-  const merge=async()=>{if(!sourceId||!targetId){toast({title:"Choose a source and destination order",variant:"destructive"});return;}setWorking(true);const {error}=await db.rpc("merge_orders",{p_source_order_id:sourceId,p_target_order_id:targetId});setWorking(false);if(error){toast({title:"Orders were not merged",description:error.message,variant:"destructive"});return;}toast({title:"Orders merged",description:"Items and purchase-order links now live on the destination order."});setSourceId("");setTargetId("");await load()};
-  const addSub=async()=>{if(!sourceItemId||!alternativeItemId||sourceItemId===alternativeItemId){toast({title:"Choose two different catalog items",variant:"destructive"});return;}const {error}=await db.from("product_substitutions").upsert({source_item_id:sourceItemId,alternative_item_id:alternativeItemId,compatibility_note:compatibilityNote.trim()||null,active:true,created_by:user?.id},{onConflict:"source_item_id,alternative_item_id"});if(error)toast({title:"Alternative not saved",description:error.message,variant:"destructive"});else{toast({title:"Alternative product saved"});setAlternativeItemId("");setCompatibilityNote("");await load()}};
+  const split=async()=>{if(!sourceId||!newNumber.trim()||!selectedItems.length){toast({title:"Choose an order, at least one untouched line and a new number",variant:"destructive"});return;}if(selectedItems.length>=sourceLines.length){toast({title:"Leave at least one line on the original order",variant:"destructive"});return;}setWorking(true);const {data,error}=await db.rpc("split_order_items",{p_source_order_id:sourceId,p_item_ids:selectedItems,p_new_order_number:newNumber.trim()});setWorking(false);if(error){toast({title:"Order was not split",description:error.message,variant:"destructive"});return;}setSplitOpen(false);toast({title:"Order split safely",description:`New order created: ${newNumber.trim()}`});await load();if(data)onOpenOrder?.(String(data))};
+  const merge=async()=>{if(!mergeSourceId||!targetId){toast({title:"Choose a source and destination order",variant:"destructive"});return;}setWorking(true);const {error}=await db.rpc("merge_orders",{p_source_order_id:mergeSourceId,p_target_order_id:targetId});setWorking(false);if(error){toast({title:"Orders were not merged",description:error.message,variant:"destructive"});return;}toast({title:"Orders merged",description:"Items and purchase-order links now live on the destination order."});setMergeSourceId("");setTargetId("");await load()};
+  const addSub=async()=>{if(!sourceItemId||!alternativeItemId||sourceItemId===alternativeItemId){toast({title:"Choose two different catalog items",variant:"destructive"});return;}setWorking(true);const {error}=await db.from("product_substitutions").upsert({source_item_id:sourceItemId,alternative_item_id:alternativeItemId,compatibility_note:compatibilityNote.trim()||null,active:true,created_by:user?.id},{onConflict:"source_item_id,alternative_item_id"});setWorking(false);if(error)toast({title:"Alternative not saved",description:error.message,variant:"destructive"});else{toast({title:"Alternative product saved"});setAlternativeItemId("");setCompatibilityNote("");await load()}};
   const applySub=async(lineId:string,alternativeId:string)=>{const {error}=await db.rpc("apply_item_substitution",{p_order_item_id:lineId,p_alternative_item_id:alternativeId});if(error)toast({title:"Alternative not applied",description:error.message,variant:"destructive"});else{toast({title:"Order line substituted",description:"The original item is preserved in the order audit trail."});await load()}};
 
   return <div className="space-y-5 pb-12 animate-in fade-in duration-300">
