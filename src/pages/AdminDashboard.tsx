@@ -554,7 +554,7 @@ const AdminDashboard = () => {
               {activeView === "repairs" && <RepairsPage />}
               {activeView === "fabrication" && <FabricationPage />}
               {activeView === "service-desk" && <ServiceDeskPage />}
-              {activeView === "order-lab" && <OrderLabPage />}
+              {activeView === "order-lab" && <OrderLabPage onOpenOrder={(orderId) => { setActiveView("orders"); window.sessionStorage.setItem("aleph:open-order", orderId); window.setTimeout(() => window.dispatchEvent(new CustomEvent("aleph:open-order", { detail: orderId })), 80); }} />}
               {activeView === "scenario-planner" && <ScenarioPlannerPage onNavigate={setActiveView} />}
               {activeView === "history" && <CompletedPage isAdmin={true} searchTerm={searchTerm} />}
               {activeView === "clients" && <ClientCompaniesPage />}
