@@ -31,20 +31,28 @@ export default function OrderLabPage(){
   const [sourceItemId,setSourceItemId]=useState("");const [alternativeItemId,setAlternativeItemId]=useState("");const [compatibilityNote,setCompatibilityNote]=useState("");
   const [loadError,setLoadError]=useState("");
   const load=useCallback(async()=>{
-    try {
-      const [allOrders,items,substitutions]=await Promise.all([
-        readAllRows<Order>((from,to)=>db.from("orders").select("id,order_number,company_id,status,urgency,description,assigned_to,created_at,companies(name)").is("completed_date",null).order("id").range(from,to)),
-        readAllRows<CatalogItem>((from,to)=>db.from("items").select("id,name,code,description").order("name").order("id").range(from,to)),
-        readAllRows<Substitution>((from,to)=>db.from("product_substitutions").select("*").eq("active",true).order("preference_rank").order("id").range(from,to)),
-      ]);
-      const active=allOrders.filter(o=>!["delivered","completed","cancelled","canceled"].includes(o.status||""));
-      const lines:OrderItem[]=[];
-      for(let offset=0;offset<active.length;offset+=100) {
-        lines.push(...await readAllRows<OrderItem>((from,to)=>db.from("order_items").select("id,order_id,name,code,description,quantity,qty_on_po,qty_received,qty_invoiced,qty_completed").in("order_id",active.slice(offset,offset+100).map(o=>o.id)).order("id").range(from,to)));
-      }
-      setOrders(active);setOrderItems(lines);setCatalog(items);setSubs(substitutions);setLoadError("");
-    } catch(error) { setLoadError(error instanceof Error?error.message:"Order data could not load"); }
-    finally { setLoading(false); }
+    const problems:string[]=[];
+    const [ordersRes,itemsRes,subsRes]=await Promise.allSettled([
+      readAllRows<Order>((from,to)=>db.from("orders").select("id,order_number,company_id,status,urgency,description,assigned_to,created_at,companies(name)").is("completed_date",null).order("id").range(from,to)),
+      readAllRows<CatalogItem>((from,to)=>db.from("items").select("id,name,code,description").order("name").order("id").range(from,to)),
+      readAllRows<Substitution>((from,to)=>db.from("product_substitutions").select("*").eq("active",true).order("preference_rank").order("id").range(from,to)),
+    ]);
+    const msg=(r:PromiseRejectedResult)=>r.reason instanceof Error?r.reason.message:"unknown error";
+    if(itemsRes.status==="fulfilled")setCatalog(itemsRes.value);else problems.push(`products (${msg(itemsRes)})`);
+    if(subsRes.status==="fulfilled")setSubs(subsRes.value);else problems.push(`alternatives (${msg(subsRes)})`);
+    if(ordersRes.status==="fulfilled"){
+      const active=ordersRes.value.filter(o=>!["delivered","completed","cancelled","canceled"].includes(o.status||""));
+      try {
+        const lines:OrderItem[]=[];
+        for(let offset=0;offset<active.length;offset+=100) {
+          lines.push(...await readAllRows<OrderItem>((from,to)=>db.from("order_items").select("id,order_id,name,code,description,quantity,qty_on_po,qty_received,qty_invoiced,qty_completed").in("order_id",active.slice(offset,offset+100).map(o=>o.id)).order("id").range(from,to)));
+        }
+        setOrderItems(lines);
+      } catch(error){problems.push(`order lines (${error instanceof Error?error.message:"unknown error"})`);}
+      setOrders(active);
+    } else problems.push(`orders (${msg(ordersRes)})`);
+    setLoadError(problems.length?`Could not load ${problems.join(", ")}`:"");
+    setLoading(false);
   },[db]);
   useEffect(()=>{void load()},[load]);
   useLiveData(["orders","order_items","items","product_substitutions"],load,{channelName:"order-lab-live",debounceMs:600});
