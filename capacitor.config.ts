@@ -7,7 +7,7 @@ const config: CapacitorConfig = {
   // Load from published URL for instant updates without new APK downloads
   server: {
     url: "https://aleph-order-tracker.lovable.app",
-    cleartext: true
+    cleartext: false
   },
   plugins: {
     CapacitorHttp: {
