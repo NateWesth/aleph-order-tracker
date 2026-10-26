@@ -1,5 +1,6 @@
+import { copyText } from "@/lib/copyText";
 import { readAllRows } from "@/lib/readAllRows";
-import { buyingRequirement, buyingShortfall, isOpenBuyingOrder, buyingOrderQuantity, allocateBuyingQuantity, createQuantityPool } from "@/lib/buyingSheet";
+import { buyingRequirement, buyingShortfall, isOpenBuyingOrder, buyingOrderQuantity, allocateBuyingQuantity, createQuantityPool, buyingCsvCell } from "@/lib/buyingSheet";
 
 type LiveCoverage = {
   asOf: string | null;
@@ -82,6 +83,7 @@ export default function BuyingSheetPage() {
   const pendingReload = useRef(false);
   const hasLoaded = useRef(false);
   const [zohoLoading, setZohoLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [zohoData, setZohoData] = useState<ZohoStockData | null>(null);
   const [search, setSearch] = useState("");
   const [supplierFilter, setSupplierFilter] = useState<string>("all");
@@ -172,33 +174,20 @@ export default function BuyingSheetPage() {
     return () => window.removeEventListener("keydown", handler);
   }, [isFullscreen]);
 
-  useEffect(() => {
-    const syncFullscreenState = () => {
-      if (document.fullscreenElement) setIsFullscreen(document.fullscreenElement === printRef.current);
-    };
-    document.addEventListener("fullscreenchange", syncFullscreenState);
-    return () => document.removeEventListener("fullscreenchange", syncFullscreenState);
-  }, []);
+  // App fullscreen keeps body-portalled menus, notes and dialogs interactive.
+  const toggleFullscreen = useCallback(() => setIsFullscreen(value => !value), []);
 
-  const toggleFullscreen = useCallback(async () => {
-    const target = printRef.current;
-    if (!target) return;
-    try {
-      if (document.fullscreenElement) {
-        await document.exitFullscreen();
-        setIsFullscreen(false);
-      } else if (target.requestFullscreen) {
-        await target.requestFullscreen();
-        setIsFullscreen(true);
-      } else {
-        // iOS/PWA fallback when the browser Fullscreen API is unavailable.
-        setIsFullscreen(value => !value);
-      }
-    } catch (error) {
-      console.warn("Fullscreen API unavailable, using app fullscreen:", error);
-      setIsFullscreen(value => !value);
-    }
-  }, []);
+  const refreshSheet = async () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    try { await fetchLocalDataRef.current(); }
+    finally { setRefreshing(false); }
+  };
+
+  const copyWithFeedback = async (text: string, description: string) => {
+    try { await copyText(text); toast({ title: "Copied", description }); }
+    catch (error) { toast({ title: "Could not copy", description: error instanceof Error ? error.message : "Clipboard unavailable", variant: "destructive" }); }
+  };
 
   // ── Data Fetching ──────────────────────────────────────────────────────
 
@@ -657,15 +646,18 @@ export default function BuyingSheetPage() {
 
   const handleBulkMarkOrdered = async (skus?: string[]) => {
     const targetSkus = skus || Array.from(selectedSkus);
-    if (targetSkus.length === 0) return;
+    if (bulkOrdering || targetSkus.length === 0) return;
     setBulkOrdering(true);
     try {
       const targetRows = sortedRows.filter(r => targetSkus.includes(r.rowKey) && r.toOrder > 0);
+      if (!targetRows.length) throw new Error("Select an item that still needs ordering.");
       const orderItemIds = [...new Set(targetRows.flatMap((row) => row.orderItemIds))];
+      if (!orderItemIds.length) throw new Error("No outstanding order lines are available for these items.");
       if (orderItemIds.length > 0) {
         const current = await readAllRows((from, to) => supabase.from("order_items").select("id, quantity, qty_on_po, order_id").in("id", orderItemIds).order("id").range(from, to));
         if (current.length !== orderItemIds.length) throw new Error("Some selected items are no longer available. Refresh and retry.");
         const updates = targetRows.flatMap(row => allocateBuyingQuantity(current.filter(item => row.orderItemIds.includes(item.id)), buyingOrderQuantity(row, adjustedQtys)));
+        if (!updates.length) throw new Error("These lines are already fully allocated, or the order quantity is zero. Refresh and check the quantities.");
         for (const item of updates) {
           const { data: changed, error } = await supabase.from("order_items")
             .update({ qty_on_po: item.nextQtyOnPO })
@@ -679,7 +671,7 @@ export default function BuyingSheetPage() {
         const updated = [...newRecent, ...recentlyOrdered].slice(0, 50);
         setRecentlyOrdered(updated);
         saveRecentlyOrdered(updated);
-        toast({ title: "Updated", description: `${orderItemIds.length} items marked as ordered` });
+        toast({ title: "Updated", description: `${updates.length} order lines updated` });
         setSelectedSkus(new Set());
         fetchLocalData();
       }
@@ -688,7 +680,7 @@ export default function BuyingSheetPage() {
 
   const generateEmailDraft = (supplierName: string) => {
     const items = sortedRows.filter(r => r.supplierName === supplierName && r.toOrder > 0);
-    if (items.length === 0) return;
+    if (items.length === 0) { toast({ title: "Nothing to order", description: "This supplier has no outstanding items with these filters." }); return; }
     const itemLines = items.map(r => {
       return `  • ${r.sku} — ${r.itemName} — Qty: ${buyingOrderQuantity(r, adjustedQtys)}`;
     }).join("\n");
@@ -711,13 +703,12 @@ export default function BuyingSheetPage() {
     if (supplierGroups.size === 0) { toast({ title: "Nothing to order", variant: "destructive" }); return; }
     const allDrafts: string[] = [];
     for (const [supplier, items] of supplierGroups) {
-      if (supplier === "No Supplier") continue;
+      
       const itemLines = items.map(r => `  • ${r.sku} — ${r.itemName} — Qty: ${buyingOrderQuantity(r, adjustedQtys)}`).join("\n");
       const totalQty = items.reduce((s, r) => s + buyingOrderQuantity(r, adjustedQtys), 0);
       allDrafts.push(`═══ ${supplier} ═══\n\nDear ${supplier},\n\nPlease find below our purchase order requirements:\n\n${itemLines}\n\nTotal items: ${items.length} | Total qty: ${totalQty}\n\nPlease confirm availability and expected delivery date.\n\nKind regards\n`);
     }
-    navigator.clipboard.writeText(allDrafts.join("\n\n"));
-    toast({ title: "All Drafts Copied", description: `${allDrafts.length} supplier emails copied to clipboard` });
+    void copyWithFeedback(allDrafts.join("\n\n"), `${allDrafts.length} supplier drafts copied`);
   };
 
   const handleSaveNote = (sku: string, value = noteText) => {
@@ -727,14 +718,12 @@ export default function BuyingSheetPage() {
   };
 
   const handleCopyPOLine = (row: BuyingSheetRow) => {
-    navigator.clipboard.writeText(`${row.sku}\t${row.itemName}\t${buyingOrderQuantity(row, adjustedQtys)}\t${row.supplierName}`);
-    toast({ title: "Copied", description: `PO line for ${row.sku} copied` });
+    void copyWithFeedback(`${row.sku}\t${row.itemName}\t${buyingOrderQuantity(row, adjustedQtys)}\t${row.supplierName}`, `PO line for ${row.sku} copied`);
   };
 
   const handleCopySelectedPOLines = () => {
     const target = sortedRows.filter(r => selectedSkus.has(r.rowKey));
-    navigator.clipboard.writeText(["SKU\tItem Name\tQty to Order\tSupplier", ...target.map(r => `${r.sku}\t${r.itemName}\t${buyingOrderQuantity(r, adjustedQtys)}\t${r.supplierName}`)].join("\n"));
-    toast({ title: "Copied", description: `${target.length} PO lines copied` });
+    void copyWithFeedback(["SKU\tItem Name\tQty to Order\tSupplier", ...target.map(r => `${r.sku}\t${r.itemName}\t${buyingOrderQuantity(r, adjustedQtys)}\t${r.supplierName}`)].join("\n"), `${target.length} PO lines copied`);
   };
 
   const handleCopySupplierEmails = () => {
@@ -742,21 +731,21 @@ export default function BuyingSheetPage() {
     const target = selectedSkus.size > 0 ? sortedRows.filter(r => selectedSkus.has(r.rowKey)) : sortedRows;
     target.forEach(r => { if (r.supplierEmail) emails.add(r.supplierEmail); });
     if (emails.size === 0) { toast({ title: "No emails", description: "No supplier emails found", variant: "destructive" }); return; }
-    navigator.clipboard.writeText(Array.from(emails).join("; "));
-    toast({ title: "Copied!", description: `${emails.size} email${emails.size !== 1 ? "s" : ""} copied` });
+    void copyWithFeedback(Array.from(emails).join("; "), `${emails.size} supplier emails copied`);
   };
 
   const handlePrint = () => {
-    const printWindow = window.open("", "_blank"); if (!printWindow) return;
+    const printWindow = window.open("", "_blank"); if (!printWindow) { toast({ title: "Print window blocked", description: "Allow pop-up windows to print the Buying Sheet.", variant: "destructive" }); return; }
     const target = selectedSkus.size > 0 ? sortedRows.filter(r => selectedSkus.has(r.rowKey)) : sortedRows;
+    const totals = target.reduce((sum, row) => ({ needed: sum.needed + row.totalNeeded, inStock: sum.inStock + row.stockOnHand, onPO: sum.onPO + row.onPurchaseOrder, toOrder: sum.toOrder + buyingOrderQuantity(row, adjustedQtys) }), { needed: 0, inStock: 0, onPO: 0, toOrder: 0 });
     const date = new Date().toLocaleDateString();
     const groups = new Map<string, BuyingSheetRow[]>();
     for (const row of target) { const key = row.supplierName || "No Supplier"; groups.set(key, [...(groups.get(key) || []), row]); }
     let html = `<!DOCTYPE html><html><head><title>Buying Sheet - ${date}</title><style>body{font-family:Arial,sans-serif;font-size:11px;padding:20px;color:#333}h1{font-size:18px}h2{font-size:14px;margin:20px 0 8px;padding:5px 8px;background:#f0f0f0;border-radius:4px}.summary{display:flex;gap:20px;margin-bottom:15px;padding:10px;background:#f8f8f8;border-radius:6px}.summary-item{text-align:center}.summary-label{font-size:10px;color:#666;text-transform:uppercase}.summary-value{font-size:16px;font-weight:bold}table{width:100%;border-collapse:collapse;margin-bottom:15px}th{text-align:left;padding:6px 8px;border-bottom:2px solid #333;font-size:10px;text-transform:uppercase;color:#666}td{padding:5px 8px;border-bottom:1px solid #ddd}.text-right{text-align:right}.urgent{color:#dc2626;font-weight:bold}.total-row{border-top:2px solid #333;font-weight:bold;background:#f8f8f8}@media print{body{padding:0}}</style></head><body><h1>📋 Buying Sheet</h1><p style="color:#666;font-size:12px">Generated: ${date} | ${target.length} SKUs | To Order: ${totals.toOrder.toLocaleString()} units</p><div class="summary"><div class="summary-item"><div class="summary-label">Total Needed</div><div class="summary-value">${totals.needed.toLocaleString()}</div></div><div class="summary-item"><div class="summary-label">In Stock</div><div class="summary-value">${totals.inStock.toLocaleString()}</div></div><div class="summary-item"><div class="summary-label">On PO</div><div class="summary-value">${totals.onPO.toLocaleString()}</div></div><div class="summary-item"><div class="summary-label">To Order</div><div class="summary-value" style="color:#2563eb">${totals.toOrder.toLocaleString()}</div></div></div>`;
     for (const [supplier, items] of groups.entries()) {
-      const st = items.reduce((s, r) => s + r.toOrder, 0);
+      const st = items.reduce((s, r) => s + buyingOrderQuantity(r, adjustedQtys), 0);
       html += `<h2>${supplier}</h2><table><thead><tr><th>SKU</th><th>Item</th><th class="text-right">Needed</th><th class="text-right">Stock</th><th class="text-right">Allocated PO</th><th class="text-right">Zoho Open PO</th><th class="text-right">To Order</th><th>Orders</th><th>Notes</th></tr></thead><tbody>`;
-      for (const item of items) html += `<tr><td style="font-family:monospace;font-size:10px">${item.sku}</td><td>${item.itemName}</td><td class="text-right">${item.totalNeeded}</td><td class="text-right">${item.stockOnHand}</td><td class="text-right">${item.onPurchaseOrder}</td><td class="text-right ${item.poVariance > 0.01 ? "urgent" : ""}">${item.zohoOnPurchaseOrder}</td><td class="text-right ${item.toOrder > 0 ? "urgent" : ""}">${item.toOrder}</td><td style="font-size:10px">${item.orders.map(o => `${o.orderNumber} (${o.customerName})`).join(", ")}</td><td style="font-style:italic;color:#666;font-size:10px">${notes[item.rowKey] || ""}</td></tr>`;
+      for (const item of items) html += `<tr><td style="font-family:monospace;font-size:10px">${item.sku}</td><td>${item.itemName}</td><td class="text-right">${item.totalNeeded}</td><td class="text-right">${item.stockOnHand}</td><td class="text-right">${item.onPurchaseOrder}</td><td class="text-right ${item.poVariance > 0.01 ? "urgent" : ""}">${item.zohoOnPurchaseOrder}</td><td class="text-right ${item.toOrder > 0 ? "urgent" : ""}">${buyingOrderQuantity(item, adjustedQtys)}</td><td style="font-size:10px">${item.orders.map(o => `${o.orderNumber} (${o.customerName})`).join(", ")}</td><td style="font-style:italic;color:#666;font-size:10px">${notes[item.rowKey] || ""}</td></tr>`;
       html += `<tr class="total-row"><td colspan="6">Total for ${supplier}</td><td class="text-right">${st}</td><td colspan="2"></td></tr></tbody></table>`;
     }
     html += `</body></html>`;
@@ -767,7 +756,7 @@ export default function BuyingSheetPage() {
     const target = selectedSkus.size > 0 ? sortedRows.filter(r => selectedSkus.has(r.rowKey)) : sortedRows;
     const headers = ["SKU","Item Name","Total Needed","In Stock","Allocated On PO","Zoho Open PO","PO Variance","To Order","Safety Stock","Recommended Qty","Coverage %","Waiting Since","Calendar Days Waiting","Stockout Risk Days","Daily Burn Rate","Demand Variability","Distinct Customers","Priority","Supplier","Lead Time","Trend","Season","Notes","Orders"];
     const csvRows = target.map(r => [r.sku, r.itemName, r.totalNeeded, r.stockOnHand, r.onPurchaseOrder, r.zohoOnPurchaseOrder, r.poVariance, r.toOrder, r.safetyStock, buyingOrderQuantity(r, adjustedQtys), r.coveragePercent, r.waitingSince, r.daysWaiting, r.stockoutRiskDays ?? "N/A", r.dailyBurnRate.toFixed(1), r.demandVariability, r.distinctCustomers, r.priorityScore, r.supplierName, r.avgLeadTimeDays ?? "N/A", r.demandTrend, r.seasonalPattern || "N/A", notes[r.rowKey] || "", r.orders.map(o => `${o.orderNumber}(${o.customerName}:${o.quantity})`).join("; ")]);
-    const csv = [headers, ...csvRows].map(r => r.map(c => `"${c}"`).join(",")).join("\n");
+    const csv = [headers, ...csvRows].map(r => r.map(buyingCsvCell).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" }); const url = URL.createObjectURL(blob);
     const a = document.createElement("a"); a.href = url; a.download = `buying-sheet-${new Date().toISOString().split("T")[0]}.csv`; a.click(); URL.revokeObjectURL(url);
   };
@@ -776,12 +765,16 @@ export default function BuyingSheetPage() {
     const target = selectedSkus.size > 0 ? sortedRows.filter(r => selectedSkus.has(r.rowKey)) : sortedRows;
     const groups = new Map<string, BuyingSheetRow[]>();
     for (const row of target) { const key = row.supplierName || "No Supplier"; groups.set(key, [...(groups.get(key) || []), row]); }
-    let csv = "";
+    const sections: string[] = [];
     for (const [supplier, items] of groups.entries()) {
-      csv += `\n"SUPPLIER: ${supplier}"\n"SKU","Item Name","Qty to Order","In Stock","Allocated On PO","Zoho Open PO","PO Variance","Notes"\n`;
-      for (const item of items) csv += `"${item.sku}","${item.itemName}","${buyingOrderQuantity(item, adjustedQtys)}","${item.stockOnHand}","${item.onPurchaseOrder}","${item.zohoOnPurchaseOrder}","${item.poVariance}","${notes[item.rowKey] || ""}"\n`;
-      csv += `"","TOTAL","${items.reduce((s, r) => s + r.toOrder, 0)}","","","","",""\n`;
+      sections.push([
+        ["SUPPLIER: " + supplier],
+        ["SKU", "Item Name", "Qty to Order", "In Stock", "Allocated On PO", "Zoho Open PO", "PO Variance", "Notes"],
+        ...items.map(item => [item.sku, item.itemName, buyingOrderQuantity(item, adjustedQtys), item.stockOnHand, item.onPurchaseOrder, item.zohoOnPurchaseOrder, item.poVariance, notes[item.rowKey] || ""]),
+        ["", "TOTAL", items.reduce((sum, row) => sum + buyingOrderQuantity(row, adjustedQtys), 0)],
+      ].map(row => row.map(buyingCsvCell).join(",")).join("\n"));
     }
+    const csv = sections.join("\n\n");
     const blob = new Blob([csv], { type: "text/csv" }); const url = URL.createObjectURL(blob);
     const a = document.createElement("a"); a.href = url; a.download = `buying-sheet-by-supplier-${new Date().toISOString().split("T")[0]}.csv`; a.click(); URL.revokeObjectURL(url);
   };
@@ -1064,7 +1057,7 @@ export default function BuyingSheetPage() {
               </div>
               <Button variant="outline" size="sm" className="w-full justify-start gap-2 text-xs" onClick={() => handleCopyPOLine(row)}><ClipboardCopy className="h-3 w-3" />Copy PO Line</Button>
               <Button variant="outline" size="sm" className="w-full justify-start gap-2 text-xs" onClick={() => generateEmailDraft(row.supplierName)}><Send className="h-3 w-3" />Draft Email to {row.supplierName}</Button>
-              {row.supplierEmail && <Button variant="outline" size="sm" className="w-full justify-start gap-2 text-xs" onClick={() => { navigator.clipboard.writeText(row.supplierEmail!); toast({ title: "Copied", description: `${row.supplierEmail} copied` }); }}><Mail className="h-3 w-3" />Copy Email</Button>}
+              {row.supplierEmail && <Button variant="outline" size="sm" className="w-full justify-start gap-2 text-xs" onClick={() => { if (row.supplierEmail) void copyWithFeedback(row.supplierEmail, "Supplier email copied"); }}><Mail className="h-3 w-3" />Copy Email</Button>}
               {notes[row.rowKey] && <div className="p-2 rounded bg-primary/5 border border-primary/10"><p className="text-[10px] font-medium text-primary mb-0.5">Note:</p><p className="text-xs text-muted-foreground">{notes[row.rowKey]}</p></div>}
             </div>
           </div>
@@ -1143,9 +1136,9 @@ export default function BuyingSheetPage() {
           <TableCell className={densityPy} onClick={() => toggleExpand(row.rowKey)}><span className="text-xs text-muted-foreground">{row.orders.length} order{row.orders.length !== 1 ? "s" : ""}</span></TableCell>
           <TableCell className="w-8" onClick={e => e.stopPropagation()}>
             <div className="flex items-center gap-0.5">
-              <Popover open={editingNote === row.rowKey} onOpenChange={open => { if (!open) setEditingNote(null); }}>
+              <Popover open={editingNote === row.rowKey} onOpenChange={open => { setEditingNote(open ? row.rowKey : null); if (open) setNoteText(notes[row.rowKey] || ""); }}>
                 <PopoverTrigger asChild>
-                  <button onClick={() => { setEditingNote(row.rowKey); setNoteText(notes[row.rowKey] || ""); }} className={`p-1 rounded hover:bg-muted transition-colors ${notes[row.rowKey] ? "text-primary" : "text-muted-foreground/40"}`}><StickyNote className="h-3.5 w-3.5" /></button>
+                  <Button variant="ghost" size="icon" aria-label={`Edit note for ${row.sku}`} className={`p-1 rounded hover:bg-muted transition-colors ${notes[row.rowKey] ? "text-primary" : "text-muted-foreground/40"}`}><StickyNote className="h-3.5 w-3.5" /></Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-64 p-3" side="left">
                   <div className="space-y-2">
@@ -1181,7 +1174,7 @@ export default function BuyingSheetPage() {
 
   return (
     <TooltipProvider>
-      <div className={`procurement-page aleph-page-workspace aleph-buying-workspace app-no-x-scroll min-w-0 w-full max-w-full space-y-5 overflow-x-hidden ${isFullscreen ? "fixed inset-0 z-[100] h-[100dvh] bg-background p-3 sm:p-5 overflow-y-auto overflow-x-hidden overscroll-contain" : ""}`} ref={printRef}>
+      <div className={`procurement-page aleph-page-workspace aleph-buying-workspace app-no-x-scroll min-w-0 w-full max-w-full space-y-5 overflow-x-hidden ${isFullscreen ? "fixed inset-0 z-40 h-[100dvh] bg-background p-3 sm:p-5 overflow-y-auto overflow-x-hidden overscroll-contain" : ""}`} ref={printRef}>
         {loadError && <div role="alert" className="border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">Buying Sheet could not refresh: {loadError}</div>}
         <div role="status" className="border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
           {liveCoverageAsOf ? `Open supplier POs and customer invoices current as of ${liveCoverageAsOf.toLocaleString()} — already-invoiced units and units on open POs are deducted.` : "Live supplier PO and invoice figures could not be loaded; quantities may include items already ordered or invoiced."}
@@ -1208,14 +1201,14 @@ export default function BuyingSheetPage() {
                 </div>
               </div>
               <div className="flex items-center gap-1.5 flex-wrap">
-                <Button variant="outline" size="sm" disabled={zohoLoading} onClick={() => void fetchLocalDataRef.current()} className="h-9 gap-1.5"><History className="h-4 w-4" />Refresh</Button>
+                <Button variant="outline" size="sm" disabled={refreshing || zohoLoading} onClick={() => void refreshSheet()} className="h-9 gap-1.5">{refreshing ? <Loader2 className="h-4 w-4 animate-spin" /> : <History className="h-4 w-4" />}{refreshing ? "Refreshing…" : "Refresh"}</Button>
                 <Tooltip><TooltipTrigger asChild>
                   <Button variant="outline" size="icon" onClick={toggleFullscreen} className="h-9 w-9" aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}>
                     {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
                   </Button>
                 </TooltipTrigger><TooltipContent><p className="text-xs">{isFullscreen ? "Exit" : "Enter"} fullscreen</p></TooltipContent></Tooltip>
                 <Tooltip><TooltipTrigger asChild>
-                  <Button variant="outline" size="icon" onClick={() => { const next: ViewDensity = viewDensity === "compact" ? "comfortable" : "compact"; setViewDensity(next); saveDensity(next); }} className="h-9 w-9">
+                  <Button aria-label="Toggle row density" variant="outline" size="icon" onClick={() => { const next: ViewDensity = viewDensity === "compact" ? "comfortable" : "compact"; setViewDensity(next); saveDensity(next); }} className="h-9 w-9">
                     {viewDensity === "compact" ? <AlignJustify className="h-4 w-4" /> : <AlignCenter className="h-4 w-4" />}
                   </Button>
                 </TooltipTrigger><TooltipContent><p className="text-xs">{viewDensity === "compact" ? "Comfortable" : "Compact"} view</p></TooltipContent></Tooltip>
@@ -1224,7 +1217,7 @@ export default function BuyingSheetPage() {
                 </Button>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="icon" className="h-9 w-9"><MoreHorizontal className="h-4 w-4" /></Button>
+                    <Button variant="outline" size="icon" className="h-9 w-9" aria-label="More buying actions"><MoreHorizontal className="h-4 w-4" /></Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-56">
                     <DropdownMenuItem onClick={handlePrint}><Printer className="h-4 w-4 mr-2" />Print sheet</DropdownMenuItem>
@@ -1287,7 +1280,7 @@ export default function BuyingSheetPage() {
                 <Button variant={showOnlyNeedOrder ? "default" : "outline"} size="sm" onClick={() => setShowOnlyNeedOrder(!showOnlyNeedOrder)} className="h-11 rounded-2xl gap-1.5 whitespace-nowrap">
                   <AlertTriangle className="h-3.5 w-3.5" />{showOnlyNeedOrder ? "Needs Order" : "Show All"}
                 </Button>
-                <Button variant={showOnlyPOMismatches ? "default" : "outline"} size="sm" onClick={() => { const next = !showOnlyPOMismatches; setShowOnlyPOMismatches(next); if (next) setShowOnlyNeedOrder(false); }} className={`h-11 rounded-2xl gap-1.5 whitespace-nowrap ${!showOnlyPOMismatches && poIntegrity.mismatches.length > 0 ? "border-amber-500/50 text-amber-700 dark:text-amber-300" : ""}`}>
+                <Button variant={showOnlyPOMismatches ? "default" : "outline"} size="sm" onClick={() => { const next = !showOnlyPOMismatches; setShowOnlyPOMismatches(next); if (next) { setShowOnlyNeedOrder(false); setViewMode("table"); } }} className={`h-11 rounded-2xl gap-1.5 whitespace-nowrap ${!showOnlyPOMismatches && poIntegrity.mismatches.length > 0 ? "border-amber-500/50 text-amber-700 dark:text-amber-300" : ""}`}>
                   <Eye className="h-3.5 w-3.5" />PO Audit {poIntegrity.mismatches.length > 0 && <Badge variant="secondary" className="ml-0.5 h-5 min-w-5 px-1.5">{poIntegrity.mismatches.length}</Badge>}
                 </Button>
               </div>
@@ -1598,7 +1591,7 @@ export default function BuyingSheetPage() {
             rows={sortedRows}
             notes={notes}
             onGenerateEmail={generateEmailDraft}
-            onCopyEmail={email => { navigator.clipboard.writeText(email); toast({ title: "Copied", description: `${email} copied` }); }}
+            onCopyEmail={email => { void copyWithFeedback(email, "Supplier email copied"); }}
           />
         )}
 
@@ -1633,10 +1626,10 @@ export default function BuyingSheetPage() {
               <Textarea value={emailDraftBody} onChange={e => setEmailDraftBody(e.target.value)} className="min-h-[250px] font-mono text-sm" />
             </div>
             <DialogFooter className="gap-2">
-              <Button variant="outline" onClick={() => { navigator.clipboard.writeText(`Subject: ${emailDraftSubject}\n\n${emailDraftBody}`); toast({ title: "Copied", description: "Email draft copied" }); }}><Copy className="h-4 w-4 mr-2" />Copy</Button>
+              <Button variant="outline" onClick={() => { void copyWithFeedback(`Subject: ${emailDraftSubject}\n\n${emailDraftBody}`, "Email draft copied"); }}><Copy className="h-4 w-4 mr-2" />Copy</Button>
               <Button onClick={() => {
                 const s = sortedRows.find(r => r.supplierName === emailDraftSupplier && r.supplierEmail);
-                window.open(`mailto:${s?.supplierEmail || ""}?subject=${encodeURIComponent(emailDraftSubject || `Purchase Order — ${emailDraftSupplier}`)}&body=${encodeURIComponent(emailDraftBody)}`, "_blank");
+                window.location.href = `mailto:${s?.supplierEmail || ""}?subject=${encodeURIComponent(emailDraftSubject || `Purchase Order — ${emailDraftSupplier}`)}&body=${encodeURIComponent(emailDraftBody)}`;
               }}><Mail className="h-4 w-4 mr-2" />Open in Email</Button>
             </DialogFooter>
           </DialogContent>

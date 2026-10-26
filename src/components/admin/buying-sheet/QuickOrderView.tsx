@@ -6,6 +6,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Flame, Timer, CheckSquare, Loader2, Send } from "lucide-react";
 import type { BuyingSheetRow } from "./types";
 import { getPriorityLevel } from "./types";
+import { buyingSelectedKeys } from "@/lib/buyingSheet";
 
 interface QuickOrderViewProps {
   rows: BuyingSheetRow[];
@@ -20,6 +21,8 @@ export function QuickOrderView({ rows, onBulkMarkOrdered, onGenerateEmail, selec
 
   // Only show items that need ordering, grouped by supplier
   const needsOrder = rows.filter(r => r.toOrder > 0);
+  const selectedKeys = buyingSelectedKeys(needsOrder, selectedSkus);
+  const allVisibleSelected = needsOrder.length > 0 && selectedKeys.length === needsOrder.length;
   const groups = new Map<string, BuyingSheetRow[]>();
   for (const row of needsOrder) {
     const key = row.supplierName || "No Supplier";
@@ -50,7 +53,7 @@ export function QuickOrderView({ rows, onBulkMarkOrdered, onGenerateEmail, selec
 
   const handleOrder = async () => {
     setOrdering(true);
-    try { await onBulkMarkOrdered(Array.from(selectedSkus)); }
+    try { await onBulkMarkOrdered(selectedKeys); }
     finally { setOrdering(false); }
   };
 
@@ -73,23 +76,23 @@ export function QuickOrderView({ rows, onBulkMarkOrdered, onGenerateEmail, selec
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={selectAll}>
-              {selectedSkus.size === needsOrder.length ? "Deselect All" : "Select All"}
+              {allVisibleSelected ? "Deselect All" : "Select All"}
             </Button>
             <span className="text-sm text-muted-foreground">
-              {selectedSkus.size > 0 ? `${selectedSkus.size} of ${needsOrder.length} selected` : `${needsOrder.length} items need ordering`}
+              {selectedKeys.length > 0 ? `${selectedKeys.length} of ${needsOrder.length} selected` : `${needsOrder.length} items need ordering`}
             </span>
           </div>
-          {selectedSkus.size > 0 && (
+          {selectedKeys.length > 0 && (
             <Button onClick={handleOrder} disabled={ordering} className="gap-2">
               {ordering ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckSquare className="h-4 w-4" />}
-              Mark {selectedSkus.size} as Ordered
+              Mark {selectedKeys.length} as Ordered
             </Button>
           )}
         </div>
       </div>
 
       {Array.from(groups.entries()).map(([supplier, items]) => {
-        const supplierTotal = items.reduce((s, r) => s + r.toOrder, 0);
+        const supplierTotal = items.reduce((s, r) => s + r.adjustedOrderQty, 0);
         const allSelected = items.every(r => selectedSkus.has(r.rowKey));
 
         return (
@@ -124,7 +127,7 @@ export function QuickOrderView({ rows, onBulkMarkOrdered, onGenerateEmail, selec
                       <p className="text-[10px] text-muted-foreground font-mono">{item.sku} • {item.orders.length} order{item.orders.length !== 1 ? "s" : ""} • {item.daysWaiting}d waiting</p>
                     </div>
                     <div className="text-right shrink-0">
-                      <p className="text-lg font-bold text-primary">{item.toOrder}</p>
+                      <p className="text-lg font-bold text-primary">{item.adjustedOrderQty}</p>
                       <p className="text-[10px] text-muted-foreground">of {item.totalNeeded}</p>
                     </div>
                   </div>
