@@ -1,5 +1,10 @@
 # Roadmap
 
+- [x] Fix Buying Sheet loading, quantities, and controls
+- [x] Run Buying Sheet regression checks
+- [ ] Restore current verified stock coverage — shared source snapshot is from 19 August; current stock cannot be recovered from stored documents, and direct Zoho API scans are prohibited.
+- [ ] Verify Buying Sheet while signed in — external unmanaged sign-in is unavailable to the test environment.
+
 - [x] Fix phone edits not appearing on desktop
 - [x] Restore Order Lab loading and actions
 - [x] Run saving and Order Lab regression checks

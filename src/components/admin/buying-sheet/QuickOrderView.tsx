@@ -11,10 +11,11 @@ interface QuickOrderViewProps {
   rows: BuyingSheetRow[];
   onBulkMarkOrdered: (skus: string[]) => Promise<void>;
   onGenerateEmail: (supplier: string) => void;
+  selectedSkus: Set<string>;
+  onSelectionChange: (selection: Set<string>) => void;
 }
 
-export function QuickOrderView({ rows, onBulkMarkOrdered, onGenerateEmail }: QuickOrderViewProps) {
-  const [selectedSkus, setSelectedSkus] = useState<Set<string>>(new Set());
+export function QuickOrderView({ rows, onBulkMarkOrdered, onGenerateEmail, selectedSkus, onSelectionChange }: QuickOrderViewProps) {
   const [ordering, setOrdering] = useState(false);
 
   // Only show items that need ordering, grouped by supplier
@@ -28,34 +29,29 @@ export function QuickOrderView({ rows, onBulkMarkOrdered, onGenerateEmail }: Qui
   }
 
   const toggleSku = (rowKey: string) => {
-    setSelectedSkus(prev => {
-      const next = new Set(prev);
+      const next = new Set(selectedSkus);
       if (next.has(rowKey)) next.delete(rowKey); else next.add(rowKey);
-      return next;
-    });
+      onSelectionChange(next);
   };
 
   const selectAll = () => {
-    if (selectedSkus.size === needsOrder.length) setSelectedSkus(new Set());
-    else setSelectedSkus(new Set(needsOrder.map(r => r.rowKey)));
+    if (needsOrder.every(r => selectedSkus.has(r.rowKey))) onSelectionChange(new Set());
+    else onSelectionChange(new Set(needsOrder.map(r => r.rowKey)));
   };
 
   const selectSupplier = (items: BuyingSheetRow[]) => {
     const rowKeys = items.map(r => r.rowKey);
     const allSelected = rowKeys.every(key => selectedSkus.has(key));
-    setSelectedSkus(prev => {
-      const next = new Set(prev);
+      const next = new Set(selectedSkus);
       if (allSelected) rowKeys.forEach(key => next.delete(key));
       else rowKeys.forEach(key => next.add(key));
-      return next;
-    });
+      onSelectionChange(next);
   };
 
   const handleOrder = async () => {
     setOrdering(true);
-    await onBulkMarkOrdered(Array.from(selectedSkus));
-    setSelectedSkus(new Set());
-    setOrdering(false);
+    try { await onBulkMarkOrdered(Array.from(selectedSkus)); }
+    finally { setOrdering(false); }
   };
 
   if (needsOrder.length === 0) {
@@ -64,7 +60,7 @@ export function QuickOrderView({ rows, onBulkMarkOrdered, onGenerateEmail }: Qui
         <CardContent className="p-8 text-center">
           <CheckSquare className="h-12 w-12 text-emerald-500 mx-auto mb-3" />
           <p className="text-lg font-semibold text-foreground">All Covered!</p>
-          <p className="text-sm text-muted-foreground">All items are covered by stock and purchase orders.</p>
+          <p className="text-sm text-muted-foreground">No items need ordering with the current filters.</p>
         </CardContent>
       </Card>
     );
