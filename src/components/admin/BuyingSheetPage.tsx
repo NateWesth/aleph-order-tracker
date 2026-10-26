@@ -1183,7 +1183,10 @@ export default function BuyingSheetPage() {
     <TooltipProvider>
       <div className={`procurement-page aleph-page-workspace aleph-buying-workspace app-no-x-scroll min-w-0 w-full max-w-full space-y-5 overflow-x-hidden ${isFullscreen ? "fixed inset-0 z-[100] h-[100dvh] bg-background p-3 sm:p-5 overflow-y-auto overflow-x-hidden overscroll-contain" : ""}`} ref={printRef}>
         {loadError && <div role="alert" className="border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">Buying Sheet could not refresh: {loadError}</div>}
-        {(!lastRefreshedAt || Date.now() - lastRefreshedAt.getTime() > 86_400_000) && <div role="status" className="border border-border bg-muted/40 p-3 text-sm text-muted-foreground">{lastRefreshedAt ? `Stock snapshot last updated ${lastRefreshedAt.toLocaleString()}. Verify stock before purchasing.` : "Stock snapshot unavailable. Quantities shown do not include verified stock."}</div>}
+        <div role="status" className="border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
+          {liveCoverageAsOf ? `Open supplier POs and customer invoices current as of ${liveCoverageAsOf.toLocaleString()} — already-invoiced units and units on open POs are deducted.` : "Live supplier PO and invoice figures could not be loaded; quantities may include items already ordered or invoiced."}
+          {(!lastRefreshedAt || Date.now() - lastRefreshedAt.getTime() > 86_400_000) && <> {lastRefreshedAt ? `Stock on hand is from ${lastRefreshedAt.toLocaleDateString()} — check the shelf before buying.` : "Stock on hand is not available — check the shelf before buying."}</>}
+        </div>
         {rows.some(row => !row.isMiscellaneous && !zohoData?.[row.sku]) && <div role="status" className="border border-border bg-muted/40 p-3 text-sm text-muted-foreground">Stock is unverified for {rows.filter(row => !row.isMiscellaneous && !zohoData?.[row.sku]).length} items missing from the shared snapshot. Verify availability before purchasing.</div>}
         {/* ── Sticky Header ── */}
         <div className="sticky top-0 z-20 -mx-1 px-1 pb-3 bg-background/88 backdrop-blur-xl supports-[backdrop-filter]:bg-background/72">
