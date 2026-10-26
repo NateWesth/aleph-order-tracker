@@ -822,6 +822,14 @@ export default function BuyingSheetPage() {
     return sorted;
   }, [filteredRows, sortField, sortDirection, pinnedSkus]);
 
+  useEffect(() => {
+    const visible = new Set(filteredRows.map(row => row.rowKey));
+    setSelectedSkus(previous => {
+      const next = new Set([...previous].filter(key => visible.has(key)));
+      return next.size === previous.size ? previous : next;
+    });
+  }, [filteredRows]);
+
   // Detect items appearing with multiple suppliers
   const multiSupplierSkus = useMemo(() => {
     const skuSuppliers = new Map<string, Set<string>>();
