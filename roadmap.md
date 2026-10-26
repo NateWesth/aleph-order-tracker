@@ -1,5 +1,8 @@
 # Roadmap
 
+- [ ] Fix Buying Sheet loading, quantities, and controls
+- [ ] Run Buying Sheet regression checks
+
 - [x] Fix phone edits not appearing on desktop
 - [x] Restore Order Lab loading and actions
 - [x] Run saving and Order Lab regression checks
