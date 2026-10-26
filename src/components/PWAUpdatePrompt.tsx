@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { RefreshCw, X } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
 
 export const PWAUpdatePrompt = () => {
   const [showUpdatePrompt, setShowUpdatePrompt] = useState(false);
@@ -9,6 +10,7 @@ export const PWAUpdatePrompt = () => {
   const userClickedUpdate = useRef(false);
 
   useEffect(() => {
+    if (Capacitor.isNativePlatform()) return;
     if (!('serviceWorker' in navigator)) return;
 
     const checkForUpdates = async () => {

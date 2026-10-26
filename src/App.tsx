@@ -12,6 +12,8 @@ import { PWAUpdatePrompt } from './components/PWAUpdatePrompt';
 import { NetworkStatusIndicator } from './components/ui/NetworkStatusIndicator';
 import { AppErrorBoundary } from './components/ui/AppErrorBoundary';
 import { useGlobalDocumentScroll } from './hooks/useGlobalDocumentScroll';
+import NativeAppBridge from './components/NativeAppBridge';
+import PushNotificationsBridge from './components/PushNotificationsBridge';
 
 // Lazy load heavy components for better Speed Index
 const Auth = lazy(() => import('./pages/Auth'));
@@ -59,6 +61,8 @@ function App() {
       <ThemeProvider>
         <AuthProvider>
           <Router>
+            <NativeAppBridge />
+            <PushNotificationsBridge />
             <div className="min-h-screen bg-background text-foreground safe-area-insets">
               <Suspense fallback={<PageFallback />}>
                 <Routes>

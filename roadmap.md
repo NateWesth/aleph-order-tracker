@@ -1,5 +1,10 @@
 # Roadmap
 
+- [x] Repair native app navigation, installed recognition and notification setup
+- [x] Verify notification preference behavior
+- [ ] Test Android permissions and Back on a physical device — requires rebuilt APK; sandbox cannot run Android
+- [ ] Closed-app Android push — Firebase connection declined; needs connection and Android Firebase configuration
+
 - [x] Repair Buying Sheet buttons, fullscreen overlays, and action feedback
 - [x] Run Buying Sheet button regression checks
 

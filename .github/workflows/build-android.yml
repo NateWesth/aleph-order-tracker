@@ -56,7 +56,8 @@ jobs:
           "$SDKMANAGER" --sdk_root="$ANDROID_HOME" --install "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 
       - name: Add Android platform
-        run: npx cap add android || true
+        run: |
+          if [ ! -d android ]; then npx cap add android; fi
 
       - name: Sync Capacitor
         run: npx cap sync android
@@ -65,6 +66,9 @@ jobs:
         run: |
           sed -i 's/<manifest/<manifest xmlns:tools="http:\/\/schemas.android.com\/tools"/' android/app/src/main/AndroidManifest.xml
           sed -i '/<application/i\    <uses-permission android:name="android.permission.USE_BIOMETRIC" \/>' android/app/src/main/AndroidManifest.xml
+          if ! grep -q 'android.permission.POST_NOTIFICATIONS' android/app/src/main/AndroidManifest.xml; then
+            sed -i '/<application/i\    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" \/>' android/app/src/main/AndroidManifest.xml
+          fi
 
       - name: Make gradlew executable
         run: chmod +x android/gradlew

@@ -1,5 +1,6 @@
 import { Capacitor } from "@capacitor/core";
 import { supabase } from "@/integrations/supabase/client";
+import { notificationsAllowedOnDevice, setDeviceNotificationsAllowed } from "./notificationPreference";
 
 export const VAPID_PUBLIC_KEY =
   "BAwX0AT4VpA5BM1eniYDcUoFTTurLjgbV7fgCySl2Pxfe2ZxmOJnSApjm3B5MBi2jWSwEDdr7NMBX1DCKQ67GnQ";
@@ -9,7 +10,7 @@ export const PUSH_TYPES = new Set([
   "mention", "new_message", "order_update", "comment_reaction",
 ]);
 
-export type PushStatus = "enabled" | "disabled" | "denied" | "unsupported" | "open-in-new-tab";
+export type PushStatus = "enabled" | "disabled" | "denied" | "unsupported" | "open-in-new-tab" | "update-required";
 
 const isNative = () => Capacitor.isNativePlatform();
 const inIframe = () => { try { return window.top !== window.self; } catch { return true; } };
@@ -30,6 +31,8 @@ async function getRegistration(): Promise<ServiceWorkerRegistration | null> {
 
 export async function getPushStatus(): Promise<PushStatus> {
   if (isNative()) {
+    if (!Capacitor.isPluginAvailable("LocalNotifications")) return "update-required";
+    if (!notificationsAllowedOnDevice()) return "disabled";
     const { LocalNotifications } = await import("@capacitor/local-notifications");
     const p = await LocalNotifications.checkPermissions();
     return p.display === "granted" ? "enabled" : p.display === "denied" ? "denied" : "disabled";
@@ -46,8 +49,13 @@ export async function getPushStatus(): Promise<PushStatus> {
 /** Must be called from a click. */
 export async function enablePush(userId: string): Promise<PushStatus> {
   if (isNative()) {
+    if (!Capacitor.isPluginAvailable("LocalNotifications")) return "update-required";
     const { LocalNotifications } = await import("@capacitor/local-notifications");
     const p = await LocalNotifications.requestPermissions();
+    if (p.display === "granted") {
+      await LocalNotifications.createChannel({ id: "aleph-comments", name: "Comments and replies", importance: 5, visibility: 1, vibration: true });
+      setDeviceNotificationsAllowed(true);
+    }
     return p.display === "granted" ? "enabled" : "denied";
   }
   if (!("Notification" in window) || !("PushManager" in window)) return "unsupported";
@@ -71,11 +79,12 @@ export async function enablePush(userId: string): Promise<PushStatus> {
 }
 
 export async function disablePush(): Promise<PushStatus> {
-  if (isNative()) return "disabled";
+  if (isNative()) { setDeviceNotificationsAllowed(false); return "disabled"; }
   const reg = await navigator.serviceWorker?.getRegistration();
   const sub = await reg?.pushManager.getSubscription();
   if (sub) {
-    await supabase.from("push_subscriptions").delete().eq("endpoint", sub.endpoint);
+    const { error } = await supabase.from("push_subscriptions").delete().eq("endpoint", sub.endpoint);
+    if (error) throw error;
     await sub.unsubscribe();
   }
   return "disabled";
@@ -84,6 +93,7 @@ export async function disablePush(): Promise<PushStatus> {
 /** Show a system notification while the app is open. Same tag as push so duplicates collapse. */
 export async function showLocalNotification(n: { id: string; title: string; message: string; order_id: string | null }) {
   if (isNative()) {
+    if (!notificationsAllowedOnDevice() || !Capacitor.isPluginAvailable("LocalNotifications")) return;
     const { LocalNotifications } = await import("@capacitor/local-notifications");
     const perm = await LocalNotifications.checkPermissions();
     if (perm.display !== "granted") return;
@@ -93,6 +103,7 @@ export async function showLocalNotification(n: { id: string; title: string; mess
         title: n.title,
         body: n.message,
         largeBody: n.message,
+        channelId: "aleph-comments",
         extra: { order_id: n.order_id },
       }],
     });

@@ -11,6 +11,7 @@ const DISMISS_KEY = "aleph:push-prompt-dismissed";
 
 function openOrder(orderId: string) {
   window.sessionStorage.setItem("aleph:open-order", orderId);
+  if (window.location.pathname !== "/admin-dashboard") { window.location.assign(`/admin-dashboard?order=${encodeURIComponent(orderId)}`); return; }
   window.setTimeout(() => window.dispatchEvent(new CustomEvent("aleph:open-order", { detail: orderId })), 300);
 }
 
@@ -21,7 +22,12 @@ export default function PushNotificationsBridge() {
   const [status, setStatus] = useState<PushStatus | null>(null);
   const [dismissed, setDismissed] = useState(() => localStorage.getItem(DISMISS_KEY) === "1");
 
-  useEffect(() => { void getPushStatus().then(setStatus).catch(() => setStatus("unsupported")); }, []);
+  useEffect(() => {
+    const refresh = () => { void getPushStatus().then(setStatus).catch(() => setStatus("update-required")); };
+    refresh();
+    window.addEventListener("aleph:notification-settings", refresh);
+    return () => window.removeEventListener("aleph:notification-settings", refresh);
+  }, []);
 
   // Open the order a tapped notification points at.
   useEffect(() => {
@@ -33,15 +39,17 @@ export default function PushNotificationsBridge() {
       const qs = params.toString();
       window.history.replaceState(null, "", window.location.pathname + (qs ? `?${qs}` : ""));
     }
-    if (!Capacitor.isNativePlatform()) return;
+    if (!Capacitor.isNativePlatform() || !Capacitor.isPluginAvailable("LocalNotifications")) return;
     let handle: { remove: () => void } | undefined;
+    let disposed = false;
     void import("@capacitor/local-notifications").then(async ({ LocalNotifications }) => {
       handle = await LocalNotifications.addListener("localNotificationActionPerformed", (a) => {
         const id = a.notification.extra?.order_id;
         if (id) openOrder(id);
       });
-    });
-    return () => handle?.remove();
+      if (disposed) handle.remove();
+    }).catch(console.warn);
+    return () => { disposed = true; handle?.remove(); };
   }, []);
 
   // Refresh this device's subscription on sign-in.
@@ -70,8 +78,9 @@ export default function PushNotificationsBridge() {
     try {
       const s = await enablePush(user.id);
       setStatus(s);
-      if (s === "enabled") toast({ title: "Notifications on", description: "You'll get comment and reply alerts on this device." });
-      else if (s === "denied") toast({ title: "Notifications blocked", description: "Allow notifications for this site in your browser settings.", variant: "destructive" });
+      if (s === "enabled") toast({ title: "Notifications on", description: Capacitor.isNativePlatform() ? "Comment and reply alerts are enabled while the app is open." : "You'll get comment and reply alerts on this device." });
+      else if (s === "denied") toast({ title: "Notifications blocked", description: "Allow notifications in your phone's app settings or browser site settings.", variant: "destructive" });
+      else if (s === "update-required") toast({ title: "Update the Android app", description: "Install the latest APK; this version is missing notification support.", variant: "destructive" });
     } catch (e) {
       toast({ title: "Couldn't turn on notifications", description: String((e as Error).message ?? e), variant: "destructive" });
     }
