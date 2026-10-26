@@ -1,7 +1,7 @@
 # Roadmap
 
-- [ ] Repair Buying Sheet buttons, fullscreen overlays, and action feedback
-- [ ] Run Buying Sheet button regression checks
+- [x] Repair Buying Sheet buttons, fullscreen overlays, and action feedback
+- [x] Run Buying Sheet button regression checks
 
 - [x] Fix Buying Sheet loading, quantities, and controls
 - [x] Run Buying Sheet regression checks
