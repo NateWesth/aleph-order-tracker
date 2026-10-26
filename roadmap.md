@@ -2,7 +2,8 @@
 
 - [x] Fix Buying Sheet loading, quantities, and controls
 - [x] Run Buying Sheet regression checks
-- [ ] Restore current verified stock coverage — shared source snapshot is from 19 August; current stock cannot be recovered from stored documents, and direct Zoho API scans are prohibited.
+- [x] Deduct invoiced units and live open-PO units on the Buying Sheet
+- [ ] Current stock on hand — Zoho stock levels are not stored anywhere in the app (last snapshot 19 Aug); needs user decision on a stock refresh.
 - [ ] Verify Buying Sheet while signed in — external unmanaged sign-in is unavailable to the test environment.
 
 - [x] Fix phone edits not appearing on desktop

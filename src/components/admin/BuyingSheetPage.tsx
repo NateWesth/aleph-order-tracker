@@ -1,5 +1,18 @@
 import { readAllRows } from "@/lib/readAllRows";
-import { buyingRequirement, buyingShortfall, isOpenBuyingOrder, buyingOrderQuantity, allocateBuyingQuantity } from "@/lib/buyingSheet";
+import { buyingRequirement, buyingShortfall, isOpenBuyingOrder, buyingOrderQuantity, allocateBuyingQuantity, createQuantityPool } from "@/lib/buyingSheet";
+
+type LiveCoverage = {
+  asOf: string | null;
+  purchaseOrders: Record<string, { outstanding: number; poNumbers: string[]; vendorName: string | null }>;
+  invoiced: { orderId: string; sku: string; qty: number }[];
+};
+
+/** Current supplier-PO and customer-invoice quantities from the Zoho documents already stored in the app (no Zoho API calls). */
+async function fetchLiveCoverage(): Promise<LiveCoverage | null> {
+  const { data, error } = await (supabase.rpc as unknown as (fn: string) => Promise<{ data: unknown; error: unknown }>)("get_buying_sheet_live_coverage");
+  if (error || !data) { console.error("Live PO/invoice coverage unavailable:", error); return null; }
+  return data as LiveCoverage;
+}
 import FabricationReorderPanel from "@/components/admin/buying-sheet/FabricationReorderPanel";
 import { useState, useEffect, useMemo, useCallback, useRef, Fragment } from "react";
 import { useLiveData } from "@/hooks/useLiveData";
@@ -104,6 +117,7 @@ export default function BuyingSheetPage() {
   const [viewDensity, setViewDensity] = useState<ViewDensity>(loadDensity);
   const [recentlyOrdered, setRecentlyOrdered] = useState<RecentlyOrderedItem[]>(loadRecentlyOrdered);
   const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(null);
+  const [liveCoverageAsOf, setLiveCoverageAsOf] = useState<Date | null>(null);
   const [showRecentlyOrdered, setShowRecentlyOrdered] = useState(false);
   const [adjustedQtys, setAdjustedQtys] = useState<Record<string, number>>({});
   const rows = useMemo(() => rawRows.map(row => {
@@ -473,8 +487,10 @@ export default function BuyingSheetPage() {
     loadInFlight.current = true;
     if (!hasLoaded.current) setLoading(true);
     try {
-      const snapshot = await fetchZohoData();
-      const orderItems = await readAllRows((from, to) => supabase.from("order_items").select("id, name, code, description, notes, quantity, qty_on_po, qty_received, progress_stage, order_id, created_at").eq("progress_stage", "awaiting-stock").order("id").range(from, to));
+      const [snapshot, live] = await Promise.all([fetchZohoData(), fetchLiveCoverage()]);
+      setLiveCoverageAsOf(live?.asOf ? new Date(live.asOf) : null);
+      const invoicedPool = createQuantityPool((live?.invoiced || []).map(i => [`${i.orderId}|${(i.sku || "").trim().toUpperCase()}`, i.qty] as [string, number]));
+      const orderItems = await readAllRows((from, to) => supabase.from("order_items").select("id, name, code, description, notes, quantity, qty_on_po, qty_received, progress_stage, order_id, created_at").eq("progress_stage", "awaiting-stock").order("created_at").order("id").range(from, to));
       const activeSkus = new Set<string>();
       if (!orderItems.length) { setRows([]); setLoadError(null); hasLoaded.current = true; await fetchSuggestedRestock(activeSkus); return; }
 
@@ -507,7 +523,8 @@ export default function BuyingSheetPage() {
       for (const item of orderItems) {
         const order = ordersMap.get(item.order_id);
         if (!order || !isOpenBuyingOrder(order)) continue;
-        const requirement = buyingRequirement(item);
+        const invoicedQty = invoicedPool.take(`${item.order_id}|${(item.code || "").trim().toUpperCase()}`, item.quantity || 0);
+        const requirement = buyingRequirement(item, invoicedQty);
         const requested = requirement.totalNeeded;
         const allocatedOnPO = requirement.allocatedOnPurchaseOrder;
         if (requested <= 0) continue;
@@ -536,20 +553,24 @@ export default function BuyingSheetPage() {
       }
 
       const zohoStock = snapshot || {};
+      // Units still outstanding on open supplier POs (from today's stored Zoho
+      // POs). Each unit covers demand once, oldest waiting lines first.
+      const livePOs = live?.purchaseOrders || {};
+      const poPool = createQuantityPool(Object.entries(livePOs).map(([sku, p]) => [sku.trim().toUpperCase(), p.outstanding] as [string, number]));
       const buyingRows: BuyingSheetRow[] = Array.from(skuMap.values()).map(entry => {
         // Shared miscellaneous SKUs are not fungible inventory. Applying the
         // catalogue's combined stock to every custom line would falsely hide
         // demand, so only exact order-linked allocations cover those rows.
         const z = entry.isMiscellaneous ? { stockOnHand: 0, onPurchaseOrder: 0, vendorName: '', vendorEmail: '', unitCost: null, costSource: null, lastPurchasedDate: null } : (zohoStock[entry.sku] || { stockOnHand: 0, onPurchaseOrder: 0, vendorName: '', vendorEmail: '' });
-        // Only demand-linked PO allocations reduce this buying requirement.
-        // Zoho's SKU total can include POs belonging to other customer orders,
-        // so it is shown for reconciliation but never silently double-counted.
-        const zohoOnPurchaseOrder = Math.max(0, z.onPurchaseOrder || 0);
-        const onPurchaseOrder = entry.allocatedOnPurchaseOrder;
+        const livePO = entry.isMiscellaneous ? undefined : livePOs[entry.sku];
+        // Live open-PO total for this SKU replaces the old snapshot figure.
+        const zohoOnPurchaseOrder = live ? Math.max(0, livePO?.outstanding || 0) : Math.max(0, z.onPurchaseOrder || 0);
+        const pooled = entry.isMiscellaneous || !live ? 0 : poPool.take(entry.sku, Math.max(0, entry.totalNeeded - entry.allocatedOnPurchaseOrder));
+        const onPurchaseOrder = Math.min(entry.totalNeeded, entry.allocatedOnPurchaseOrder + pooled);
         const poVariance = Math.abs(zohoOnPurchaseOrder - onPurchaseOrder);
         const toOrder = buyingShortfall(entry.totalNeeded, z.stockOnHand, onPurchaseOrder);
         // Zoho vendor (from historical POs) takes priority as the suggested supplier
-        const supplierName = z.vendorName || entry.supplierName;
+        const supplierName = z.vendorName || livePO?.vendorName || entry.supplierName;
         const supplierEmail = z.vendorEmail || entry.supplierEmail || undefined;
         const daysWaiting = calendarDaysSince(entry.oldestCreatedAt);
         const covered = z.stockOnHand + onPurchaseOrder;
@@ -1162,7 +1183,10 @@ export default function BuyingSheetPage() {
     <TooltipProvider>
       <div className={`procurement-page aleph-page-workspace aleph-buying-workspace app-no-x-scroll min-w-0 w-full max-w-full space-y-5 overflow-x-hidden ${isFullscreen ? "fixed inset-0 z-[100] h-[100dvh] bg-background p-3 sm:p-5 overflow-y-auto overflow-x-hidden overscroll-contain" : ""}`} ref={printRef}>
         {loadError && <div role="alert" className="border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">Buying Sheet could not refresh: {loadError}</div>}
-        {(!lastRefreshedAt || Date.now() - lastRefreshedAt.getTime() > 86_400_000) && <div role="status" className="border border-border bg-muted/40 p-3 text-sm text-muted-foreground">{lastRefreshedAt ? `Stock snapshot last updated ${lastRefreshedAt.toLocaleString()}. Verify stock before purchasing.` : "Stock snapshot unavailable. Quantities shown do not include verified stock."}</div>}
+        <div role="status" className="border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
+          {liveCoverageAsOf ? `Open supplier POs and customer invoices current as of ${liveCoverageAsOf.toLocaleString()} — already-invoiced units and units on open POs are deducted.` : "Live supplier PO and invoice figures could not be loaded; quantities may include items already ordered or invoiced."}
+          {(!lastRefreshedAt || Date.now() - lastRefreshedAt.getTime() > 86_400_000) && <> {lastRefreshedAt ? `Stock on hand is from ${lastRefreshedAt.toLocaleDateString()} — check the shelf before buying.` : "Stock on hand is not available — check the shelf before buying."}</>}
+        </div>
         {rows.some(row => !row.isMiscellaneous && !zohoData?.[row.sku]) && <div role="status" className="border border-border bg-muted/40 p-3 text-sm text-muted-foreground">Stock is unverified for {rows.filter(row => !row.isMiscellaneous && !zohoData?.[row.sku]).length} items missing from the shared snapshot. Verify availability before purchasing.</div>}
         {/* ── Sticky Header ── */}
         <div className="sticky top-0 z-20 -mx-1 px-1 pb-3 bg-background/88 backdrop-blur-xl supports-[backdrop-filter]:bg-background/72">
