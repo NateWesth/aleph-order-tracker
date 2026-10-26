@@ -117,6 +117,7 @@ export default function BuyingSheetPage() {
   const [viewDensity, setViewDensity] = useState<ViewDensity>(loadDensity);
   const [recentlyOrdered, setRecentlyOrdered] = useState<RecentlyOrderedItem[]>(loadRecentlyOrdered);
   const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(null);
+  const [liveCoverageAsOf, setLiveCoverageAsOf] = useState<Date | null>(null);
   const [showRecentlyOrdered, setShowRecentlyOrdered] = useState(false);
   const [adjustedQtys, setAdjustedQtys] = useState<Record<string, number>>({});
   const rows = useMemo(() => rawRows.map(row => {
@@ -522,7 +523,8 @@ export default function BuyingSheetPage() {
       for (const item of orderItems) {
         const order = ordersMap.get(item.order_id);
         if (!order || !isOpenBuyingOrder(order)) continue;
-        const requirement = buyingRequirement(item);
+        const invoicedQty = invoicedPool.take(`${item.order_id}|${(item.code || "").trim().toUpperCase()}`, item.quantity || 0);
+        const requirement = buyingRequirement(item, invoicedQty);
         const requested = requirement.totalNeeded;
         const allocatedOnPO = requirement.allocatedOnPurchaseOrder;
         if (requested <= 0) continue;
@@ -551,20 +553,24 @@ export default function BuyingSheetPage() {
       }
 
       const zohoStock = snapshot || {};
+      // Units still outstanding on open supplier POs (from today's stored Zoho
+      // POs). Each unit covers demand once, oldest waiting lines first.
+      const livePOs = live?.purchaseOrders || {};
+      const poPool = createQuantityPool(Object.entries(livePOs).map(([sku, p]) => [sku.trim().toUpperCase(), p.outstanding] as [string, number]));
       const buyingRows: BuyingSheetRow[] = Array.from(skuMap.values()).map(entry => {
         // Shared miscellaneous SKUs are not fungible inventory. Applying the
         // catalogue's combined stock to every custom line would falsely hide
         // demand, so only exact order-linked allocations cover those rows.
         const z = entry.isMiscellaneous ? { stockOnHand: 0, onPurchaseOrder: 0, vendorName: '', vendorEmail: '', unitCost: null, costSource: null, lastPurchasedDate: null } : (zohoStock[entry.sku] || { stockOnHand: 0, onPurchaseOrder: 0, vendorName: '', vendorEmail: '' });
-        // Only demand-linked PO allocations reduce this buying requirement.
-        // Zoho's SKU total can include POs belonging to other customer orders,
-        // so it is shown for reconciliation but never silently double-counted.
-        const zohoOnPurchaseOrder = Math.max(0, z.onPurchaseOrder || 0);
-        const onPurchaseOrder = entry.allocatedOnPurchaseOrder;
+        const livePO = entry.isMiscellaneous ? undefined : livePOs[entry.sku];
+        // Live open-PO total for this SKU replaces the old snapshot figure.
+        const zohoOnPurchaseOrder = live ? Math.max(0, livePO?.outstanding || 0) : Math.max(0, z.onPurchaseOrder || 0);
+        const pooled = entry.isMiscellaneous || !live ? 0 : poPool.take(entry.sku, Math.max(0, entry.totalNeeded - entry.allocatedOnPurchaseOrder));
+        const onPurchaseOrder = Math.min(entry.totalNeeded, entry.allocatedOnPurchaseOrder + pooled);
         const poVariance = Math.abs(zohoOnPurchaseOrder - onPurchaseOrder);
         const toOrder = buyingShortfall(entry.totalNeeded, z.stockOnHand, onPurchaseOrder);
         // Zoho vendor (from historical POs) takes priority as the suggested supplier
-        const supplierName = z.vendorName || entry.supplierName;
+        const supplierName = z.vendorName || livePO?.vendorName || entry.supplierName;
         const supplierEmail = z.vendorEmail || entry.supplierEmail || undefined;
         const daysWaiting = calendarDaysSince(entry.oldestCreatedAt);
         const covered = z.stockOnHand + onPurchaseOrder;
