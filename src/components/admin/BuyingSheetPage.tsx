@@ -758,7 +758,7 @@ export default function BuyingSheetPage() {
     let csv = "";
     for (const [supplier, items] of groups.entries()) {
       csv += `\n"SUPPLIER: ${supplier}"\n"SKU","Item Name","Qty to Order","In Stock","Allocated On PO","Zoho Open PO","PO Variance","Notes"\n`;
-      for (const item of items) csv += `"${item.sku}","${item.itemName}","${item.toOrder}","${item.stockOnHand}","${item.onPurchaseOrder}","${item.zohoOnPurchaseOrder}","${item.poVariance}","${notes[item.rowKey] || ""}"\n`;
+      for (const item of items) csv += `"${item.sku}","${item.itemName}","${buyingOrderQuantity(item, adjustedQtys)}","${item.stockOnHand}","${item.onPurchaseOrder}","${item.zohoOnPurchaseOrder}","${item.poVariance}","${notes[item.rowKey] || ""}"\n`;
       csv += `"","TOTAL","${items.reduce((s, r) => s + r.toOrder, 0)}","","","","",""\n`;
     }
     const blob = new Blob([csv], { type: "text/csv" }); const url = URL.createObjectURL(blob);
@@ -1163,6 +1163,7 @@ export default function BuyingSheetPage() {
       <div className={`procurement-page aleph-page-workspace aleph-buying-workspace app-no-x-scroll min-w-0 w-full max-w-full space-y-5 overflow-x-hidden ${isFullscreen ? "fixed inset-0 z-[100] h-[100dvh] bg-background p-3 sm:p-5 overflow-y-auto overflow-x-hidden overscroll-contain" : ""}`} ref={printRef}>
         {loadError && <div role="alert" className="border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">Buying Sheet could not refresh: {loadError}</div>}
         {(!lastRefreshedAt || Date.now() - lastRefreshedAt.getTime() > 86_400_000) && <div role="status" className="border border-border bg-muted/40 p-3 text-sm text-muted-foreground">{lastRefreshedAt ? `Stock snapshot last updated ${lastRefreshedAt.toLocaleString()}. Verify stock before purchasing.` : "Stock snapshot unavailable. Quantities shown do not include verified stock."}</div>}
+        {rows.some(row => !row.isMiscellaneous && !zohoData?.[row.sku]) && <div role="status" className="border border-border bg-muted/40 p-3 text-sm text-muted-foreground">Stock is unverified for {rows.filter(row => !row.isMiscellaneous && !zohoData?.[row.sku]).length} items missing from the shared snapshot. Verify availability before purchasing.</div>}
         {/* ── Sticky Header ── */}
         <div className="sticky top-0 z-20 -mx-1 px-1 pb-3 bg-background/88 backdrop-blur-xl supports-[backdrop-filter]:bg-background/72">
           <div className="procurement-command-center rounded-[24px] border border-border/60 bg-card/92 shadow-xl shadow-black/[0.04] overflow-hidden mb-3">
