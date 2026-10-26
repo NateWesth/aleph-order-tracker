@@ -47,3 +47,12 @@ export function allocateBuyingQuantity(lines: Array<{ id: string; quantity: numb
     return added > 0 ? [{ ...line, nextQtyOnPO: line.qty_on_po + added }] : [];
   });
 }
+
+/** Quote embedded commas, newlines and double quotes for spreadsheet exports. */
+export function buyingCsvCell(value: unknown) {
+  return `"${String(value ?? "").replaceAll('"', '""')}"`;
+}
+
+export function buyingSelectedKeys(rows: Array<{ rowKey: string }>, selected: Set<string>) {
+  return rows.filter(row => selected.has(row.rowKey)).map(row => row.rowKey);
+}

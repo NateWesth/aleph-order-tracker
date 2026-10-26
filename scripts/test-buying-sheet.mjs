@@ -5,6 +5,13 @@ import ts from "typescript";
 const source = await readFile(new URL("../src/lib/buyingSheet.ts", import.meta.url), "utf8");
 const js = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext } }).outputText;
 const { buyingRequirement, buyingShortfall, isOpenBuyingOrder, buyingOrderQuantity, allocateBuyingQuantity } = await import("data:text/javascript;base64," + Buffer.from(js).toString("base64"));
+const { buyingCsvCell, buyingSelectedKeys } = await import("data:text/javascript;base64," + Buffer.from(js).toString("base64"));
+test("export preserves quoted product names and multiline notes", () => {
+  assert.equal(buyingCsvCell('Blade 12"\nHeavy, duty'), '"Blade 12""\nHeavy, duty"');
+});
+test("quick actions target only selected rows visible in the queue", () => {
+  assert.deepEqual(buyingSelectedKeys([{rowKey:"visible"}], new Set(["hidden", "visible"])), ["visible"]);
+});
 test("partial receipt is not purchased twice", () => {
   const r = buyingRequirement({ quantity: 10, qty_received: 4, qty_on_po: 7 });
   assert.deepEqual(r, { totalNeeded: 6, allocatedOnPurchaseOrder: 3 });
