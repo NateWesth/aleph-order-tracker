@@ -58,7 +58,7 @@ const Settings = () => {
 
   useEffect(() => {
     // Check if already installed
-    const isInStandaloneMode = window.matchMedia('(display-mode: standalone)').matches 
+    const isInStandaloneMode = Capacitor.isNativePlatform() || window.matchMedia('(display-mode: standalone)').matches 
       || (window.navigator as any).standalone === true;
     setIsInstalled(isInStandaloneMode);
 

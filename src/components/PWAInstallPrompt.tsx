@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Download, X, Smartphone } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -15,6 +16,7 @@ export const PWAInstallPrompt = () => {
   const [isStandalone, setIsStandalone] = useState(false);
 
   useEffect(() => {
+    if (Capacitor.isNativePlatform()) return;
     // Check if already installed (standalone mode)
     const isInStandaloneMode = window.matchMedia('(display-mode: standalone)').matches 
       || (window.navigator as any).standalone === true;
