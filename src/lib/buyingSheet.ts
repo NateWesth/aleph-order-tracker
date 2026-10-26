@@ -50,7 +50,7 @@ export function allocateBuyingQuantity(lines: Array<{ id: string; quantity: numb
 
 /** Quote embedded commas, newlines and double quotes for spreadsheet exports. */
 export function buyingCsvCell(value: unknown) {
-  return `"${String(value ?? "").replaceAll('"', '""')}"`;
+  return `"${String(value ?? "").replace(/"/g, '""')}"`;
 }
 
 export function buyingSelectedKeys(rows: Array<{ rowKey: string }>, selected: Set<string>) {
