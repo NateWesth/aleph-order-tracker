@@ -1,5 +1,18 @@
 import { readAllRows } from "@/lib/readAllRows";
-import { buyingRequirement, buyingShortfall, isOpenBuyingOrder, buyingOrderQuantity, allocateBuyingQuantity } from "@/lib/buyingSheet";
+import { buyingRequirement, buyingShortfall, isOpenBuyingOrder, buyingOrderQuantity, allocateBuyingQuantity, createQuantityPool } from "@/lib/buyingSheet";
+
+type LiveCoverage = {
+  asOf: string | null;
+  purchaseOrders: Record<string, { outstanding: number; poNumbers: string[]; vendorName: string | null }>;
+  invoiced: { orderId: string; sku: string; qty: number }[];
+};
+
+/** Current supplier-PO and customer-invoice quantities from the Zoho documents already stored in the app (no Zoho API calls). */
+async function fetchLiveCoverage(): Promise<LiveCoverage | null> {
+  const { data, error } = await (supabase.rpc as unknown as (fn: string) => Promise<{ data: unknown; error: unknown }>)("get_buying_sheet_live_coverage");
+  if (error || !data) { console.error("Live PO/invoice coverage unavailable:", error); return null; }
+  return data as LiveCoverage;
+}
 import FabricationReorderPanel from "@/components/admin/buying-sheet/FabricationReorderPanel";
 import { useState, useEffect, useMemo, useCallback, useRef, Fragment } from "react";
 import { useLiveData } from "@/hooks/useLiveData";
@@ -473,8 +486,10 @@ export default function BuyingSheetPage() {
     loadInFlight.current = true;
     if (!hasLoaded.current) setLoading(true);
     try {
-      const snapshot = await fetchZohoData();
-      const orderItems = await readAllRows((from, to) => supabase.from("order_items").select("id, name, code, description, notes, quantity, qty_on_po, qty_received, progress_stage, order_id, created_at").eq("progress_stage", "awaiting-stock").order("id").range(from, to));
+      const [snapshot, live] = await Promise.all([fetchZohoData(), fetchLiveCoverage()]);
+      setLiveCoverageAsOf(live?.asOf ? new Date(live.asOf) : null);
+      const invoicedPool = createQuantityPool((live?.invoiced || []).map(i => [`${i.orderId}|${(i.sku || "").trim().toUpperCase()}`, i.qty] as [string, number]));
+      const orderItems = await readAllRows((from, to) => supabase.from("order_items").select("id, name, code, description, notes, quantity, qty_on_po, qty_received, progress_stage, order_id, created_at").eq("progress_stage", "awaiting-stock").order("created_at").order("id").range(from, to));
       const activeSkus = new Set<string>();
       if (!orderItems.length) { setRows([]); setLoadError(null); hasLoaded.current = true; await fetchSuggestedRestock(activeSkus); return; }
 
