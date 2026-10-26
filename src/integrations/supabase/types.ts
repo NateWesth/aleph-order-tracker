@@ -3802,6 +3802,7 @@ export type Database = {
         Args: never
         Returns: number
       }
+      get_buying_sheet_live_coverage: { Args: never; Returns: Json }
       get_current_user_role: {
         Args: never
         Returns: Database["public"]["Enums"]["app_role"]
