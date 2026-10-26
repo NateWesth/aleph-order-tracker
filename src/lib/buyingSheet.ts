@@ -18,3 +18,12 @@ export function buyingShortfall(needed: number, stock: number, allocated: number
 export function buyingOrderQuantity(row: { rowKey: string; recommendedOrderQty: number }, overrides: Record<string, number>) {
   return overrides[row.rowKey] ?? row.recommendedOrderQty;
 }
+
+export function allocateBuyingQuantity(lines: Array<{ id: string; quantity: number; qty_on_po: number }>, purchased: number) {
+  let remaining = Math.max(0, purchased);
+  return lines.flatMap(line => {
+    const added = Math.min(Math.max(0, line.quantity - line.qty_on_po), remaining);
+    remaining -= added;
+    return added > 0 ? [{ ...line, nextQtyOnPO: line.qty_on_po + added }] : [];
+  });
+}

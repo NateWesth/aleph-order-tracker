@@ -1,5 +1,5 @@
 import { readAllRows } from "@/lib/readAllRows";
-import { buyingRequirement, buyingShortfall, isOpenBuyingOrder, buyingOrderQuantity } from "@/lib/buyingSheet";
+import { buyingRequirement, buyingShortfall, isOpenBuyingOrder, buyingOrderQuantity, allocateBuyingQuantity } from "@/lib/buyingSheet";
 import FabricationReorderPanel from "@/components/admin/buying-sheet/FabricationReorderPanel";
 import { useState, useEffect, useMemo, useCallback, useRef, Fragment } from "react";
 import { useLiveData } from "@/hooks/useLiveData";
@@ -60,7 +60,7 @@ const earliestTimestamp = (...dates: Array<string | null | undefined>) => {
 
 export default function BuyingSheetPage() {
   const { toast } = useToast();
-  const [rows, setRows] = useState<BuyingSheetRow[]>([]);
+  const [rawRows, setRows] = useState<BuyingSheetRow[]>([]);
   const [suggestedRows, setSuggestedRows] = useState<SuggestedRestockRow[]>([]);
   const [suggestedOpen, setSuggestedOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -106,6 +106,10 @@ export default function BuyingSheetPage() {
   const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(null);
   const [showRecentlyOrdered, setShowRecentlyOrdered] = useState(false);
   const [adjustedQtys, setAdjustedQtys] = useState<Record<string, number>>({});
+  const rows = useMemo(() => rawRows.map(row => {
+    const adjustedOrderQty = buyingOrderQuantity(row, adjustedQtys);
+    return { ...row, adjustedOrderQty, estimatedCost: row.unitCost === null ? null : Math.round(row.unitCost * adjustedOrderQty * 100) / 100 };
+  }), [rawRows, adjustedQtys]);
   const [supplierReliabilityMap, setSupplierReliabilityMap] = useState<Map<string, number>>(new Map());
   const [weeklyHistory, setWeeklyHistory] = useState<Map<string, { thisWeek: number; lastWeek: number }>>(new Map());
   const [costHistory, setCostHistory] = useState<Map<string, number>>(new Map());
@@ -188,12 +192,12 @@ export default function BuyingSheetPage() {
     try {
       const now = new Date();
       const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+      const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 1);
       const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 2, 1);
-      const prevMonthEnd = new Date(now.getFullYear(), now.getMonth() - 1, 0);
+      const prevMonthEnd = lastMonthStart;
       const [lastRes, prevRes] = await Promise.all([
-        readAllRows((from, to) => supabase.from("order_items").select("code, quantity").not("code", "is", null).gte("created_at", lastMonthStart.toISOString()).lte("created_at", lastMonthEnd.toISOString()).order("id").range(from, to)).then(data => ({ data })),
-        readAllRows((from, to) => supabase.from("order_items").select("code, quantity").not("code", "is", null).gte("created_at", prevMonthStart.toISOString()).lte("created_at", prevMonthEnd.toISOString()).order("id").range(from, to)).then(data => ({ data })),
+        readAllRows((from, to) => supabase.from("order_items").select("code, quantity").not("code", "is", null).gte("created_at", lastMonthStart.toISOString()).lt("created_at", lastMonthEnd.toISOString()).order("id").range(from, to)).then(data => ({ data })),
+        readAllRows((from, to) => supabase.from("order_items").select("code, quantity").not("code", "is", null).gte("created_at", prevMonthStart.toISOString()).lt("created_at", prevMonthEnd.toISOString()).order("id").range(from, to)).then(data => ({ data })),
       ]);
       const lastMap = new Map<string, number>();
       const prevMap = new Map<string, number>();
@@ -377,7 +381,7 @@ export default function BuyingSheetPage() {
   const fetchWeeklyHistory = async () => {
     try {
       const now = new Date();
-      const thisWeekStart = new Date(now); thisWeekStart.setDate(now.getDate() - now.getDay());
+      const thisWeekStart = new Date(now); thisWeekStart.setDate(now.getDate() - now.getDay()); thisWeekStart.setHours(0, 0, 0, 0);
       const lastWeekStart = new Date(thisWeekStart); lastWeekStart.setDate(lastWeekStart.getDate() - 7);
       const [thisRes, lastRes] = await Promise.all([
         readAllRows((from, to) => supabase.from("order_items").select("code, quantity").not("code", "is", null).gte("created_at", thisWeekStart.toISOString()).order("id").range(from, to)).then(data => ({ data })),
@@ -640,16 +644,17 @@ export default function BuyingSheetPage() {
       if (orderItemIds.length > 0) {
         const current = await readAllRows((from, to) => supabase.from("order_items").select("id, quantity, qty_on_po, order_id").in("id", orderItemIds).order("id").range(from, to));
         if (current.length !== orderItemIds.length) throw new Error("Some selected items are no longer available. Refresh and retry.");
-        for (const item of current) {
+        const updates = targetRows.flatMap(row => allocateBuyingQuantity(current.filter(item => row.orderItemIds.includes(item.id)), buyingOrderQuantity(row, adjustedQtys)));
+        for (const item of updates) {
           const { data: changed, error } = await supabase.from("order_items")
-            .update({ qty_on_po: item.quantity })
+            .update({ qty_on_po: item.nextQtyOnPO })
             .eq("id", item.id).eq("qty_on_po", item.qty_on_po).eq("quantity", item.quantity)
             .select("id").maybeSingle();
           if (error) throw error;
           if (!changed) throw new Error("An item changed on another device. Refresh and retry.");
         }
         // Track recently ordered
-        const newRecent: RecentlyOrderedItem[] = targetRows.map(r => ({ sku: r.sku, itemName: r.itemName, quantity: r.toOrder, orderedAt: new Date().toISOString(), supplier: r.supplierName }));
+        const newRecent: RecentlyOrderedItem[] = targetRows.map(r => ({ sku: r.sku, itemName: r.itemName, quantity: buyingOrderQuantity(r, adjustedQtys), orderedAt: new Date().toISOString(), supplier: r.supplierName }));
         const updated = [...newRecent, ...recentlyOrdered].slice(0, 50);
         setRecentlyOrdered(updated);
         saveRecentlyOrdered(updated);
@@ -657,14 +662,13 @@ export default function BuyingSheetPage() {
         setSelectedSkus(new Set());
         fetchLocalData();
       }
-    } catch (err) { toast({ title: "Error", description: err instanceof Error ? err.message : "Failed to update items", variant: "destructive" }); } finally { setBulkOrdering(false); }
+    } catch (err) { toast({ title: "Error", description: err instanceof Error ? err.message : "Failed to update items", variant: "destructive" }); } finally { setBulkOrdering(false); void fetchLocalDataRef.current(); }
   };
 
   const generateEmailDraft = (supplierName: string) => {
     const items = sortedRows.filter(r => r.supplierName === supplierName && r.toOrder > 0);
     if (items.length === 0) return;
     const itemLines = items.map(r => {
-      const recQty = r.recommendedOrderQty > r.toOrder ? `${r.toOrder} (+ ${r.safetyStock} safety stock = ${r.recommendedOrderQty})` : `${r.toOrder}`;
       return `  • ${r.sku} — ${r.itemName} — Qty: ${buyingOrderQuantity(r, adjustedQtys)}`;
     }).join("\n");
     const totalQty = items.reduce((s, r) => s + buyingOrderQuantity(r, adjustedQtys), 0);
@@ -1271,7 +1275,7 @@ export default function BuyingSheetPage() {
         {/* Event-driven sync status */}
         {lastRefreshedAt && (
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <span className="flex items-center gap-1.5"><Zap className="h-3.5 w-3.5 text-emerald-500" />Live webhook cache · last document event {lastRefreshedAt.toLocaleTimeString()}</span>
+            <span className="flex items-center gap-1.5"><Zap className="h-3.5 w-3.5 text-primary" />Shared stock snapshot · {lastRefreshedAt.toLocaleString()}</span>
           </div>
         )}
 
