@@ -1,9 +1,29 @@
-/** Only units still awaiting receipt belong in the procurement requirement. */
-export function buyingRequirement(line: { quantity: number; qty_received?: number | null; qty_on_po?: number | null }) {
+/**
+ * Only units not yet received from the supplier AND not yet invoiced to the
+ * customer belong in the procurement requirement. Invoiced units have already
+ * left the building, so they can never need purchasing again.
+ */
+export function buyingRequirement(line: { quantity: number; qty_received?: number | null; qty_on_po?: number | null }, invoiced = 0) {
   const quantity = Math.max(0, line.quantity || 0);
   const received = Math.min(quantity, Math.max(0, line.qty_received || 0));
-  const totalNeeded = quantity - received;
+  const fulfilled = Math.max(received, Math.min(quantity, Math.max(0, invoiced || 0)));
+  const totalNeeded = quantity - fulfilled;
   return { totalNeeded, allocatedOnPurchaseOrder: Math.min(totalNeeded, Math.max(0, (line.qty_on_po || 0) - received)) };
+}
+
+/** A shared quantity pool (invoiced units per order+SKU, or open PO units per SKU) consumed line by line so nothing is counted twice. */
+export function createQuantityPool(entries: Iterable<[string, number]>) {
+  const remaining = new Map<string, number>();
+  for (const [key, qty] of entries) remaining.set(key, (remaining.get(key) || 0) + Math.max(0, Number(qty) || 0));
+  return {
+    take(key: string, wanted: number) {
+      const available = remaining.get(key) || 0;
+      const taken = Math.min(available, Math.max(0, wanted));
+      if (taken > 0) remaining.set(key, available - taken);
+      return taken;
+    },
+    left: (key: string) => remaining.get(key) || 0,
+  };
 }
 
 export function isOpenBuyingOrder(order: { status?: string | null; completed_date?: string | null }) {

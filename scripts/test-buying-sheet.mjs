@@ -23,4 +23,17 @@ test("a partial purchase never fully marks every demand line ordered", () => {
 test("custom row identities keep quantity overrides separate", () => {
   assert.equal(buyingOrderQuantity({ rowKey: "M-MISC:one", recommendedOrderQty: 8 }, { "M-MISC:one": 2 }), 2);
   assert.equal(buyingOrderQuantity({ rowKey: "M-MISC:two", recommendedOrderQty: 8 }, { "M-MISC:one": 2 }), 8);
+});const { createQuantityPool } = await import("data:text/javascript;base64," + Buffer.from(js).toString("base64"));
+test("units already invoiced to the customer are not purchased", () => {
+  assert.equal(buyingRequirement({ quantity: 10, qty_received: 0, qty_on_po: 0 }, 6).totalNeeded, 4);
+  assert.equal(buyingRequirement({ quantity: 10, qty_received: 0, qty_on_po: 0 }, 12).totalNeeded, 0);
+});
+test("received and invoiced units are not subtracted twice", () => {
+  assert.equal(buyingRequirement({ quantity: 10, qty_received: 5, qty_on_po: 5 }, 5).totalNeeded, 5);
+});
+test("an open supplier PO covers demand only once across lines", () => {
+  const pool = createQuantityPool([["SKU-A", 12]]);
+  assert.equal(pool.take("SKU-A", 10), 10);
+  assert.equal(pool.take("SKU-A", 10), 2);
+  assert.equal(pool.take("SKU-A", 10), 0);
 });
