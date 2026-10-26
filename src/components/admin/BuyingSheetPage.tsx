@@ -1,3 +1,5 @@
+import { readAllRows } from "@/lib/readAllRows";
+import { buyingRequirement, buyingShortfall, isOpenBuyingOrder, buyingOrderQuantity } from "@/lib/buyingSheet";
 import FabricationReorderPanel from "@/components/admin/buying-sheet/FabricationReorderPanel";
 import { useState, useEffect, useMemo, useCallback, useRef, Fragment } from "react";
 import { useLiveData } from "@/hooks/useLiveData";
@@ -62,6 +64,10 @@ export default function BuyingSheetPage() {
   const [suggestedRows, setSuggestedRows] = useState<SuggestedRestockRow[]>([]);
   const [suggestedOpen, setSuggestedOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const loadInFlight = useRef(false);
+  const pendingReload = useRef(false);
+  const hasLoaded = useRef(false);
   const [zohoLoading, setZohoLoading] = useState(false);
   const [zohoData, setZohoData] = useState<ZohoStockData | null>(null);
   const [search, setSearch] = useState("");
@@ -130,30 +136,11 @@ export default function BuyingSheetPage() {
   useLiveData(["orders", "order_items", "order_purchase_orders"], () => {
     void fetchLocalDataRef.current();
     fetchLastPurchaseDates();
-  }, { enabled: insightsReady, fallbackIntervalMs: 0, debounceMs: 1500, channelName: "buying-sheet-local-live-data" });
+  }, { enabled: insightsReady, fallbackIntervalMs: 15_000, debounceMs: 1500, channelName: "buying-sheet-local-live-data" });
 
-  // Zoho document webhooks update one shared cache row. Realtime broadcasts
-  // that single change to every app, so no browser needs to poll Zoho.
-  useEffect(() => {
-    const channel = supabase
-      .channel("buying-sheet-event-cache")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "buying_sheet_cache", filter: "id=eq.buying-sheet" },
-        (change) => {
-          const next = change.new as { payload?: ZohoStockData; fetched_at?: string };
-          if (!next?.payload) return;
-          setZohoData(next.payload);
-          setLastRefreshedAt(next.fetched_at ? new Date(next.fetched_at) : new Date());
-          void fetchLocalDataRef.current();
-        },
-      )
-      .subscribe();
-
-    return () => {
-      void supabase.removeChannel(channel);
-    };
-  }, []);
+  useLiveData(["buying_sheet_cache"], () => {
+    void fetchLocalDataRef.current();
+  }, { enabled: insightsReady, fallbackIntervalMs: 30_000, debounceMs: 1500, channelName: "buying-sheet-cache-live-data" });
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -205,8 +192,8 @@ export default function BuyingSheetPage() {
       const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 2, 1);
       const prevMonthEnd = new Date(now.getFullYear(), now.getMonth() - 1, 0);
       const [lastRes, prevRes] = await Promise.all([
-        supabase.from("order_items").select("code, quantity").not("code", "is", null).gte("created_at", lastMonthStart.toISOString()).lte("created_at", lastMonthEnd.toISOString()),
-        supabase.from("order_items").select("code, quantity").not("code", "is", null).gte("created_at", prevMonthStart.toISOString()).lte("created_at", prevMonthEnd.toISOString()),
+        readAllRows((from, to) => supabase.from("order_items").select("code, quantity").not("code", "is", null).gte("created_at", lastMonthStart.toISOString()).lte("created_at", lastMonthEnd.toISOString()).order("id").range(from, to)).then(data => ({ data })),
+        readAllRows((from, to) => supabase.from("order_items").select("code, quantity").not("code", "is", null).gte("created_at", prevMonthStart.toISOString()).lte("created_at", prevMonthEnd.toISOString()).order("id").range(from, to)).then(data => ({ data })),
       ]);
       const lastMap = new Map<string, number>();
       const prevMap = new Map<string, number>();
@@ -221,7 +208,7 @@ export default function BuyingSheetPage() {
   const fetchLeadTimes = async () => {
     try {
       const oneYearAgo = new Date(); oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
-      const { data } = await supabase.from("order_items").select("code, created_at, completed_at, order_id").eq("progress_stage", "completed").not("code", "is", null).not("completed_at", "is", null).gte("completed_at", oneYearAgo.toISOString());
+      const data = await readAllRows((from, to) => supabase.from("order_items").select("code, created_at, completed_at, order_id").eq("progress_stage", "completed").not("code", "is", null).not("completed_at", "is", null).gte("completed_at", oneYearAgo.toISOString()).order("id").range(from, to));
       const skuLeadTimes = new Map<string, number[]>();
       (data || []).forEach(item => {
         if (!item.created_at || !item.completed_at) return;
@@ -246,7 +233,7 @@ export default function BuyingSheetPage() {
     try {
       const currentMonth = new Date().getMonth();
       const oneYearAgo = new Date(); oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
-      const { data } = await supabase.from("order_items").select("code, quantity, created_at").not("code", "is", null).gte("created_at", oneYearAgo.toISOString());
+      const data = await readAllRows((from, to) => supabase.from("order_items").select("code, quantity, created_at").not("code", "is", null).gte("created_at", oneYearAgo.toISOString()).order("id").range(from, to));
       const skuMonthlyTotals = new Map<string, Map<number, number[]>>();
       (data || []).forEach(item => {
         const sku = (item.code || "").trim().toUpperCase();
@@ -276,7 +263,7 @@ export default function BuyingSheetPage() {
 
   const fetchLastPurchaseDates = async () => {
     try {
-      const { data } = await supabase.from("order_items").select("code, completed_at").eq("progress_stage", "completed").not("code", "is", null).not("completed_at", "is", null).order("completed_at", { ascending: false });
+      const data = await readAllRows((from, to) => supabase.from("order_items").select("code, completed_at").eq("progress_stage", "completed").not("code", "is", null).not("completed_at", "is", null).order("completed_at", { ascending: false }).order("id").range(from, to));
       const map = new Map<string, string>();
       (data || []).forEach(item => { const sku = (item.code || "").trim().toUpperCase(); if (!map.has(sku) && item.completed_at) map.set(sku, item.completed_at); });
       setLastPurchaseMap(map);
@@ -293,15 +280,8 @@ export default function BuyingSheetPage() {
         .maybeSingle();
       if (cacheError) throw cacheError;
 
-      let payload = cached;
-      if (!payload?.payload) {
-        // One-time bootstrap for a new environment. Once this row exists,
-        // normal page loads never call Zoho again.
-        const { data, error } = await supabase.functions.invoke("buying-sheet-data", { body: { force: false } });
-        if (error) throw error;
-        if (data?.error) throw new Error(data.error);
-        payload = { payload: data?.data || {}, fetched_at: data?.fetchedAt || new Date().toISOString() } as typeof cached;
-      }
+      const payload = cached;
+      if (!payload?.payload) throw new Error("No stock snapshot is available yet");
 
       const next = (payload?.payload || {}) as unknown as ZohoStockData;
       setZohoData(next);
@@ -309,15 +289,15 @@ export default function BuyingSheetPage() {
       return next;
     } catch (error) {
       toast({ title: "Error", description: "Failed to load the shared Zoho snapshot", variant: "destructive" });
-      return null;
+      return zohoData;
     } finally { setZohoLoading(false); }
   };
 
   const fetchSuggestedRestock = async (activeSkus: Set<string>) => {
     try {
       const threeMonthsAgo = new Date(); threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
-      const { data: completedItems, error } = await supabase.from("order_items").select("code, name, quantity, completed_at, order_id").eq("progress_stage", "completed").not("code", "is", null).gte("completed_at", threeMonthsAgo.toISOString()).order("completed_at", { ascending: false });
-      if (error || !completedItems?.length) return;
+      const completedItems = await readAllRows((from, to) => supabase.from("order_items").select("code, name, quantity, completed_at, order_id").eq("progress_stage", "completed").not("code", "is", null).gte("completed_at", threeMonthsAgo.toISOString()).order("completed_at", { ascending: false }).order("id").range(from, to)); const error = null;
+      if (error || !completedItems?.length) { setSuggestedRows([]); return; }
       const skuMonthMap = new Map<string, { itemName: string; months: Map<string, number>; totalOrders: number; lastDate: string }>();
       for (const item of completedItems) {
         const sku = (item.code || "").trim().toUpperCase();
@@ -400,8 +380,8 @@ export default function BuyingSheetPage() {
       const thisWeekStart = new Date(now); thisWeekStart.setDate(now.getDate() - now.getDay());
       const lastWeekStart = new Date(thisWeekStart); lastWeekStart.setDate(lastWeekStart.getDate() - 7);
       const [thisRes, lastRes] = await Promise.all([
-        supabase.from("order_items").select("code, quantity").not("code", "is", null).gte("created_at", thisWeekStart.toISOString()),
-        supabase.from("order_items").select("code, quantity").not("code", "is", null).gte("created_at", lastWeekStart.toISOString()).lt("created_at", thisWeekStart.toISOString()),
+        readAllRows((from, to) => supabase.from("order_items").select("code, quantity").not("code", "is", null).gte("created_at", thisWeekStart.toISOString()).order("id").range(from, to)).then(data => ({ data })),
+        readAllRows((from, to) => supabase.from("order_items").select("code, quantity").not("code", "is", null).gte("created_at", lastWeekStart.toISOString()).lt("created_at", thisWeekStart.toISOString()).order("id").range(from, to)).then(data => ({ data })),
       ]);
       const thisMap = new Map<string, number>();
       const lastMap = new Map<string, number>();
@@ -419,10 +399,10 @@ export default function BuyingSheetPage() {
   const fetchCostHistory = async () => {
     try {
       const oneYearAgo = new Date(); oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
-      const { data } = await supabase.from("orders").select("id, total_amount").not("total_amount", "is", null).gt("total_amount", 0).gte("created_at", oneYearAgo.toISOString());
+      const data = await readAllRows((from, to) => supabase.from("orders").select("id, total_amount").not("total_amount", "is", null).gt("total_amount", 0).gte("created_at", oneYearAgo.toISOString()).order("id").range(from, to));
       if (!data?.length) return;
       const orderAmounts = new Map(data.map(o => [o.id, o.total_amount as number]));
-      const { data: items } = await supabase.from("order_items").select("code, quantity, order_id").not("code", "is", null).gte("created_at", oneYearAgo.toISOString());
+      const items = await readAllRows((from, to) => supabase.from("order_items").select("code, quantity, order_id").not("code", "is", null).gte("created_at", oneYearAgo.toISOString()).order("id").range(from, to));
       if (!items?.length) return;
       // Rough unit cost: order total / total items in order
       const skuCosts = new Map<string, number[]>();
@@ -475,7 +455,7 @@ export default function BuyingSheetPage() {
 
     // Cost: real vendor-bill cost first, local history only as a last resort
     const unitCost = billUnitCost ?? costHistory.get(sku) ?? null;
-    const qtyForCost = toOrder > 0 ? toOrder : recommendedOrderQty;
+    const qtyForCost = adjustedQtys[sku] ?? recommendedOrderQty;
     const estimatedCost = unitCost !== null ? Math.round(unitCost * qtyForCost * 100) / 100 : null;
 
     // Adjusted qty (user override or recommended)
@@ -485,16 +465,18 @@ export default function BuyingSheetPage() {
   };
 
   const fetchLocalData = async () => {
-    setLoading(true);
+    if (loadInFlight.current) { pendingReload.current = true; return; }
+    loadInFlight.current = true;
+    if (!hasLoaded.current) setLoading(true);
     try {
-      const { data: orderItems, error: itemsError } = await supabase.from("order_items").select("id, name, code, description, notes, quantity, qty_on_po, progress_stage, order_id, created_at").in("progress_stage", ["awaiting-stock"]).order("created_at", { ascending: false });
-      if (itemsError) throw itemsError;
+      const snapshot = await fetchZohoData();
+      const orderItems = await readAllRows((from, to) => supabase.from("order_items").select("id, name, code, description, notes, quantity, qty_on_po, qty_received, progress_stage, order_id, created_at").eq("progress_stage", "awaiting-stock").order("id").range(from, to));
       const activeSkus = new Set<string>();
-      if (!orderItems?.length) { setRows([]); setLoading(false); fetchSuggestedRestock(activeSkus); return; }
+      if (!orderItems.length) { setRows([]); setLoadError(null); hasLoaded.current = true; await fetchSuggestedRestock(activeSkus); return; }
 
       const orderIds = [...new Set(orderItems.map(i => i.order_id))];
       const [ordersResult, poResult] = await Promise.all([
-        supabase.from("orders").select("id, order_number, company_id, supplier_id, urgency, created_at").in("id", orderIds),
+        supabase.from("orders").select("id, order_number, company_id, supplier_id, urgency, created_at, status, completed_date").in("id", orderIds),
         supabase.from("order_purchase_orders").select("order_id, supplier_id").in("order_id", orderIds),
       ]);
       if (ordersResult.error) throw ordersResult.error;
@@ -519,14 +501,16 @@ export default function BuyingSheetPage() {
 
       const skuMap = new Map<string, { rowKey: string; sku: string; itemName: string; isMiscellaneous: boolean; orderItemIds: string[]; totalNeeded: number; allocatedOnPurchaseOrder: number; orders: { orderNumber: string; customerName: string; quantity: number; urgency?: string }[]; supplierName: string; supplierId: string | null; supplierEmail?: string; oldestCreatedAt: string; hasUrgent: boolean }>();
       for (const item of orderItems) {
-        const requested = Math.max(0, item.quantity || 0);
-        const allocatedOnPO = Math.min(requested, Math.max(0, item.qty_on_po || 0));
+        const order = ordersMap.get(item.order_id);
+        if (!order || !isOpenBuyingOrder(order)) continue;
+        const requirement = buyingRequirement(item);
+        const requested = requirement.totalNeeded;
+        const allocatedOnPO = requirement.allocatedOnPurchaseOrder;
         if (requested <= 0) continue;
         const sku = (item.code || "NO-SKU").trim().toUpperCase(); activeSkus.add(sku);
         const itemName = getItemDisplayName(item);
         const rowKey = getItemIdentityKey(item);
         const miscellaneous = isMiscellaneousItem(sku) || isMiscellaneousItem(item.name);
-        const order = ordersMap.get(item.order_id);
         const waitingSince = earliestTimestamp(order?.created_at, item.created_at);
         const customerName = order?.company_id ? companiesMap.get(order.company_id) || "Unknown" : "Unknown";
         const urgency = order?.urgency || "normal";
@@ -547,7 +531,7 @@ export default function BuyingSheetPage() {
         }
       }
 
-      const zohoStock = zohoData || {};
+      const zohoStock = snapshot || {};
       const buyingRows: BuyingSheetRow[] = Array.from(skuMap.values()).map(entry => {
         // Shared miscellaneous SKUs are not fungible inventory. Applying the
         // catalogue's combined stock to every custom line would falsely hide
@@ -559,7 +543,7 @@ export default function BuyingSheetPage() {
         const zohoOnPurchaseOrder = Math.max(0, z.onPurchaseOrder || 0);
         const onPurchaseOrder = entry.allocatedOnPurchaseOrder;
         const poVariance = Math.abs(zohoOnPurchaseOrder - onPurchaseOrder);
-        const toOrder = Math.max(0, entry.totalNeeded - z.stockOnHand - onPurchaseOrder);
+        const toOrder = buyingShortfall(entry.totalNeeded, z.stockOnHand, onPurchaseOrder);
         // Zoho vendor (from historical POs) takes priority as the suggested supplier
         const supplierName = z.vendorName || entry.supplierName;
         const supplierEmail = z.vendorEmail || entry.supplierEmail || undefined;
@@ -609,41 +593,17 @@ export default function BuyingSheetPage() {
         row.abcClass = pct <= 0.8 ? "A" : pct <= 0.95 ? "B" : "C";
       }
       setRows(buyingRows);
-      fetchSuggestedRestock(activeSkus);
-    } catch (error) { console.error("Failed to fetch buying sheet data:", error); } finally { setLoading(false); }
-
-    fetchZohoData().then(zoho => {
-      if (zoho) {
-        setRows(prev => prev.map(row => {
-          const z = row.isMiscellaneous ? { stockOnHand: 0, onPurchaseOrder: 0, vendorName: '', vendorEmail: '', unitCost: null, costSource: null, lastPurchasedDate: null } : (zoho[row.sku] || { stockOnHand: 0, onPurchaseOrder: 0, vendorName: '', vendorEmail: '' });
-          const zohoOnPurchaseOrder = Math.max(0, z.onPurchaseOrder || 0);
-          const onPurchaseOrder = row.allocatedOnPurchaseOrder;
-          const poVariance = Math.abs(zohoOnPurchaseOrder - onPurchaseOrder);
-          const toOrder = Math.max(0, row.totalNeeded - z.stockOnHand - onPurchaseOrder);
-          // Zoho vendor (from historical POs) takes priority as the suggested supplier
-          const supplierName = z.vendorName || row.supplierName;
-          const supplierEmail = z.vendorEmail || row.supplierEmail || undefined;
-          const covered = z.stockOnHand + onPurchaseOrder;
-          const coveragePercent = row.totalNeeded > 0 ? Math.min(100, Math.round((covered / row.totalNeeded) * 100)) : 100;
-          const stockoutRiskDays = getStockoutRiskDays(row.sku, z.stockOnHand, onPurchaseOrder);
-          let priorityScore = 0;
-          if (toOrder > 0) priorityScore += 30; if (row.hasUrgent) priorityScore += 40;
-          if (row.daysWaiting > 7) priorityScore += 15; if (row.daysWaiting > 3) priorityScore += 10;
-          if (coveragePercent < 25) priorityScore += 15; else if (coveragePercent < 50) priorityScore += 10;
-          priorityScore += Math.min(20, row.orders.length * 5);
-          if (stockoutRiskDays !== null && stockoutRiskDays <= 7) priorityScore += 15;
-          else if (stockoutRiskDays !== null && stockoutRiskDays <= 14) priorityScore += 5;
-          if (row.distinctCustomers >= 3) priorityScore += 10;
-          else if (row.distinctCustomers >= 2) priorityScore += 5;
-          if (row.avgLeadTimeDays !== null && row.daysWaiting > row.avgLeadTimeDays) priorityScore += 10;
-          const safetyStock = getSafetyStock(row.sku, row.avgLeadTimeDays);
-          const recommendedOrderQty = toOrder > 0 ? toOrder + safetyStock : 0;
-          const analytical = computeAnalyticalFields(row.sku, toOrder, row.daysWaiting, row.avgLeadTimeDays, row.orders, recommendedOrderQty, z.unitCost ?? null, z.costSource ?? null);
-          return { ...row, supplierName, supplierEmail, stockOnHand: z.stockOnHand, onPurchaseOrder, zohoOnPurchaseOrder, poVariance, toOrder, coveragePercent, priorityScore, stockoutRiskDays, safetyStock, recommendedOrderQty, lastPurchasedDate: z.lastPurchasedDate || row.lastPurchasedDate, ...analytical };
-        }));
-        toast({ title: "Live data ready", description: "Stock, PO and vendor-bill data loaded from the shared event cache" });
-      }
-    });
+      setLoadError(null);
+      hasLoaded.current = true;
+      await fetchSuggestedRestock(activeSkus);
+    } catch (error) {
+      console.error("Failed to fetch buying sheet data:", error);
+      setLoadError(error instanceof Error ? error.message : "Could not load Buying Sheet");
+    } finally {
+      setLoading(false);
+      loadInFlight.current = false;
+      if (pendingReload.current) { pendingReload.current = false; void fetchLocalDataRef.current(); }
+    }
   };
 
   // Realtime callbacks are registered once, but always execute the newest
@@ -675,11 +635,19 @@ export default function BuyingSheetPage() {
     if (targetSkus.length === 0) return;
     setBulkOrdering(true);
     try {
-      const targetRows = sortedRows.filter(r => targetSkus.includes(r.rowKey));
+      const targetRows = sortedRows.filter(r => targetSkus.includes(r.rowKey) && r.toOrder > 0);
       const orderItemIds = [...new Set(targetRows.flatMap((row) => row.orderItemIds))];
       if (orderItemIds.length > 0) {
-        const { error } = await supabase.from("order_items").update({ stock_status: "ordered", notes: `Marked ordered from buying sheet on ${new Date().toLocaleDateString()}` }).in("id", orderItemIds);
-        if (error) throw error;
+        const current = await readAllRows((from, to) => supabase.from("order_items").select("id, quantity, qty_on_po, order_id").in("id", orderItemIds).order("id").range(from, to));
+        if (current.length !== orderItemIds.length) throw new Error("Some selected items are no longer available. Refresh and retry.");
+        for (const item of current) {
+          const { data: changed, error } = await supabase.from("order_items")
+            .update({ qty_on_po: item.quantity })
+            .eq("id", item.id).eq("qty_on_po", item.qty_on_po).eq("quantity", item.quantity)
+            .select("id").maybeSingle();
+          if (error) throw error;
+          if (!changed) throw new Error("An item changed on another device. Refresh and retry.");
+        }
         // Track recently ordered
         const newRecent: RecentlyOrderedItem[] = targetRows.map(r => ({ sku: r.sku, itemName: r.itemName, quantity: r.toOrder, orderedAt: new Date().toISOString(), supplier: r.supplierName }));
         const updated = [...newRecent, ...recentlyOrdered].slice(0, 50);
@@ -689,7 +657,7 @@ export default function BuyingSheetPage() {
         setSelectedSkus(new Set());
         fetchLocalData();
       }
-    } catch (err) { toast({ title: "Error", description: "Failed to update items", variant: "destructive" }); } finally { setBulkOrdering(false); }
+    } catch (err) { toast({ title: "Error", description: err instanceof Error ? err.message : "Failed to update items", variant: "destructive" }); } finally { setBulkOrdering(false); }
   };
 
   const generateEmailDraft = (supplierName: string) => {
@@ -697,9 +665,9 @@ export default function BuyingSheetPage() {
     if (items.length === 0) return;
     const itemLines = items.map(r => {
       const recQty = r.recommendedOrderQty > r.toOrder ? `${r.toOrder} (+ ${r.safetyStock} safety stock = ${r.recommendedOrderQty})` : `${r.toOrder}`;
-      return `  • ${r.sku} — ${r.itemName} — Qty: ${recQty}`;
+      return `  • ${r.sku} — ${r.itemName} — Qty: ${buyingOrderQuantity(r, adjustedQtys)}`;
     }).join("\n");
-    const totalQty = items.reduce((s, r) => s + r.recommendedOrderQty, 0);
+    const totalQty = items.reduce((s, r) => s + buyingOrderQuantity(r, adjustedQtys), 0);
     const urgentItems = items.filter(r => r.hasUrgent);
     const urgentNote = urgentItems.length > 0 ? `\n⚠️ URGENT: ${urgentItems.map(r => r.sku).join(", ")} — Please prioritize these items.\n` : "";
     setEmailDraftBody(`Dear ${supplierName},\n\nPlease find below our purchase order requirements:\n${urgentNote}\n${itemLines}\n\nTotal items: ${items.length}\nTotal quantity (incl. safety stock): ${totalQty}\n\nPlease confirm availability and expected delivery date.\n\nKind regards`);
@@ -719,28 +687,28 @@ export default function BuyingSheetPage() {
     const allDrafts: string[] = [];
     for (const [supplier, items] of supplierGroups) {
       if (supplier === "No Supplier") continue;
-      const itemLines = items.map(r => `  • ${r.sku} — ${r.itemName} — Qty: ${r.recommendedOrderQty}`).join("\n");
-      const totalQty = items.reduce((s, r) => s + r.recommendedOrderQty, 0);
+      const itemLines = items.map(r => `  • ${r.sku} — ${r.itemName} — Qty: ${buyingOrderQuantity(r, adjustedQtys)}`).join("\n");
+      const totalQty = items.reduce((s, r) => s + buyingOrderQuantity(r, adjustedQtys), 0);
       allDrafts.push(`═══ ${supplier} ═══\n\nDear ${supplier},\n\nPlease find below our purchase order requirements:\n\n${itemLines}\n\nTotal items: ${items.length} | Total qty: ${totalQty}\n\nPlease confirm availability and expected delivery date.\n\nKind regards\n`);
     }
     navigator.clipboard.writeText(allDrafts.join("\n\n"));
     toast({ title: "All Drafts Copied", description: `${allDrafts.length} supplier emails copied to clipboard` });
   };
 
-  const handleSaveNote = (sku: string) => {
-    const updated = { ...notes, [sku]: noteText };
-    if (!noteText.trim()) delete updated[sku];
+  const handleSaveNote = (sku: string, value = noteText) => {
+    const updated = { ...notes, [sku]: value };
+    if (!value.trim()) delete updated[sku];
     setNotes(updated); saveNotes(updated); setEditingNote(null); setNoteText("");
   };
 
   const handleCopyPOLine = (row: BuyingSheetRow) => {
-    navigator.clipboard.writeText(`${row.sku}\t${row.itemName}\t${row.toOrder}\t${row.supplierName}`);
+    navigator.clipboard.writeText(`${row.sku}\t${row.itemName}\t${buyingOrderQuantity(row, adjustedQtys)}\t${row.supplierName}`);
     toast({ title: "Copied", description: `PO line for ${row.sku} copied` });
   };
 
   const handleCopySelectedPOLines = () => {
     const target = sortedRows.filter(r => selectedSkus.has(r.rowKey));
-    navigator.clipboard.writeText(["SKU\tItem Name\tQty to Order\tSupplier", ...target.map(r => `${r.sku}\t${r.itemName}\t${r.toOrder}\t${r.supplierName}`)].join("\n"));
+    navigator.clipboard.writeText(["SKU\tItem Name\tQty to Order\tSupplier", ...target.map(r => `${r.sku}\t${r.itemName}\t${buyingOrderQuantity(r, adjustedQtys)}\t${r.supplierName}`)].join("\n"));
     toast({ title: "Copied", description: `${target.length} PO lines copied` });
   };
 
@@ -773,7 +741,7 @@ export default function BuyingSheetPage() {
   const handleExportCSV = () => {
     const target = selectedSkus.size > 0 ? sortedRows.filter(r => selectedSkus.has(r.rowKey)) : sortedRows;
     const headers = ["SKU","Item Name","Total Needed","In Stock","Allocated On PO","Zoho Open PO","PO Variance","To Order","Safety Stock","Recommended Qty","Coverage %","Waiting Since","Calendar Days Waiting","Stockout Risk Days","Daily Burn Rate","Demand Variability","Distinct Customers","Priority","Supplier","Lead Time","Trend","Season","Notes","Orders"];
-    const csvRows = target.map(r => [r.sku, r.itemName, r.totalNeeded, r.stockOnHand, r.onPurchaseOrder, r.zohoOnPurchaseOrder, r.poVariance, r.toOrder, r.safetyStock, r.recommendedOrderQty, r.coveragePercent, r.waitingSince, r.daysWaiting, r.stockoutRiskDays ?? "N/A", r.dailyBurnRate.toFixed(1), r.demandVariability, r.distinctCustomers, r.priorityScore, r.supplierName, r.avgLeadTimeDays ?? "N/A", r.demandTrend, r.seasonalPattern || "N/A", notes[r.sku] || "", r.orders.map(o => `${o.orderNumber}(${o.customerName}:${o.quantity})`).join("; ")]);
+    const csvRows = target.map(r => [r.sku, r.itemName, r.totalNeeded, r.stockOnHand, r.onPurchaseOrder, r.zohoOnPurchaseOrder, r.poVariance, r.toOrder, r.safetyStock, buyingOrderQuantity(r, adjustedQtys), r.coveragePercent, r.waitingSince, r.daysWaiting, r.stockoutRiskDays ?? "N/A", r.dailyBurnRate.toFixed(1), r.demandVariability, r.distinctCustomers, r.priorityScore, r.supplierName, r.avgLeadTimeDays ?? "N/A", r.demandTrend, r.seasonalPattern || "N/A", notes[r.rowKey] || "", r.orders.map(o => `${o.orderNumber}(${o.customerName}:${o.quantity})`).join("; ")]);
     const csv = [headers, ...csvRows].map(r => r.map(c => `"${c}"`).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" }); const url = URL.createObjectURL(blob);
     const a = document.createElement("a"); a.href = url; a.download = `buying-sheet-${new Date().toISOString().split("T")[0]}.csv`; a.click(); URL.revokeObjectURL(url);
@@ -796,7 +764,7 @@ export default function BuyingSheetPage() {
   // ── Computed Data ──────────────────────────────────────────────────────
   const uniqueSuppliers = useMemo(() => {
     const suppliers = new Map<string, { name: string; count: number; totalToOrder: number; email?: string }>();
-    rows.forEach(r => { if (r.supplierId) { const e = suppliers.get(r.supplierId); if (e) { e.count++; e.totalToOrder += r.toOrder; } else suppliers.set(r.supplierId, { name: r.supplierName, count: 1, totalToOrder: r.toOrder, email: r.supplierEmail }); } });
+    rows.forEach(r => { { const e = suppliers.get(r.supplierName); if (e) { e.count++; e.totalToOrder += r.toOrder; } else suppliers.set(r.supplierName, { name: r.supplierName, count: 1, totalToOrder: r.toOrder, email: r.supplierEmail }); } });
     return Array.from(suppliers.entries()).sort((a, b) => a[1].name.localeCompare(b[1].name));
   }, [rows]);
 
@@ -828,7 +796,7 @@ export default function BuyingSheetPage() {
 
   const filteredRows = useMemo(() => rows.filter(row => {
     const matchesSearch = !search || row.itemName.toLowerCase().includes(search.toLowerCase()) || row.sku.toLowerCase().includes(search.toLowerCase()) || row.supplierName.toLowerCase().includes(search.toLowerCase()) || row.orders.some(o => o.orderNumber.toLowerCase().includes(search.toLowerCase()) || o.customerName.toLowerCase().includes(search.toLowerCase()));
-    return matchesSearch && (supplierFilter === "all" || row.supplierId === supplierFilter) && (!showOnlyNeedOrder || row.toOrder > 0) && (!showOnlyPOMismatches || row.poVariance > 0.01) && (priorityFilter === "all" || getPriorityLevel(row.priorityScore) === priorityFilter);
+    return matchesSearch && (supplierFilter === "all" || row.supplierName === supplierFilter) && (!showOnlyNeedOrder || row.toOrder > 0) && (!showOnlyPOMismatches || row.poVariance > 0.01) && (priorityFilter === "all" || getPriorityLevel(row.priorityScore) === priorityFilter);
   }), [rows, search, supplierFilter, showOnlyNeedOrder, showOnlyPOMismatches, priorityFilter]);
 
   const sortedRows = useMemo(() => {
@@ -1151,7 +1119,7 @@ export default function BuyingSheetPage() {
                     <p className="text-xs font-medium text-muted-foreground">Note for {row.sku}</p>
                     <Textarea value={noteText} onChange={e => setNoteText(e.target.value)} placeholder="Add procurement note..." className="min-h-[60px] text-sm" autoFocus />
                     <div className="flex gap-1 justify-end">
-                      {notes[row.rowKey] && <Button variant="ghost" size="sm" onClick={() => { setNoteText(""); handleSaveNote(row.rowKey); }}><X className="h-3 w-3 mr-1" />Clear</Button>}
+                      {notes[row.rowKey] && <Button variant="ghost" size="sm" onClick={() => { handleSaveNote(row.rowKey, ""); }}><X className="h-3 w-3 mr-1" />Clear</Button>}
                       <Button size="sm" onClick={() => handleSaveNote(row.rowKey)}>Save</Button>
                     </div>
                   </div>
@@ -1181,6 +1149,8 @@ export default function BuyingSheetPage() {
   return (
     <TooltipProvider>
       <div className={`procurement-page aleph-page-workspace aleph-buying-workspace app-no-x-scroll min-w-0 w-full max-w-full space-y-5 overflow-x-hidden ${isFullscreen ? "fixed inset-0 z-[100] h-[100dvh] bg-background p-3 sm:p-5 overflow-y-auto overflow-x-hidden overscroll-contain" : ""}`} ref={printRef}>
+        {loadError && <div role="alert" className="border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">Buying Sheet could not refresh: {loadError}</div>}
+        {(!lastRefreshedAt || Date.now() - lastRefreshedAt.getTime() > 86_400_000) && <div role="status" className="border border-border bg-muted/40 p-3 text-sm text-muted-foreground">{lastRefreshedAt ? `Stock snapshot last updated ${lastRefreshedAt.toLocaleString()}. Verify stock before purchasing.` : "Stock snapshot unavailable. Quantities shown do not include verified stock."}</div>}
         {/* ── Sticky Header ── */}
         <div className="sticky top-0 z-20 -mx-1 px-1 pb-3 bg-background/88 backdrop-blur-xl supports-[backdrop-filter]:bg-background/72">
           <div className="procurement-command-center rounded-[24px] border border-border/60 bg-card/92 shadow-xl shadow-black/[0.04] overflow-hidden mb-3">
@@ -1201,6 +1171,7 @@ export default function BuyingSheetPage() {
                 </div>
               </div>
               <div className="flex items-center gap-1.5 flex-wrap">
+                <Button variant="outline" size="sm" disabled={zohoLoading} onClick={() => void fetchLocalDataRef.current()} className="h-9 gap-1.5"><History className="h-4 w-4" />Refresh</Button>
                 <Tooltip><TooltipTrigger asChild>
                   <Button variant="outline" size="icon" onClick={toggleFullscreen} className="h-9 w-9" aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}>
                     {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
@@ -1535,7 +1506,7 @@ export default function BuyingSheetPage() {
                                 <TableCell colSpan={15}>
                                   <div className="flex items-center justify-between gap-2 flex-wrap">
                                     <div className="flex items-center gap-2">
-                                      <span onClick={(e) => { e.stopPropagation(); setSelectedSkus(prev => { const next = new Set(prev); if (allSelected) items.forEach(r => next.delete(r.sku)); else items.forEach(r => next.add(r.sku)); return next; }); }} className="inline-flex">
+                                      <span onClick={(e) => { e.stopPropagation(); setSelectedSkus(prev => { const next = new Set(prev); if (allSelected) items.forEach(r => next.delete(r.rowKey)); else items.forEach(r => next.add(r.rowKey)); return next; }); }} className="inline-flex">
                                         <Checkbox checked={allSelected} data-state={someSelected && !allSelected ? "indeterminate" : allSelected ? "checked" : "unchecked"} />
                                       </span>
                                       <button onClick={() => toggleSupplierCollapse(supplier)} className="p-0.5 rounded hover:bg-background/60">
@@ -1597,6 +1568,8 @@ export default function BuyingSheetPage() {
         {viewMode === "quick" && (
           <QuickOrderView
             rows={sortedRows}
+            selectedSkus={selectedSkus}
+            onSelectionChange={setSelectedSkus}
             onBulkMarkOrdered={handleBulkMarkOrdered}
             onGenerateEmail={generateEmailDraft}
           />
