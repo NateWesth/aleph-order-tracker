@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { costKeys, costSignature, resolveBillCost } from './costMatching.ts'
+import { invoiceLinkFingerprint, hasCurrentInvoiceLinks, type InvoiceLink } from './invoiceLinks.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -219,6 +220,17 @@ Deno.serve(async (req) => {
     const periodMonth = `${date_start.slice(0, 7)}-01`
     cacheFallback = { periodMonth, repId: rep_id }
 
+    // Read ownership before every cache path, including the five-minute refresh guard.
+    const linkRows: InvoiceLink[] = []
+    for (let offset = 0; ; offset += 1000) {
+      const { data, error } = await supabase.from('commission_invoice_links')
+        .select('invoice_id, rep_id').order('invoice_id').range(offset, offset + 999)
+      if (error) throw new Error(`Failed to read COD invoice links: ${error.message}`)
+      linkRows.push(...(data || []))
+      if (!data || data.length < 1000) break
+    }
+    const linksFingerprint = invoiceLinkFingerprint(linkRows)
+
     // Protect Zoho from accidental refresh storms. Even an explicit refresh
     // reuses a report generated in the last five minutes. The UI remains
     // responsive and repeated clicks/reconnects cannot fan out into hundreds
@@ -226,7 +238,7 @@ Deno.serve(async (req) => {
     if (force_refresh) {
       const recentCache = await readCachedCommissionReport(supabase, periodMonth, rep_id)
       const refreshedAt = recentCache?.refreshed_at ? new Date(recentCache.refreshed_at).getTime() : 0
-      if (recentCache && (recentCache.report as any)?.report_version >= 11 && Number.isFinite(refreshedAt) && Date.now() - refreshedAt < 5 * 60 * 1000) {
+      if (recentCache && (recentCache.report as any)?.report_version >= 11 && hasCurrentInvoiceLinks(recentCache.report, linksFingerprint) && Number.isFinite(refreshedAt) && Date.now() - refreshedAt < 5 * 60 * 1000) {
         const report = await applyLockedPayoutsToReport(supabase, recentCache.report, periodMonth)
         return new Response(JSON.stringify({
           ...report,
@@ -247,7 +259,7 @@ Deno.serve(async (req) => {
       // cost and are treated as stale so we recompute with historical bills.
       const hasCostAsOfVersion = cachedReport
         && (cachedReport.report as any)?.report_version >= 11
-      if (cachedReport && hasUnresolvedField && hasCostAsOfVersion) {
+      if (cachedReport && hasUnresolvedField && hasCostAsOfVersion && hasCurrentInvoiceLinks(cachedReport.report, linksFingerprint)) {
         const report = await applyLockedPayoutsToReport(supabase, cachedReport.report, periodMonth)
         return new Response(JSON.stringify({
           ...report,
@@ -421,7 +433,6 @@ Deno.serve(async (req) => {
     console.log(`Fetched ${creditByInvoiceId.size} invoices with credit notes`)
 
     // Cash / COD invoices: generic walk-in customers linked to a rep per invoice.
-    const { data: linkRows } = await supabase.from('commission_invoice_links').select('invoice_id, rep_id')
     const invoiceLinks = new Map<string, string>()
     for (const r of linkRows || []) invoiceLinks.set(String(r.invoice_id), String(r.rep_id))
     const isCashCustomer = (n: string) => /\b(cash|c\.?o\.?d\.?)\b/i.test(n || '')
@@ -923,7 +934,7 @@ Deno.serve(async (req) => {
     const unresolved = Array.from(unresolvedByKey.values())
       .sort((a, b) => b.occurrences - a.occurrences)
 
-    const report = { success: true, data, summary, unresolved_cost_items: unresolved, unassigned_customers: Array.from(unassignedByName.values()).sort((a, b) => b.sub_total - a.sub_total), cash_invoices: cashInvoices.sort((a, b) => a.date.localeCompare(b.date)), report_version: 11 }
+    const report = { success: true, data, summary, unresolved_cost_items: unresolved, unassigned_customers: Array.from(unassignedByName.values()).sort((a, b) => b.sub_total - a.sub_total), cash_invoices: cashInvoices.sort((a, b) => a.date.localeCompare(b.date)), invoice_links_fingerprint: linksFingerprint, report_version: 11 }
     await upsertCachedCommissionReport(supabase, {
       periodMonth,
       repId: rep_id ?? null,
