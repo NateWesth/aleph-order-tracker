@@ -1,0 +1,21 @@
+<!doctype html>
+<html>
+  <body style="margin:0">
+    <div id="root"></div>
+    <script type="module">
+      import React from "react";
+      import { createRoot } from "react-dom/client";
+      import { UnresolvedCostsPanel } from "/src/components/admin/UnresolvedCostsPanel.tsx";
+
+      const items = [
+        { item_name: "M10 Bolt", item_description: "Zinc plated", invoice_number: "INV-1", customer_name: "ACME", quantity: 5, sell_rate: 20, sub_total: 100, occurrences: 2 },
+        { item_name: "Grinding Disc", item_description: "115mm", invoice_number: "INV-2", customer_name: "BETA", quantity: 2, sell_rate: 35, sub_total: 70, occurrences: 1 },
+      ];
+
+      createRoot(document.getElementById("root")).render(
+        React.createElement(UnresolvedCostsPanel, { items, onSaved: () => {} })
+      );
+      window.__harnessReady = true;
+    </script>
+  </body>
+</html>
