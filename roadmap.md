@@ -1,5 +1,7 @@
 # Roadmap
 
+- [ ] Diagnose remaining missing bill costs and Sune’s missing commission
+
 - [x] Repair SKU matching for commission vendor-bill costs and verify regressions
 - [ ] Verify refreshed commission statement while signed in — external unmanaged sign-in unavailable in the sandbox
 
