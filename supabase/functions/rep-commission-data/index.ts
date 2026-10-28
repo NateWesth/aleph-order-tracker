@@ -238,7 +238,7 @@ Deno.serve(async (req) => {
     if (force_refresh) {
       const recentCache = await readCachedCommissionReport(supabase, periodMonth, rep_id)
       const refreshedAt = recentCache?.refreshed_at ? new Date(recentCache.refreshed_at).getTime() : 0
-      if (recentCache && (recentCache.report as any)?.report_version >= 11 && hasCurrentInvoiceLinks(recentCache.report, linksFingerprint) && Number.isFinite(refreshedAt) && Date.now() - refreshedAt < 5 * 60 * 1000) {
+      if (recentCache && (recentCache.report as any)?.report_version >= 12 && hasCurrentInvoiceLinks(recentCache.report, linksFingerprint) && Number.isFinite(refreshedAt) && Date.now() - refreshedAt < 5 * 60 * 1000) {
         const report = await applyLockedPayoutsToReport(supabase, recentCache.report, periodMonth)
         return new Response(JSON.stringify({
           ...report,
@@ -258,7 +258,7 @@ Deno.serve(async (req) => {
       // v2 = cost-as-of-invoice-date resolution. Older caches used latest-only
       // cost and are treated as stale so we recompute with historical bills.
       const hasCostAsOfVersion = cachedReport
-        && (cachedReport.report as any)?.report_version >= 11
+        && (cachedReport.report as any)?.report_version >= 12
       if (cachedReport && hasUnresolvedField && hasCostAsOfVersion && hasCurrentInvoiceLinks(cachedReport.report, linksFingerprint)) {
         const report = await applyLockedPayoutsToReport(supabase, cachedReport.report, periodMonth)
         return new Response(JSON.stringify({
@@ -575,6 +575,7 @@ Deno.serve(async (req) => {
         invoice_discount?: number
         excluded_line_count?: number
         excluded_sub_total?: number
+        cod_linked?: boolean
       }>
     }
 
@@ -624,7 +625,9 @@ Deno.serve(async (req) => {
       }
 
       const linkedRepId = invoiceLinks.get(String(inv.invoice_id)) || null
-      if (isCashCustomer(inv.customer_name || '') || linkedRepId) {
+      // Linked cash invoices live on the rep's statement like any other
+      // invoice; only unlinked ones stay in the Cash (COD) linking list.
+      if (!linkedRepId && isCashCustomer(inv.customer_name || '')) {
         cashInvoices.push({
           invoice_id: String(inv.invoice_id),
           invoice_number: String(inv.invoice_number || inv.number || ''),
@@ -859,6 +862,7 @@ Deno.serve(async (req) => {
         invoice_discount: r2(invoiceLevelDiscount),
         excluded_line_count: excludedLines.length,
         excluded_sub_total: excludedSubTotal,
+        cod_linked: Boolean(linkedRepId),
       })
 
     }
@@ -934,7 +938,7 @@ Deno.serve(async (req) => {
     const unresolved = Array.from(unresolvedByKey.values())
       .sort((a, b) => b.occurrences - a.occurrences)
 
-    const report = { success: true, data, summary, unresolved_cost_items: unresolved, unassigned_customers: Array.from(unassignedByName.values()).sort((a, b) => b.sub_total - a.sub_total), cash_invoices: cashInvoices.sort((a, b) => a.date.localeCompare(b.date)), invoice_links_fingerprint: linksFingerprint, report_version: 11 }
+    const report = { success: true, data, summary, unresolved_cost_items: unresolved, unassigned_customers: Array.from(unassignedByName.values()).sort((a, b) => b.sub_total - a.sub_total), cash_invoices: cashInvoices.sort((a, b) => a.date.localeCompare(b.date)), invoice_links_fingerprint: linksFingerprint, report_version: 12 }
     await upsertCachedCommissionReport(supabase, {
       periodMonth,
       repId: rep_id ?? null,

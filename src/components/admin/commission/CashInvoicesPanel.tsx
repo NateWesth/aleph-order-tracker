@@ -27,9 +27,12 @@ export default function CashInvoicesPanel({ invoices, reps, formatCurrency, onCh
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState<string | null>(null);
   const [savedLinks, setSavedLinks] = useState<Record<string, string | null>>({});
-  const displayedInvoices = invoices.map((inv) => ({ ...inv, rep_id: Object.prototype.hasOwnProperty.call(savedLinks, inv.invoice_id) ? savedLinks[inv.invoice_id] : inv.rep_id }));
-  if (invoices.length === 0) return null;
-  const unlinked = displayedInvoices.filter((i) => !i.rep_id);
+  // Linked invoices leave this list and appear on the rep's statement instead.
+  const displayedInvoices = invoices
+    .map((inv) => ({ ...inv, rep_id: Object.prototype.hasOwnProperty.call(savedLinks, inv.invoice_id) ? savedLinks[inv.invoice_id] : inv.rep_id }))
+    .filter((i) => !i.rep_id);
+  if (displayedInvoices.length === 0) return null;
+  const unlinked = displayedInvoices;
 
   const link = async (inv: CashInvoice, repId: string) => {
     if (saving) return;
@@ -72,12 +75,9 @@ export default function CashInvoicesPanel({ invoices, reps, formatCurrency, onCh
         <div className="flex flex-wrap items-center gap-2">
           <Banknote className="h-4 w-4 text-primary" />
           <p className="text-sm font-semibold">Cash (COD) invoices</p>
-          <Badge variant="outline" className="text-[10px]">{invoices.length - unlinked.length} linked</Badge>
-          {unlinked.length > 0 && (
-            <Badge variant="outline" className="text-[10px] border-warning/50 text-warning">
-              {unlinked.length} not linked · {formatCurrency(unlinked.reduce((s, i) => s + i.sub_total, 0))}
-            </Badge>
-          )}
+          <Badge variant="outline" className="text-[10px] border-warning/50 text-warning">
+            {unlinked.length} not linked · {formatCurrency(unlinked.reduce((s, i) => s + i.sub_total, 0))}
+          </Badge>
         </div>
         {open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
       </Button>
@@ -90,13 +90,12 @@ export default function CashInvoicesPanel({ invoices, reps, formatCurrency, onCh
                 <p className="text-[11px] text-muted-foreground">{inv.date} · {formatCurrency(inv.sub_total)} excl. VAT</p>
               </div>
               <Select
-                value={inv.rep_id || "none"}
+                value={inv.rep_id || ""}
                 disabled={saving !== null}
                 onValueChange={(v) => void link(inv, v)}
               >
                 <SelectTrigger className="h-8 w-44 text-xs"><SelectValue placeholder="Link to rep" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">Not linked</SelectItem>
                   {reps.map((r) => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
                 </SelectContent>
               </Select>
