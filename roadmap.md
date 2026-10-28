@@ -1,6 +1,7 @@
 # Roadmap
 
-- [ ] Repair SKU matching for commission vendor-bill costs and verify regressions
+- [x] Repair SKU matching for commission vendor-bill costs and verify regressions
+- [ ] Verify refreshed commission statement while signed in — external unmanaged sign-in unavailable in the sandbox
 
 - [x] Repair native app navigation, installed recognition and notification setup
 - [x] Verify notification preference behavior
