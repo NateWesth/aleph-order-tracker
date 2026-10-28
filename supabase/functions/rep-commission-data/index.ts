@@ -223,7 +223,7 @@ Deno.serve(async (req) => {
     if (force_refresh) {
       const recentCache = await readCachedCommissionReport(supabase, periodMonth, rep_id)
       const refreshedAt = recentCache?.refreshed_at ? new Date(recentCache.refreshed_at).getTime() : 0
-      if (recentCache && (recentCache.report as any)?.report_version >= 9 && Number.isFinite(refreshedAt) && Date.now() - refreshedAt < 5 * 60 * 1000) {
+      if (recentCache && (recentCache.report as any)?.report_version >= 10 && Number.isFinite(refreshedAt) && Date.now() - refreshedAt < 5 * 60 * 1000) {
         const report = await applyLockedPayoutsToReport(supabase, recentCache.report, periodMonth)
         return new Response(JSON.stringify({
           ...report,
@@ -243,7 +243,7 @@ Deno.serve(async (req) => {
       // v2 = cost-as-of-invoice-date resolution. Older caches used latest-only
       // cost and are treated as stale so we recompute with historical bills.
       const hasCostAsOfVersion = cachedReport
-        && (cachedReport.report as any)?.report_version >= 9
+        && (cachedReport.report as any)?.report_version >= 10
       if (cachedReport && hasUnresolvedField && hasCostAsOfVersion) {
         const report = await applyLockedPayoutsToReport(supabase, cachedReport.report, periodMonth)
         return new Response(JSON.stringify({
