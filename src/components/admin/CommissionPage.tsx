@@ -744,6 +744,8 @@ const CommissionPage = () => {
 
   // Commission report - uses previous month by default. Auto-runs whenever the
   // Report tab is opened OR the selected month changes.
+  const backfillRunsRef = useRef(0);
+  const fetchCommissionReportRef = useRef<((forceRefresh?: boolean) => void) | null>(null);
   const fetchCommissionReport = useCallback(async (forceRefresh = false) => {
     const requestKey = `${selectedMonth}:${forceRefresh ? "refresh" : "cache"}`;
     if (reportRequestRef.current === requestKey) return;
@@ -774,8 +776,18 @@ const CommissionPage = () => {
         }
         throw new Error(message);
       }
+      // Supplier bills are read in stages; keep going automatically until done.
+      const progressText = String(response.data?.notice || response.data?.error || "");
+      if (/backfill in progress/i.test(progressText) && backfillRunsRef.current < 20) {
+        backfillRunsRef.current += 1;
+        window.setTimeout(() => fetchCommissionReportRef.current?.(forceRefresh), 15000);
+      } else if (!/backfill in progress/i.test(progressText)) {
+        backfillRunsRef.current = 0;
+      }
       if (response.data?.rate_limited) {
-        setReportNotice(response.data.error || "Zoho API rate limit reached. Please refresh later.");
+        setReportNotice(/backfill in progress/i.test(progressText)
+          ? "Reading supplier bills from Zoho for item costs — this continues automatically, keep this page open."
+          : response.data.error || "Zoho API rate limit reached. Please refresh later.");
         return;
       }
       setReportNotice(null);
@@ -783,7 +795,9 @@ const CommissionPage = () => {
       setCommissionData(withOverrides);
       if (response.data?.cached && response.data?.refreshed_at) {
         const cachedAt = format(new Date(response.data.refreshed_at), "PPp");
-        setReportNotice(response.data.notice || (response.data.stale_due_to_rate_limit
+        setReportNotice(/backfill in progress/i.test(progressText)
+          ? `Reading supplier bills from Zoho for item costs — this continues automatically, keep this page open. Showing the last saved report from ${cachedAt} meanwhile.`
+          : response.data.notice || (response.data.stale_due_to_rate_limit
           ? `Zoho API rate limit reached. Showing cached data from ${cachedAt}.`
           : response.data.refresh_suppressed
             ? `Zoho was refreshed recently (${cachedAt}). Reusing that snapshot to avoid duplicate API calls.`
@@ -797,6 +811,7 @@ const CommissionPage = () => {
       setLoadingReport(false);
     }
   }, [selectedMonth, toast, applyLineOverrides]);
+  useEffect(() => { fetchCommissionReportRef.current = fetchCommissionReport; }, [fetchCommissionReport]);
 
   // Save (or clear) a single line-item field override, then refresh the report.
   const saveLineOverride = useCallback(async (
