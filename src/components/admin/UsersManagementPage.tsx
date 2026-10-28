@@ -1,3 +1,4 @@
+import { CommissionRepAccessButton } from "./commission/CommissionRepAccessButton";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -308,6 +309,7 @@ export default function UsersManagementPage() {
                   <Button size="sm" variant="outline" onClick={() => toggleCommissionAccess(user.id, !user.can_edit_commission)}>
                     <Percent className="mr-1 h-4 w-4" /> {user.can_edit_commission ? 'Remove Commission' : 'Allow Commission'}
                   </Button>
+                  {user.can_edit_commission && user.role !== 'admin' && <CommissionRepAccessButton userId={user.id} />}
                   <Button size="sm" variant="ghost" onClick={() => approveUser(user.id, false)} className="text-destructive hover:bg-destructive/10 hover:text-destructive sm:col-span-2">
                     Revoke access
                   </Button>

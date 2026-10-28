@@ -467,12 +467,16 @@ const CommissionPage = () => {
   const fetchData = useCallback(async () => {
     setLoadingReps(true);
     try {
-      const [repsRes, companiesRes, assignRes] = await Promise.all([
+      const { data: { user: me } } = await supabase.auth.getUser();
+      const [repsRes, companiesRes, assignRes, accessRes] = await Promise.all([
         supabase.from("reps").select("*").order("name"),
         supabase.from("companies").select("id, name, code").order("name"),
         supabase.from("rep_company_assignments").select("rep_id, company_id, commission_rate"),
+        (supabase as any).from("commission_rep_access").select("rep_id").eq("user_id", me?.id ?? ""),
       ]);
-      if (repsRes.data) setReps(repsRes.data as Rep[]);
+      // Users limited to specific reps only see those reps (none set = all reps).
+      const allowedReps = new Set(((accessRes.data as { rep_id: string }[]) || []).map((r) => r.rep_id));
+      if (repsRes.data) setReps((repsRes.data as Rep[]).filter((r) => allowedReps.size === 0 || allowedReps.has(r.id)));
       if (companiesRes.data) {
         const zohoCompanies = companiesRes.data.filter(isZohoCompany);
         const dedupedCompanies = Array.from(
@@ -1245,7 +1249,7 @@ const CommissionPage = () => {
         {/* Commission Report Tab */}
         <TabsContent value="report" className="mt-0 space-y-4 min-w-0">
           {reportNotice && (
-            <div className="flex items-start gap-2 p-3 rounded-lg border-2 border-warning/30 bg-warning/10 text-sm text-warning">
+            <div className="flex items-start gap-2 p-3 rounded-lg border-2 border-logo-violet/30 bg-logo-violet/10 text-sm text-logo-violet">
               <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
               <p>{reportNotice}</p>
             </div>
@@ -1432,13 +1436,13 @@ const CommissionPage = () => {
                           className={cn(
                             "gap-1.5 relative transition-all",
                             missing.length > 0 &&
-                              "border-amber-500/70 text-amber-600 hover:text-amber-700 hover:bg-amber-500/10 dark:text-amber-400 dark:hover:text-amber-300 shadow-[0_0_0_3px_rgba(245,158,11,0.15)] ring-1 ring-amber-500/40"
+                              "border-logo-magenta/70 text-logo-magenta hover:text-logo-magenta hover:bg-logo-magenta/10   shadow-[0_0_0_3px_hsl(var(--logo-magenta)/0.15)] ring-1 ring-logo-magenta/40"
                           )}
                         >
                           {missing.length > 0 && (
                             <span className="relative flex h-2 w-2">
-                              <span className="absolute inline-flex h-full w-full rounded-full bg-amber-500 opacity-75 animate-ping" />
-                              <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
+                              <span className="absolute inline-flex h-full w-full rounded-full bg-logo-magenta opacity-75 animate-ping" />
+                              <span className="relative inline-flex rounded-full h-2 w-2 bg-logo-magenta" />
                             </span>
                           )}
                           <AlertTriangle className="h-4 w-4" />
@@ -1448,7 +1452,7 @@ const CommissionPage = () => {
                       <TooltipContent side="bottom" className="max-w-xs">
                         {missing.length > 0 ? (
                           <div className="space-y-1">
-                            <p className="font-semibold text-amber-500">
+                            <p className="font-semibold text-logo-magenta">
                               {missing.length} item{missing.length === 1 ? "" : "s"} need a cost
                             </p>
                             <p className="text-xs">
@@ -1470,7 +1474,7 @@ const CommissionPage = () => {
                     <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
                       <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
-                          <AlertTriangle className="h-4 w-4 text-amber-500" />
+                          <AlertTriangle className="h-4 w-4 text-logo-magenta" />
                           Items with Missing Cost
                         </DialogTitle>
                       </DialogHeader>
@@ -1526,7 +1530,7 @@ const CommissionPage = () => {
                           className="flex items-center gap-2 cursor-pointer flex-1 min-w-0"
                           onClick={() => toggleExpanded(d.rep_id)}
                         >
-                          {expandedReps.has(d.rep_id) ? <ChevronDown className="h-4 w-4 shrink-0" /> : <ChevronRight className="h-4 w-4 shrink-0" />}
+                          <ChevronRight className="h-4 w-4 shrink-0 text-logo-violet" />
                           <CardTitle className="text-base truncate">{d.rep_name}</CardTitle>
                           <Badge variant="secondary" className="text-[10px]">{COMMISSION_METHOD_LABEL[(reps.find(r => r.id === d.rep_id)?.commission_method || "") as CommissionMethod] ?? "Commission"}</Badge>
                           {d.invoice_count === 0 && d.locked_invoice_count === 0 && (
@@ -1632,8 +1636,20 @@ const CommissionPage = () => {
                         </Popover>
                       )}
                     </CardHeader>
-                    {expandedReps.has(d.rep_id) && d.invoices.length > 0 && (
-                      <CardContent className="pt-0">
+                    <Dialog open={expandedReps.has(d.rep_id)} onOpenChange={(o) => { if (!o) toggleExpanded(d.rep_id); }}>
+                      <DialogContent className="order-bubble-dialog max-w-5xl w-[calc(100vw-1.5rem)] max-h-[88vh] overflow-y-auto rounded-[22px] border-logo-violet/30">
+                        <DialogHeader>
+                          <DialogTitle className="flex flex-wrap items-center gap-2">
+                            <span className="h-2.5 w-2.5 rounded-full bg-gradient-to-r from-logo-cyan via-logo-violet to-logo-magenta" />
+                            {d.rep_name}
+                            <span className="text-sm font-normal text-muted-foreground">· {format(selectedDate, "MMMM yyyy")} · {d.invoice_count} due · {formatCurrency(d.total_invoiced)}</span>
+                            <span className="ml-auto text-lg font-bold text-primary">{formatCurrency(d.commission_earned)}</span>
+                          </DialogTitle>
+                        </DialogHeader>
+                        {d.invoices.length === 0 ? (
+                          <p className="py-6 text-center text-sm text-muted-foreground">No invoices for this rep in {format(selectedDate, "MMMM yyyy")}.</p>
+                        ) : (
+
                         <div className="border rounded-lg overflow-hidden">
                           <table className="w-full text-sm">
                             <thead className="bg-muted/50">
@@ -1691,7 +1707,7 @@ const CommissionPage = () => {
                                             </button>
                                           )}
                                           {(inv.credited_sub_total ?? 0) > 0 && (
-                                            <Badge variant="outline" className="text-[10px] ml-1 border-amber-500/60 text-amber-700 dark:text-amber-300">
+                                            <Badge variant="outline" className="text-[10px] ml-1 border-logo-magenta/60 text-logo-magenta ">
                                               −{formatCurrency(inv.credited_sub_total || 0)} credited
                                             </Badge>
                                           )}
@@ -1886,8 +1902,9 @@ const CommissionPage = () => {
                             </tbody>
                           </table>
                         </div>
-                      </CardContent>
-                    )}
+                        )}
+                      </DialogContent>
+                    </Dialog>
                   </Card>
                 ))}
                 {commissionData.data.length === 0 && (

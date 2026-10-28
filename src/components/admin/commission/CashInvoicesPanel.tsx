@@ -75,7 +75,7 @@ export default function CashInvoicesPanel({ invoices, reps, formatCurrency, onCh
         <div className="flex flex-wrap items-center gap-2">
           <Banknote className="h-4 w-4 text-primary" />
           <p className="text-sm font-semibold">Cash (COD) invoices</p>
-          <Badge variant="outline" className="text-[10px] border-warning/50 text-warning">
+          <Badge variant="outline" className="text-[10px] border-logo-violet/50 text-logo-violet">
             {unlinked.length} not linked · {formatCurrency(unlinked.reduce((s, i) => s + i.sub_total, 0))}
           </Badge>
         </div>

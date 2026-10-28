@@ -604,6 +604,38 @@ export type Database = {
           },
         ]
       }
+      commission_rep_access: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          rep_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          rep_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          rep_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commission_rep_access_rep_id_fkey"
+            columns: ["rep_id"]
+            isOneToOne: false
+            referencedRelation: "reps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       commission_report_cache: {
         Row: {
           created_at: string

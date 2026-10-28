@@ -171,6 +171,7 @@ Deno.serve(async (req) => {
   }
 
   let cacheFallback: { periodMonth: string; repId?: string } | null = null
+  let allowedRepIds: Set<string> | null = null
 
   try {
     const authHeader = req.headers.get('Authorization')
@@ -197,6 +198,18 @@ Deno.serve(async (req) => {
       rep_id?: string
       force_refresh?: boolean
     }
+
+    // Non-admins may be limited to specific reps (commission_rep_access). No rows = all reps.
+    {
+      const { data: adminFlag } = await supabase.rpc('has_role', { _user_id: user.id, _role: 'admin' })
+      if (!adminFlag) {
+        const { data: accessRows, error: accessErr } = await supabase.from('commission_rep_access')
+          .select('rep_id').eq('user_id', user.id)
+        if (accessErr) throw new Error(`Failed to read commission access: ${accessErr.message}`)
+        if (accessRows && accessRows.length > 0) allowedRepIds = new Set(accessRows.map((r: any) => r.rep_id))
+      }
+    }
+    const scope = (report: any) => scopeReportToReps(report, allowedRepIds)
 
     if (!date_start || !date_end) {
       return new Response(JSON.stringify({ error: 'date_start and date_end are required' }), {
@@ -249,7 +262,7 @@ Deno.serve(async (req) => {
       if (recentCache && (recentCache.report as any)?.report_version >= 13 && hasCurrentInvoiceLinks(recentCache.report, linksFingerprint) && Number.isFinite(refreshedAt) && Date.now() - refreshedAt < 5 * 60 * 1000) {
         const report = await applyLockedPayoutsToReport(supabase, recentCache.report, periodMonth)
         return new Response(JSON.stringify({
-          ...report,
+          ...scope(report),
           cached: true,
           refresh_suppressed: true,
           refreshed_at: recentCache.refreshed_at,
@@ -270,7 +283,7 @@ Deno.serve(async (req) => {
       if (cachedReport && hasUnresolvedField && hasCostAsOfVersion && hasCurrentInvoiceLinks(cachedReport.report, linksFingerprint)) {
         const report = await applyLockedPayoutsToReport(supabase, cachedReport.report, periodMonth)
         return new Response(JSON.stringify({
-          ...report,
+          ...scope(report),
           cached: true,
           refreshed_at: cachedReport.refreshed_at,
         }), {
@@ -956,7 +969,7 @@ Deno.serve(async (req) => {
       costPrices: Object.fromEntries(costMap),
     })
 
-    return new Response(JSON.stringify({ ...report, cost_prices: Object.fromEntries(costMap), cached: false, refreshed_at: new Date().toISOString() }), {
+    return new Response(JSON.stringify({ ...scope(report), cost_prices: Object.fromEntries(costMap), cached: false, refreshed_at: new Date().toISOString() }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
 
@@ -971,7 +984,7 @@ Deno.serve(async (req) => {
           if (cachedReport) {
             const report = await applyLockedPayoutsToReport(supabase, cachedReport.report, cacheFallback.periodMonth)
             return new Response(JSON.stringify({
-              ...report,
+              ...scopeReportToReps(report, allowedRepIds),
               cached: true,
               stale_due_to_rate_limit: true,
               refreshed_at: cachedReport.refreshed_at,
@@ -1075,6 +1088,26 @@ function normalizeCommissionReportForCache(report: any) {
       totalInvoices: data.reduce((s: number, d: any) => s + Number(d.invoice_count || 0), 0),
 
     },
+  }
+}
+
+function scopeReportToReps(report: any, allowed: Set<string> | null) {
+  if (!allowed || !report?.data) return report
+  const data = report.data.filter((r: any) => allowed.has(r.rep_id))
+  const summary = {
+    ...(report.summary || {}),
+    totalInvoiced: data.reduce((s: number, r: any) => s + Number(r.total_invoiced || 0), 0),
+    totalCommission: data.reduce((s: number, r: any) => s + Number(r.commission_earned || 0), 0),
+    totalInvoices: data.reduce((s: number, r: any) => s + Number(r.invoice_count || 0), 0),
+  }
+  const invoiceNumbers = new Set(data.flatMap((r: any) => (r.invoices || []).map((i: any) => i.invoice_number)))
+  return {
+    ...report,
+    data,
+    summary,
+    unresolved_cost_items: (report.unresolved_cost_items || []).filter((u: any) => invoiceNumbers.has(u.invoice_number)),
+    unassigned_customers: [],
+    cash_invoices: [],
   }
 }
 
