@@ -32,7 +32,15 @@ test("28/72: higher markup stays capped at 7% of cost", () => {
   near(profitSplitCommission("profit_split_28", 200, 100, 3).commission, 21);
 });
 
-test("28/72: markup below 25% pays rep 50% of profit", () => {
+test("28/72: 20% markup still pays flat 7% of cost", () => {
+  near(profitSplitCommission("profit_split_28", 120, 100, 1).commission, 7);
+});
+
+test("28/72: exactly 14% markup pays 7% of cost", () => {
+  near(profitSplitCommission("profit_split_28", 114, 100, 1).commission, 7);
+});
+
+test("28/72: markup below 14% pays rep 50% of profit", () => {
   near(profitSplitCommission("profit_split_28", 110, 100, 1).commission, 5);
 });
 
