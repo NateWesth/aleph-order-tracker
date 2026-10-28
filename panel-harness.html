@@ -52,14 +52,7 @@
       supabase.auth.getUser = async () => ({ data: { user: { id: "u1" } } });
       supabase.auth.onAuthStateChange = (cb) => ({ data: { subscription: { unsubscribe() {} } } });
       supabase.from = () => chain();
-      const realFetch = window.fetch.bind(window);
-      window.fetch = (input, init) => {
-        const url = typeof input === "string" ? input : (input && input.url) || "";
-        if (url.includes("rep-commission-data")) {
-          return Promise.resolve(new Response(JSON.stringify(report), { status: 200, headers: { "Content-Type": "application/json" } }));
-        }
-        return realFetch(input, init);
-      };
+      window.__report = report;
       supabase.channel = () => ({ on() { return this; }, subscribe(cb) { return this; } });
       supabase.removeChannel = async () => {};
 
