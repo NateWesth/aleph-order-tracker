@@ -223,7 +223,7 @@ Deno.serve(async (req) => {
     if (force_refresh) {
       const recentCache = await readCachedCommissionReport(supabase, periodMonth, rep_id)
       const refreshedAt = recentCache?.refreshed_at ? new Date(recentCache.refreshed_at).getTime() : 0
-      if (recentCache && (recentCache.report as any)?.report_version >= 9 && Number.isFinite(refreshedAt) && Date.now() - refreshedAt < 5 * 60 * 1000) {
+      if (recentCache && (recentCache.report as any)?.report_version >= 10 && Number.isFinite(refreshedAt) && Date.now() - refreshedAt < 5 * 60 * 1000) {
         const report = await applyLockedPayoutsToReport(supabase, recentCache.report, periodMonth)
         return new Response(JSON.stringify({
           ...report,
@@ -243,7 +243,7 @@ Deno.serve(async (req) => {
       // v2 = cost-as-of-invoice-date resolution. Older caches used latest-only
       // cost and are treated as stale so we recompute with historical bills.
       const hasCostAsOfVersion = cachedReport
-        && (cachedReport.report as any)?.report_version >= 9
+        && (cachedReport.report as any)?.report_version >= 10
       if (cachedReport && hasUnresolvedField && hasCostAsOfVersion) {
         const report = await applyLockedPayoutsToReport(supabase, cachedReport.report, periodMonth)
         return new Response(JSON.stringify({
@@ -417,9 +417,16 @@ Deno.serve(async (req) => {
     const creditByInvoiceId = await fetchCreditNotesByInvoice(accessToken, orgId, date_start, date_end)
     console.log(`Fetched ${creditByInvoiceId.size} invoices with credit notes`)
 
+    // Cash / COD invoices: generic walk-in customers linked to a rep per invoice.
+    const { data: linkRows } = await supabase.from('commission_invoice_links').select('invoice_id, rep_id')
+    const invoiceLinks = new Map<string, string>()
+    for (const r of linkRows || []) invoiceLinks.set(String(r.invoice_id), String(r.rep_id))
+    const isCashCustomer = (n: string) => /\b(cash|c\.?o\.?d\.?)\b/i.test(n || '')
+    const cashInvoices: Array<{ invoice_id: string; invoice_number: string; customer_name: string; date: string; sub_total: number; rep_id: string | null }> = []
+
     // Pre-filter: only fetch line-item details for invoices belonging to assigned reps
     const relevantInvoices = invoiceList.filter(inv =>
-      matchInvoiceToAssignment(inv.customer_name || '') !== null
+      invoiceLinks.has(String(inv.invoice_id)) || matchInvoiceToAssignment(inv.customer_name || '') !== null
     )
     console.log(`${relevantInvoices.length} invoices match assigned customers; fetching line items...`)
 
@@ -602,9 +609,22 @@ Deno.serve(async (req) => {
         processedInvoiceIds.add(dedupKey)
       }
 
-      const target = matchInvoiceToAssignment(inv.customer_name || '')
+      const linkedRepId = invoiceLinks.get(String(inv.invoice_id)) || null
+      if (isCashCustomer(inv.customer_name || '') || linkedRepId) {
+        cashInvoices.push({
+          invoice_id: String(inv.invoice_id),
+          invoice_number: String(inv.invoice_number || inv.number || ''),
+          customer_name: inv.customer_name || '',
+          date: String(inv.date || inv.invoice_date || '').slice(0, 10),
+          sub_total: r2(getInvoiceSubTotal(inv)),
+          rep_id: linkedRepId,
+        })
+      }
+      const target: any = linkedRepId
+        ? { rep_id: linkedRepId, company_id: null, commission_rate: null }
+        : (isCashCustomer(inv.customer_name || '') ? null : matchInvoiceToAssignment(inv.customer_name || ''))
       if (!target) {
-        if (inv.customer_name) {
+        if (inv.customer_name && !isCashCustomer(inv.customer_name)) {
           const key = normalizeCompanyName(inv.customer_name)
           const cur = unassignedByName.get(key) || { customer_name: inv.customer_name, invoice_count: 0, sub_total: 0 }
           cur.invoice_count += 1
@@ -627,7 +647,7 @@ Deno.serve(async (req) => {
           || inv.date || inv.invoice_date || ''
       ).slice(0, 10)
 
-      const histAssign = resolveAssignmentAsOf(target.company_id, invoiceDateForRate)
+      const histAssign = target.company_id ? resolveAssignmentAsOf(target.company_id, invoiceDateForRate) : null
       const effectiveRepId = histAssign?.rep_id || target.rep_id
       const result = repResults.get(effectiveRepId) || repResults.get(target.rep_id)
       if (!result) continue
@@ -900,7 +920,7 @@ Deno.serve(async (req) => {
     const unresolved = Array.from(unresolvedByKey.values())
       .sort((a, b) => b.occurrences - a.occurrences)
 
-    const report = { success: true, data, summary, unresolved_cost_items: unresolved, unassigned_customers: Array.from(unassignedByName.values()).sort((a, b) => b.sub_total - a.sub_total), report_version: 9 }
+    const report = { success: true, data, summary, unresolved_cost_items: unresolved, unassigned_customers: Array.from(unassignedByName.values()).sort((a, b) => b.sub_total - a.sub_total), cash_invoices: cashInvoices.sort((a, b) => a.date.localeCompare(b.date)), report_version: 10 }
     await upsertCachedCommissionReport(supabase, {
       periodMonth,
       repId: rep_id ?? null,
