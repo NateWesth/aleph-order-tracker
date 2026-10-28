@@ -223,7 +223,7 @@ Deno.serve(async (req) => {
     if (force_refresh) {
       const recentCache = await readCachedCommissionReport(supabase, periodMonth, rep_id)
       const refreshedAt = recentCache?.refreshed_at ? new Date(recentCache.refreshed_at).getTime() : 0
-      if (recentCache && (recentCache.report as any)?.report_version >= 8 && Number.isFinite(refreshedAt) && Date.now() - refreshedAt < 5 * 60 * 1000) {
+      if (recentCache && (recentCache.report as any)?.report_version >= 9 && Number.isFinite(refreshedAt) && Date.now() - refreshedAt < 5 * 60 * 1000) {
         const report = await applyLockedPayoutsToReport(supabase, recentCache.report, periodMonth)
         return new Response(JSON.stringify({
           ...report,
@@ -243,7 +243,7 @@ Deno.serve(async (req) => {
       // v2 = cost-as-of-invoice-date resolution. Older caches used latest-only
       // cost and are treated as stale so we recompute with historical bills.
       const hasCostAsOfVersion = cachedReport
-        && (cachedReport.report as any)?.report_version >= 8
+        && (cachedReport.report as any)?.report_version >= 9
       if (cachedReport && hasUnresolvedField && hasCostAsOfVersion) {
         const report = await applyLockedPayoutsToReport(supabase, cachedReport.report, periodMonth)
         return new Response(JSON.stringify({
@@ -477,7 +477,7 @@ Deno.serve(async (req) => {
     //    we can resolve cost as-of each invoice date (not just the latest).
     const stillNeeded = new Set<string>()
     for (const key of requestedCostKeys) stillNeeded.add(key)
-    const billCostHistory = await fetchBillCostHistory(accessToken, orgId, stillNeeded, date_end)
+    const billCostHistory = await fetchBillCostHistory(supabase, accessToken, orgId, stillNeeded, date_start, date_end)
 
     // Scalar "latest known" cost map — used only for cache metadata / logging.
     const costMap = new Map<string, number>()
@@ -900,7 +900,7 @@ Deno.serve(async (req) => {
     const unresolved = Array.from(unresolvedByKey.values())
       .sort((a, b) => b.occurrences - a.occurrences)
 
-    const report = { success: true, data, summary, unresolved_cost_items: unresolved, unassigned_customers: Array.from(unassignedByName.values()).sort((a, b) => b.sub_total - a.sub_total), report_version: 8 }
+    const report = { success: true, data, summary, unresolved_cost_items: unresolved, unassigned_customers: Array.from(unassignedByName.values()).sort((a, b) => b.sub_total - a.sub_total), report_version: 9 }
     await upsertCachedCommissionReport(supabase, {
       periodMonth,
       repId: rep_id ?? null,
@@ -1350,104 +1350,147 @@ async function fetchInvoicesWithLineItems(
   return results
 }
 
-// Fetch the LATEST vendor bill cost (excluding tax) for each requested
-// (name+description) signature. Walks recent bills newest-first and keeps
-// the first (= most recent) rate seen per signature. Stops early once every
-// requested signature has been resolved or the page cap is reached.
+// Vendor bill cost history for the requested cost keys (exact text, item ID, SKU).
+// Bill line items are saved in commission_bill_cache so each bill is read from
+// Zoho once; later refreshes only read new or edited bills. Zoho calls are
+// retried on dropped connections, and a run that runs out of time keeps its
+// progress and reports how far it got instead of losing everything.
+const BILL_PHASE_BUDGET_MS = 85_000
+
+async function zohoGet(url: string, accessToken: string): Promise<any> {
+  let lastError = ''
+  for (let attempt = 0; attempt < 4; attempt++) {
+    if (attempt) await new Promise(r => setTimeout(r, 1500 * attempt * attempt))
+    try {
+      const resp = await fetch(url, { headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` } })
+      const data = await resp.json().catch(() => ({}))
+      if (resp.ok && data.code === 0) return data
+      lastError = data?.message || `HTTP ${resp.status}`
+      if (resp.status !== 429 && resp.status < 500) break
+    } catch (e) {
+      lastError = e instanceof Error ? e.message : String(e)
+    }
+  }
+  throw new Error(lastError)
+}
+
 async function fetchBillCostHistory(
+  supabase: any,
   accessToken: string,
   orgId: string,
   signatures: Set<string>,
+  invoiceDateStart: string,
   invoiceDateEnd: string,
 ): Promise<Map<string, Array<{ date: string; rate: number }>>> {
   const history = new Map<string, Array<{ date: string; rate: number }>>()
   const skuIdentities = new Map<string, Set<string>>()
   if (signatures.size === 0) return history
+  const startedAt = Date.now()
+  // A key is settled once it has a bill dated on/before the period start:
+  // older bills can no longer change the as-of-invoice-date cost.
+  const settled = new Set<string>()
+
+  const addLines = (billDate: string, lines: any[]) => {
+    for (const li of lines || []) {
+      const rate = toNumber(li.rate) ?? toNumber(li.item_rate)
+      if (rate === null || rate <= 0) continue
+      for (const key of costKeys(li)) {
+        if (!signatures.has(key)) continue
+        if (key.startsWith('sku:') && li.item_id) {
+          const ids = skuIdentities.get(key) || new Set<string>()
+          ids.add(String(li.item_id))
+          skuIdentities.set(key, ids)
+        }
+        const arr = history.get(key) || []
+        arr.push({ date: billDate, rate })
+        history.set(key, arr)
+        if (billDate && billDate <= invoiceDateStart) settled.add(key)
+      }
+    }
+  }
 
   let page = 1
   const maxPages = 25 // ~5,000 bills lookback cap
   let hasMore = true
+  let fetchedNow = 0
 
   while (hasMore && page <= maxPages) {
     const params = new URLSearchParams({
-      organization_id: orgId,
-      page: String(page),
-      per_page: '200',
-      sort_column: 'date',
-      sort_order: 'D',
+      organization_id: orgId, page: String(page), per_page: '200', sort_column: 'date', sort_order: 'D',
     })
     if (invoiceDateEnd) params.set('date_before', invoiceDateEnd)
     let listData: any
     try {
-      const resp = await fetch(`${ZOHO_API_URL}/books/v3/bills?${params.toString()}`, {
-        headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` },
-      })
-      listData = await resp.json()
-      if (!resp.ok || listData.code !== 0) {
-        throw new Error(`Vendor bill lookup failed: ${listData?.message || resp.status}`)
-      }
+      listData = await zohoGet(`${ZOHO_API_URL}/books/v3/bills?${params.toString()}`, accessToken)
     } catch (e) {
       throw new Error(`Vendor bill lookup failed: ${e instanceof Error ? e.message : String(e)}`)
     }
-
-    const bills = listData.bills || []
+    const bills: any[] = (listData.bills || []).filter((b: any) => b.bill_id)
     if (!bills.length) break
 
-    for (let i = 0; i < bills.length; i += 8) {
-      const batch = bills.slice(i, i + 8)
-      const details = await Promise.all(batch.map(async (b: any) => {
-        const id = b.bill_id
-        if (!id) throw new Error('Vendor bill lookup returned a bill without an ID')
-        try {
-          const r = await fetch(
-            `${ZOHO_API_URL}/books/v3/bills/${id}?organization_id=${orgId}`,
-            { headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` } },
-          )
-          const d = await r.json()
-          if (!r.ok || d.code !== 0 || !d.bill) throw new Error(d.message || `HTTP ${r.status}`)
-          return d.bill
-        } catch (e) { throw new Error(`Vendor bill detail lookup failed: ${e instanceof Error ? e.message : String(e)}`) }
-      }))
+    const ids = bills.map(b => String(b.bill_id))
+    const { data: cachedRows, error: cacheErr } = await supabase
+      .from('commission_bill_cache')
+      .select('bill_id, last_modified_time, line_items')
+      .in('bill_id', ids)
+    if (cacheErr) console.warn('commission_bill_cache read failed:', cacheErr.message)
+    const cached = new Map<string, any>((cachedRows || []).map((r: any) => [r.bill_id, r]))
 
-      for (const bill of details) {
-        if (!bill) continue
-        const billDate: string = String(bill.date || bill.bill_date || '')
-        for (const li of bill.line_items || []) {
-          // Vendor bill rate is already exclusive of tax in Zoho Books.
-          const rate = toNumber(li.rate) ?? toNumber(li.item_rate)
-          if (rate === null || rate <= 0) continue
+    const missing = bills.filter(b => {
+      const row = cached.get(String(b.bill_id))
+      return !row || String(row.last_modified_time || '') !== String(b.last_modified_time || '')
+    })
 
-          for (const key of costKeys(li)) {
-            if (!signatures.has(key)) continue
-            if (key.startsWith('sku:') && li.item_id) {
-              const ids = skuIdentities.get(key) || new Set<string>()
-              ids.add(String(li.item_id))
-              skuIdentities.set(key, ids)
-            }
-            const arr = history.get(key) || []
-            arr.push({ date: billDate, rate })
-            history.set(key, arr)
-          }
-        }
+    for (let i = 0; i < missing.length; i += 5) {
+      if (Date.now() - startedAt > BILL_PHASE_BUDGET_MS) {
+        throw new Error(`Vendor bill backfill in progress: ${fetchedNow} more supplier bills saved this run. Press Refresh again in a minute to continue — each refresh picks up where the last one stopped.`)
       }
+      const batch = missing.slice(i, i + 5)
+      const details = await Promise.all(batch.map(async (b: any) => {
+        try {
+          const d = await zohoGet(`${ZOHO_API_URL}/books/v3/bills/${b.bill_id}?organization_id=${orgId}`, accessToken)
+          return d.bill
+        } catch (e) {
+          throw new Error(`Vendor bill detail lookup failed: ${e instanceof Error ? e.message : String(e)}`)
+        }
+      }))
+      const rows = details.filter(Boolean).map((bill: any, idx: number) => ({
+        bill_id: String(bill.bill_id || batch[idx].bill_id),
+        bill_date: String(bill.date || bill.bill_date || batch[idx].date || '') || null,
+        last_modified_time: String(batch[idx].last_modified_time || bill.last_modified_time || ''),
+        line_items: (bill.line_items || []).map((li: any) => ({
+          item_id: li.item_id, name: li.name, description: li.description, sku: li.sku,
+          item_code: li.item_code, rate: li.rate, item_rate: li.item_rate,
+        })),
+        fetched_at: new Date().toISOString(),
+      }))
+      if (rows.length) {
+        const { error: upErr } = await supabase.from('commission_bill_cache').upsert(rows, { onConflict: 'bill_id' })
+        if (upErr) console.warn('commission_bill_cache write failed:', upErr.message)
+        for (const row of rows) cached.set(row.bill_id, row)
+        fetchedNow += rows.length
+      }
+    }
+
+    for (const b of bills) {
+      const row = cached.get(String(b.bill_id))
+      if (row) addLines(String(b.date || ''), row.line_items)
     }
 
     hasMore = listData.page_context?.has_more_page ?? false
     page++
+    if (settled.size >= signatures.size) { hasMore = false; break }
   }
 
   if (hasMore) throw new Error('Vendor bill history exceeds the safe lookup limit')
+  console.log(`Vendor bills: ${fetchedNow} read from Zoho, ${page - 1} list pages, ${history.size}/${signatures.size} cost keys found`)
   // Reused SKUs must not pool costs from distinct Zoho products.
   for (const [key, ids] of skuIdentities) if (ids.size > 1) history.delete(key)
-  // Sort each history desc by date so callers can find "latest on or before X"
-  // with a simple linear scan.
   for (const arr of history.values()) {
     arr.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
   }
-
   return history
 }
-
 
 async function getOrgId(supabase: any): Promise<string> {
   const { data } = await supabase

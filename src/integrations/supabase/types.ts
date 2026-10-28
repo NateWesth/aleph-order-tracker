@@ -312,6 +312,30 @@ export type Database = {
           },
         ]
       }
+      commission_bill_cache: {
+        Row: {
+          bill_date: string | null
+          bill_id: string
+          fetched_at: string
+          last_modified_time: string | null
+          line_items: Json
+        }
+        Insert: {
+          bill_date?: string | null
+          bill_id: string
+          fetched_at?: string
+          last_modified_time?: string | null
+          line_items?: Json
+        }
+        Update: {
+          bill_date?: string | null
+          bill_id?: string
+          fetched_at?: string
+          last_modified_time?: string | null
+          line_items?: Json
+        }
+        Relationships: []
+      }
       commission_item_cost_overrides: {
         Row: {
           cost: number
