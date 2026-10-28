@@ -1,5 +1,8 @@
 # Roadmap
 
+- [x] Apply cost-based commission caps to both rep options, update labels, and deploy
+- [x] Verify capped calculations and client/server agreement with regression tests
+
 - [x] Stop supplier-bill reads failing mid-scan (saved bill copy, retries, auto-continue) so SKU costs actually refresh
 - [ ] Confirm SKU costs on a refreshed statement — needs a signed-in refresh; sandbox sign-in unavailable
 
