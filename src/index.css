@@ -3734,3 +3734,14 @@ html[data-density="dense"] .app-page-stage :is(.rounded-\[28px\],.rounded-\[26px
 .order-bubble-dialog[data-state="open"] {
   animation: order-bubble-center 0.28s cubic-bezier(0.16, 1, 0.3, 1) both !important;
 }
+
+/* Commission: single-column workspace with a light top header. */
+.commission-hero {
+  background:
+    radial-gradient(circle at 100% 0, hsl(var(--workspace-accent) / .14), transparent 22rem),
+    hsl(var(--card));
+}
+.commission-body .commission-rep-card { border-radius: 1.25rem !important; }
+.commission-rule-card {
+  background: linear-gradient(135deg, hsl(var(--workspace-accent) / .08), transparent 55%), hsl(var(--card));
+}
