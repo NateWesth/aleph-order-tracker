@@ -171,6 +171,7 @@ Deno.serve(async (req) => {
   }
 
   let cacheFallback: { periodMonth: string; repId?: string } | null = null
+  let allowedRepIds: Set<string> | null = null
 
   try {
     const authHeader = req.headers.get('Authorization')
@@ -199,7 +200,6 @@ Deno.serve(async (req) => {
     }
 
     // Non-admins may be limited to specific reps (commission_rep_access). No rows = all reps.
-    let allowedRepIds: Set<string> | null = null
     {
       const { data: adminFlag } = await supabase.rpc('has_role', { _user_id: user.id, _role: 'admin' })
       if (!adminFlag) {
@@ -984,7 +984,7 @@ Deno.serve(async (req) => {
           if (cachedReport) {
             const report = await applyLockedPayoutsToReport(supabase, cachedReport.report, cacheFallback.periodMonth)
             return new Response(JSON.stringify({
-              ...report,
+              ...scopeReportToReps(report, allowedRepIds),
               cached: true,
               stale_due_to_rate_limit: true,
               refreshed_at: cachedReport.refreshed_at,
