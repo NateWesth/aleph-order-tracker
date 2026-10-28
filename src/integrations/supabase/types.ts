@@ -336,6 +336,47 @@ export type Database = {
         }
         Relationships: []
       }
+      commission_invoice_links: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          customer_name: string | null
+          invoice_date: string | null
+          invoice_id: string
+          invoice_number: string | null
+          rep_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          customer_name?: string | null
+          invoice_date?: string | null
+          invoice_id: string
+          invoice_number?: string | null
+          rep_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          customer_name?: string | null
+          invoice_date?: string | null
+          invoice_id?: string
+          invoice_number?: string | null
+          rep_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commission_invoice_links_rep_id_fkey"
+            columns: ["rep_id"]
+            isOneToOne: false
+            referencedRelation: "reps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       commission_item_cost_overrides: {
         Row: {
           cost: number
