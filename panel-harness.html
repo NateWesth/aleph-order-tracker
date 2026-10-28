@@ -38,6 +38,7 @@
 
       supabase.auth.getSession = async () => ({ data: { session: { user: { id: "u1" } } } });
       supabase.auth.getUser = async () => ({ data: { user: { id: "u1" } } });
+      supabase.auth.onAuthStateChange = (cb) => ({ data: { subscription: { unsubscribe() {} } } });
       supabase.from = () => chain();
       supabase.functions.invoke = async (name) => ({ data: report, error: null });
       supabase.channel = () => ({ on() { return this; }, subscribe(cb) { return this; } });
