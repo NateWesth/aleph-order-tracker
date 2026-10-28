@@ -68,7 +68,7 @@ const getInvoiceSubTotal = (invoice: Record<string, unknown>): number => {
 //   - unknown cost -> 0% commission (skip line, never overpay)
 // 'profit_split_60' / 'profit_split_28':
 //   Rep receives a share of the line PROFIT ((sell - cost) x qty).
-//   - markup on cost >= 25% -> 60% (or 28%) to the rep, rest to the company
+//   - markup on cost >= 25% -> 60% (or 28%) of profit, capped at 15% (or 7%) of cost x qty
 //   - markup on cost <  25% -> 50% / 50%
 //   - no profit or unknown cost -> 0
 type CommissionMethod = 'margin_scaled' | 'half_markup_below_25' | 'profit_split_60' | 'profit_split_28'
@@ -115,7 +115,10 @@ const computeLineCommission = (
     const profit = (sellRate - (cost as number)) * qty
     if (profit <= 0) return { commission: 0, effectiveRate: 0, excluded_reason: 'negative_margin' }
     const share = marginPct >= 25 ? (method === 'profit_split_60' ? 0.6 : 0.28) : 0.5
-    const commission = profit * share
+    const costCap = method === 'profit_split_60' ? 0.15 : 0.07
+    const commission = marginPct >= 25
+      ? Math.min(profit * share, (cost as number) * qty * costCap)
+      : profit * share
     const effectiveRate = lineSubTotal > 0 ? (commission / lineSubTotal) * 100 : 0
     return { commission, effectiveRate }
   }
@@ -223,7 +226,7 @@ Deno.serve(async (req) => {
     if (force_refresh) {
       const recentCache = await readCachedCommissionReport(supabase, periodMonth, rep_id)
       const refreshedAt = recentCache?.refreshed_at ? new Date(recentCache.refreshed_at).getTime() : 0
-      if (recentCache && (recentCache.report as any)?.report_version >= 10 && Number.isFinite(refreshedAt) && Date.now() - refreshedAt < 5 * 60 * 1000) {
+      if (recentCache && (recentCache.report as any)?.report_version >= 11 && Number.isFinite(refreshedAt) && Date.now() - refreshedAt < 5 * 60 * 1000) {
         const report = await applyLockedPayoutsToReport(supabase, recentCache.report, periodMonth)
         return new Response(JSON.stringify({
           ...report,
@@ -243,7 +246,7 @@ Deno.serve(async (req) => {
       // v2 = cost-as-of-invoice-date resolution. Older caches used latest-only
       // cost and are treated as stale so we recompute with historical bills.
       const hasCostAsOfVersion = cachedReport
-        && (cachedReport.report as any)?.report_version >= 10
+        && (cachedReport.report as any)?.report_version >= 11
       if (cachedReport && hasUnresolvedField && hasCostAsOfVersion) {
         const report = await applyLockedPayoutsToReport(supabase, cachedReport.report, periodMonth)
         return new Response(JSON.stringify({
@@ -920,7 +923,7 @@ Deno.serve(async (req) => {
     const unresolved = Array.from(unresolvedByKey.values())
       .sort((a, b) => b.occurrences - a.occurrences)
 
-    const report = { success: true, data, summary, unresolved_cost_items: unresolved, unassigned_customers: Array.from(unassignedByName.values()).sort((a, b) => b.sub_total - a.sub_total), cash_invoices: cashInvoices.sort((a, b) => a.date.localeCompare(b.date)), report_version: 10 }
+    const report = { success: true, data, summary, unresolved_cost_items: unresolved, unassigned_customers: Array.from(unassignedByName.values()).sort((a, b) => b.sub_total - a.sub_total), cash_invoices: cashInvoices.sort((a, b) => a.date.localeCompare(b.date)), report_version: 11 }
     await upsertCachedCommissionReport(supabase, {
       periodMonth,
       repId: rep_id ?? null,
