@@ -1,5 +1,8 @@
 # Roadmap
 
+- [x] Stop supplier-bill reads failing mid-scan (saved bill copy, retries, auto-continue) so SKU costs actually refresh
+- [ ] Confirm SKU costs on a refreshed statement — needs a signed-in refresh; sandbox sign-in unavailable
+
 - [x] Diagnose remaining missing bill costs and Sune’s missing commission
 - [x] Fix N/A-name SKU matching, exact miscellaneous-description matching, and show a current-month action for empty statements
 - [ ] Confirm remaining vendor costs and Sune’s refreshed October payout — requires authenticated Zoho statement refresh; external unmanaged sign-in unavailable
