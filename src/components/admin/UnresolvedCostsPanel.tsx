@@ -59,7 +59,25 @@ export const saveCost = async (item: { item_name: string; item_description: stri
 
 export const UnresolvedCostsPanel = ({ items, onSaved }: Props) => {
   const { toast } = useToast();
-  const [expanded, setExpanded] = useState(true);
+  // Collapse state survives re-renders and remounts so the panel never
+  // silently re-expands while the user is working through the list.
+  const [expanded, setExpanded] = useState(() => {
+    try {
+      return sessionStorage.getItem("aleph:unresolved-costs-open") !== "0";
+    } catch {
+      return true;
+    }
+  });
+  const toggleExpanded = () => {
+    setExpanded((e) => {
+      try {
+        sessionStorage.setItem("aleph:unresolved-costs-open", e ? "0" : "1");
+      } catch {
+        // Storage unavailable (private mode) — the toggle still works in-page.
+      }
+      return !e;
+    });
+  };
   const [values, setValues] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState<Record<string, boolean>>({});
   const [savedKeys, setSavedKeys] = useState<Set<string>>(new Set());
