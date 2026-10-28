@@ -1923,7 +1923,7 @@ const CommissionPage = () => {
                 <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
                   <div className="rounded-xl bg-primary/10 p-2.5">
                     <p className="text-[10px] text-muted-foreground">Markup 25% or more</p>
-                    <p className="mt-0.5 font-bold">Rep {m === "profit_split_60" ? "60%" : "28%"} of profit, capped at {m === "profit_split_60" ? "15%" : "7%"} of cost</p>
+                    <p className="mt-0.5 font-bold">{m === "profit_split_60" ? "Rep 60% of profit, capped at 15% of cost" : "Rep gets 7% of cost from 14% markup"}</p>
                     <p className="text-muted-foreground">Company keeps remaining profit</p>
                   </div>
                   <div className="rounded-xl bg-muted/60 p-2.5">
@@ -2025,7 +2025,7 @@ const CommissionPage = () => {
                     <div className="text-sm">
                       <div className="font-medium">{COMMISSION_METHOD_LABEL[m]}</div>
                       <div className="text-xs text-muted-foreground">
-                        Markup 25% or more: rep gets {m === "profit_split_60" ? "60%" : "28%"} of the profit, capped at {m === "profit_split_60" ? "15%" : "7%"} of cost × quantity. Company keeps the remainder. Below 25%: profit is split 50 / 50.
+                        {m === "profit_split_60" ? "Markup 25% or more: rep gets 60% of the profit, capped at 15% of cost × quantity. Below 25%: profit is split 50 / 50." : "Markup 14% or more: rep gets 7% of cost × quantity. Company keeps the remainder. Below 14%: profit is split 50 / 50."}
                       </div>
                     </div>
                   </label>
