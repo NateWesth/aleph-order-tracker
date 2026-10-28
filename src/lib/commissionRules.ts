@@ -6,6 +6,10 @@ export type CommissionMethod =
   | "half_markup_below_25";
 
 export const PROFIT_SPLIT_THRESHOLD = 25; // markup on cost, %
+export const PROFIT_SPLIT_THRESHOLD_BY_METHOD: Record<"profit_split_60" | "profit_split_28", number> = {
+  profit_split_60: 25,
+  profit_split_28: 14,
+};
 export const LOW_MARKUP_REP_SHARE = 0.5;
 
 export const PROFIT_SPLIT_COST_CAP: Record<"profit_split_60" | "profit_split_28", number> = {
@@ -20,7 +24,7 @@ export const PROFIT_SPLIT_SHARE: Record<"profit_split_60" | "profit_split_28", n
 
 export const COMMISSION_METHOD_LABEL: Record<CommissionMethod, string> = {
   profit_split_60: "60 / 40 · capped at 15% of cost",
-  profit_split_28: "28 / 72 · capped at 7% of cost",
+  profit_split_28: "28 / 72 · 7% of cost from 14% markup",
   margin_scaled: "Margin-scaled (legacy)",
   half_markup_below_25: "Half-markup (legacy)",
 };
@@ -39,10 +43,13 @@ export function profitSplitCommission(
   const markupPct = ((sellRate - cost) / cost) * 100;
   const profit = (sellRate - cost) * qty;
   if (profit <= 0) return { commission: 0, repShare: 0, markupPct };
-  const highMarkup = markupPct >= PROFIT_SPLIT_THRESHOLD;
-  const share = highMarkup ? PROFIT_SPLIT_SHARE[method] : LOW_MARKUP_REP_SHARE;
-  const commission = highMarkup
-    ? Math.min(profit * share, cost * qty * PROFIT_SPLIT_COST_CAP[method])
-    : profit * share;
+  const highMarkup = markupPct >= PROFIT_SPLIT_THRESHOLD_BY_METHOD[method];
+  const capAmount = cost * qty * PROFIT_SPLIT_COST_CAP[method];
+  // 28/72 pays a flat 7% of cost from 14% markup up (where 50/50 also equals 7%).
+  const commission = !highMarkup
+    ? profit * LOW_MARKUP_REP_SHARE
+    : method === "profit_split_28"
+      ? capAmount
+      : Math.min(profit * PROFIT_SPLIT_SHARE[method], capAmount);
   return { commission, repShare: commission / profit, markupPct };
 }
