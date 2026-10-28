@@ -901,6 +901,7 @@ const CommissionPage = () => {
     "rep_company_assignments",
     "rep_rate_history",
     "rep_company_assignment_history",
+    "commission_invoice_links",
   ], () => fetchCommissionReport(false), {
     enabled: activeTab === "report",
     fallbackIntervalMs: 0,
@@ -1250,7 +1251,7 @@ const CommissionPage = () => {
               invoices={commissionData.cash_invoices}
               reps={reps}
               formatCurrency={formatCurrency}
-              onChanged={() => { void fetchCommissionReport(true); }}
+              onChanged={() => { void fetchCommissionReport(false); }}
             />
           )}
 
