@@ -44,8 +44,11 @@
       supabase.channel = () => ({ on() { return this; }, subscribe(cb) { return this; } });
       supabase.removeChannel = async () => {};
 
+      const { AuthProvider } = await import("/src/contexts/AuthContext.tsx");
       const { default: CommissionPage } = await import("/src/components/admin/CommissionPage.tsx");
-      createRoot(document.getElementById("root")).render(React.createElement(CommissionPage));
+      createRoot(document.getElementById("root")).render(
+        React.createElement(AuthProvider, null, React.createElement(CommissionPage))
+      );
       window.__harnessReady = true;
     </script>
   </body>
