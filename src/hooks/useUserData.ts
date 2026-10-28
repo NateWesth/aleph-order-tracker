@@ -111,17 +111,20 @@ export function useUserData(): UserData {
       return userDataCache.get(cacheKey);
     }
 
-    let query = supabase.from('companies').select('*');
-    
-    // If not admin, only fetch companies they have access to
-    if (userRole !== 'admin') {
-      query = query.or(`id.in.(${userId}),code.in.(select company_code from profiles where id = '${userId}')`);
-    }
-
     const promise = (async () => {
-      const { data, error } = await query;
-      if (error) throw error;
-      return data || [];
+      // Page through every client (the server returns at most 1000 per request).
+      const rows: any[] = [];
+      for (let from = 0; ; from += 1000) {
+        let query = supabase.from('companies').select('*').order('name').range(from, from + 999);
+        if (userRole !== 'admin') {
+          query = query.or(`id.in.(${userId}),code.in.(select company_code from profiles where id = '${userId}')`);
+        }
+        const { data, error } = await query;
+        if (error) throw error;
+        rows.push(...(data || []));
+        if (!data || data.length < 1000) break;
+      }
+      return rows;
     })();
 
     userDataCache.set(cacheKey, promise);

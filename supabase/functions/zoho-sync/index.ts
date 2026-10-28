@@ -252,14 +252,14 @@ async function getValidAccessToken(supabase: any, clientId: string, clientSecret
 }
 
 // Fetch all pages from a Zoho Books endpoint
-async function fetchAllPages(accessToken: string, orgId: string, endpoint: string, listKey: string) {
+async function fetchAllPages(accessToken: string, orgId: string, endpoint: string, listKey: string, extra = '') {
   let allItems: any[] = []
   let page = 1
   let hasMore = true
 
   while (hasMore) {
     const response = await fetch(
-      `${ZOHO_API_URL}/books/v3/${endpoint}?organization_id=${orgId}&page=${page}&per_page=200`,
+      `${ZOHO_API_URL}/books/v3/${endpoint}?organization_id=${orgId}&page=${page}&per_page=200${extra}`,
       { headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` } }
     )
 
@@ -303,34 +303,44 @@ async function syncItems(supabase: any, accessToken: string, orgId: string): Pro
   return synced
 }
 
-// Sync Zoho Books Contacts → companies table
+// Sync Zoho Books customers → companies table. Every customer (active and
+// inactive) is pulled; existing rows are matched by Zoho id code, then by
+// normalised name, so a client is never inserted twice.
 async function syncContacts(supabase: any, accessToken: string, orgId: string): Promise<number> {
-  const zohoContacts = await fetchAllPages(accessToken, orgId, 'contacts', 'contacts')
+  const all = await fetchAllPages(accessToken, orgId, 'contacts', 'contacts', '&contact_type=customer&filter_by=Status.All')
+  const key = (v: string) => String(v || '').trim().replace(/\s+/g, ' ').toLowerCase()
+
+  const { data: existing, error: exErr } = await supabase.from('companies').select('id, name, code')
+  if (exErr) throw new Error(`Failed to read clients: ${exErr.message}`)
+  const byCode = new Map<string, any>()
+  const byName = new Map<string, any>()
+  for (const c of existing || []) { byCode.set(c.code, c); byName.set(key(c.name), c) }
+
   let synced = 0
-
-  for (const contact of zohoContacts) {
-    // Use contact_id as a unique code prefix
-    const code = contact.contact_number || `ZOHO-${contact.contact_id}`
-    
-    const { error } = await supabase
-      .from('companies')
-      .upsert({
-        code,
-        name: contact.company_name || contact.contact_name,
-        contact_person: contact.contact_name || null,
-        email: contact.email || null,
-        phone: contact.phone || contact.mobile || null,
-        address: formatAddress(contact.billing_address),
-        vat_number: contact.gst_no || contact.vat_reg_no || null,
-      }, { onConflict: 'code' })
-
-    if (error) {
-      console.error(`Failed to upsert contact ${contact.contact_name}:`, error.message)
-    } else {
-      synced++
+  const seen = new Set<string>()
+  for (const contact of all) {
+    if (contact.contact_type && contact.contact_type !== 'customer') continue
+    const name = String(contact.company_name || contact.contact_name || '').trim().replace(/\s+/g, ' ')
+    if (!name) continue
+    const nameKey = key(name)
+    if (seen.has(nameKey)) continue
+    seen.add(nameKey)
+    const code = `ZOHO-${contact.contact_id}`
+    const row = {
+      name,
+      contact_person: contact.contact_name || null,
+      email: contact.email || null,
+      phone: contact.phone || contact.mobile || null,
+      address: formatAddress(contact.billing_address),
+      vat_number: contact.gst_no || contact.vat_reg_no || null,
     }
+    const match = byCode.get(code) || byName.get(nameKey)
+    const { error } = match
+      ? await supabase.from('companies').update({ ...row, code: match.code.startsWith('ZOHO-') ? match.code : code }).eq('id', match.id)
+      : await supabase.from('companies').insert({ ...row, code })
+    if (error) console.error(`Failed to save client ${name}:`, error.message)
+    else synced++
   }
-
   return synced
 }
 
