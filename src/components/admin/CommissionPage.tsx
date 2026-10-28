@@ -1526,7 +1526,7 @@ const CommissionPage = () => {
                           className="flex items-center gap-2 cursor-pointer flex-1 min-w-0"
                           onClick={() => toggleExpanded(d.rep_id)}
                         >
-                          {expandedReps.has(d.rep_id) ? <ChevronDown className="h-4 w-4 shrink-0" /> : <ChevronRight className="h-4 w-4 shrink-0" />}
+                          <ChevronRight className="h-4 w-4 shrink-0 text-logo-violet" />
                           <CardTitle className="text-base truncate">{d.rep_name}</CardTitle>
                           <Badge variant="secondary" className="text-[10px]">{COMMISSION_METHOD_LABEL[(reps.find(r => r.id === d.rep_id)?.commission_method || "") as CommissionMethod] ?? "Commission"}</Badge>
                           {d.invoice_count === 0 && d.locked_invoice_count === 0 && (
@@ -1632,8 +1632,20 @@ const CommissionPage = () => {
                         </Popover>
                       )}
                     </CardHeader>
-                    {expandedReps.has(d.rep_id) && d.invoices.length > 0 && (
-                      <CardContent className="pt-0">
+                    <Dialog open={expandedReps.has(d.rep_id)} onOpenChange={(o) => { if (!o) toggleExpanded(d.rep_id); }}>
+                      <DialogContent className="order-bubble-dialog max-w-5xl w-[calc(100vw-1.5rem)] max-h-[88vh] overflow-y-auto rounded-[22px] border-logo-violet/30">
+                        <DialogHeader>
+                          <DialogTitle className="flex flex-wrap items-center gap-2">
+                            <span className="h-2.5 w-2.5 rounded-full bg-gradient-to-r from-logo-cyan via-logo-violet to-logo-magenta" />
+                            {d.rep_name}
+                            <span className="text-sm font-normal text-muted-foreground">· {format(selectedDate, "MMMM yyyy")} · {d.invoice_count} due · {formatCurrency(d.total_invoiced)}</span>
+                            <span className="ml-auto text-lg font-bold text-primary">{formatCurrency(d.commission_earned)}</span>
+                          </DialogTitle>
+                        </DialogHeader>
+                        {d.invoices.length === 0 ? (
+                          <p className="py-6 text-center text-sm text-muted-foreground">No invoices for this rep in {format(selectedDate, "MMMM yyyy")}.</p>
+                        ) : (
+
                         <div className="border rounded-lg overflow-hidden">
                           <table className="w-full text-sm">
                             <thead className="bg-muted/50">
@@ -1886,8 +1898,9 @@ const CommissionPage = () => {
                             </tbody>
                           </table>
                         </div>
-                      </CardContent>
-                    )}
+                        )}
+                      </DialogContent>
+                    </Dialog>
                   </Card>
                 ))}
                 {commissionData.data.length === 0 && (
