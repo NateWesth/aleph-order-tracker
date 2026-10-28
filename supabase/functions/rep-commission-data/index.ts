@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { costKeys, costSignature, resolveBillCost } from './costMatching.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -222,7 +223,7 @@ Deno.serve(async (req) => {
     if (force_refresh) {
       const recentCache = await readCachedCommissionReport(supabase, periodMonth, rep_id)
       const refreshedAt = recentCache?.refreshed_at ? new Date(recentCache.refreshed_at).getTime() : 0
-      if (recentCache && Number.isFinite(refreshedAt) && Date.now() - refreshedAt < 5 * 60 * 1000) {
+      if (recentCache && (recentCache.report as any)?.report_version >= 7 && Number.isFinite(refreshedAt) && Date.now() - refreshedAt < 5 * 60 * 1000) {
         const report = await applyLockedPayoutsToReport(supabase, recentCache.report, periodMonth)
         return new Response(JSON.stringify({
           ...report,
@@ -242,7 +243,7 @@ Deno.serve(async (req) => {
       // v2 = cost-as-of-invoice-date resolution. Older caches used latest-only
       // cost and are treated as stale so we recompute with historical bills.
       const hasCostAsOfVersion = cachedReport
-        && (cachedReport.report as any)?.report_version >= 6
+        && (cachedReport.report as any)?.report_version >= 7
       if (cachedReport && hasUnresolvedField && hasCostAsOfVersion) {
         const report = await applyLockedPayoutsToReport(supabase, cachedReport.report, periodMonth)
         return new Response(JSON.stringify({
@@ -430,7 +431,7 @@ Deno.serve(async (req) => {
     )
 
     // ---------------------------------------------------------------------
-    // Cost resolution: STRICT name + description match against vendor bills.
+    // Cost resolution: exact text first, then stable item ID/SKU against vendor bills.
     // The Zoho item list is NOT used — only vendor bill line items count as
     // authoritative cost, matching exactly on (item name, description).
     // Admin-entered overrides in commission_item_cost_overrides win over bills
@@ -438,12 +439,14 @@ Deno.serve(async (req) => {
     // skipped.
     // ---------------------------------------------------------------------
     const lineCostSignatures = new Set<string>()
+    const requestedCostKeys = new Set<string>()
     const signatureSamples = new Map<string, { name: string; description: string; sample_invoice_number?: string; sample_customer?: string }>()
     for (const inv of invoicesWithLines) {
       for (const li of inv.line_items || []) {
         const sig = lineCostSignature(li)
         if (!sig) continue
         lineCostSignatures.add(sig)
+        for (const key of costKeys(li)) requestedCostKeys.add(key)
         if (!signatureSamples.has(sig)) {
           signatureSamples.set(sig, {
             name: getLineName(li),
@@ -473,9 +476,7 @@ Deno.serve(async (req) => {
     // 2) Vendor bill lookup for the remainder — returns a HISTORY per sig so
     //    we can resolve cost as-of each invoice date (not just the latest).
     const stillNeeded = new Set<string>()
-    for (const sig of lineCostSignatures) {
-      if (!overrideCostMap.has(sig)) stillNeeded.add(sig)
-    }
+    for (const key of requestedCostKeys) stillNeeded.add(key)
     const billCostHistory = await fetchBillCostHistory(accessToken, orgId, stillNeeded, date_end)
 
     // Scalar "latest known" cost map — used only for cache metadata / logging.
@@ -488,20 +489,11 @@ Deno.serve(async (req) => {
     // Resolve the cost for a given signature as of a specific invoice date.
     // Prefers the latest bill on or before the invoice date; falls back to the
     // earliest bill we have if none precede the invoice. Admin overrides win.
-    const resolveCostAsOf = (sig: string | null, invoiceDate: string): number | null => {
+    const resolveCostAsOf = (sig: string | null, invoiceDate: string, li: Record<string, unknown>): number | null => {
       if (!sig) return null
       const override = overrideCostMap.get(sig)
       if (override !== undefined) return override
-      const history = billCostHistory.get(sig)
-      if (!history || history.length === 0) return null
-      if (invoiceDate) {
-        for (const entry of history) {
-          if (entry.date && entry.date <= invoiceDate) return entry.rate
-        }
-      }
-      // No bill precedes the invoice — use the earliest available bill
-      // (last element after desc sort) as best-effort baseline.
-      return history[history.length - 1].rate
+      return resolveBillCost(costKeys(li), billCostHistory, invoiceDate)
     }
 
     console.log(`Resolved ${costMap.size}/${lineCostSignatures.size} item costs (${billCostHistory.size} vendor bill histories, ${overrideCostMap.size} manual overrides)`)
@@ -692,7 +684,7 @@ Deno.serve(async (req) => {
         if (rawSubTotal <= 0) continue
         const rawSellRate = toNumber(li.rate) ?? (qty > 0 ? rawSubTotal / qty : 0)
         const sig = lineCostSignature(li)
-        const cost = resolveCostAsOf(sig, invoiceDateForCost)
+        const cost = resolveCostAsOf(sig, invoiceDateForCost, li)
         rawLines.push({ li, qty, rawSubTotal, rawSellRate, sig, cost })
         sumRawSubTotals += rawSubTotal
       }
@@ -908,7 +900,7 @@ Deno.serve(async (req) => {
     const unresolved = Array.from(unresolvedByKey.values())
       .sort((a, b) => b.occurrences - a.occurrences)
 
-    const report = { success: true, data, summary, unresolved_cost_items: unresolved, unassigned_customers: Array.from(unassignedByName.values()).sort((a, b) => b.sub_total - a.sub_total), report_version: 6 }
+    const report = { success: true, data, summary, unresolved_cost_items: unresolved, unassigned_customers: Array.from(unassignedByName.values()).sort((a, b) => b.sub_total - a.sub_total), report_version: 7 }
     await upsertCachedCommissionReport(supabase, {
       periodMonth,
       repId: rep_id ?? null,
@@ -924,7 +916,7 @@ Deno.serve(async (req) => {
 
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to calculate commission'
-    const isRateLimit = message.toLowerCase().includes('rate limit')
+    const isRateLimit = /rate limit|vendor bill/i.test(message)
     if (isRateLimit) {
       console.warn('Rep commission data paused:', message)
       if (cacheFallback) {
@@ -937,7 +929,7 @@ Deno.serve(async (req) => {
               cached: true,
               stale_due_to_rate_limit: true,
               refreshed_at: cachedReport.refreshed_at,
-              notice: `Zoho API rate limit reached. Showing cached data from ${cachedReport.refreshed_at}.`,
+              notice: `Cost refresh could not finish: ${message}. Showing the last saved report from ${cachedReport.refreshed_at}.`,
             }), {
               status: 200,
               headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -1311,11 +1303,7 @@ function getLineDescription(li: Record<string, unknown>): string {
 // admin cost overrides. BOTH name and description must match exactly
 // (case-insensitive, whitespace-collapsed).
 function buildCostSignature(name: string, description: string): string {
-  const norm = (s: string) => s.toLowerCase().trim().replace(/\s+/g, ' ')
-  const n = norm(name)
-  const d = norm(description)
-  if (!n && !d) return ''
-  return `${n}||${d}`
+  return costSignature(name, description)
 }
 
 function lineCostSignature(li: Record<string, unknown>): string {
@@ -1373,6 +1361,7 @@ async function fetchBillCostHistory(
   invoiceDateEnd: string,
 ): Promise<Map<string, Array<{ date: string; rate: number }>>> {
   const history = new Map<string, Array<{ date: string; rate: number }>>()
+  const skuIdentities = new Map<string, Set<string>>()
   if (signatures.size === 0) return history
 
   let page = 1
@@ -1395,12 +1384,10 @@ async function fetchBillCostHistory(
       })
       listData = await resp.json()
       if (!resp.ok || listData.code !== 0) {
-        console.error('Zoho bills list error:', listData?.message)
-        break
+        throw new Error(`Vendor bill lookup failed: ${listData?.message || resp.status}`)
       }
     } catch (e) {
-      console.error('Zoho bills fetch error:', e)
-      break
+      throw new Error(`Vendor bill lookup failed: ${e instanceof Error ? e.message : String(e)}`)
     }
 
     const bills = listData.bills || []
@@ -1410,16 +1397,16 @@ async function fetchBillCostHistory(
       const batch = bills.slice(i, i + 8)
       const details = await Promise.all(batch.map(async (b: any) => {
         const id = b.bill_id
-        if (!id) return null
+        if (!id) throw new Error('Vendor bill lookup returned a bill without an ID')
         try {
           const r = await fetch(
             `${ZOHO_API_URL}/books/v3/bills/${id}?organization_id=${orgId}`,
             { headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` } },
           )
           const d = await r.json()
-          if (!r.ok || d.code !== 0) return null
-          return d.bill || null
-        } catch { return null }
+          if (!r.ok || d.code !== 0 || !d.bill) throw new Error(d.message || `HTTP ${r.status}`)
+          return d.bill
+        } catch (e) { throw new Error(`Vendor bill detail lookup failed: ${e instanceof Error ? e.message : String(e)}`) }
       }))
 
       for (const bill of details) {
@@ -1430,11 +1417,17 @@ async function fetchBillCostHistory(
           const rate = toNumber(li.rate) ?? toNumber(li.item_rate)
           if (rate === null || rate <= 0) continue
 
-          const sig = lineCostSignature(li)
-          if (!sig || !signatures.has(sig)) continue
-          const arr = history.get(sig) || []
-          arr.push({ date: billDate, rate })
-          history.set(sig, arr)
+          for (const key of costKeys(li)) {
+            if (!signatures.has(key)) continue
+            if (key.startsWith('sku:') && li.item_id) {
+              const ids = skuIdentities.get(key) || new Set<string>()
+              ids.add(String(li.item_id))
+              skuIdentities.set(key, ids)
+            }
+            const arr = history.get(key) || []
+            arr.push({ date: billDate, rate })
+            history.set(key, arr)
+          }
         }
       }
     }
@@ -1443,6 +1436,9 @@ async function fetchBillCostHistory(
     page++
   }
 
+  if (hasMore) throw new Error('Vendor bill history exceeds the safe lookup limit')
+  // Reused SKUs must not pool costs from distinct Zoho products.
+  for (const [key, ids] of skuIdentities) if (ids.size > 1) history.delete(key)
   // Sort each history desc by date so callers can find "latest on or before X"
   // with a simple linear scan.
   for (const arr of history.values()) {
