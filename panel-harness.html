@@ -1,6 +1,18 @@
 <!doctype html>
 <html>
-  <head><link rel="stylesheet" href="/src/index.css"></head>
+  <head><link rel="stylesheet" href="/src/index.css">
+    <script>
+      const realFetch = window.fetch.bind(window);
+      window.__report = null;
+      window.fetch = (input, init) => {
+        const url = typeof input === "string" ? input : (input && input.url) || "";
+        if (url.includes("rep-commission-data") && window.__report) {
+          return Promise.resolve(new Response(JSON.stringify(window.__report), { status: 200, headers: { "Content-Type": "application/json" } }));
+        }
+        return realFetch(input, init);
+      };
+    </script>
+  </head>
   <body style="margin:0">
     <div id="root"></div>
     <script type="module">
