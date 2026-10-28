@@ -1852,96 +1852,88 @@ const CommissionPage = () => {
         </TabsContent>
 
         {/* Manage Reps Tab */}
-        <TabsContent value="reps" className="space-y-5 min-w-0">
-          <div className="flex justify-between items-center flex-wrap gap-2">
-            <h2 className="text-lg font-semibold">Sales Reps</h2>
-            <div className="flex items-center gap-2 flex-wrap">
-              <div className="flex items-center gap-1 rounded-lg border p-0.5">
-                <Button
-                  size="sm"
-                  variant={methodFilter === "all" ? "secondary" : "ghost"}
-                  className="h-7 text-xs"
-                  onClick={() => setMethodFilter("all")}
-                >
-                  All ({reps.length})
-                </Button>
-                <Button
-                  size="sm"
-                  variant={methodFilter === "margin_scaled" ? "secondary" : "ghost"}
-                  className="h-7 text-xs"
-                  onClick={() => setMethodFilter("margin_scaled")}
-                >
-                  Margin-scaled ({reps.filter(r => (r.commission_method || "margin_scaled") === "margin_scaled").length})
-                </Button>
-                <Button
-                  size="sm"
-                  variant={methodFilter === "half_markup_below_25" ? "secondary" : "ghost"}
-                  className="h-7 text-xs"
-                  onClick={() => setMethodFilter("half_markup_below_25")}
-                >
-                  Half-markup ({reps.filter(r => r.commission_method === "half_markup_below_25").length})
-                </Button>
+        <TabsContent value="reps" className="mt-0 space-y-4 min-w-0">
+          <div className="grid gap-3 md:grid-cols-2">
+            {(["profit_split_60", "profit_split_28"] as const).map((m) => (
+              <div key={m} className="commission-rule-card rounded-2xl border border-border/60 bg-card p-4">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="font-display text-sm font-black">{COMMISSION_METHOD_LABEL[m]}</p>
+                  <Badge variant="outline" className="text-[10px]">{reps.filter(r => r.commission_method === m).length} reps</Badge>
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                  <div className="rounded-xl bg-primary/10 p-2.5">
+                    <p className="text-[10px] text-muted-foreground">Markup 25% or more</p>
+                    <p className="mt-0.5 font-bold">Rep {m === "profit_split_60" ? "60%" : "28%"} · Company {m === "profit_split_60" ? "40%" : "72%"}</p>
+                  </div>
+                  <div className="rounded-xl bg-muted/60 p-2.5">
+                    <p className="text-[10px] text-muted-foreground">Markup below 25%</p>
+                    <p className="mt-0.5 font-bold">Rep 50% · Company 50%</p>
+                  </div>
+                </div>
               </div>
-              <Button onClick={() => { setEditingRep(null); setRepForm({ name: "", email: "", commission_rate: "5", commission_method: "profit_split_60" }); setRepDialogOpen(true); }}>
-                <Plus className="h-4 w-4 mr-1.5" />Add Rep
-              </Button>
+            ))}
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-1 rounded-xl border border-border/60 bg-card p-1">
+              {(["all", "profit_split_60", "profit_split_28"] as const).map((m) => (
+                <Button key={m} size="sm" variant={methodFilter === m ? "secondary" : "ghost"} className="h-7 text-xs" onClick={() => setMethodFilter(m)}>
+                  {m === "all" ? `All (${reps.length})` : `${m === "profit_split_60" ? "60 / 40" : "28 / 72"} (${reps.filter(r => r.commission_method === m).length})`}
+                </Button>
+              ))}
             </div>
+            <Button onClick={() => { setEditingRep(null); setRepForm({ name: "", email: "", commission_rate: "5", commission_method: "profit_split_60" }); setRepDialogOpen(true); }}>
+              <Plus className="h-4 w-4 mr-1.5" />Add rep
+            </Button>
           </div>
 
           {loadingReps ? (
             <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
           ) : reps.length === 0 ? (
-            <Card>
-              <CardContent className="py-8 text-center text-muted-foreground">
-                No sales reps yet. Add a rep to get started.
-              </CardContent>
-            </Card>
+            <Card><CardContent className="py-8 text-center text-muted-foreground">No sales reps yet. Add a rep to get started.</CardContent></Card>
           ) : (
-            <div className="grid gap-3">
+            <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
               {reps
-                .filter(rep => methodFilter === "all" || (rep.commission_method || "margin_scaled") === methodFilter)
+                .filter(rep => methodFilter === "all" || rep.commission_method === methodFilter)
                 .map((rep) => {
-                const assignedCompanies = getRepAssignedCompanies(rep.id);
-                const method = (rep.commission_method || "margin_scaled") as CommissionMethod;
-                return (
-                  <Card key={rep.id}>
-                    <CardContent className="py-4 flex items-center justify-between gap-3">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-medium">{rep.name}</span>
-                          <Badge variant="secondary">{Number(rep.commission_rate).toFixed(2)}% default</Badge>
-                          <Badge variant="outline" className="text-xs">
-                            {method === "margin_scaled" ? "Margin-scaled" : "Half-markup <25%"}
-                          </Badge>
-                        </div>
-                        {rep.email && <p className="text-xs text-muted-foreground">{rep.email}</p>}
-                        {assignedCompanies.length > 0 ? (
-                          <div className="flex flex-wrap gap-1 mt-1.5">
-                            {assignedCompanies.map((c, i) => (
-                              <Badge key={i} variant="outline" className="text-xs">
-                                {c.name}{c.overrideRate !== null ? ` (${c.overrideRate}%)` : ''}
-                              </Badge>
-                            ))}
+                  const assignedCompanies = getRepAssignedCompanies(rep.id);
+                  const method = (rep.commission_method || "margin_scaled") as CommissionMethod;
+                  const legacy = !isProfitSplit(method);
+                  return (
+                    <Card key={rep.id} className="rounded-2xl border-border/60">
+                      <CardContent className="space-y-3 p-4">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex min-w-0 items-center gap-3">
+                            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary/15 text-sm font-black text-primary">{rep.name.slice(0, 1).toUpperCase()}</span>
+                            <div className="min-w-0">
+                              <p className="truncate font-semibold">{rep.name}</p>
+                              <p className="truncate text-xs text-muted-foreground">{rep.email || "No email"}</p>
+                            </div>
                           </div>
-                        ) : (
-                          <p className="text-xs text-destructive mt-1">No companies assigned</p>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <Button variant="outline" size="sm" onClick={() => openAssignDialog(rep.id)}>
-                          <Users className="h-3.5 w-3.5 mr-1" />Assign
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => openEditRep(rep)}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="text-destructive" onClick={() => handleDeleteRep(rep.id)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
+                          <div className="flex shrink-0 items-center">
+                            <Button variant="ghost" size="icon" aria-label="Edit rep" onClick={() => openEditRep(rep)}><Pencil className="h-4 w-4" /></Button>
+                            <Button variant="ghost" size="icon" aria-label="Delete rep" className="text-destructive" onClick={() => handleDeleteRep(rep.id)}><Trash2 className="h-4 w-4" /></Button>
+                          </div>
+                        </div>
+                        <Badge variant={legacy ? "destructive" : "secondary"} className="text-[10px]">
+                          {COMMISSION_METHOD_LABEL[method] ?? method}{legacy ? " — edit to choose a split" : ""}
+                        </Badge>
+                        <div className="flex items-center justify-between gap-2 border-t border-border/50 pt-3">
+                          {assignedCompanies.length > 0 ? (
+                            <p className="truncate text-xs text-muted-foreground" title={assignedCompanies.map(c => c.name).join(", ")}>
+                              {assignedCompanies.length} client{assignedCompanies.length === 1 ? "" : "s"}: {assignedCompanies.slice(0, 2).map(c => c.name).join(", ")}{assignedCompanies.length > 2 ? "…" : ""}
+                            </p>
+                          ) : (
+                            <p className="text-xs text-destructive">No clients assigned</p>
+                          )}
+                          <Button variant="outline" size="sm" className="shrink-0" onClick={() => openAssignDialog(rep.id)}>
+                            <Users className="h-3.5 w-3.5 mr-1" />Clients
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
             </div>
           )}
         </TabsContent>
@@ -1970,38 +1962,19 @@ const CommissionPage = () => {
               <p className="text-xs text-muted-foreground mt-1">This is the default rate. You can override per-company in assignments.</p>
             </div>
             <div>
-              <Label>Commission Calculation Method</Label>
-              <div className="space-y-2 mt-2">
-                <label className="flex items-start gap-2 p-2 rounded-md border cursor-pointer hover:bg-muted/50">
-                  <input
-                    type="radio"
-                    name="commission_method"
-                    className="mt-1"
-                    checked={repForm.commission_method === "margin_scaled"}
-                    onChange={() => setRepForm(f => ({ ...f, commission_method: "margin_scaled" }))}
-                  />
-                  <div className="text-sm">
-                    <div className="font-medium">Margin-scaled rate</div>
-                    <div className="text-xs text-muted-foreground">
-                      Full rate at 25%+ margin. Below 25%, rate drops 1% per 1% margin shortfall (floored at 0).
+              <Label>Profit split</Label>
+              <div className="mt-2 grid gap-2">
+                {(["profit_split_60", "profit_split_28"] as const).map((m) => (
+                  <label key={m} className={cn("flex cursor-pointer items-start gap-2 rounded-xl border p-3 hover:bg-muted/50", repForm.commission_method === m && "border-primary bg-primary/5")}>
+                    <input type="radio" name="commission_method" className="mt-1" checked={repForm.commission_method === m} onChange={() => setRepForm(f => ({ ...f, commission_method: m }))} />
+                    <div className="text-sm">
+                      <div className="font-medium">{COMMISSION_METHOD_LABEL[m]}</div>
+                      <div className="text-xs text-muted-foreground">
+                        Markup 25% or more: rep gets {m === "profit_split_60" ? "60%" : "28%"} of the profit. Below 25%: profit is split 50 / 50.
+                      </div>
                     </div>
-                  </div>
-                </label>
-                <label className="flex items-start gap-2 p-2 rounded-md border cursor-pointer hover:bg-muted/50">
-                  <input
-                    type="radio"
-                    name="commission_method"
-                    className="mt-1"
-                    checked={repForm.commission_method === "half_markup_below_25"}
-                    onChange={() => setRepForm(f => ({ ...f, commission_method: "half_markup_below_25" }))}
-                  />
-                  <div className="text-sm">
-                    <div className="font-medium">Half-markup below 25%</div>
-                    <div className="text-xs text-muted-foreground">
-                      Full rate at 25%+ margin. Below 25%, rep earns 50% of the markup (sell − cost) for that line.
-                    </div>
-                  </div>
-                </label>
+                  </label>
+                ))}
               </div>
             </div>
           </div>
