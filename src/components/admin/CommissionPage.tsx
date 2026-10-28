@@ -467,12 +467,16 @@ const CommissionPage = () => {
   const fetchData = useCallback(async () => {
     setLoadingReps(true);
     try {
-      const [repsRes, companiesRes, assignRes] = await Promise.all([
+      const { data: { user: me } } = await supabase.auth.getUser();
+      const [repsRes, companiesRes, assignRes, accessRes] = await Promise.all([
         supabase.from("reps").select("*").order("name"),
         supabase.from("companies").select("id, name, code").order("name"),
         supabase.from("rep_company_assignments").select("rep_id, company_id, commission_rate"),
+        (supabase as any).from("commission_rep_access").select("rep_id").eq("user_id", me?.id ?? ""),
       ]);
-      if (repsRes.data) setReps(repsRes.data as Rep[]);
+      // Users limited to specific reps only see those reps (none set = all reps).
+      const allowedReps = new Set(((accessRes.data as { rep_id: string }[]) || []).map((r) => r.rep_id));
+      if (repsRes.data) setReps((repsRes.data as Rep[]).filter((r) => allowedReps.size === 0 || allowedReps.has(r.id)));
       if (companiesRes.data) {
         const zohoCompanies = companiesRes.data.filter(isZohoCompany);
         const dedupedCompanies = Array.from(
