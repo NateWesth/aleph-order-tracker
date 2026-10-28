@@ -1,6 +1,6 @@
 # Roadmap
 
-- [ ] Repair COD link display and statement cache refresh; test link, relink and unlink handling
+- [x] Repair COD link display and statement cache refresh; test link, relink and unlink handling
 
 - [x] Apply cost-based commission caps to both rep options, update labels, and deploy
 - [x] Verify capped calculations and client/server agreement with regression tests
