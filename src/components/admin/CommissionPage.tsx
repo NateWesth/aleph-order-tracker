@@ -22,6 +22,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { UnresolvedCostsPanel, saveCost as saveOverrideCost } from "./UnresolvedCostsPanel";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import CommissionRepManagementDialog from "./CommissionRepManagementDialog";
+import CashInvoicesPanel, { type CashInvoice } from "./commission/CashInvoicesPanel";
 import UnassignedClientsPanel, { type UnassignedCustomer } from "./commission/UnassignedClientsPanel";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLiveData } from "@/hooks/useLiveData";
@@ -135,6 +136,7 @@ type CommissionResult = {
   notice?: string;
   unresolved_cost_items?: UnresolvedCostItem[];
   unassigned_customers?: UnassignedCustomer[];
+  cash_invoices?: CashInvoice[];
 };
 
 
@@ -1240,6 +1242,15 @@ const CommissionPage = () => {
               reps={reps}
               formatCurrency={formatCurrency}
               onAssigned={() => { void fetchData(); void fetchCommissionReport(true); }}
+            />
+          )}
+
+          {commissionData?.cash_invoices && (
+            <CashInvoicesPanel
+              invoices={commissionData.cash_invoices}
+              reps={reps}
+              formatCurrency={formatCurrency}
+              onChanged={() => { void fetchCommissionReport(true); }}
             />
           )}
 
