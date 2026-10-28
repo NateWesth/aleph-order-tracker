@@ -90,7 +90,7 @@ export default function CashInvoicesPanel({ invoices, reps, formatCurrency, onCh
                 <p className="text-[11px] text-muted-foreground">{inv.date} · {formatCurrency(inv.sub_total)} excl. VAT</p>
               </div>
               <Select
-                value={inv.rep_id || "none"}
+                value={inv.rep_id || ""}
                 disabled={saving !== null}
                 onValueChange={(v) => void link(inv, v)}
               >
