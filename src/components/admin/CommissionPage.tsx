@@ -22,6 +22,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { UnresolvedCostsPanel, saveCost as saveOverrideCost } from "./UnresolvedCostsPanel";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import CommissionRepManagementDialog from "./CommissionRepManagementDialog";
+import UnassignedClientsPanel, { type UnassignedCustomer } from "./commission/UnassignedClientsPanel";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLiveData } from "@/hooks/useLiveData";
 
@@ -133,6 +134,7 @@ type CommissionResult = {
   stale_due_to_rate_limit?: boolean;
   notice?: string;
   unresolved_cost_items?: UnresolvedCostItem[];
+  unassigned_customers?: UnassignedCustomer[];
 };
 
 
@@ -1212,6 +1214,15 @@ const CommissionPage = () => {
               <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
               <p>{reportNotice}</p>
             </div>
+          )}
+
+          {commissionData?.unassigned_customers && (
+            <UnassignedClientsPanel
+              customers={commissionData.unassigned_customers}
+              reps={reps}
+              formatCurrency={formatCurrency}
+              onAssigned={() => { void fetchData(); void fetchCommissionReport(true); }}
+            />
           )}
 
           {commissionData?.unresolved_cost_items && commissionData.unresolved_cost_items.length > 0 && (

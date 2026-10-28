@@ -242,7 +242,7 @@ Deno.serve(async (req) => {
       // v2 = cost-as-of-invoice-date resolution. Older caches used latest-only
       // cost and are treated as stale so we recompute with historical bills.
       const hasCostAsOfVersion = cachedReport
-        && (cachedReport.report as any)?.report_version >= 5
+        && (cachedReport.report as any)?.report_version >= 6
       if (cachedReport && hasUnresolvedField && hasCostAsOfVersion) {
         const report = await applyLockedPayoutsToReport(supabase, cachedReport.report, periodMonth)
         return new Response(JSON.stringify({
@@ -584,6 +584,7 @@ Deno.serve(async (req) => {
     let matched = 0
     let duplicatesSkipped = 0
     const unmatchedSamples: string[] = []
+    const unassignedByName = new Map<string, { customer_name: string; invoice_count: number; sub_total: number }>()
     const processedInvoiceIds = new Set<string>()
     const unresolvedCostItems: Array<{
       item_name: string
@@ -611,6 +612,13 @@ Deno.serve(async (req) => {
 
       const target = matchInvoiceToAssignment(inv.customer_name || '')
       if (!target) {
+        if (inv.customer_name) {
+          const key = normalizeCompanyName(inv.customer_name)
+          const cur = unassignedByName.get(key) || { customer_name: inv.customer_name, invoice_count: 0, sub_total: 0 }
+          cur.invoice_count += 1
+          cur.sub_total = r2(cur.sub_total + getInvoiceSubTotal(inv))
+          unassignedByName.set(key, cur)
+        }
         if (unmatchedSamples.length < 10 && inv.customer_name) {
           unmatchedSamples.push(inv.customer_name)
         }
@@ -900,7 +908,7 @@ Deno.serve(async (req) => {
     const unresolved = Array.from(unresolvedByKey.values())
       .sort((a, b) => b.occurrences - a.occurrences)
 
-    const report = { success: true, data, summary, unresolved_cost_items: unresolved, report_version: 5 }
+    const report = { success: true, data, summary, unresolved_cost_items: unresolved, unassigned_customers: Array.from(unassignedByName.values()).sort((a, b) => b.sub_total - a.sub_total), report_version: 6 }
     await upsertCachedCommissionReport(supabase, {
       periodMonth,
       repId: rep_id ?? null,
