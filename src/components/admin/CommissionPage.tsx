@@ -88,6 +88,7 @@ type CommissionInvoice = {
   invoice_discount?: number;
   excluded_line_count?: number;
   excluded_sub_total?: number;
+  cod_linked?: boolean;
 };
 
 type CommissionRepData = {

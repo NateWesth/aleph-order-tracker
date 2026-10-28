@@ -75,12 +75,9 @@ export default function CashInvoicesPanel({ invoices, reps, formatCurrency, onCh
         <div className="flex flex-wrap items-center gap-2">
           <Banknote className="h-4 w-4 text-primary" />
           <p className="text-sm font-semibold">Cash (COD) invoices</p>
-          <Badge variant="outline" className="text-[10px]">{invoices.length - unlinked.length} linked</Badge>
-          {unlinked.length > 0 && (
-            <Badge variant="outline" className="text-[10px] border-warning/50 text-warning">
-              {unlinked.length} not linked · {formatCurrency(unlinked.reduce((s, i) => s + i.sub_total, 0))}
-            </Badge>
-          )}
+          <Badge variant="outline" className="text-[10px] border-warning/50 text-warning">
+            {unlinked.length} not linked · {formatCurrency(unlinked.reduce((s, i) => s + i.sub_total, 0))}
+          </Badge>
         </div>
         {open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
       </Button>
@@ -99,7 +96,6 @@ export default function CashInvoicesPanel({ invoices, reps, formatCurrency, onCh
               >
                 <SelectTrigger className="h-8 w-44 text-xs"><SelectValue placeholder="Link to rep" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">Not linked</SelectItem>
                   {reps.map((r) => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
                 </SelectContent>
               </Select>
