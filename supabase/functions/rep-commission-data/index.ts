@@ -65,7 +65,12 @@ const getInvoiceSubTotal = (invoice: Record<string, unknown>): number => {
 //   - 0 <= margin < 25%  -> commission = 50% of the profit (split in half)
 //   - negative margin -> 0% commission
 //   - unknown cost -> 0% commission (skip line, never overpay)
-type CommissionMethod = 'margin_scaled' | 'half_markup_below_25'
+// 'profit_split_60' / 'profit_split_28':
+//   Rep receives a share of the line PROFIT ((sell - cost) x qty).
+//   - markup on cost >= 25% -> 60% (or 28%) to the rep, rest to the company
+//   - markup on cost <  25% -> 50% / 50%
+//   - no profit or unknown cost -> 0
+type CommissionMethod = 'margin_scaled' | 'half_markup_below_25' | 'profit_split_60' | 'profit_split_28'
 
 const computeEffectiveRate = (
   fullRate: number,
@@ -100,6 +105,18 @@ const computeLineCommission = (
   const hasRealCost = cost !== null && cost > 0
   if (hasRealCost && sellRate > 0) {
     marginPct = ((sellRate - (cost as number)) / (cost as number)) * 100
+  }
+
+  if (method === 'profit_split_60' || method === 'profit_split_28') {
+    if (marginPct === null) {
+      return { commission: 0, effectiveRate: 0, excluded_reason: 'unknown_cost' }
+    }
+    const profit = (sellRate - (cost as number)) * qty
+    if (profit <= 0) return { commission: 0, effectiveRate: 0, excluded_reason: 'negative_margin' }
+    const share = marginPct >= 25 ? (method === 'profit_split_60' ? 0.6 : 0.28) : 0.5
+    const commission = profit * share
+    const effectiveRate = lineSubTotal > 0 ? (commission / lineSubTotal) * 100 : 0
+    return { commission, effectiveRate }
   }
 
   if (method === 'half_markup_below_25') {
