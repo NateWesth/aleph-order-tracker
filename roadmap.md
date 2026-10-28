@@ -1,5 +1,9 @@
 # Roadmap
 
+- [x] Diagnose remaining missing bill costs and Sune’s missing commission
+- [x] Fix N/A-name SKU matching, exact miscellaneous-description matching, and show a current-month action for empty statements
+- [ ] Confirm remaining vendor costs and Sune’s refreshed October payout — requires authenticated Zoho statement refresh; external unmanaged sign-in unavailable
+
 - [x] Repair SKU matching for commission vendor-bill costs and verify regressions
 - [ ] Verify refreshed commission statement while signed in — external unmanaged sign-in unavailable in the sandbox
 

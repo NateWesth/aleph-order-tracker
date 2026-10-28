@@ -783,11 +783,11 @@ const CommissionPage = () => {
       setCommissionData(withOverrides);
       if (response.data?.cached && response.data?.refreshed_at) {
         const cachedAt = format(new Date(response.data.refreshed_at), "PPp");
-        setReportNotice(response.data.stale_due_to_rate_limit
+        setReportNotice(response.data.notice || (response.data.stale_due_to_rate_limit
           ? `Zoho API rate limit reached. Showing cached data from ${cachedAt}.`
           : response.data.refresh_suppressed
             ? `Zoho was refreshed recently (${cachedAt}). Reusing that snapshot to avoid duplicate API calls.`
-            : `Showing cached Zoho data from ${cachedAt}. Use Refresh from Zoho only when you need the latest invoices.`);
+            : `Showing cached Zoho data from ${cachedAt}. Use Refresh from Zoho only when you need the latest invoices.`));
       }
     } catch (e: any) {
       console.error("Commission report error:", e);
@@ -1485,6 +1485,9 @@ const CommissionPage = () => {
                           {expandedReps.has(d.rep_id) ? <ChevronDown className="h-4 w-4 shrink-0" /> : <ChevronRight className="h-4 w-4 shrink-0" />}
                           <CardTitle className="text-base truncate">{d.rep_name}</CardTitle>
                           <Badge variant="secondary" className="text-[10px]">{COMMISSION_METHOD_LABEL[(reps.find(r => r.id === d.rep_id)?.commission_method || "") as CommissionMethod] ?? "Commission"}</Badge>
+                          {d.invoice_count === 0 && d.locked_invoice_count === 0 && (
+                            <span className="text-xs text-muted-foreground">No eligible invoices in {format(selectedDate, "MMMM yyyy")}</span>
+                          )}
                           {d.locked_invoice_count > 0 && (
                             <Badge variant="outline" className="gap-1 text-xs">
                               <Lock className="h-3 w-3" />
@@ -1493,6 +1496,11 @@ const CommissionPage = () => {
                           )}
                         </div>
                         <div className="flex items-center gap-3 text-sm">
+                          {d.invoice_count === 0 && d.locked_invoice_count === 0 && isPreviousMonth && (
+                            <Button size="sm" variant="outline" onClick={() => setSelectedMonth(format(new Date(), "yyyy-MM"))}>
+                              View {format(new Date(), "MMMM")}
+                            </Button>
+                          )}
                           <div className="text-right">
                             <div className="text-xs text-muted-foreground">{d.invoice_count} due • {formatCurrency(d.total_invoiced)}</div>
                             <div className="font-bold text-primary">{formatCurrency(d.commission_earned)}</div>
