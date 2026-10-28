@@ -3777,6 +3777,7 @@ export type Database = {
         Returns: undefined
       }
       can_edit_commission: { Args: { _user_id: string }; Returns: boolean }
+      company_name_key: { Args: { p: string }; Returns: string }
       complete_fulfillment_delivery: {
         Args: { p_order_id: string }
         Returns: Json
@@ -3852,6 +3853,7 @@ export type Database = {
         Args: { update_id: string; user_uuid: string }
         Returns: undefined
       }
+      merge_duplicate_companies: { Args: never; Returns: number }
       merge_orders: {
         Args: { p_source_order_id: string; p_target_order_id: string }
         Returns: string
