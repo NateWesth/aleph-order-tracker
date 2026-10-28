@@ -231,7 +231,13 @@ Deno.serve(async (req) => {
       linkRows.push(...(data || []))
       if (!data || data.length < 1000) break
     }
-    const linksFingerprint = invoiceLinkFingerprint(linkRows)
+    // Manually entered costs also invalidate cached reports, so saved costs show at once.
+    const { data: costOvFp, error: costOvFpErr } = await supabase.from('commission_item_cost_overrides')
+      .select('item_name, item_description, cost')
+    if (costOvFpErr) throw new Error(`Failed to read saved item costs: ${costOvFpErr.message}`)
+    const costFingerprint = JSON.stringify((costOvFp || [])
+      .map((r: any) => `${r.item_name ?? ''}||${r.item_description ?? ''}=${Number(r.cost)}`).sort())
+    const linksFingerprint = `${invoiceLinkFingerprint(linkRows)}#costs:${costFingerprint}`
 
     // Protect Zoho from accidental refresh storms. Even an explicit refresh
     // reuses a report generated in the last five minutes. The UI remains
