@@ -6,36 +6,45 @@
     <script type="module">
       import React from "react";
       import { createRoot } from "react-dom/client";
-      import * as Tabs from "/src/components/ui/tabs.tsx";
-      import { Button } from "/src/components/ui/button.tsx";
-      import { UnresolvedCostsPanel } from "/src/components/admin/UnresolvedCostsPanel.tsx";
-      import UnassignedClientsPanel from "/src/components/admin/commission/UnassignedClientsPanel.tsx";
+      import { supabase } from "/src/integrations/supabase/client.ts";
 
       const items = [
         { item_name: "M10 Bolt", item_description: "Zinc plated", invoice_number: "INV-1", customer_name: "ACME", quantity: 5, sell_rate: 20, sub_total: 100, occurrences: 2 },
         { item_name: "Grinding Disc", item_description: "115mm", invoice_number: "INV-2", customer_name: "BETA", quantity: 2, sell_rate: 35, sub_total: 70, occurrences: 1 },
       ];
-      const customers = [{ customer_name: "ACME", invoice_count: 3, sub_total: 500 }];
-      const reps = [{ id: "r1", name: "Nathan" }];
-      const fc = (n) => "R " + n.toFixed(2);
+      const report = {
+        data: [{
+          rep_id: "r1", rep_name: "Nathan", is_locked: false, locked_invoice_count: 0,
+          locked_commission: 0, invoice_count: 2, total_invoiced: 1000, commission_earned: 300,
+          adjustments_total: 0, net_commission: 300, open_adjustment_count: 0,
+          companies: ["ACME"], invoices: [],
+        }],
+        summary: { totalInvoiced: 1000, totalCommission: 300, totalInvoices: 2 },
+        unresolved_cost_items: items,
+        unassigned_customers: [{ customer_name: "ACME", invoice_count: 3, sub_total: 500 }],
+      };
 
-      // Mirror the real CommissionPage Statements tab structure.
-      createRoot(document.getElementById("root")).render(
-        React.createElement("div", { className: "commission-page aleph-page-workspace aleph-commission-workspace app-no-x-scroll min-w-0 w-full max-w-full space-y-5 overflow-x-hidden", style: { padding: 16 } },
-          React.createElement(Tabs.Tabs, { defaultValue: "report", className: "min-w-0" },
-            React.createElement("div", { className: "commission-body mt-4 min-w-0" },
-              React.createElement(Tabs.TabsContent, { value: "report", className: "mt-0 space-y-4 min-w-0" },
-                React.createElement("div", { className: "flex items-start gap-2 p-3 rounded-lg border-2 text-sm" }, "notice"),
-                React.createElement(UnassignedClientsPanel, { customers, reps, formatCurrency: fc, onAssigned: () => {} }),
-                React.createElement(UnresolvedCostsPanel, { items, onSaved: () => {} }),
-                React.createElement("div", { className: "commission-actions flex flex-wrap items-center gap-2 rounded-2xl border p-3" },
-                  React.createElement(Button, { variant: "outline" }, "Refresh from Zoho")
-                )
-              )
-            )
-          )
-        )
-      );
+      const chain = () => {
+        const p = Promise.resolve({ data: [], error: null });
+        const builder = {
+          select: () => builder, eq: () => builder, ilike: () => builder,
+          order: () => builder, maybeSingle: () => p.then(() => ({ data: null, error: null })),
+          single: () => p.then(() => ({ data: null, error: null })),
+          upsert: () => p, update: () => p, insert: () => p, delete: () => p,
+          then: p.then.bind(p), catch: p.catch.bind(p), finally: p.finally.bind(p),
+        };
+        return builder;
+      };
+
+      supabase.auth.getSession = async () => ({ data: { session: { user: { id: "u1" } } } });
+      supabase.auth.getUser = async () => ({ data: { user: { id: "u1" } } });
+      supabase.from = () => chain();
+      supabase.functions.invoke = async (name) => ({ data: report, error: null });
+      supabase.channel = () => ({ on() { return this; }, subscribe(cb) { return this; } });
+      supabase.removeChannel = async () => {};
+
+      const { default: CommissionPage } = await import("/src/components/admin/CommissionPage.tsx");
+      createRoot(document.getElementById("root")).render(React.createElement(CommissionPage));
       window.__harnessReady = true;
     </script>
   </body>
