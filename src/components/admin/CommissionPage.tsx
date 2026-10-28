@@ -539,7 +539,7 @@ const CommissionPage = () => {
       name: rep.name,
       email: rep.email || "",
       commission_rate: String(rep.commission_rate),
-      commission_method: (rep.commission_method as CommissionMethod) || "margin_scaled",
+      commission_method: isProfitSplit(rep.commission_method) ? rep.commission_method : "profit_split_60",
     });
     setRepDialogOpen(true);
   };
@@ -1186,43 +1186,27 @@ const CommissionPage = () => {
   return (
     <div className="commission-page aleph-page-workspace aleph-commission-workspace app-no-x-scroll min-w-0 w-full max-w-full space-y-5 overflow-x-hidden">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="min-w-0">
-        <div className="commission-statement-shell grid gap-5 lg:grid-cols-[245px_minmax(0,1fr)]">
-          <aside className="commission-statement-nav rounded-[26px] border border-border/65 bg-card p-4 text-foreground shadow-xl lg:sticky lg:top-4 lg:self-start">
-            <div className="flex items-center gap-3 border-b border-border/60 pb-4">
-              <span className="grid h-11 w-11 place-items-center rounded-2xl bg-primary/15 text-primary"><Percent className="h-5 w-5" /></span>
-              <div>
-                <p className="text-[8px] font-black uppercase tracking-[0.2em] text-muted-foreground">Finance workspace</p>
-                <h1 className="font-display text-lg font-black">Commission</h1>
+        <header className="commission-hero relative overflow-hidden rounded-3xl border border-border/60 bg-card p-4 sm:p-5">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-primary/15 text-primary"><Percent className="h-5 w-5" /></span>
+              <div className="min-w-0">
+                <h1 className="font-display text-xl font-black leading-tight">Commission</h1>
+                <p className="text-xs text-muted-foreground">
+                  {format(selectedDate, "MMMM yyyy")} · {isPreviousMonth ? "standard payout period" : "custom period"} · profit split per line, excl. VAT
+                </p>
               </div>
             </div>
-
-            <div className="my-4 rounded-2xl bg-muted/50 p-3 ring-1 ring-border/50">
-              <p className="text-[8px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Active statement</p>
-              <p className="mt-1 text-base font-black">{format(selectedDate, "MMMM yyyy")}</p>
-              <p className="mt-1 text-[10px] text-muted-foreground">{isPreviousMonth ? "Standard payout period" : "Custom reporting period"}</p>
-            </div>
-
-            <TabsList className="flex h-auto w-full flex-col gap-2 bg-transparent p-0">
-              <TabsTrigger value="report" className="h-12 w-full justify-start rounded-2xl px-3 text-muted-foreground data-[state=active]:bg-primary/15 data-[state=active]:text-foreground"><FileText className="mr-2 h-4 w-4" /><span className="text-left"><strong className="block text-xs">Statements</strong><span className="block text-[8px] font-normal opacity-60">Earnings and payouts</span></span></TabsTrigger>
-              <TabsTrigger value="reps" className="h-12 w-full justify-start rounded-2xl px-3 text-muted-foreground data-[state=active]:bg-primary/15 data-[state=active]:text-foreground"><Users className="mr-2 h-4 w-4" /><span className="text-left"><strong className="block text-xs">Representatives</strong><span className="block text-[8px] font-normal opacity-60">Rates and assignments</span></span></TabsTrigger>
+            <TabsList className="h-auto rounded-xl bg-muted/60 p-1">
+              <TabsTrigger value="report" className="rounded-lg px-3 py-1.5 text-xs"><FileText className="mr-1.5 h-3.5 w-3.5" />Statements</TabsTrigger>
+              <TabsTrigger value="reps" className="rounded-lg px-3 py-1.5 text-xs"><Users className="mr-1.5 h-3.5 w-3.5" />Representatives</TabsTrigger>
             </TabsList>
-
-            <p className="mt-5 border-t border-background/15 pt-4 text-[9px] leading-relaxed text-background/45">Commission is calculated from invoice subtotals excluding VAT. Paid lines can be locked to protect finalized statements.</p>
-          </aside>
-
-          <main className="commission-statement-content min-w-0">
-
-        {/* Commission Report Tab */}
-        <TabsContent value="report" className="space-y-5 min-w-0">
-          {/* Info banner */}
-          <div className="commission-info flex items-start gap-3 rounded-2xl border border-border/60 bg-card/70 p-4 text-sm text-muted-foreground shadow-sm">
-            <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
-            <div>
-              <p className="font-medium text-foreground">Commission is calculated on amounts excluding VAT (sub-total)</p>
-              <p>This month's commission due = last month's sales. Default view shows previous month ({format(subMonths(new Date(), 1), "MMMM yyyy")}).</p>
-            </div>
           </div>
+        </header>
 
+        <div className="commission-body mt-4 min-w-0">
+        {/* Commission Report Tab */}
+        <TabsContent value="report" className="mt-0 space-y-4 min-w-0">
           {reportNotice && (
             <div className="flex items-start gap-2 p-3 rounded-lg border-2 border-warning/30 bg-warning/10 text-sm text-warning">
               <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
@@ -1456,7 +1440,7 @@ const CommissionPage = () => {
           {/* Summary Cards */}
           {commissionData && (
             <div className="contents">
-              <div className="commission-kpis grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="commission-kpis grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <Card className="commission-kpi rounded-[22px] border-border/60 shadow-sm overflow-hidden">
                   <CardContent className="pt-5 pb-4">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Total Invoiced (excl. VAT)</p>
@@ -1478,7 +1462,7 @@ const CommissionPage = () => {
               </div>
 
               {/* Missing Costs are shown via a small trigger in the action bar above; details open in a dialog. */}
-              <div className="commission-ledger-grid grid gap-4 xl:grid-cols-2">
+              <div className="commission-ledger-grid grid gap-3">
                 {commissionData.data.map((d) => (
                   <Card key={d.rep_id} className={cn("commission-rep-card rounded-[22px] border-border/60 shadow-sm overflow-hidden transition-all hover:shadow-md", d.is_locked && "opacity-70")}>
                     <CardHeader className="pb-2">
@@ -1489,7 +1473,7 @@ const CommissionPage = () => {
                         >
                           {expandedReps.has(d.rep_id) ? <ChevronDown className="h-4 w-4 shrink-0" /> : <ChevronRight className="h-4 w-4 shrink-0" />}
                           <CardTitle className="text-base truncate">{d.rep_name}</CardTitle>
-                          <Badge variant="secondary">{Number(d.commission_rate).toFixed(2)}% default</Badge>
+                          <Badge variant="secondary" className="text-[10px]">{COMMISSION_METHOD_LABEL[(reps.find(r => r.id === d.rep_id)?.commission_method || "") as CommissionMethod] ?? "Commission"}</Badge>
                           {d.locked_invoice_count > 0 && (
                             <Badge variant="outline" className="gap-1 text-xs">
                               <Lock className="h-3 w-3" />
@@ -1937,7 +1921,6 @@ const CommissionPage = () => {
             </div>
           )}
         </TabsContent>
-          </main>
         </div>
       </Tabs>
 
@@ -1955,11 +1938,6 @@ const CommissionPage = () => {
             <div>
               <Label>Email</Label>
               <Input value={repForm.email} onChange={e => setRepForm(f => ({ ...f, email: e.target.value }))} placeholder="john@example.com" />
-            </div>
-            <div>
-              <Label>Default Commission Rate (%)</Label>
-              <Input type="number" step="0.5" min="0" max="100" value={repForm.commission_rate} onChange={e => setRepForm(f => ({ ...f, commission_rate: e.target.value }))} />
-              <p className="text-xs text-muted-foreground mt-1">This is the default rate. You can override per-company in assignments.</p>
             </div>
             <div>
               <Label>Profit split</Label>
