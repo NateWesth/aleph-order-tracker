@@ -27,9 +27,12 @@ export default function CashInvoicesPanel({ invoices, reps, formatCurrency, onCh
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState<string | null>(null);
   const [savedLinks, setSavedLinks] = useState<Record<string, string | null>>({});
-  const displayedInvoices = invoices.map((inv) => ({ ...inv, rep_id: Object.prototype.hasOwnProperty.call(savedLinks, inv.invoice_id) ? savedLinks[inv.invoice_id] : inv.rep_id }));
-  if (invoices.length === 0) return null;
-  const unlinked = displayedInvoices.filter((i) => !i.rep_id);
+  // Linked invoices leave this list and appear on the rep's statement instead.
+  const displayedInvoices = invoices
+    .map((inv) => ({ ...inv, rep_id: Object.prototype.hasOwnProperty.call(savedLinks, inv.invoice_id) ? savedLinks[inv.invoice_id] : inv.rep_id }))
+    .filter((i) => !i.rep_id);
+  if (displayedInvoices.length === 0) return null;
+  const unlinked = displayedInvoices;
 
   const link = async (inv: CashInvoice, repId: string) => {
     if (saving) return;
