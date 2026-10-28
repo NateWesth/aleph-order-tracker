@@ -12,7 +12,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
-  Plus, Pencil, Trash2, Users, DollarSign, FileText, Download, ChevronDown, ChevronRight, Loader2, RefreshCw, AlertCircle, Lock, Unlock, Settings2
+  Plus, Pencil, Trash2, Users, DollarSign, FileText, Download, ChevronDown, ChevronRight, Loader2, RefreshCw, AlertCircle, Lock, Unlock, Settings2, X
 } from "lucide-react";
 import { format, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import jsPDF from "jspdf";
@@ -909,6 +909,19 @@ const CommissionPage = () => {
     debounceMs: 2500,
   });
 
+  // Unlink a Cash (COD) invoice from a rep: it leaves the statement and
+  // returns to the Cash (COD) invoices linking list.
+  const unlinkCodInvoice = async (inv: CommissionInvoice) => {
+    if (!confirm(`Unlink ${inv.invoice_number} from this rep? It moves back to the Cash (COD) invoices list.`)) return;
+    const { error } = await supabase.from("commission_invoice_links").delete().eq("invoice_id", inv.invoice_id);
+    if (error) {
+      toast({ title: "Could not unlink", description: error.message, variant: "destructive" });
+      return;
+    }
+    toast({ title: "Invoice unlinked", description: `${inv.invoice_number} is back in the Cash (COD) list.` });
+    void fetchCommissionReport(false);
+  };
+
   // Lock all currently-unlocked invoices for a single rep into commission_payouts.
   const lockRepPayout = async (rep: CommissionRepData) => {
     const unlocked = rep.invoices.filter(i => !i.locked);
@@ -1664,6 +1677,19 @@ const CommissionPage = () => {
                                             : <ChevronRight className="h-3 w-3 text-muted-foreground" />)}
                                           {inv.invoice_number}
                                           {inv.locked && <Lock className="h-3 w-3 text-muted-foreground ml-1" />}
+                                          {inv.cod_linked && (
+                                            <Badge variant="outline" className="text-[10px] ml-1 border-primary/50 text-primary">COD</Badge>
+                                          )}
+                                          {inv.cod_linked && !inv.locked && (
+                                            <button
+                                              type="button"
+                                              title="Unlink from this rep (moves back to the Cash (COD) list)"
+                                              className="ml-1 inline-flex items-center text-muted-foreground hover:text-destructive"
+                                              onClick={(e) => { e.stopPropagation(); void unlinkCodInvoice(inv); }}
+                                            >
+                                              <X className="h-3 w-3" />
+                                            </button>
+                                          )}
                                           {(inv.credited_sub_total ?? 0) > 0 && (
                                             <Badge variant="outline" className="text-[10px] ml-1 border-amber-500/60 text-amber-700 dark:text-amber-300">
                                               −{formatCurrency(inv.credited_sub_total || 0)} credited
