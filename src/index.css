@@ -2873,8 +2873,8 @@ html, body, .aleph-content-scroll { scrollbar-width: thin !important; }
   overflow: hidden;
   isolation: isolate;
   background:
-    radial-gradient(circle at 120% -10%, hsl(var(--workspace-accent) / .42), transparent 15rem),
-    hsl(var(--foreground));
+    radial-gradient(circle at 120% -10%, hsl(var(--workspace-accent) / .18), transparent 15rem),
+    hsl(var(--card));
 }
 
 .commission-statement-nav::after {
@@ -2884,7 +2884,7 @@ html, body, .aleph-content-scroll { scrollbar-width: thin !important; }
   inset: auto -4rem -5rem auto;
   width: 11rem;
   height: 11rem;
-  border: 1px solid hsl(var(--background) / .09);
+  border: 1px solid hsl(var(--foreground) / .06);
   border-radius: 999px;
   box-shadow: 0 0 0 1.7rem hsl(var(--background) / .025), 0 0 0 3.4rem hsl(var(--background) / .018);
 }

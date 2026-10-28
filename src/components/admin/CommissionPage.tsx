@@ -1185,24 +1185,24 @@ const CommissionPage = () => {
     <div className="commission-page aleph-page-workspace aleph-commission-workspace app-no-x-scroll min-w-0 w-full max-w-full space-y-5 overflow-x-hidden">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="min-w-0">
         <div className="commission-statement-shell grid gap-5 lg:grid-cols-[245px_minmax(0,1fr)]">
-          <aside className="commission-statement-nav rounded-[26px] border border-border/65 bg-foreground p-4 text-background shadow-xl lg:sticky lg:top-4 lg:self-start">
-            <div className="flex items-center gap-3 border-b border-background/15 pb-4">
-              <span className="grid h-11 w-11 place-items-center rounded-2xl bg-background text-foreground"><Percent className="h-5 w-5" /></span>
+          <aside className="commission-statement-nav rounded-[26px] border border-border/65 bg-card p-4 text-foreground shadow-xl lg:sticky lg:top-4 lg:self-start">
+            <div className="flex items-center gap-3 border-b border-border/60 pb-4">
+              <span className="grid h-11 w-11 place-items-center rounded-2xl bg-primary/15 text-primary"><Percent className="h-5 w-5" /></span>
               <div>
-                <p className="text-[8px] font-black uppercase tracking-[0.2em] text-background/55">Finance workspace</p>
+                <p className="text-[8px] font-black uppercase tracking-[0.2em] text-muted-foreground">Finance workspace</p>
                 <h1 className="font-display text-lg font-black">Commission</h1>
               </div>
             </div>
 
-            <div className="my-4 rounded-2xl bg-background/8 p-3 ring-1 ring-background/10">
-              <p className="text-[8px] font-bold uppercase tracking-[0.18em] text-background/50">Active statement</p>
+            <div className="my-4 rounded-2xl bg-muted/50 p-3 ring-1 ring-border/50">
+              <p className="text-[8px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Active statement</p>
               <p className="mt-1 text-base font-black">{format(selectedDate, "MMMM yyyy")}</p>
-              <p className="mt-1 text-[10px] text-background/55">{isPreviousMonth ? "Standard payout period" : "Custom reporting period"}</p>
+              <p className="mt-1 text-[10px] text-muted-foreground">{isPreviousMonth ? "Standard payout period" : "Custom reporting period"}</p>
             </div>
 
             <TabsList className="flex h-auto w-full flex-col gap-2 bg-transparent p-0">
-              <TabsTrigger value="report" className="h-12 w-full justify-start rounded-2xl px-3 text-background/65 data-[state=active]:bg-background data-[state=active]:text-foreground"><FileText className="mr-2 h-4 w-4" /><span className="text-left"><strong className="block text-xs">Statements</strong><span className="block text-[8px] font-normal opacity-60">Earnings and payouts</span></span></TabsTrigger>
-              <TabsTrigger value="reps" className="h-12 w-full justify-start rounded-2xl px-3 text-background/65 data-[state=active]:bg-background data-[state=active]:text-foreground"><Users className="mr-2 h-4 w-4" /><span className="text-left"><strong className="block text-xs">Representatives</strong><span className="block text-[8px] font-normal opacity-60">Rates and assignments</span></span></TabsTrigger>
+              <TabsTrigger value="report" className="h-12 w-full justify-start rounded-2xl px-3 text-muted-foreground data-[state=active]:bg-primary/15 data-[state=active]:text-foreground"><FileText className="mr-2 h-4 w-4" /><span className="text-left"><strong className="block text-xs">Statements</strong><span className="block text-[8px] font-normal opacity-60">Earnings and payouts</span></span></TabsTrigger>
+              <TabsTrigger value="reps" className="h-12 w-full justify-start rounded-2xl px-3 text-muted-foreground data-[state=active]:bg-primary/15 data-[state=active]:text-foreground"><Users className="mr-2 h-4 w-4" /><span className="text-left"><strong className="block text-xs">Representatives</strong><span className="block text-[8px] font-normal opacity-60">Rates and assignments</span></span></TabsTrigger>
             </TabsList>
 
             <p className="mt-5 border-t border-background/15 pt-4 text-[9px] leading-relaxed text-background/45">Commission is calculated from invoice subtotals excluding VAT. Paid lines can be locked to protect finalized statements.</p>
