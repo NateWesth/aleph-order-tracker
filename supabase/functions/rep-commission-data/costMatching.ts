@@ -1,7 +1,8 @@
 type Line = Record<string, unknown>
 const normalize = (value: unknown) => String(value ?? '').trim().toLowerCase().replace(/\s+/g, ' ')
+const text = (value: unknown) => typeof value === 'string' || typeof value === 'number' ? normalize(value) : ''
 const generic = (value: unknown) => {
-  const v = normalize(value)
+  const v = text(value)
   return !v || ['n/a', 'na', '-', 'item', 'product', 'miscellaneous', 'misc'].includes(v) || v.startsWith('m-misc')
 }
 
@@ -18,9 +19,16 @@ export function costKeys(line: Line): string[] {
   const exact = costSignature(name, description)
   const keys = exact ? [exact] : []
   const sku = [line.sku, line.item_code, line.code].find(value => !generic(value))
-  const isShared = [name, line.sku, line.item_code, line.code]
-    .some(value => normalize(value) && generic(value))
-  if (isShared) return keys
+  // Placeholder names (N/A) do not invalidate a real SKU. Explicit shared
+  // miscellaneous identifiers do, because their item ID is reused too.
+  const isShared = [name, line.sku, line.item_code, line.code].some(value => {
+    const v = text(value)
+    return ['item', 'product', 'miscellaneous', 'misc'].includes(v) || v.startsWith('m-misc')
+  })
+  if (isShared) {
+    if (!generic(description)) keys.push(`desc:${normalize(description)}`)
+    return keys
+  }
   const id = normalize(line.item_id)
   if (id) keys.push(`id:${id}`)
   if (sku) keys.push(`sku:${normalize(sku)}`)
