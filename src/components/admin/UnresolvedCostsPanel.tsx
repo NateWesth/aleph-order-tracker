@@ -59,7 +59,25 @@ export const saveCost = async (item: { item_name: string; item_description: stri
 
 export const UnresolvedCostsPanel = ({ items, onSaved }: Props) => {
   const { toast } = useToast();
-  const [expanded, setExpanded] = useState(true);
+  // Collapse state survives re-renders and remounts so the panel never
+  // silently re-expands while the user is working through the list.
+  const [expanded, setExpanded] = useState(() => {
+    try {
+      return sessionStorage.getItem("aleph:unresolved-costs-open") !== "0";
+    } catch {
+      return true;
+    }
+  });
+  const toggleExpanded = () => {
+    setExpanded((e) => {
+      try {
+        sessionStorage.setItem("aleph:unresolved-costs-open", e ? "0" : "1");
+      } catch {
+        // Storage unavailable (private mode) — the toggle still works in-page.
+      }
+      return !e;
+    });
+  };
   const [values, setValues] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState<Record<string, boolean>>({});
   const [savedKeys, setSavedKeys] = useState<Set<string>>(new Set());
@@ -140,24 +158,36 @@ export const UnresolvedCostsPanel = ({ items, onSaved }: Props) => {
 
   return (
     <div className="rounded-lg border border-amber-500/40 bg-amber-500/5">
-      <div className="w-full flex items-center gap-2 p-3">
-        <button
-          type="button"
-          className="flex items-center gap-2 text-left flex-1 min-w-0"
-          onClick={() => setExpanded((e) => !e)}
-        >
-          {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-          <AlertTriangle className="h-4 w-4 text-amber-600" />
+      <div
+        className="flex w-full cursor-pointer select-none items-center gap-2 p-3"
+        role="button"
+        tabIndex={0}
+        aria-expanded={expanded}
+        aria-label={expanded ? "Collapse unresolved costs" : "Expand unresolved costs"}
+        onClick={toggleExpanded}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            toggleExpanded();
+          }
+        }}
+      >
+        <div className="flex min-w-0 flex-1 items-center gap-2 text-left">
+          {expanded ? <ChevronDown className="h-4 w-4 shrink-0" /> : <ChevronRight className="h-4 w-4 shrink-0" />}
+          <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" />
           <span className="font-medium text-amber-800 dark:text-amber-200">
             {visibleItems.length} item{visibleItems.length === 1 ? "" : "s"} with no vendor-bill cost match
           </span>
-          <span className="text-xs text-muted-foreground ml-2 truncate">
+          <span className="ml-2 truncate text-xs text-muted-foreground">
             Enter cost (ex VAT) so commission can be calculated
           </span>
-        </button>
+        </div>
         <Button
           size="sm"
-          onClick={saveAll}
+          onClick={(e) => {
+            e.stopPropagation();
+            saveAll();
+          }}
           disabled={savingAll || pendingCount === 0}
         >
           {savingAll ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5 mr-1" />}
