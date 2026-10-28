@@ -871,7 +871,10 @@ const CommissionPage = () => {
         commission_rate?: number | null;
         commission?: number | null;
       };
-      const { error } = await supabase.from("commission_line_overrides").insert(insertRow);
+      // Upsert so two quick saves on the same line (e.g. Save all) merge instead of conflicting.
+      const { error } = await supabase
+        .from("commission_line_overrides")
+        .upsert(insertRow, { onConflict: "rep_id,invoice_id,line_index" });
       if (error) { toast({ title: "Save failed", description: error.message, variant: "destructive" }); return; }
     }
     toast({ title: "Updated" });
