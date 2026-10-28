@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { Plus, Search, Users, Building2 } from "lucide-react";
+import { Plus, Search, Users, Building2, RefreshCw } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
 import { Input } from "@/components/ui/input";
 
@@ -28,6 +28,24 @@ export default function ClientCompaniesPage() {
   const [isNewCompanyDialogOpen, setIsNewCompanyDialogOpen] = useState(false);
   const [isEditCompanyDialogOpen, setIsEditCompanyDialogOpen] = useState(false);
   const [editingCompany, setEditingCompany] = useState<any>(null);
+  const [syncing, setSyncing] = useState(false);
+
+  const syncFromZoho = async () => {
+    setSyncing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("zoho-sync", { body: { sync_type: "contacts" } });
+      if (error) {
+        const details = (error as any).context?.text ? await (error as any).context.text() : error.message;
+        throw new Error(details);
+      }
+      await refetch();
+      toast({ title: "Clients updated from Zoho", description: `${data?.synced ?? data?.total_synced ?? "All"} clients checked. Duplicates are merged automatically.` });
+    } catch (e: any) {
+      toast({ title: "Zoho sync failed", description: e?.message || String(e), variant: "destructive" });
+    } finally {
+      setSyncing(false);
+    }
+  };
   const [searchTerm, setSearchTerm] = useState('');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [companyToDelete, setCompanyToDelete] = useState<any>(null);
@@ -194,6 +212,10 @@ export default function ClientCompaniesPage() {
         stats={[{ label: "clients", value: filteredCompanies.length, icon: Building2 }]}
         actions={
           <>
+            <Button variant="outline" onClick={() => void syncFromZoho()} disabled={syncing}>
+              <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? "animate-spin" : ""}`} />
+              {syncing ? "Syncing…" : "Sync from Zoho"}
+            </Button>
             <Button variant="outline" onClick={() => setInviteDialogOpen(true)}>
               <Users className="h-4 w-4 mr-2" />
               Invite Client
