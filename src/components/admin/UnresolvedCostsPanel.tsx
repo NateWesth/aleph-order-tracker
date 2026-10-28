@@ -157,7 +157,7 @@ export const UnresolvedCostsPanel = ({ items, onSaved }: Props) => {
   }).length;
 
   return (
-    <div className="rounded-lg border border-amber-500/40 bg-amber-500/5">
+    <div className="rounded-lg border border-logo-magenta/40 bg-logo-magenta/5">
       <div
         className="flex w-full cursor-pointer select-none items-center gap-2 p-3"
         role="button"
@@ -174,8 +174,8 @@ export const UnresolvedCostsPanel = ({ items, onSaved }: Props) => {
       >
         <div className="flex min-w-0 flex-1 items-center gap-2 text-left">
           {expanded ? <ChevronDown className="h-4 w-4 shrink-0" /> : <ChevronRight className="h-4 w-4 shrink-0" />}
-          <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" />
-          <span className="font-medium text-amber-800 dark:text-amber-200">
+          <AlertTriangle className="h-4 w-4 shrink-0 text-logo-magenta" />
+          <span className="font-medium text-logo-magenta ">
             {visibleItems.length} item{visibleItems.length === 1 ? "" : "s"} with no vendor-bill cost match
           </span>
           <span className="ml-2 truncate text-xs text-muted-foreground">
@@ -195,7 +195,7 @@ export const UnresolvedCostsPanel = ({ items, onSaved }: Props) => {
         </Button>
       </div>
       {expanded && (
-        <div className="border-t border-amber-500/40 divide-y divide-amber-500/20">
+        <div className="border-t border-logo-magenta/40 divide-y divide-logo-magenta/20">
           {visibleItems.map((item) => {
             const k = keyOf(item);
             const isSaving = !!saving[k];

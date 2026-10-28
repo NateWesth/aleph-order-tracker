@@ -1245,7 +1245,7 @@ const CommissionPage = () => {
         {/* Commission Report Tab */}
         <TabsContent value="report" className="mt-0 space-y-4 min-w-0">
           {reportNotice && (
-            <div className="flex items-start gap-2 p-3 rounded-lg border-2 border-warning/30 bg-warning/10 text-sm text-warning">
+            <div className="flex items-start gap-2 p-3 rounded-lg border-2 border-logo-violet/30 bg-logo-violet/10 text-sm text-logo-violet">
               <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
               <p>{reportNotice}</p>
             </div>
@@ -1432,13 +1432,13 @@ const CommissionPage = () => {
                           className={cn(
                             "gap-1.5 relative transition-all",
                             missing.length > 0 &&
-                              "border-amber-500/70 text-amber-600 hover:text-amber-700 hover:bg-amber-500/10 dark:text-amber-400 dark:hover:text-amber-300 shadow-[0_0_0_3px_rgba(245,158,11,0.15)] ring-1 ring-amber-500/40"
+                              "border-logo-magenta/70 text-logo-magenta hover:text-logo-magenta hover:bg-logo-magenta/10   shadow-[0_0_0_3px_hsl(var(--logo-magenta)/0.15)] ring-1 ring-logo-magenta/40"
                           )}
                         >
                           {missing.length > 0 && (
                             <span className="relative flex h-2 w-2">
-                              <span className="absolute inline-flex h-full w-full rounded-full bg-amber-500 opacity-75 animate-ping" />
-                              <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
+                              <span className="absolute inline-flex h-full w-full rounded-full bg-logo-magenta opacity-75 animate-ping" />
+                              <span className="relative inline-flex rounded-full h-2 w-2 bg-logo-magenta" />
                             </span>
                           )}
                           <AlertTriangle className="h-4 w-4" />
@@ -1448,7 +1448,7 @@ const CommissionPage = () => {
                       <TooltipContent side="bottom" className="max-w-xs">
                         {missing.length > 0 ? (
                           <div className="space-y-1">
-                            <p className="font-semibold text-amber-500">
+                            <p className="font-semibold text-logo-magenta">
                               {missing.length} item{missing.length === 1 ? "" : "s"} need a cost
                             </p>
                             <p className="text-xs">
@@ -1470,7 +1470,7 @@ const CommissionPage = () => {
                     <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
                       <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
-                          <AlertTriangle className="h-4 w-4 text-amber-500" />
+                          <AlertTriangle className="h-4 w-4 text-logo-magenta" />
                           Items with Missing Cost
                         </DialogTitle>
                       </DialogHeader>
@@ -1691,7 +1691,7 @@ const CommissionPage = () => {
                                             </button>
                                           )}
                                           {(inv.credited_sub_total ?? 0) > 0 && (
-                                            <Badge variant="outline" className="text-[10px] ml-1 border-amber-500/60 text-amber-700 dark:text-amber-300">
+                                            <Badge variant="outline" className="text-[10px] ml-1 border-logo-magenta/60 text-logo-magenta ">
                                               −{formatCurrency(inv.credited_sub_total || 0)} credited
                                             </Badge>
                                           )}

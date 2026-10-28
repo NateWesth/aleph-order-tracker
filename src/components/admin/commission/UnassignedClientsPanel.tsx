@@ -55,10 +55,10 @@ export default function UnassignedClientsPanel({ customers, reps, formatCurrency
   };
 
   return (
-    <div className="rounded-2xl border border-warning/40 bg-warning/5 p-3">
+    <div className="rounded-2xl border border-logo-violet/40 bg-logo-violet/5 p-3">
       <button type="button" className="flex w-full items-center justify-between gap-2 text-left" onClick={() => setOpen((o) => !o)}>
         <div className="flex items-center gap-2">
-          <UserPlus className="h-4 w-4 text-warning" />
+          <UserPlus className="h-4 w-4 text-logo-violet" />
           <p className="text-sm font-semibold">{customers.length} clients have no rep</p>
           <Badge variant="outline" className="text-[10px]">{formatCurrency(total)} not counted</Badge>
         </div>
