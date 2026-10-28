@@ -26,7 +26,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useLiveData } from "@/hooks/useLiveData";
 
 
-type CommissionMethod = "margin_scaled" | "half_markup_below_25";
+import { COMMISSION_METHOD_LABEL, isProfitSplit, profitSplitCommission, type CommissionMethod } from "@/lib/commissionRules";
 
 type Rep = {
   id: string;
@@ -387,7 +387,7 @@ const CommissionPage = () => {
   const [assignments, setAssignments] = useState<RepAssignment[]>([]);
   const [repDialogOpen, setRepDialogOpen] = useState(false);
   const [editingRep, setEditingRep] = useState<Rep | null>(null);
-  const [repForm, setRepForm] = useState({ name: "", email: "", commission_rate: "5", commission_method: "margin_scaled" as CommissionMethod });
+  const [repForm, setRepForm] = useState({ name: "", email: "", commission_rate: "5", commission_method: "profit_split_60" as CommissionMethod });
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [assignRepId, setAssignRepId] = useState<string | null>(null);
   const [selectedCompanies, setSelectedCompanies] = useState<Set<string>>(new Set());
@@ -522,7 +522,7 @@ const CommissionPage = () => {
 
     setRepDialogOpen(false);
     setEditingRep(null);
-    setRepForm({ name: "", email: "", commission_rate: "5", commission_method: "margin_scaled" });
+    setRepForm({ name: "", email: "", commission_rate: "5", commission_method: "profit_split_60" });
     fetchData();
   };
 
@@ -666,6 +666,8 @@ const CommissionPage = () => {
           } else if (isManualCommissionRate) {
             // Explicit rate override -> straight rate × subtotal (bypasses half-markup rule)
             commission = sub_total * (commission_rate / 100);
+          } else if (isProfitSplit(method)) {
+            commission = profitSplitCommission(method, sell, effectiveCost, qty).commission;
           } else if (method === "half_markup_below_25") {
             // Unknown/placeholder cost -> skip (never overpay on unverifiable lines)
             if (effectiveCost == null) commission = 0;
@@ -1880,7 +1882,7 @@ const CommissionPage = () => {
                   Half-markup ({reps.filter(r => r.commission_method === "half_markup_below_25").length})
                 </Button>
               </div>
-              <Button onClick={() => { setEditingRep(null); setRepForm({ name: "", email: "", commission_rate: "5", commission_method: "margin_scaled" }); setRepDialogOpen(true); }}>
+              <Button onClick={() => { setEditingRep(null); setRepForm({ name: "", email: "", commission_rate: "5", commission_method: "profit_split_60" }); setRepDialogOpen(true); }}>
                 <Plus className="h-4 w-4 mr-1.5" />Add Rep
               </Button>
             </div>
