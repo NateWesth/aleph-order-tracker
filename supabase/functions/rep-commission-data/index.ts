@@ -624,7 +624,9 @@ Deno.serve(async (req) => {
       }
 
       const linkedRepId = invoiceLinks.get(String(inv.invoice_id)) || null
-      if (isCashCustomer(inv.customer_name || '') || linkedRepId) {
+      // Linked cash invoices live on the rep's statement like any other
+      // invoice; only unlinked ones stay in the Cash (COD) linking list.
+      if (!linkedRepId && isCashCustomer(inv.customer_name || '')) {
         cashInvoices.push({
           invoice_id: String(inv.invoice_id),
           invoice_number: String(inv.invoice_number || inv.number || ''),
@@ -859,6 +861,7 @@ Deno.serve(async (req) => {
         invoice_discount: r2(invoiceLevelDiscount),
         excluded_line_count: excludedLines.length,
         excluded_sub_total: excludedSubTotal,
+        cod_linked: Boolean(linkedRepId),
       })
 
     }
