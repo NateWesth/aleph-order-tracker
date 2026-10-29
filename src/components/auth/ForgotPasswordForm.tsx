@@ -14,7 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 const forgotPasswordSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address" }),
   userType: z.enum(["client", "admin"], {
-    required_error: "Please select a user type",
+    error: "Please select a user type",
   })
 });
 
