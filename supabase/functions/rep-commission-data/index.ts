@@ -1561,7 +1561,8 @@ async function fetchBillCostHistory(
     if (settled.size >= signatures.size) { hasMore = false; break }
   }
 
-  if (hasMore) throw new Error('Vendor bill history exceeds the safe lookup limit')
+  // Older bills beyond the lookback cap are skipped; unmatched lines stay in "missing costs".
+  if (hasMore) console.warn(`Vendor bill lookback cap reached after ${page - 1} pages; using bills read so far`)
   console.log(`Vendor bills: ${fetchedNow} read from Zoho, ${page - 1} list pages, ${history.size}/${signatures.size} cost keys found`)
   // Reused SKUs must not pool costs from distinct Zoho products.
   for (const [key, ids] of skuIdentities) if (ids.size > 1) history.delete(key)

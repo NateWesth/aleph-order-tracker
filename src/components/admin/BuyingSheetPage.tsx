@@ -174,6 +174,12 @@ export default function BuyingSheetPage() {
     return () => window.removeEventListener("keydown", handler);
   }, [isFullscreen]);
 
+  // App top bar and mobile nav are z-50; hide them so the z-40 sheet stays usable below portalled dialogs.
+  useEffect(() => {
+    document.body.classList.toggle("aleph-sheet-fullscreen", isFullscreen);
+    return () => document.body.classList.remove("aleph-sheet-fullscreen");
+  }, [isFullscreen]);
+
   // App fullscreen keeps body-portalled menus, notes and dialogs interactive.
   const toggleFullscreen = useCallback(() => setIsFullscreen(value => !value), []);
 
