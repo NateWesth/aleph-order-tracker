@@ -336,7 +336,8 @@ async function syncContacts(supabase: any, accessToken: string, orgId: string): 
     }
     const match = byCode.get(code) || byName.get(nameKey)
     const { error } = match
-      ? await supabase.from('companies').update({ ...row, code: match.code.startsWith('ZOHO-') ? match.code : code }).eq('id', match.id)
+      // Never change an existing code: invites and portal sign-ups link through it.
+      ? await supabase.from('companies').update({ ...row, code: match.code }).eq('id', match.id)
       : await supabase.from('companies').insert({ ...row, code })
     if (error) console.error(`Failed to save client ${name}:`, error.message)
     else synced++
