@@ -1,5 +1,8 @@
 # Roadmap
 
+- [ ] Add third-position On route lane, restricted driver actions and explicit completion persistence
+- [ ] Test dispatch transition rules and verify board controls
+
 - [x] Repair COD link display and statement cache refresh; test link, relink and unlink handling
 
 - [x] Apply cost-based commission caps to both rep options, update labels, and deploy
