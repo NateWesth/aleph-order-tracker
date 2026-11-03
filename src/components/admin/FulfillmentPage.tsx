@@ -1312,7 +1312,7 @@ export default function FulfillmentPage() {
   const collectionLanes = useMemo(() => [
     { id: "ready", label: "Ready to plan", hint: "Pickup or supplier delivery", icon: Warehouse, items: collectionFiltered.filter((po) => !po.state || po.state.status === "pending") },
     { id: "scheduled", label: "Arrival planned", hint: "Upcoming stock movements", icon: CalendarDays, items: collectionFiltered.filter((po) => po.state?.status === "scheduled") },
-    { id: "collecting", label: "Receiving now", hint: "Record actual quantities", icon: PackageCheck, items: collectionFiltered.filter((po) => po.state?.status === "collecting") },
+    { id: "collecting", label: "Partially received", hint: "Record actual quantities", icon: PackageCheck, items: collectionFiltered.filter((po) => po.state?.status === "collecting") },
   ], [collectionFiltered]);
 
   const selectedDelivery = deliveryOrders.find((order) => order.id === selectedDeliveryId) || null;
