@@ -1,5 +1,7 @@
 # Project implementation rules
 
+- Order bulk status changes share item-counter updates and verify affected rows; selection uses unique filtered order IDs across lanes. Why: board positions derive from quantities and denied writes must not report success.
+
 - Dispatch On route transitions use the revision-checked save RPC and database guard; quantity confirmations use the idempotent receipt RPC. Why: only ready/planned stops may depart, and refreshes cannot silently remove unchecked stops.
 
 - Keep the centred operational popup entrance animation in the global theme so Orders, Collections, Deliveries, and other order surfaces share identical motion.
