@@ -5,7 +5,7 @@ import { PullToRefresh } from "@/components/ui/PullToRefresh";
 import { useOrderCelebration, ConfettiOverlay } from "@/components/ui/OrderCelebration";
 import { playClick, playSuccess } from "@/utils/ambientSounds";
 import { Button } from "@/components/ui/button";
-import { Plus, Filter, Users, RefreshCw } from "lucide-react";
+import { Plus, Filter, Users, RefreshCw, CheckSquare } from "lucide-react";
 import OrderTemplatesDialog from "./components/OrderTemplatesDialog";
 import OverdueAlerts from "./components/OverdueAlerts";
 import SavedFiltersBar, { type OrderFilter } from "./components/SavedFiltersBar";
@@ -37,6 +37,8 @@ import OrderItemsFloatingBubble from "./components/OrderItemsFloatingBubble";
 import BulkActionsBar from "./components/BulkActionsBar";
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import { cn } from "@/lib/utils";
+import { readAllRows } from "@/lib/readAllRows";
+import { selectAllOrderIds } from "@/lib/orderBulkActions";
 import { getItemDisplayName, getItemSecondaryDescription } from "@/lib/itemDisplay";
 
 interface OrdersPageProps {
@@ -360,15 +362,9 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
 
   const fetchOrders = useCallback(async () => {
     try {
-      const { data, error } = await supabase
-        .from("orders")
-        .select(
-          "id, order_number, description, status, urgency, company_id, user_id, created_at, supplier_id, purchase_order_number",
-        )
-        .or("status.is.null,status.neq.delivered")
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
+      const data = await readAllRows<any>((from, to) => supabase.from("orders")
+        .select("id, order_number, description, status, urgency, company_id, user_id, created_at, supplier_id, purchase_order_number")
+        .or("status.is.null,status.neq.delivered").order("created_at", { ascending: false }).order("id").range(from, to));
 
       const companyIds = [...new Set(data?.map((o) => o.company_id).filter(Boolean))];
       const orderIds = data?.map((o) => o.id) || [];
@@ -381,10 +377,9 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
           ? supabase.from("companies").select("id, name").in("id", companyIds)
           : Promise.resolve({ data: [], error: null }),
         orderIds.length > 0
-          ? supabase
-              .from("order_items")
+          ? readAllRows<any>((from, to) => supabase.from("order_items")
               .select("id, order_id, name, code, description, notes, quantity, stock_status, qty_on_po, qty_received, qty_invoiced, qty_completed")
-              .in("order_id", orderIds)
+              .in("order_id", orderIds).order("id").range(from, to)).then(data => ({ data, error: null }))
           : Promise.resolve({ data: [], error: null }),
         orderIds.length > 0
           ? supabase
@@ -514,6 +509,7 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
       }));
 
       setOrders(ordersWithData);
+      setSelectedOrderIds(previous => new Set([...previous].filter(id => ordersWithData.some(order => order.id === id))));
 
       /*
        * If the currently opened bubble belongs to an order that no longer
@@ -998,6 +994,7 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
             </div>
 
             <div className="flex flex-wrap items-center justify-start gap-1.5 lg:justify-end">
+              <Button size="sm" variant="outline" className="h-7 gap-1 px-2 text-xs" disabled={!filteredOrders.length} onClick={() => setSelectedOrderIds(selectAllOrderIds(filteredOrders))}><CheckSquare className="h-3.5 w-3.5"/>Select all ({filteredOrders.length})</Button>
               <OverdueAlerts />
 
               <SavedFiltersBar
@@ -1135,6 +1132,8 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
                       selectedOrderIds={selectedOrderIds}
                       onToggleOrderSelection={toggleOrderSelection}
                       onSelectOrderGroup={selectOrderGroup}
+                      onSelectAllOrders={() => setSelectedOrderIds(selectAllOrderIds(filteredOrders))}
+                      totalOrderCount={filteredOrders.length}
                       groupByClient={groupByClient}
                       allTags={allTags}
                       tagAssignments={tagAssignments}
