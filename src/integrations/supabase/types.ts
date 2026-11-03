@@ -3874,6 +3874,15 @@ export type Database = {
         Returns: undefined
       }
       can_edit_commission: { Args: { _user_id: string }; Returns: boolean }
+      check_dispatch_completion: {
+        Args: {
+          p_id: string
+          p_notes?: string
+          p_request_id: string
+          p_revision: number
+        }
+        Returns: Json
+      }
       company_name_key: { Args: { p: string }; Returns: string }
       complete_fulfillment_delivery: {
         Args: { p_order_id: string }
