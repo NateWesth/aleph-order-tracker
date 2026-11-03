@@ -126,7 +126,7 @@ export default function FreshDispatchPage(){
   if(updateError)setError(updateError.message);else await load();
  };
  const completeOne=async(doc:DispatchDocument)=>{
-  const quantities=Object.fromEntries(doc.lines.map(line=>[line.id,lineRemaining(doc,line)]).filter(([,q])=>Number(q)>0));
+  const quantities=doc.status==="on-route"&&doc.source_closed?{}:Object.fromEntries(doc.lines.map(line=>[line.id,lineRemaining(doc,line)]).filter(([,q])=>Number(q)>0));
   if(!Object.keys(quantities).length&&doc.status!=="on-route")return;
   const {error:rpcError}=await db.rpc("record_dispatch_receipt",{p_id:doc.id,p_revision:doc.revision,p_request_id:crypto.randomUUID(),p_quantities:quantities,p_notes:"Driver confirmed completion"});
   if(rpcError)throw rpcError;
