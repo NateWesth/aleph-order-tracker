@@ -5,7 +5,7 @@ import ts from "typescript";
 const load = async path => ts.transpileModule(await readFile(new URL(path, import.meta.url), "utf8"), { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText;
 const url = js => "data:text/javascript;base64," + Buffer.from(js).toString("base64");
 const paging = url(await load("../src/lib/readAllRows.ts"));
-const { selectAllOrderIds, orderItemCounters, verifyOrderMutation, updateSelectedOrderStatus } = await import(url((await load("../src/lib/orderBulkActions.ts")).replace('"./readAllRows"', JSON.stringify(paging))));
+const { selectAllOrderIds, orderItemCounters, verifyOrderMutation, updateSelectedOrderStatus, mutateSelectedOrders } = await import(url((await load("../src/lib/orderBulkActions.ts")).replace('"./readAllRows"', JSON.stringify(paging))));
 test("Select all includes every matching order across columns, once", () => {
   const orders = Array.from({ length: 1201 }, (_, i) => ({ id: `order-${i}` }));
   const selected = selectAllOrderIds([...orders, orders[0]]);
@@ -21,6 +21,14 @@ test("Denied or missing bulk mutation rows cannot report success", () => {
   assert.throws(() => verifyOrderMutation(["a", "b"], [{ id: "a" }]), /1 selected order/);
   assert.throws(() => verifyOrderMutation(["a"], []), /1 selected order/);
   verifyOrderMutation(["a", "b"], [{ id: "a" }, { id: "b" }]);
+});
+test("Bulk delete and assignment include every ID in bounded batches", async () => {
+  const ids = Array.from({ length: 1201 }, (_, i) => `order-${i}`);
+  const batches = [];
+  await mutateSelectedOrders(ids, async batch => { batches.push(batch); return { data: batch.map(id => ({ id })), error: null }; });
+  assert.equal(batches.length, 7);
+  assert.deepEqual(batches.flat(), ids);
+  await assert.rejects(() => mutateSelectedOrders(["a", "b"], async () => ({ data: [{ id: "a" }], error: null })), /1 selected order/);
 });
 test("Multiple complete updates every item on every selected order, including beyond the row cap", async () => {
   const items = Array.from({ length: 1001 }, (_, i) => ({ id: `item-${i}`, quantity: 3 }));

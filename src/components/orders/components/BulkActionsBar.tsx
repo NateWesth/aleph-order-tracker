@@ -138,16 +138,18 @@ export default function BulkActionsBar({ selectedOrders, onClearSelection, onAct
     if (!selectedTagId || !user?.id) return;
     setLoading(true);
     try {
-      const rows = ids.map((order_id) => ({
+      await mutateSelectedOrders(ids, async batch => {
+      const rows = batch.map((order_id) => ({
         order_id,
         tag_id: selectedTagId,
         assigned_by: user.id,
       }));
-      const { data, error } = await supabase.from("order_tag_assignments").upsert(rows, { onConflict: "order_id,tag_id", ignoreDuplicates: true });
+      const { error } = await supabase.from("order_tag_assignments").upsert(rows, { onConflict: "order_id,tag_id", ignoreDuplicates: true });
       if (error) throw error;
-      const verified = await supabase.from("order_tag_assignments").select("order_id").eq("tag_id", selectedTagId).in("order_id", ids);
+      const verified = await supabase.from("order_tag_assignments").select("order_id").eq("tag_id", selectedTagId).in("order_id", batch);
       if (verified.error) throw verified.error;
-      verifyOrderMutation(ids, (verified.data || []).map(row => ({ id: row.order_id })));
+      return { data: (verified.data || []).map(row => ({ id: row.order_id })), error: null };
+      });
       toast({ title: "Tag Applied", description: `Tag added to ${ids.length} orders.` });
       setShowTagDialog(false);
       setSelectedTagId("");
