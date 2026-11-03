@@ -18,6 +18,16 @@ export function verifyOrderMutation(ids: string[], rows: Array<{ id: string }> |
   if (missing.length) throw new Error(`${missing.length} selected order(s) could not be changed. Your selection is kept; check your access and retry.`);
 }
 
+export async function mutateSelectedOrders(ids: string[], mutate: (batch: string[]) => PromiseLike<{ data: Array<{ id: string }> | null; error: { message: string } | null }>) {
+  const unique = [...new Set(ids)];
+  for (let start = 0; start < unique.length; start += 200) {
+    const batch = unique.slice(start, start + 200);
+    const { data, error } = await mutate(batch);
+    if (error) throw new Error(error.message);
+    verifyOrderMutation(batch, data);
+  }
+}
+
 export async function updateSelectedOrderStatus(db: any, ids: string[], status: string) {
   if (!["ordered", "in-progress", "in-stock", "ready", "delivered"].includes(status)) throw new Error("Choose a valid order status.");
   for (const id of [...new Set(ids)]) {

@@ -8,7 +8,7 @@ import { CheckSquare, Loader2, Tag as TagIcon, Flame, UserRound, CheckCircle2 } 
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import { updateSelectedOrderStatus, verifyOrderMutation } from "@/lib/orderBulkActions";
+import { updateSelectedOrderStatus, verifyOrderMutation, mutateSelectedOrders } from "@/lib/orderBulkActions";
 import { OrderWithCompany } from "../types/orderTypes";
 
 interface BulkActionsBarProps {
@@ -118,12 +118,10 @@ export default function BulkActionsBar({ selectedOrders, onClearSelection, onAct
     if (!newUrgency) return;
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      await mutateSelectedOrders(ids, batch => supabase
         .from("orders")
         .update({ urgency: newUrgency, updated_at: new Date().toISOString() })
-        .in("id", ids).select("id");
-      if (error) throw error;
-      verifyOrderMutation(ids, data);
+        .in("id", batch).select("id"));
       toast({ title: "Urgency Updated", description: `${ids.length} orders set to ${newUrgency}.` });
       setShowUrgencyDialog(false);
       setNewUrgency("");
@@ -165,9 +163,7 @@ export default function BulkActionsBar({ selectedOrders, onClearSelection, onAct
   const handleBulkDelete = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.from("orders").delete().in("id", ids).select("id");
-      if (error) throw error;
-      verifyOrderMutation(ids, data);
+      await mutateSelectedOrders(ids, batch => supabase.from("orders").delete().in("id", batch).select("id"));
       toast({ title: "Deleted", description: `${ids.length} orders deleted.` });
       setShowDeleteDialog(false);
       onClearSelection();
@@ -182,9 +178,7 @@ export default function BulkActionsBar({ selectedOrders, onClearSelection, onAct
   const handleBulkAssignment = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.from("orders").update({ assigned_to: assignee === "unassigned" ? null : assignee, updated_at: new Date().toISOString() } as any).in("id", ids).select("id");
-      if (error) throw error;
-      verifyOrderMutation(ids, data);
+      await mutateSelectedOrders(ids, batch => supabase.from("orders").update({ assigned_to: assignee === "unassigned" ? null : assignee, updated_at: new Date().toISOString() } as any).in("id", batch).select("id"));
       toast({ title: "Orders assigned", description: `${ids.length} order${ids.length === 1 ? "" : "s"} updated.` });
       setShowAssignDialog(false);
       onClearSelection();
