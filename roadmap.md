@@ -1,7 +1,8 @@
 # Roadmap
 
-- [ ] Add admin-managed client links for automatic purchasing/invoicing order assignments, separate from reps and dispatch
-- [ ] Test assignment scope, permissions, existing orders and future orders; verify available app checks
+- [x] Add admin-managed client links for automatic purchasing/invoicing order assignments, separate from reps and dispatch
+- [x] Test assignment scope, permissions, existing orders and future orders; check compilation and deployed triggers
+- [ ] Verify client assignment dialog while signed in — external unmanaged sign-in is unavailable in the sandbox
 
 - [x] Repair board-wide Select all and multi-order completion/delete/other actions
 - [x] Test bulk selection and mutation results; check compilation

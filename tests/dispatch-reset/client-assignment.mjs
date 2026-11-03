@@ -41,6 +41,10 @@ await db.query('UPDATE companies SET purchasing_invoicing_user_id=$1 WHERE id=$2
 assert.deepEqual((await db.query('SELECT assigned_to FROM orders WHERE company_id=$1',[client])).rows.map(row=>row.assigned_to),[buyer,buyer]);
 assert.equal((await db.query('SELECT assigned_to FROM orders WHERE company_id=$1',[other])).rows[0].assigned_to,admin);
 console.log('PASS: all existing client orders assigned, other clients unchanged');
+assert.ok((await db.query('SELECT fulfillment_assigned_to,user_id FROM orders WHERE company_id=$1',[client])).rows.every(row=>row.fulfillment_assigned_to===admin && row.user_id===admin));
+assert.equal((await db.query('SELECT assigned_to FROM dispatch_documents')).rows[0].assigned_to,admin);
+assert.equal((await db.query('SELECT assigned_to FROM po_collection_state')).rows[0].assigned_to,admin);
+assert.equal((await db.query('SELECT rep_id FROM rep_company_assignments')).rows[0].rep_id,other);
 const created=(await db.query('INSERT INTO orders(company_id,assigned_to) VALUES($1,$2) RETURNING id,assigned_to',[client,admin])).rows[0];
 assert.equal(created.assigned_to,buyer);
 await db.query('UPDATE orders SET assigned_to=$1 WHERE id=$2',[admin,created.id]);
