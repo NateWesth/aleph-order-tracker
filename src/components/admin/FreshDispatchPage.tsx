@@ -110,7 +110,7 @@ export default function FreshDispatchPage(){
  const lanes=mode==="collection"?[
   {id:"pending",label:"Ready to plan",description:"Pickup or supplier delivery",icon:Warehouse,docs:visible.filter(doc=>doc.status==="pending")},
   {id:"scheduled",label:"Arrival planned",description:"Upcoming stock movements",icon:CalendarDays,docs:visible.filter(doc=>doc.status==="scheduled")},
-  {id:"in-progress",label:"Receiving now",description:"Record actual quantities",icon:PackageCheck,docs:visible.filter(doc=>doc.status==="in-progress")},
+  {id:"in-progress",label:"Partially received",description:"Record actual quantities",icon:PackageCheck,docs:visible.filter(doc=>doc.status==="in-progress")},
  ]:[
   {id:"pending",label:"Ready to plan",description:"Assign and schedule",icon:PackageCheck,docs:visible.filter(doc=>doc.status==="pending")},
   {id:"scheduled",label:"Route planned",description:"Upcoming dispatches",icon:CalendarDays,docs:visible.filter(doc=>doc.status==="scheduled")},
