@@ -1,5 +1,7 @@
 # Project implementation rules
 
+- Client purchasing/invoicing links use companies.purchasing_invoicing_user_id and guarded database triggers to enforce orders.assigned_to for existing and future orders; do not modify rep or fulfillment assignments. Why: every order creation path must inherit the same admin-managed operational owner without assigning dispatch work.
+
 - Order bulk status changes share item-counter updates and verify affected rows; selection uses unique filtered order IDs across lanes. Why: board positions derive from quantities and denied writes must not report success.
 
 - Dispatch On route transitions use the revision-checked save RPC and database guard; quantity confirmations use the idempotent receipt RPC. Why: only ready/planned stops may depart, and refreshes cannot silently remove unchecked stops.
