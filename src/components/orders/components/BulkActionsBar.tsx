@@ -4,10 +4,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { CheckSquare, Loader2, Tag as TagIcon, Flame, UserRound } from "lucide-react";
+import { CheckSquare, Loader2, Tag as TagIcon, Flame, UserRound, CheckCircle2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { updateSelectedOrderStatus, verifyOrderMutation } from "@/lib/orderBulkActions";
 import { OrderWithCompany } from "../types/orderTypes";
 
 interface BulkActionsBarProps {
@@ -28,7 +29,7 @@ const URGENCY_OPTIONS = [
   { value: "low", label: "Low" },
   { value: "normal", label: "Normal" },
   { value: "high", label: "High" },
-  { value: "urgent", label: "Urgent" },
+  { value: "medium", label: "Medium" },
 ];
 
 interface OrderTag {
@@ -38,6 +39,7 @@ interface OrderTag {
 }
 
 export default function BulkActionsBar({ selectedOrders, onClearSelection, onActionComplete }: BulkActionsBarProps) {
+  const [showCompleteDialog, setShowCompleteDialog] = useState(false);
   const [showStatusDialog, setShowStatusDialog] = useState(false);
   const [showUrgencyDialog, setShowUrgencyDialog] = useState(false);
   const [showTagDialog, setShowTagDialog] = useState(false);
@@ -63,23 +65,26 @@ export default function BulkActionsBar({ selectedOrders, onClearSelection, onAct
 
   useEffect(() => {
     if (!showAssignDialog || team.length) return;
-    supabase.from("profiles").select("id,full_name,email").order("full_name").then(({ data }) => {
+    supabase.from("profiles").select("id,full_name,email").eq("approved", true).order("full_name").then(({ data }) => {
       if (data) setTeam(data);
     });
   }, [showAssignDialog, team.length]);
 
   useEffect(() => {
+    const openComplete = () => setShowCompleteDialog(true);
     const openAssign = () => setShowAssignDialog(true);
     const openStatus = () => setShowStatusDialog(true);
     const openUrgency = () => setShowUrgencyDialog(true);
     const openTag = () => setShowTagDialog(true);
     const openDelete = () => setShowDeleteDialog(true);
+    window.addEventListener("aleph:bulk-orders-complete", openComplete);
     window.addEventListener("aleph:bulk-orders-assign", openAssign);
     window.addEventListener("aleph:bulk-orders-status", openStatus);
     window.addEventListener("aleph:bulk-orders-urgency", openUrgency);
     window.addEventListener("aleph:bulk-orders-tag", openTag);
     window.addEventListener("aleph:bulk-orders-delete", openDelete);
     return () => {
+      window.removeEventListener("aleph:bulk-orders-complete", openComplete);
       window.removeEventListener("aleph:bulk-orders-assign", openAssign);
       window.removeEventListener("aleph:bulk-orders-status", openStatus);
       window.removeEventListener("aleph:bulk-orders-urgency", openUrgency);
@@ -90,23 +95,13 @@ export default function BulkActionsBar({ selectedOrders, onClearSelection, onAct
 
   if (selectedOrders.length === 0) return null;
 
-  const ids = selectedOrders.map((o) => o.id);
+  const ids = [...new Set(selectedOrders.map((o) => o.id))];
 
   const handleBulkStatusUpdate = async () => {
     if (!newStatus) return;
     setLoading(true);
     try {
-      const { error } = await supabase
-        .from("orders")
-        .update({
-          status: newStatus,
-          updated_at: new Date().toISOString(),
-          ...(newStatus === "completed" || newStatus === "delivered"
-            ? { completed_date: new Date().toISOString() }
-            : {}),
-        })
-        .in("id", ids);
-      if (error) throw error;
+      await updateSelectedOrderStatus(supabase, ids, newStatus);
       toast({ title: "Bulk Update Complete", description: `${ids.length} orders updated to "${newStatus}".` });
       setShowStatusDialog(false);
       setNewStatus("");
@@ -123,11 +118,12 @@ export default function BulkActionsBar({ selectedOrders, onClearSelection, onAct
     if (!newUrgency) return;
     setLoading(true);
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("orders")
         .update({ urgency: newUrgency, updated_at: new Date().toISOString() })
-        .in("id", ids);
+        .in("id", ids).select("id");
       if (error) throw error;
+      verifyOrderMutation(ids, data);
       toast({ title: "Urgency Updated", description: `${ids.length} orders set to ${newUrgency}.` });
       setShowUrgencyDialog(false);
       setNewUrgency("");
@@ -149,8 +145,11 @@ export default function BulkActionsBar({ selectedOrders, onClearSelection, onAct
         tag_id: selectedTagId,
         assigned_by: user.id,
       }));
-      const { error } = await supabase.from("order_tag_assignments").insert(rows);
-      if (error && !error.message.includes("duplicate")) throw error;
+      const { data, error } = await supabase.from("order_tag_assignments").upsert(rows, { onConflict: "order_id,tag_id", ignoreDuplicates: true });
+      if (error) throw error;
+      const verified = await supabase.from("order_tag_assignments").select("order_id").eq("tag_id", selectedTagId).in("order_id", ids);
+      if (verified.error) throw verified.error;
+      verifyOrderMutation(ids, (verified.data || []).map(row => ({ id: row.order_id })));
       toast({ title: "Tag Applied", description: `Tag added to ${ids.length} orders.` });
       setShowTagDialog(false);
       setSelectedTagId("");
@@ -166,8 +165,9 @@ export default function BulkActionsBar({ selectedOrders, onClearSelection, onAct
   const handleBulkDelete = async () => {
     setLoading(true);
     try {
-      const { error } = await supabase.from("orders").delete().in("id", ids);
+      const { data, error } = await supabase.from("orders").delete().in("id", ids).select("id");
       if (error) throw error;
+      verifyOrderMutation(ids, data);
       toast({ title: "Deleted", description: `${ids.length} orders deleted.` });
       setShowDeleteDialog(false);
       onClearSelection();
@@ -182,8 +182,9 @@ export default function BulkActionsBar({ selectedOrders, onClearSelection, onAct
   const handleBulkAssignment = async () => {
     setLoading(true);
     try {
-      const { error } = await supabase.from("orders").update({ assigned_to: assignee === "unassigned" ? null : assignee, updated_at: new Date().toISOString() } as any).in("id", ids);
+      const { data, error } = await supabase.from("orders").update({ assigned_to: assignee === "unassigned" ? null : assignee, updated_at: new Date().toISOString() } as any).in("id", ids).select("id");
       if (error) throw error;
+      verifyOrderMutation(ids, data);
       toast({ title: "Orders assigned", description: `${ids.length} order${ids.length === 1 ? "" : "s"} updated.` });
       setShowAssignDialog(false);
       onClearSelection();
@@ -193,6 +194,21 @@ export default function BulkActionsBar({ selectedOrders, onClearSelection, onAct
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleBulkComplete = async () => {
+    if (loading) return;
+    setLoading(true);
+    try {
+      await updateSelectedOrderStatus(supabase, ids, "delivered");
+      setShowCompleteDialog(false);
+      toast({ title: "Completed", description: `${ids.length} orders and all their items completed.` });
+      onClearSelection();
+      onActionComplete();
+    } catch (error: any) {
+      toast({ title: "Completion failed", description: error.message, variant: "destructive" });
+      onActionComplete();
+    } finally { setLoading(false); }
   };
 
   const handleBulkExport = () => {
@@ -217,12 +233,12 @@ export default function BulkActionsBar({ selectedOrders, onClearSelection, onAct
 
   return (
     <>
-      <div className="sticky top-0 z-40 flex items-center justify-between gap-3 p-3 bg-primary/5 border border-primary/20 rounded-xl animate-in slide-in-from-top-2">
+      <div className="sticky top-0 z-40 flex flex-wrap items-center justify-between gap-3 p-3 bg-primary/5 border border-primary/20 rounded-xl animate-in slide-in-from-top-2">
         <div className="flex items-center gap-2">
           <CheckSquare className="h-4 w-4 text-primary" />
           <span className="text-sm font-medium">{selectedOrders.length} selected</span>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
+        <fieldset disabled={loading} className="flex items-center gap-2 flex-wrap">
           <Button size="sm" variant="outline" onClick={handleBulkExport}>Export CSV</Button>
           <Button size="sm" variant="outline" onClick={() => setShowTagDialog(true)}>
             <TagIcon className="h-3 w-3 mr-1" /> Tag
@@ -231,12 +247,16 @@ export default function BulkActionsBar({ selectedOrders, onClearSelection, onAct
             <Flame className="h-3 w-3 mr-1" /> Urgency
           </Button>
           <Button size="sm" variant="outline" onClick={() => setShowAssignDialog(true)}><UserRound className="mr-1 h-3 w-3" />Assign</Button>
+          <Button size="sm" onClick={() => setShowCompleteDialog(true)}><CheckCircle2 className="mr-1 h-3 w-3"/>Complete</Button>
           <Button size="sm" onClick={() => setShowStatusDialog(true)}>Update Status</Button>
           <Button size="sm" variant="destructive" onClick={() => setShowDeleteDialog(true)} disabled={loading}>Delete</Button>
           <Button size="sm" variant="ghost" onClick={onClearSelection}>Clear</Button>
-        </div>
+        </fieldset>
       </div>
 
+      <Dialog open={showCompleteDialog} onOpenChange={open => { if (!loading) setShowCompleteDialog(open); }}>
+        <DialogContent className="max-w-sm"><DialogHeader><DialogTitle>Complete {ids.length} orders?</DialogTitle></DialogHeader><p className="text-sm text-muted-foreground">All remaining items on these orders will be completed and the orders will move to history.</p><DialogFooter><Button variant="outline" disabled={loading} onClick={() => setShowCompleteDialog(false)}>Cancel</Button><Button disabled={loading} onClick={() => void handleBulkComplete()}><CheckCircle2 className="mr-2 h-4 w-4"/>{loading ? "Completing…" : "Complete orders"}</Button></DialogFooter></DialogContent>
+      </Dialog>
       <Dialog open={showStatusDialog} onOpenChange={setShowStatusDialog}>
         <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle>Bulk Status Update</DialogTitle></DialogHeader>
