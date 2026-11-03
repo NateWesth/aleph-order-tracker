@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import ts from "typescript";
-const load = async path => ts.transpileModule(await readFile(new URL(path, import.meta.url), "utf8"), { compilerOptions: { module: ts.ModuleKind.ESNext } }).outputText;
+const load = async path => ts.transpileModule(await readFile(new URL(path, import.meta.url), "utf8"), { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText;
 const url = js => "data:text/javascript;base64," + Buffer.from(js).toString("base64");
 const paging = url(await load("../src/lib/readAllRows.ts"));
 const { selectAllOrderIds, orderItemCounters, verifyOrderMutation, updateSelectedOrderStatus } = await import(url((await load("../src/lib/orderBulkActions.ts")).replace('"./readAllRows"', JSON.stringify(paging))));
