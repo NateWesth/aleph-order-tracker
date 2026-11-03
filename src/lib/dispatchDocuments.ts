@@ -11,4 +11,6 @@ export function lineRemaining(doc:DispatchDocument,line:DispatchLine){
  return Math.max(0,Number(line.quantity)-Math.max(Number(line.source_completed||0),Number(doc.completed_quantities[line.id]||0)));
 }
 export const remainingUnits=(doc:DispatchDocument)=>doc.lines.reduce((sum,line)=>sum+lineRemaining(doc,line),0);
-export const isActiveDispatch=(doc:DispatchDocument)=>Date.parse(doc.source_created_at)>=Date.parse(DISPATCH_START)&&!doc.source_closed&&!["completed","dismissed"].includes(doc.status)&&remainingUnits(doc)>0;
+export const isActiveDispatch=(doc:DispatchDocument)=>Date.parse(doc.source_created_at)>=Date.parse(DISPATCH_START)&&(doc.status==="on-route"||(!doc.source_closed&&!["completed","dismissed"].includes(doc.status)&&remainingUnits(doc)>0));
+export const canMarkOnRoute=(doc:DispatchDocument)=>isActiveDispatch(doc)&&["pending","scheduled"].includes(doc.status);
+export const canMoveDispatch=(doc:DispatchDocument,status:string)=>doc.status!=="on-route"&&(status!=="on-route"||canMarkOnRoute(doc));

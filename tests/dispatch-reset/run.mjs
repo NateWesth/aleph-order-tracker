@@ -1,5 +1,5 @@
 import {PGlite} from "@electric-sql/pglite";
-import {readFile} from "node:fs/promises";
+import {readFile,readdir} from "node:fs/promises";
 import assert from "node:assert/strict";
 const db=new PGlite();
 await db.exec("CREATE ROLE authenticated; CREATE ROLE service_role; CREATE SCHEMA auth; CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql AS $$SELECT NULLIF(current_setting('request.jwt.claim.sub',true),'')::uuid$$; CREATE TABLE profiles(id uuid primary key,approved boolean); CREATE TABLE zoho_document_cache(organization_id text,document_type text,document_id text,payload jsonb);");
@@ -68,4 +68,37 @@ await call("ingest_dispatch_document",["org","purchase_order",make("2026-09-14T0
 await call("ingest_dispatch_document",["org","purchase_order",make("2026-09-14T00:00:00+0200","DISMISSED")]);
 assert.equal((await get("collection:org:CLOSED")).status,"completed");assert.equal((await get("collection:org:DISMISSED")).status,"dismissed");
 console.log("PASS legacy collected and dismissed PO IDs remain closed after the fresh-source import");
+await db.exec("CREATE ROLE anon;");
+const migrations=new URL("../../supabase/migrations/",import.meta.url);
+for(const file of (await readdir(migrations)).filter(name=>name.startsWith("20261103051444_")||name.startsWith("20261103051532_")).sort())await db.exec(await readFile(new URL(file,migrations),"utf8"));
+for(const initial of ["pending","scheduled"]){
+ const id="collection:org:ON-"+initial;
+ await call("ingest_dispatch_document",["org","purchase_order",make("2026-09-14T00:00:00+0200","ON-"+initial)]);
+ await db.query("UPDATE dispatch_documents SET status=$1 WHERE id=$2",[initial,id]);
+ let current=await get(id);
+ await call("save_dispatch_document",[id,current.revision,{status:"on-route"}]);
+ assert.equal((await get(id)).status,"on-route",initial+" may enter On route");
+ current=await get(id);
+ for(const target of ["pending","scheduled","in-progress","dismissed"])await assert.rejects(()=>call("save_dispatch_document",[id,current.revision,{status:target}]),/Confirm quantities/);
+ await assert.rejects(()=>call("record_dispatch_receipt",[id,current.revision,crypto.randomUUID(),{},""]),/Enter quantities/);
+ const partial=await call("record_dispatch_receipt",[id,current.revision,crypto.randomUUID(),{L1:3},"Checked partial stop"]);
+ assert.equal(partial.completed,false);assert.equal((await get(id)).status,"in-progress");
+ current=await get(id);
+ await assert.rejects(()=>call("save_dispatch_document",[id,current.revision,{status:"on-route"}]),/Only active ready or planned/);
+}
+const checkId="collection:org:CHECK";
+await call("ingest_dispatch_document",["org","purchase_order",make("2026-09-14T00:00:00+0200","CHECK")]);
+let checking=await get(checkId);
+await call("save_dispatch_document",[checkId,checking.revision,{status:"on-route"}]);
+await db.query("SELECT set_config('request.jwt.claim.sub','',false)");
+const sourceDone=make("2026-09-14T00:00:00+0200","CHECK");sourceDone.last_modified_time="2026-09-16T00:00:00+0200";sourceDone.status="closed";sourceDone.line_items[0].quantity_received=10;
+await call("ingest_dispatch_document",["org","purchase_order",sourceDone]);
+await db.query("UPDATE dispatch_documents SET status='completed' WHERE id=$1",[checkId]);
+checking=await get(checkId);assert.equal(checking.status,"on-route");assert.equal(checking.source_closed,true);
+await db.query("SELECT set_config('request.jwt.claim.sub',$1,false)",[uid]);
+const checkedRequest=crypto.randomUUID();
+const checked=await call("record_dispatch_receipt",[checkId,checking.revision,checkedRequest,{},"Driver checked completion"]);
+assert.equal(checked.checked,true);assert.equal((await get(checkId)).status,"completed");
+assert.deepEqual(await call("record_dispatch_receipt",[checkId,checking.revision,checkedRequest,{},"Driver checked completion"]),checked);
+console.log("PASS On route entry from only pending/scheduled, explicit partial confirmation, protected source refresh and idempotent final check");
 await db.close();

@@ -1,7 +1,8 @@
 # Roadmap
 
-- [ ] Add third-position On route lane, restricted driver actions and explicit completion persistence
-- [ ] Test dispatch transition rules and verify board controls
+- [x] Add third-position On route lane, restricted driver actions and explicit completion persistence
+- [x] Test dispatch transition rules and check compilation
+- [ ] Verify On route controls while signed in — external unmanaged sign-in is unavailable in the sandbox
 
 - [x] Repair COD link display and statement cache refresh; test link, relink and unlink handling
 

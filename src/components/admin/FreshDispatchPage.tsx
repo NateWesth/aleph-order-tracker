@@ -6,7 +6,7 @@ import {useAuth} from "@/contexts/AuthContext";
 import {useLiveData} from "@/hooks/useLiveData";
 import {useDraftRecovery} from "@/hooks/useDraftRecovery";
 import {readAllRows} from "@/lib/readAllRows";
-import {DISPATCH_FIELDS,DISPATCH_START,isActiveDispatch,lineRemaining,remainingUnits,type DispatchDocument} from "@/lib/dispatchDocuments";
+import {DISPATCH_FIELDS,DISPATCH_START,isActiveDispatch,canMarkOnRoute,canMoveDispatch,lineRemaining,remainingUnits,type DispatchDocument} from "@/lib/dispatchDocuments";
 import {Button} from "@/components/ui/button";
 import {Input} from "@/components/ui/input";
 import {Textarea} from "@/components/ui/textarea";
@@ -110,27 +110,26 @@ export default function FreshDispatchPage(){
  const lanes=mode==="collection"?[
   {id:"pending",label:"Ready to plan",description:"Pickup or supplier delivery",icon:Warehouse,docs:visible.filter(doc=>doc.status==="pending")},
   {id:"scheduled",label:"Arrival planned",description:"Upcoming stock movements",icon:CalendarDays,docs:visible.filter(doc=>doc.status==="scheduled")},
+  {id:"on-route",label:"On route",description:"Awaiting driver confirmation",icon:Truck,docs:visible.filter(doc=>doc.status==="on-route")},
   {id:"in-progress",label:"Partially received",description:"Record actual quantities",icon:PackageCheck,docs:visible.filter(doc=>doc.status==="in-progress")},
  ]:[
   {id:"pending",label:"Ready to plan",description:"Assign and schedule",icon:PackageCheck,docs:visible.filter(doc=>doc.status==="pending")},
   {id:"scheduled",label:"Route planned",description:"Upcoming dispatches",icon:CalendarDays,docs:visible.filter(doc=>doc.status==="scheduled")},
+  {id:"on-route",label:"On route",description:"Awaiting driver confirmation",icon:Truck,docs:visible.filter(doc=>doc.status==="on-route")},
   {id:"in-progress",label:"Partially delivered",description:"Complete on handover",icon:Navigation,docs:visible.filter(doc=>doc.status==="in-progress")},
  ];
  const memberName=(id:string|null)=>members.find(member=>member.id===id)?.full_name||"Unassigned";
  const openMenu=(doc:DispatchDocument,x:number,y:number)=>setMenu({doc,x,y});
  const updateDoc=async(doc:DispatchDocument,patch:Record<string,unknown>)=>{
   setMenu(null);
-  const {error:updateError}=await db.from("dispatch_documents").update(patch).eq("id",doc.id);
+  const {error:updateError}=await db.rpc("save_dispatch_document",{p_id:doc.id,p_revision:doc.revision,p_patch:patch});
   if(updateError)setError(updateError.message);else await load();
  };
  const completeOne=async(doc:DispatchDocument)=>{
-  const quantities=Object.fromEntries(doc.lines.map(line=>[line.id,lineRemaining(doc,line)]).filter(([,q])=>Number(q)>0));
-  if(Object.keys(quantities).length){
-   const {error:rpcError}=await db.rpc("record_dispatch_receipt",{p_id:doc.id,p_revision:doc.revision,p_request_id:crypto.randomUUID(),p_quantities:quantities,p_notes:"Marked complete — remaining quantities filled automatically"});
-   if(rpcError)throw rpcError;
-  }
-  const {error:e2}=await db.from("dispatch_documents").update({status:"completed"}).eq("id",doc.id);
-  if(e2)throw e2;
+  const quantities=doc.status==="on-route"&&doc.source_closed?{}:Object.fromEntries(doc.lines.map(line=>[line.id,lineRemaining(doc,line)]).filter(([,q])=>Number(q)>0));
+  if(!Object.keys(quantities).length&&doc.status!=="on-route")return;
+  const {error:rpcError}=await db.rpc("record_dispatch_receipt",{p_id:doc.id,p_revision:doc.revision,p_request_id:crypto.randomUUID(),p_quantities:quantities,p_notes:"Driver confirmed completion"});
+  if(rpcError)throw rpcError;
  };
  const runBulk=async(targets:DispatchDocument[],action:(doc:DispatchDocument)=>Promise<void>,confirmText?:string)=>{
   if(!targets.length)return;
@@ -140,7 +139,7 @@ export default function FreshDispatchPage(){
   setBulkBusy(false);setPicked(new Set());await load();
   if(failed.length)setError(failed.join(" · "));
  };
- const patchAction=(patch:Record<string,unknown>)=>async(doc:DispatchDocument)=>{const {error:e}=await db.from("dispatch_documents").update(patch).eq("id",doc.id);if(e)throw e;};
+ const patchAction=(patch:Record<string,unknown>)=>async(doc:DispatchDocument)=>{const {error:e}=await db.rpc("save_dispatch_document",{p_id:doc.id,p_revision:doc.revision,p_patch:patch});if(e)throw e;};
  const deleteAction=patchAction({status:"dismissed"});
  const pickedDocs=visible.filter(doc=>picked.has(doc.id));
  const cardOpen=(doc:DispatchDocument)=>selectMode?()=>togglePick(doc.id):()=>setSelected(doc);
@@ -170,19 +169,20 @@ export default function FreshDispatchPage(){
   {selectMode&&<div className="sticky top-2 z-30 flex flex-wrap items-center gap-2 rounded-2xl border border-logo-violet/40 bg-card/95 p-3 shadow-lg backdrop-blur">
    <span className="text-sm font-bold">{pickedDocs.length} selected</span>
    <Button size="sm" variant="outline" onClick={()=>setPicked(pickedDocs.length===visible.length?new Set():new Set(visible.map(d=>d.id)))}>{pickedDocs.length===visible.length?"Clear all":"Select all ("+visible.length+")"}</Button>
-   <select aria-label="Move selected" disabled={!pickedDocs.length||bulkBusy} className="h-9 rounded-md border bg-background px-2 text-sm" value="" onChange={e=>{const v=e.target.value;if(v)void runBulk(pickedDocs,patchAction({status:v}));}}><option value="">Move to…</option>{lanes.map(l=><option key={l.id} value={l.id}>{l.label}</option>)}</select>
+   <select aria-label="Move selected" disabled={!pickedDocs.length||bulkBusy} className="h-9 rounded-md border bg-background px-2 text-sm" value="" onChange={e=>{const v=e.target.value;if(v)void runBulk(pickedDocs,patchAction({status:v}));}}><option value="">Move to…</option>{lanes.filter(l=>pickedDocs.every(d=>canMoveDispatch(d,l.id))).map(l=><option key={l.id} value={l.id}>{l.label}</option>)}</select>
    <select aria-label="Assign selected" disabled={!pickedDocs.length||bulkBusy} className="h-9 rounded-md border bg-background px-2 text-sm" value="" onChange={e=>{const v=e.target.value;if(v)void runBulk(pickedDocs,patchAction({assigned_to:v==="none"?null:v}));}}><option value="">Assign to…</option><option value="none">Unassigned</option>{members.map(m=><option key={m.id} value={m.id}>{m.full_name||"Team member"}</option>)}</select>
    <Button size="sm" variant="outline" disabled={!pickedDocs.length||bulkBusy} onClick={()=>void runBulk(pickedDocs,patchAction({urgent:true}))}><Flame className="mr-1 h-4 w-4"/>Urgent</Button>
    <Button size="sm" disabled={!pickedDocs.length||bulkBusy} onClick={()=>void runBulk(pickedDocs,completeOne,"Complete "+pickedDocs.length+" document(s)? All remaining quantities will be filled in and they move to History.")}><CheckCircle2 className="mr-1 h-4 w-4"/>Complete</Button>
-   <Button size="sm" variant="destructive" disabled={!pickedDocs.length||bulkBusy} onClick={()=>void runBulk(pickedDocs,deleteAction,"Delete "+pickedDocs.length+" document(s) from the board? They move to History / excluded.")}><Trash2 className="mr-1 h-4 w-4"/>Delete</Button>
+   <Button size="sm" variant="destructive" disabled={!pickedDocs.length||bulkBusy||pickedDocs.some(d=>d.status==="on-route")} onClick={()=>void runBulk(pickedDocs,deleteAction,"Delete "+pickedDocs.length+" document(s) from the board? They move to History / excluded.")}><Trash2 className="mr-1 h-4 w-4"/>Delete</Button>
    {bulkBusy&&<span className="text-xs text-muted-foreground">Working…</span>}
   </div>}
     {loading?<p role="status">Loading dispatch records…</p>:visible.length===0?<div className="rounded-2xl border border-dashed p-8 text-center"><p className="font-semibold">{shownError?"Records could not be verified":history?"No matching history":"No matching outstanding documents"}</p><p className="mt-2 text-sm text-muted-foreground">Check Source health before assuming everything is complete. Draft and void documents do not require dispatch.</p></div>:history?
     <div className="grid min-w-0 gap-3 md:grid-cols-2 xl:grid-cols-3">{visible.map(doc=><DispatchCard key={doc.id} doc={doc} unread={hasUnread(commentsSeen,doc.kind+":"+doc.id,commentCounts[doc.kind+":"+doc.id]||0)} memberName={memberName} history onOpen={cardOpen(doc)} selectMode={selectMode} picked={picked.has(doc.id)} onContextMenu={(x,y)=>openMenu(doc,x,y)}/>)}</div>:
-    <>{isMobile&&<div className="grid grid-cols-3 gap-2" role="tablist" aria-label="Dispatch lanes">{lanes.map((lane,index)=>{const tone=[{active:"border-logo-cyan bg-logo-cyan/10 text-logo-cyan"},{active:"border-logo-violet bg-logo-violet/10 text-logo-violet"},{active:"border-logo-magenta bg-logo-magenta/10 text-logo-magenta"}][index];const active=mobileLane===lane.id;return <button type="button" key={lane.id} role="tab" aria-selected={active} onClick={()=>setMobileLane(lane.id)} className={"min-h-12 rounded-xl border p-2 text-center "+(active?tone.active:"border-border/60 bg-card/70 text-muted-foreground")}><span className="block truncate text-[11px] font-bold">{lane.label}</span><span className="mt-0.5 block text-xs font-black">{lane.docs.length}</span></button>;})}</div>}
-    <div className="fulfillment-board-grid grid min-w-0 gap-4 xl:grid-cols-3">{lanes.filter(lane=>!isMobile||lane.id===mobileLane).map((lane)=>{const index=lanes.findIndex(l=>l.id===lane.id);const Icon=lane.icon;const tone=[
+    <>{isMobile&&<div className="grid grid-cols-2 gap-2" role="tablist" aria-label="Dispatch lanes">{lanes.map((lane,index)=>{const tone=[{active:"border-logo-cyan bg-logo-cyan/10 text-logo-cyan"},{active:"border-logo-violet bg-logo-violet/10 text-logo-violet"},{active:"border-success bg-success/10 text-success"},{active:"border-logo-magenta bg-logo-magenta/10 text-logo-magenta"}][index];const active=mobileLane===lane.id;return <button type="button" key={lane.id} role="tab" aria-selected={active} onClick={()=>setMobileLane(lane.id)} className={"min-h-12 rounded-xl border p-2 text-center "+(active?tone.active:"border-border/60 bg-card/70 text-muted-foreground")}><span className="block truncate text-[11px] font-bold">{lane.label}</span><span className="mt-0.5 block text-xs font-black">{lane.docs.length}</span></button>;})}</div>}
+    <div className="fulfillment-board-grid grid min-w-0 gap-4 xl:grid-cols-4">{lanes.filter(lane=>!isMobile||lane.id===mobileLane).map((lane)=>{const index=lanes.findIndex(l=>l.id===lane.id);const Icon=lane.icon;const tone=[
      {icon:"bg-logo-cyan",selected:"border-logo-cyan ring-2 ring-logo-cyan/50 shadow-lg",hover:"hover:border-logo-cyan/40",header:"border-logo-cyan/40 bg-logo-cyan/10",pill:"bg-logo-cyan text-logo-on"},
      {icon:"bg-logo-violet",selected:"border-logo-violet ring-2 ring-logo-violet/50 shadow-lg",hover:"hover:border-logo-violet/40",header:"border-logo-violet/40 bg-logo-violet/10",pill:"bg-logo-violet text-logo-on"},
+     {icon:"bg-success",selected:"border-success ring-2 ring-success/50 shadow-lg",hover:"hover:border-success/40",header:"border-success/40 bg-success/10",pill:"bg-success text-success-foreground"},
      {icon:"bg-logo-magenta",selected:"border-logo-magenta ring-2 ring-logo-magenta/50 shadow-lg",hover:"hover:border-logo-magenta/40",header:"border-logo-magenta/40 bg-logo-magenta/10",pill:"bg-logo-magenta text-logo-on"},
     ][index];const selected=activeLane===lane.id;return <section key={lane.id} onClick={()=>setActiveLane(selected?null:lane.id)} className={"fulfillment-lane flex min-w-0 cursor-pointer flex-col overflow-hidden rounded-[28px] border bg-card/70 shadow-sm transition "+(selected?tone.selected:"border-border/60 "+tone.hover)}>
      <header className={"shrink-0 border-b "+(selected?tone.header:"border-border/55")}><div className="flex w-full items-center justify-between gap-3 px-4 py-4 text-left"><div className="flex min-w-0 items-center gap-3"><span className={"grid h-9 w-9 shrink-0 place-items-center rounded-2xl text-logo-on shadow-lg "+tone.icon}><Icon className="h-4 w-4"/></span><div className="min-w-0"><h2 className="truncate text-sm font-black">{lane.label}</h2><p className="truncate text-[10px] text-muted-foreground">{lane.description}</p></div></div><span className={"grid h-7 min-w-7 place-items-center rounded-full px-2 text-xs font-bold "+(selected?tone.pill:"bg-muted")}>{lane.docs.length}</span></div></header>
@@ -196,11 +196,11 @@ export default function FreshDispatchPage(){
     <Button variant="ghost" className="h-9 w-full justify-start px-2" onClick={()=>{setSelected(menu.doc);setMenu(null);}}><Eye className="mr-2 h-4 w-4"/>Open details</Button>
     <Button variant="ghost" className="h-9 w-full justify-start px-2" onClick={()=>void updateDoc(menu.doc,{urgent:!menu.doc.urgent})}><Flame className="mr-2 h-4 w-4"/>{menu.doc.urgent?"Remove urgent flag":"Mark as urgent"}</Button>
     <Button variant="ghost" className="h-9 w-full justify-start px-2" onClick={()=>void runBulk(picked.has(menu.doc.id)&&pickedDocs.length>1?pickedDocs:[menu.doc],completeOne,"Mark as complete? Remaining quantities will be filled in and it moves to History.")}><CheckCircle2 className="mr-2 h-4 w-4"/>Complete{picked.has(menu.doc.id)&&pickedDocs.length>1?" "+pickedDocs.length+" selected":""}</Button>
-    <Button variant="ghost" className="h-9 w-full justify-start px-2 text-destructive" onClick={()=>void runBulk(picked.has(menu.doc.id)&&pickedDocs.length>1?pickedDocs:[menu.doc],deleteAction,"Delete from the board? It moves to History / excluded.")}><Trash2 className="mr-2 h-4 w-4"/>Delete{picked.has(menu.doc.id)&&pickedDocs.length>1?" "+pickedDocs.length+" selected":""}</Button>
+    <Button variant="ghost" disabled={menu.doc.status==="on-route"} className="h-9 w-full justify-start px-2 text-destructive" onClick={()=>void runBulk(picked.has(menu.doc.id)&&pickedDocs.length>1?pickedDocs:[menu.doc],deleteAction,"Delete from the board? It moves to History / excluded.")}><Trash2 className="mr-2 h-4 w-4"/>Delete{picked.has(menu.doc.id)&&pickedDocs.length>1?" "+pickedDocs.length+" selected":""}</Button>
     <Button variant="ghost" className="h-9 w-full justify-start px-2" onClick={()=>{setSelectMode(true);togglePick(menu.doc.id);setMenu(null);}}><CheckSquare className="mr-2 h-4 w-4"/>{picked.has(menu.doc.id)?"Deselect":"Select"}</Button>
     <div className="my-1 h-px bg-border"/>
     <p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Move to</p>
-    {lanes.filter(lane=>lane.id!==menu.doc.status).map(lane=><Button key={lane.id} variant="ghost" className="h-9 w-full justify-start px-2" onClick={()=>void updateDoc(menu.doc,{status:lane.id})}><ArrowRight className="mr-2 h-4 w-4"/>{lane.label}</Button>)}
+    {lanes.filter(lane=>lane.id!==menu.doc.status&&canMoveDispatch(menu.doc,lane.id)).map(lane=><Button key={lane.id} variant="ghost" className="h-9 w-full justify-start px-2" onClick={()=>void updateDoc(menu.doc,{status:lane.id})}><ArrowRight className="mr-2 h-4 w-4"/>{lane.label}</Button>)}
     <div className="my-1 h-px bg-border"/>
     <p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Assign to</p>
     <Button variant="ghost" className="h-9 w-full justify-start px-2" onClick={()=>void updateDoc(menu.doc,{assigned_to:null})}><UserRound className="mr-2 h-4 w-4"/>Unassigned</Button>
@@ -229,6 +229,13 @@ function DispatchDocumentDialog({doc,members,onClose,onSaved}:{doc:DispatchDocum
  const [receipts,setReceipts]=useState<any[]|null>(null);
  const recovery=useDraftRecovery("fresh-dispatch:"+doc.id,{snapshot,form,quantities,receiptNote,attempt},dirty,value=>{setSnapshot(value.snapshot);setForm(value.form);setQuantities(value.quantities);setReceiptNote(value.receiptNote);setAttempt(value.attempt);setDirty(true);});
  const active=isActiveDispatch(snapshot);
+ const needsCheck=snapshot.status==="on-route"&&(snapshot.source_closed||remainingUnits(snapshot)<=0);
+ const markOnRoute=async()=>{
+  if(saving||attempt||planChanged)return;
+  setSaving(true);setError("");
+  try{const {error}=await db.rpc("save_dispatch_document",{p_id:doc.id,p_revision:snapshot.revision,p_patch:{status:"on-route"}});if(error)throw error;await refresh();await onSaved();}
+  catch(e:any){setError(e.message);}finally{setSaving(false);}
+ };
  const planChanged=JSON.stringify(form)!==JSON.stringify({assigned_to:snapshot.assigned_to||"",scheduled_for:snapshot.scheduled_for||"",urgent:snapshot.urgent,method:snapshot.method,notes:snapshot.notes});
  const refresh=async()=>{const {data,error}=await db.from("dispatch_documents").select(DISPATCH_FIELDS).eq("id",doc.id).single();if(error)throw error;setSnapshot(data);return data as DispatchDocument;};
  const change=(key:string,value:any)=>{setDirty(true);setForm(current=>({...current,[key]:value}));};
@@ -245,7 +252,7 @@ function DispatchDocumentDialog({doc,members,onClose,onSaved}:{doc:DispatchDocum
   if(saving)return;
   if(planChanged&&!attempt){setError("Save assignment & instructions before confirming quantities.");return;}
   const selected=Object.fromEntries(Object.entries(quantities).filter(([,qty])=>qty>0));
-  if(!attempt&&!Object.keys(selected).length){setError("Enter the quantities completed now.");return;}
+  if(!attempt&&!needsCheck&&!Object.keys(selected).length){setError("Enter the quantities completed now.");return;}
   const request=attempt||{p_id:doc.id,p_revision:snapshot.revision,p_request_id:crypto.randomUUID(),p_quantities:selected,p_notes:receiptNote};
   setAttempt(request);setDirty(true);setSaving(true);setError("");
   let confirmed=false;
@@ -278,6 +285,8 @@ function DispatchDocumentDialog({doc,members,onClose,onSaved}:{doc:DispatchDocum
     </header>
      <div className="flex-1 space-y-6 overflow-y-auto p-4 sm:p-6 animate-order-floating-bubble-content">
      {recovery.banner}
+     {active&&<div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4"><p className="text-sm font-semibold">{snapshot.status==="on-route"?"On route · awaiting confirmation":snapshot.status==="scheduled"?"Planned":snapshot.status==="pending"?"Ready to plan":snapshot.kind==="collection"?"Partially received":"Partially delivered"}</p>{canMarkOnRoute(snapshot)&&<Button onClick={markOnRoute} disabled={saving||!!attempt||planChanged}><Truck className="mr-2 h-4 w-4"/>Mark On route</Button>}{snapshot.status==="on-route"&&<Button disabled={saving||!!attempt||planChanged} onClick={()=>{if(!window.confirm("Confirm this stop is complete? All remaining quantities will be recorded."))return;setDirty(true);setQuantities(Object.fromEntries(snapshot.lines.filter(line=>lineRemaining(snapshot,line)>0).map(line=>[line.id,lineRemaining(snapshot,line)])));}}><CheckCircle2 className="mr-2 h-4 w-4"/>Select all to complete</Button>}</div>}
+     {needsCheck&&<p className="text-sm text-muted-foreground">Zoho shows this stop as closed or fully fulfilled. Check completion to remove it from On route.</p>}
      {error&&<p role="alert" className="rounded-xl bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
      <div className="grid grid-cols-2 gap-4 rounded-xl border border-border/60 bg-muted/30 p-4 md:grid-cols-4">
       <div><p className="text-[10px] font-bold uppercase text-muted-foreground">Reference</p><p className="mt-0.5 text-sm font-medium">{snapshot.reference}</p></div>
@@ -326,7 +335,7 @@ function DispatchDocumentDialog({doc,members,onClose,onSaved}:{doc:DispatchDocum
       <div className="min-w-0 flex-1"><Input aria-label="Receipt note" placeholder="Add a receipt note for this action…" value={receiptNote} onChange={e=>{setDirty(true);setReceiptNote(e.target.value);}} disabled={saving||!!attempt}/></div>
       <div className="flex gap-3">
        <Button variant="outline" disabled={saving||!!attempt} onClick={async()=>{try{const latest=await refresh();setForm({assigned_to:latest.assigned_to||"",scheduled_for:latest.scheduled_for||"",urgent:latest.urgent,method:latest.method,notes:latest.notes});setQuantities(current=>Object.fromEntries(latest.lines.map(line=>[line.id,Math.min(current[line.id]||0,lineRemaining(latest,line))])));setError("");}catch(e:any){setError(e.message);}}}>Reload</Button>
-       <Button className="min-h-11" disabled={saving||(planChanged&&!attempt)} onClick={record}>{saving?"Saving…":attempt?"Check / retry same receipt":"Confirm selected quantities"}</Button>
+       <Button className="min-h-11" disabled={saving||(planChanged&&!attempt)} onClick={record}>{saving?"Saving…":attempt?"Check / retry same receipt":needsCheck?"Check completion":"Confirm selected quantities"}</Button>
       </div>
      </div>
     </footer>}
