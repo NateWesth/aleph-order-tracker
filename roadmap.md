@@ -1,5 +1,9 @@
 # Roadmap
 
+- [x] Repair board-wide Select all and multi-order completion/delete/other actions
+- [x] Test bulk selection and mutation results; check compilation
+- [ ] Verify bulk order controls while signed in — external unmanaged sign-in is unavailable in the sandbox
+
 - [x] Add third-position On route lane, restricted driver actions and explicit completion persistence
 - [x] Test dispatch transition rules and check compilation
 - [ ] Verify On route controls while signed in — external unmanaged sign-in is unavailable in the sandbox

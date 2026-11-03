@@ -87,6 +87,8 @@ interface OrderStatusColumnProps {
   selectedOrderIds?: Set<string>;
   onToggleOrderSelection?: (orderId: string) => void;
   onSelectOrderGroup?: (orderIds: string[], replace?: boolean) => void;
+  onSelectAllOrders?: () => void;
+  totalOrderCount?: number;
   groupByClient?: boolean;
   allTags?: { id: string; name: string; color: string }[];
   tagAssignments?: Map<string, string[]>;
@@ -132,6 +134,8 @@ function OrderStatusColumn({
   selectedOrderIds,
   onToggleOrderSelection,
   onSelectOrderGroup,
+  onSelectAllOrders,
+  totalOrderCount = 0,
   groupByClient = false,
   allTags = [],
   tagAssignments,
@@ -437,8 +441,10 @@ function OrderStatusColumn({
             <Button variant="ghost" className="h-9 w-full justify-start px-2" onClick={() => { setDetailsTab("details"); setDetailsOrder(contextOrder.order); setContextOrder(null); }}><Eye className="mr-2 h-4 w-4" />Open order</Button>
             <Button variant="ghost" className="h-9 w-full justify-start px-2" onClick={() => { onToggleOrderSelection?.(contextOrder.order.id); setContextOrder(null); }}><CheckSquare className="mr-2 h-4 w-4" />{selectedOrderIds?.has(contextOrder.order.id) ? "Deselect this order" : "Select this order"}</Button>
             <Button variant="ghost" className="h-9 w-full justify-start px-2" onClick={() => { onSelectOrderGroup?.(orders.map((item) => item.id)); setContextOrder(null); }}><Users className="mr-2 h-4 w-4" />Select this group ({orders.length})</Button>
+            <Button variant="ghost" className="h-9 w-full justify-start px-2" onClick={() => { onSelectAllOrders?.(); setContextOrder(null); }}><CheckSquare className="mr-2 h-4 w-4"/>Select all ({totalOrderCount})</Button>
             <div className="my-1 h-px bg-border" />
             {[
+              ["Complete selected", "aleph:bulk-orders-complete"],
               ["Assign selected", "aleph:bulk-orders-assign"],
               ["Change status", "aleph:bulk-orders-status"],
               ["Change urgency", "aleph:bulk-orders-urgency"],
@@ -489,6 +495,7 @@ function OrderStatusColumn({
             {/* Order Header */}
 
             <div className="flex items-start justify-between gap-2">
+              {onToggleOrderSelection && <Checkbox aria-label={`Select order ${order.order_number}`} checked={isSelected} onPointerDown={event => event.stopPropagation()} onClick={event => event.stopPropagation()} onCheckedChange={() => onToggleOrderSelection(order.id)} />}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5"><span className="truncate text-sm font-black text-foreground">{order.order_number}</span>{(order.commentCount || 0) > 0 && <span className="relative inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-blue-500/12 px-1.5 text-[9px] font-black text-blue-600"><MessageCircle className="mr-0.5 h-2.5 w-2.5" />{order.commentCount}{hasUnread(commentsSeen, `order:${order.id}`, order.commentCount || 0) && <span title="New comments" className="absolute -right-1 -top-1 h-2 w-2 animate-pulse rounded-full bg-logo-cyan shadow-[0_0_6px_2px_hsl(var(--logo-cyan)/0.8)]" />}</span>}</div>
                 <span className="mt-0.5 block truncate text-[11px] font-medium text-muted-foreground">
@@ -596,8 +603,8 @@ function OrderStatusColumn({
           // Select the card as soon as its menu opens. This guarantees the
           // bulk toolbar and its dialogs already exist before a menu command
           // dispatches, including when this is the first selected order.
-          // Right-clicking an unselected card targets only that card, never a stale selection.
-          if (!selectedOrderIds?.has(order.id)) onSelectOrderGroup?.([order.id], true);
+          // Opening another card preserves the existing multi-order selection.
+          if (!selectedOrderIds?.has(order.id)) onSelectOrderGroup?.([order.id]);
           setContextOrder({ order, x: event.clientX, y: event.clientY });
         }}
       >

@@ -17,6 +17,7 @@ import OrdersHeader from "./components/OrdersHeader";
 import BulkActionsBar from "./components/BulkActionsBar";
 import { Trash2, Users, CheckSquare } from "lucide-react";
 import { format, startOfMonth, endOfMonth } from "date-fns";
+import { readAllRows } from "@/lib/readAllRows";
 import { MenuPortal, useViewportMenuPosition } from "@/hooks/useViewportMenuPosition";
 
 interface Company {
@@ -122,16 +123,9 @@ export const OrdersListPage: React.FC = () => {
       const monthStart = startOfMonth(now);
       const monthEnd = endOfMonth(now);
 
-      const { data: ordersData, error } = await supabase
-        .from('orders')
-        .select('*')
-        .eq('company_id', selectedCompanyId)
-        .gte('created_at', monthStart.toISOString())
-        .lte('created_at', monthEnd.toISOString())
-        .order('created_at', { ascending: false });
-
-
-      if (error) throw error;
+      const ordersData = await readAllRows<any>((from, to) => supabase.from('orders').select('*')
+        .eq('company_id', selectedCompanyId).gte('created_at', monthStart.toISOString()).lte('created_at', monthEnd.toISOString())
+        .order('created_at', { ascending: false }).order('id').range(from, to));
 
       // Get company names
       const ordersWithCompanies = await Promise.all(
@@ -223,7 +217,7 @@ export const OrdersListPage: React.FC = () => {
             <Button variant="ghost" className="h-9 w-full justify-start px-2" onClick={() => { toggleSelect(menu.id); setMenu(null); }}><CheckSquare className="mr-2 h-4 w-4" />{selectedIds.has(menu.id) ? "Deselect this order" : "Select this order"}</Button>
             <Button variant="ghost" className="h-9 w-full justify-start px-2" onClick={() => { setSelectedIds(new Set(filteredOrders.map((o) => o.id))); setMenu(null); }}><Users className="mr-2 h-4 w-4" />Select all ({filteredOrders.length})</Button>
             <div className="my-1 h-px bg-border" />
-            {[["Assign selected", "aleph:bulk-orders-assign"], ["Change status", "aleph:bulk-orders-status"], ["Change urgency", "aleph:bulk-orders-urgency"], ["Add tag", "aleph:bulk-orders-tag"]].map(([label, ev]) => (
+            {[["Complete selected", "aleph:bulk-orders-complete"], ["Assign selected", "aleph:bulk-orders-assign"], ["Change status", "aleph:bulk-orders-status"], ["Change urgency", "aleph:bulk-orders-urgency"], ["Add tag", "aleph:bulk-orders-tag"]].map(([label, ev]) => (
               <Button key={ev} variant="ghost" className="h-9 w-full justify-start px-2" onClick={() => runBulk(ev)}>{label}</Button>
             ))}
             <div className="my-1 h-px bg-border" />
