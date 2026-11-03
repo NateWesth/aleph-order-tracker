@@ -687,6 +687,7 @@ export type Database = {
           logo: string | null
           name: string
           phone: string | null
+          purchasing_invoicing_user_id: string | null
           updated_at: string | null
           vat_number: string | null
         }
@@ -701,6 +702,7 @@ export type Database = {
           logo?: string | null
           name: string
           phone?: string | null
+          purchasing_invoicing_user_id?: string | null
           updated_at?: string | null
           vat_number?: string | null
         }
@@ -715,10 +717,19 @@ export type Database = {
           logo?: string | null
           name?: string
           phone?: string | null
+          purchasing_invoicing_user_id?: string | null
           updated_at?: string | null
           vat_number?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "companies_purchasing_invoicing_user_id_fkey"
+            columns: ["purchasing_invoicing_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       dispatch_area_links: {
         Row: {
