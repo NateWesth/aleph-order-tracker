@@ -1,6 +1,6 @@
 
 import { Button } from "@/components/ui/button";
-import { Building2, Copy, Edit, Mail, Phone, Trash2, UserRound } from "lucide-react";
+import { Building2, Copy, Edit, Mail, Phone, Trash2, UserRound, UserRoundCog } from "lucide-react";
 
 interface Company {
   id: string;
@@ -13,6 +13,7 @@ interface Company {
   vat_number?: string;
   account_manager?: string;
   created_at: string;
+  purchasing_invoicing_user_id?: string | null;
 }
 
 interface CompanyTableProps {
@@ -20,9 +21,11 @@ interface CompanyTableProps {
   onCopyCode: (code: string) => void;
   onEditCompany: (company: Company) => void;
   onDeleteCompany: (company: Company) => void;
+  onAssignCompany?: (company: Company) => void;
+  assignmentNames?: Record<string, string>;
 }
 
-export default function CompanyTable({ companies, onCopyCode, onEditCompany, onDeleteCompany }: CompanyTableProps) {
+export default function CompanyTable({ companies, onCopyCode, onEditCompany, onDeleteCompany, onAssignCompany, assignmentNames = {} }: CompanyTableProps) {
   if (companies.length === 0) {
     return (
       <div className="rounded-[28px] border-2 border-dashed border-border bg-card/45 py-16 text-center text-muted-foreground">
@@ -45,12 +48,14 @@ export default function CompanyTable({ companies, onCopyCode, onEditCompany, onD
               </button>
             </div>
             <div className="flex gap-1">
+              {onAssignCompany && <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl" onClick={() => onAssignCompany(company)} aria-label={`Assign purchasing and invoicing for ${company.name}`} title="Assign purchasing & invoicing"><UserRoundCog className="h-4 w-4" /></Button>}
               <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl" onClick={() => onEditCompany(company)} aria-label={`Edit ${company.name}`}><Edit className="h-4 w-4" /></Button>
               <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-destructive hover:text-destructive" onClick={() => onDeleteCompany(company)} aria-label={`Delete ${company.name}`}><Trash2 className="h-4 w-4" /></Button>
             </div>
           </div>
 
           <div className="grid gap-2 p-4 text-sm">
+            {onAssignCompany && <Button variant="outline" size="sm" className="justify-start" onClick={() => onAssignCompany(company)}><UserRoundCog className="mr-2 h-4 w-4 shrink-0" /><span className="truncate">Purchasing & invoicing: {company.purchasing_invoicing_user_id ? assignmentNames[company.purchasing_invoicing_user_id] || "Linked user" : "Unassigned"}</span></Button>}
             <div className="flex min-w-0 items-center gap-2 rounded-xl bg-muted/35 px-3 py-2.5">
               <UserRound className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
               <span className="truncate text-muted-foreground">{company.contact_person || "No contact assigned"}</span>

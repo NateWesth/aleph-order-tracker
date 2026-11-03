@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -21,9 +21,26 @@ import { useCompanyData } from "./hooks/useCompanyData";
 import { generateCompanyCode, copyToClipboard } from "./utils/companyUtils";
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import ClientInviteDialog from "./ClientInviteDialog";
+import ClientOrderAssignmentDialog, { type AssignmentClient, type AssignmentMember } from "./ClientOrderAssignmentDialog";
+import { readAllRows } from "@/lib/readAllRows";
 
 export default function ClientCompaniesPage() {
-  const { companies, loading, refetch } = useCompanyData();
+  const { companies, loading, refetch, isAdmin } = useCompanyData();
+  const [assignmentCompany, setAssignmentCompany] = useState<AssignmentClient | null>(null);
+  const [assignmentTeam, setAssignmentTeam] = useState<AssignmentMember[]>([]);
+  const [teamLoading, setTeamLoading] = useState(true);
+  const [teamError, setTeamError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!isAdmin) return;
+    let active = true;
+    setTeamLoading(true);
+    setTeamError(null);
+    readAllRows<AssignmentMember>((from, to) => supabase.from("profiles").select("id, full_name, email").eq("approved", true).order("full_name").order("id").range(from, to))
+      .then(rows => { if (active) setAssignmentTeam(rows); })
+      .catch(() => { if (active) setTeamError("Could not load approved users. Reopen Clients to try again."); })
+      .finally(() => { if (active) setTeamLoading(false); });
+    return () => { active = false; };
+  }, [isAdmin]);
   const { toast } = useToast();
   const [isNewCompanyDialogOpen, setIsNewCompanyDialogOpen] = useState(false);
   const [isEditCompanyDialogOpen, setIsEditCompanyDialogOpen] = useState(false);
@@ -240,6 +257,8 @@ export default function ClientCompaniesPage() {
       />
 
       <CompanyTable 
+        onAssignCompany={isAdmin ? setAssignmentCompany : undefined}
+        assignmentNames={Object.fromEntries(assignmentTeam.map(member => [member.id, member.full_name || member.email || "Team member"]))}
         companies={filteredCompanies.map(company => ({
           ...company,
           created_at: company.created_at || new Date().toISOString()
@@ -283,6 +302,7 @@ export default function ClientCompaniesPage() {
       />
 
       {/* Client Invite Dialog */}
+      {isAdmin && <ClientOrderAssignmentDialog company={assignmentCompany} team={assignmentTeam} teamLoading={teamLoading} teamError={teamError} onClose={() => setAssignmentCompany(null)} onSaved={refetch} />}
       <ClientInviteDialog
         open={inviteDialogOpen}
         onOpenChange={setInviteDialogOpen}

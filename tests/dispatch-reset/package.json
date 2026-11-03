@@ -1,1 +1,1 @@
-{"private":true,"type":"module","scripts":{"test":"node run.mjs && node edge.mjs"},"dependencies":{"@electric-sql/pglite":"0.3.16"}}
+{"private":true,"type":"module","scripts":{"test":"node run.mjs && node edge.mjs && node client-assignment.mjs"},"dependencies":{"@electric-sql/pglite":"0.3.16"}}

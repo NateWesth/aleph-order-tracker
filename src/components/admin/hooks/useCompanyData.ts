@@ -21,13 +21,15 @@ export const useCompanyData = () => {
     companies, 
     isLoading: loading, 
     error, 
-    refetch 
+    refetch,
+    role
   } = useUserData();
 
   return {
     companies,
     loading,
     error,
-    refetch
+    refetch,
+    isAdmin: role === 'admin'
   };
 };
