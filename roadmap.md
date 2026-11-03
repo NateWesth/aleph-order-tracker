@@ -1,5 +1,8 @@
 # Roadmap
 
+- [ ] Add admin-managed client links for automatic purchasing/invoicing order assignments, separate from reps and dispatch
+- [ ] Test assignment scope, permissions, existing orders and future orders; verify available app checks
+
 - [x] Repair board-wide Select all and multi-order completion/delete/other actions
 - [x] Test bulk selection and mutation results; check compilation
 - [ ] Verify bulk order controls while signed in — external unmanaged sign-in is unavailable in the sandbox
