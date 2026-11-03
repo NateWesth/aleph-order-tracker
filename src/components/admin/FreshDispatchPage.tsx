@@ -114,7 +114,7 @@ export default function FreshDispatchPage(){
  ]:[
   {id:"pending",label:"Ready to plan",description:"Assign and schedule",icon:PackageCheck,docs:visible.filter(doc=>doc.status==="pending")},
   {id:"scheduled",label:"Route planned",description:"Upcoming dispatches",icon:CalendarDays,docs:visible.filter(doc=>doc.status==="scheduled")},
-  {id:"in-progress",label:"Out on route",description:"Complete on handover",icon:Navigation,docs:visible.filter(doc=>doc.status==="in-progress")},
+  {id:"in-progress",label:"Partially delivered",description:"Complete on handover",icon:Navigation,docs:visible.filter(doc=>doc.status==="in-progress")},
  ];
  const memberName=(id:string|null)=>members.find(member=>member.id===id)?.full_name||"Unassigned";
  const openMenu=(doc:DispatchDocument,x:number,y:number)=>setMenu({doc,x,y});
