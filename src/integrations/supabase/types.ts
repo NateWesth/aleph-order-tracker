@@ -3907,6 +3907,16 @@ export type Database = {
         Args: { d: Database["public"]["Tables"]["dispatch_documents"]["Row"] }
         Returns: number
       }
+      finish_dispatch_route_stop: {
+        Args: {
+          p_id: string
+          p_notes?: string
+          p_quantities?: Json
+          p_request_id: string
+          p_revision: number
+        }
+        Returns: Json
+      }
       generate_my_overdue_fulfillment_notifications: {
         Args: never
         Returns: number
