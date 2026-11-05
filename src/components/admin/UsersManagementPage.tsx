@@ -81,10 +81,10 @@ export default function UsersManagementPage() {
 
       setUsers(usersWithRoles);
     } catch (error: any) {
-      console.error("Failed to fetch users:", error);
+      console.error("Failed to fetch users:", error?.message || error);
       toast({
         title: "Error",
-        description: "Failed to fetch users. Please try again.",
+        description: `Failed to fetch users: ${error?.message || "please try again"}.`,
         variant: "destructive",
       });
     } finally {
