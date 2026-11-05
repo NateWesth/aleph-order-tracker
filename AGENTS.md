@@ -4,7 +4,7 @@
 
 - Order bulk status changes share item-counter updates and verify affected rows; selection uses unique filtered order IDs across lanes. Why: board positions derive from quantities and denied writes must not report success.
 
-- Dispatch On route transitions use the revision-checked save RPC and database guard; quantity confirmations use the idempotent receipt RPC. Why: only ready/planned stops may depart, and refreshes cannot silently remove unchecked stops.
+- Dispatch On route entry uses revision-checked saves; receipts retain On route until the idempotent finish_dispatch_route_stop RPC derives full/partial/none from cumulative quantities. Why: explicit completion must not invent deliveries or let source refreshes remove unchecked stops.
 
 - Keep the centred operational popup entrance animation in the global theme so Orders, Collections, Deliveries, and other order surfaces share identical motion.
 - Position custom right-click menus with the shared viewport-aware hook so they flip and remain fully visible near every screen edge.- Comment push: notifications INSERT trigger -> send-push edge fn (VAPID web push, claims row via pushed_at); SW push handlers live in public/push-sw.js imported by workbox; native app uses local notifications while open. Why: one pipeline for every device.

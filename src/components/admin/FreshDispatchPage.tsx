@@ -126,11 +126,17 @@ export default function FreshDispatchPage(){
   if(updateError)setError(updateError.message);else await load();
  };
  const completeOne=async(doc:DispatchDocument)=>{
+  if(doc.status==="on-route"){await finishRoute(doc);return;}
   const quantities=doc.status==="on-route"&&doc.source_closed?{}:Object.fromEntries(doc.lines.map(line=>[line.id,lineRemaining(doc,line)]).filter(([,q])=>Number(q)>0));
   if(!Object.keys(quantities).length&&doc.status!=="on-route")return;
   const {error:rpcError}=await db.rpc("record_dispatch_receipt",{p_id:doc.id,p_revision:doc.revision,p_request_id:crypto.randomUUID(),p_quantities:quantities,p_notes:"Driver confirmed completion"});
   if(rpcError)throw rpcError;
  };
+ const finishRoute=async(doc:DispatchDocument)=>{
+  const {error:rpcError}=await db.rpc("finish_dispatch_route_stop",{p_id:doc.id,p_revision:doc.revision,p_request_id:crypto.randomUUID(),p_quantities:{},p_notes:"Driver completed route stop"});
+  if(rpcError)throw rpcError;
+ };
+ const routeConfirm="Finish this route stop using confirmed quantities only? All items: History. Some items: Partially received/delivered. No items: Ready to plan. Outstanding items will not be marked complete.";
  const runBulk=async(targets:DispatchDocument[],action:(doc:DispatchDocument)=>Promise<void>,confirmText?:string)=>{
   if(!targets.length)return;
   if(confirmText&&!window.confirm(confirmText))return;
@@ -172,7 +178,7 @@ export default function FreshDispatchPage(){
    <select aria-label="Move selected" disabled={!pickedDocs.length||bulkBusy} className="h-9 rounded-md border bg-background px-2 text-sm" value="" onChange={e=>{const v=e.target.value;if(v)void runBulk(pickedDocs,patchAction({status:v}));}}><option value="">Move to…</option>{lanes.filter(l=>pickedDocs.every(d=>canMoveDispatch(d,l.id))).map(l=><option key={l.id} value={l.id}>{l.label}</option>)}</select>
    <select aria-label="Assign selected" disabled={!pickedDocs.length||bulkBusy} className="h-9 rounded-md border bg-background px-2 text-sm" value="" onChange={e=>{const v=e.target.value;if(v)void runBulk(pickedDocs,patchAction({assigned_to:v==="none"?null:v}));}}><option value="">Assign to…</option><option value="none">Unassigned</option>{members.map(m=><option key={m.id} value={m.id}>{m.full_name||"Team member"}</option>)}</select>
    <Button size="sm" variant="outline" disabled={!pickedDocs.length||bulkBusy} onClick={()=>void runBulk(pickedDocs,patchAction({urgent:true}))}><Flame className="mr-1 h-4 w-4"/>Urgent</Button>
-   <Button size="sm" disabled={!pickedDocs.length||bulkBusy} onClick={()=>void runBulk(pickedDocs,completeOne,"Complete "+pickedDocs.length+" document(s)? All remaining quantities will be filled in and they move to History.")}><CheckCircle2 className="mr-1 h-4 w-4"/>Complete</Button>
+   <Button size="sm" disabled={!pickedDocs.length||bulkBusy} onClick={()=>void runBulk(pickedDocs,completeOne,pickedDocs.some(d=>d.status==="on-route")?routeConfirm:"Complete "+pickedDocs.length+" document(s)? All remaining quantities will be filled in and they move to History.")}><CheckCircle2 className="mr-1 h-4 w-4"/>Complete</Button>
    <Button size="sm" variant="destructive" disabled={!pickedDocs.length||bulkBusy||pickedDocs.some(d=>d.status==="on-route")} onClick={()=>void runBulk(pickedDocs,deleteAction,"Delete "+pickedDocs.length+" document(s) from the board? They move to History / excluded.")}><Trash2 className="mr-1 h-4 w-4"/>Delete</Button>
    {bulkBusy&&<span className="text-xs text-muted-foreground">Working…</span>}
   </div>}
@@ -186,7 +192,7 @@ export default function FreshDispatchPage(){
      {icon:"bg-logo-magenta",selected:"border-logo-magenta ring-2 ring-logo-magenta/50 shadow-lg",hover:"hover:border-logo-magenta/40",header:"border-logo-magenta/40 bg-logo-magenta/10",pill:"bg-logo-magenta text-logo-on"},
     ][index];const selected=activeLane===lane.id;return <section key={lane.id} onClick={()=>setActiveLane(selected?null:lane.id)} className={"fulfillment-lane flex min-w-0 cursor-pointer flex-col overflow-hidden rounded-[28px] border bg-card/70 shadow-sm transition "+(selected?tone.selected:"border-border/60 "+tone.hover)}>
      <header className={"shrink-0 border-b "+(selected?tone.header:"border-border/55")}><div className="flex w-full items-center justify-between gap-3 px-4 py-4 text-left"><div className="flex min-w-0 items-center gap-3"><span className={"grid h-9 w-9 shrink-0 place-items-center rounded-2xl text-logo-on shadow-lg "+tone.icon}><Icon className="h-4 w-4"/></span><div className="min-w-0"><h2 className="truncate text-sm font-black">{lane.label}</h2><p className="truncate text-[10px] text-muted-foreground">{lane.description}</p></div></div><span className={"grid h-7 min-w-7 place-items-center rounded-full px-2 text-xs font-bold "+(selected?tone.pill:"bg-muted")}>{lane.docs.length}</span></div></header>
-     <div className={"min-h-0 flex-1 space-y-3 p-3 sm:min-h-[420px] "+(selected?"max-h-[70vh] overflow-y-auto":"overflow-visible")}>{lane.docs.length?lane.docs.map(doc=><DispatchCard key={doc.id} doc={doc} unread={hasUnread(commentsSeen,doc.kind+":"+doc.id,commentCounts[doc.kind+":"+doc.id]||0)} memberName={memberName} onOpen={cardOpen(doc)} selectMode={selectMode} picked={picked.has(doc.id)} onContextMenu={(x,y)=>openMenu(doc,x,y)}/>):<div className="grid min-h-56 place-items-center rounded-3xl border border-dashed border-border/60 bg-muted/20 p-6 text-center"><div><CheckCircle2 className="mx-auto h-7 w-7 text-success opacity-60"/><p className="mt-3 text-xs font-bold">Lane clear</p><p className="mt-1 text-[10px] text-muted-foreground">New work appears here live.</p></div></div>}</div>
+     <div className={"min-h-0 flex-1 space-y-3 p-3 sm:min-h-[420px] "+(selected?"max-h-[70vh] overflow-y-auto":"overflow-visible")}>{lane.docs.length?lane.docs.map(doc=><DispatchCard key={doc.id} doc={doc} unread={hasUnread(commentsSeen,doc.kind+":"+doc.id,commentCounts[doc.kind+":"+doc.id]||0)} memberName={memberName} onOpen={cardOpen(doc)} onRouteComplete={()=>void runBulk([doc],finishRoute,routeConfirm)} busy={bulkBusy} selectMode={selectMode} picked={picked.has(doc.id)} onContextMenu={(x,y)=>openMenu(doc,x,y)}/>):<div className="grid min-h-56 place-items-center rounded-3xl border border-dashed border-border/60 bg-muted/20 p-6 text-center"><div><CheckCircle2 className="mx-auto h-7 w-7 text-success opacity-60"/><p className="mt-3 text-xs font-bold">Lane clear</p><p className="mt-1 text-[10px] text-muted-foreground">New work appears here live.</p></div></div>}</div>
     </section>})}</div></>}
   {selected&&<DispatchDocumentDialog key={selected.id} doc={selected} members={members} onClose={()=>setSelected(null)} onSaved={async()=>{await load();}}/>}
   <DriverRouteLinks docs={docs} members={members} onSaved={()=>void load()} open={routeOpen} onClose={()=>setRouteOpen(false)}/>
@@ -195,11 +201,11 @@ export default function FreshDispatchPage(){
    <div ref={menuPosition.ref} role="menu" aria-label={"Actions for "+menu.doc.reference} className="fixed z-[91] max-h-[calc(100dvh-16px)] w-60 max-w-[calc(100vw-16px)] overflow-y-auto rounded-lg border border-border bg-popover p-1.5 text-popover-foreground shadow-xl" style={menuPosition.style} onMouseDown={(e)=>e.stopPropagation()}>
     <Button variant="ghost" className="h-9 w-full justify-start px-2" onClick={()=>{setSelected(menu.doc);setMenu(null);}}><Eye className="mr-2 h-4 w-4"/>Open details</Button>
     <Button variant="ghost" className="h-9 w-full justify-start px-2" onClick={()=>void updateDoc(menu.doc,{urgent:!menu.doc.urgent})}><Flame className="mr-2 h-4 w-4"/>{menu.doc.urgent?"Remove urgent flag":"Mark as urgent"}</Button>
-    <Button variant="ghost" className="h-9 w-full justify-start px-2" onClick={()=>void runBulk(picked.has(menu.doc.id)&&pickedDocs.length>1?pickedDocs:[menu.doc],completeOne,"Mark as complete? Remaining quantities will be filled in and it moves to History.")}><CheckCircle2 className="mr-2 h-4 w-4"/>Complete{picked.has(menu.doc.id)&&pickedDocs.length>1?" "+pickedDocs.length+" selected":""}</Button>
+    <Button variant="ghost" className="h-9 w-full justify-start px-2" onClick={()=>void runBulk(picked.has(menu.doc.id)&&pickedDocs.length>1?pickedDocs:[menu.doc],completeOne,(picked.has(menu.doc.id)?pickedDocs:[menu.doc]).some(d=>d.status==="on-route")?routeConfirm:"Mark as complete? Remaining quantities will be filled in and it moves to History.")}><CheckCircle2 className="mr-2 h-4 w-4"/>{menu.doc.status==="on-route"?"Route complete":"Complete"}{picked.has(menu.doc.id)&&pickedDocs.length>1?" "+pickedDocs.length+" selected":""}</Button>
     <Button variant="ghost" disabled={menu.doc.status==="on-route"} className="h-9 w-full justify-start px-2 text-destructive" onClick={()=>void runBulk(picked.has(menu.doc.id)&&pickedDocs.length>1?pickedDocs:[menu.doc],deleteAction,"Delete from the board? It moves to History / excluded.")}><Trash2 className="mr-2 h-4 w-4"/>Delete{picked.has(menu.doc.id)&&pickedDocs.length>1?" "+pickedDocs.length+" selected":""}</Button>
     <Button variant="ghost" className="h-9 w-full justify-start px-2" onClick={()=>{setSelectMode(true);togglePick(menu.doc.id);setMenu(null);}}><CheckSquare className="mr-2 h-4 w-4"/>{picked.has(menu.doc.id)?"Deselect":"Select"}</Button>
     <div className="my-1 h-px bg-border"/>
-    <p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Move to</p>
+    {menu.doc.status!=="on-route"&&<p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Move to</p>}
     {lanes.filter(lane=>lane.id!==menu.doc.status&&canMoveDispatch(menu.doc,lane.id)).map(lane=><Button key={lane.id} variant="ghost" className="h-9 w-full justify-start px-2" onClick={()=>void updateDoc(menu.doc,{status:lane.id})}><ArrowRight className="mr-2 h-4 w-4"/>{lane.label}</Button>)}
     <div className="my-1 h-px bg-border"/>
     <p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Assign to</p>
@@ -210,15 +216,16 @@ export default function FreshDispatchPage(){
  </div>;
 }
 
-function DispatchCard({doc,unread=false,memberName,history=false,onOpen,onContextMenu,selectMode=false,picked=false}:{doc:DispatchDocument;unread?:boolean;memberName:(id:string|null)=>string;history?:boolean;onOpen:()=>void;onContextMenu?:(x:number,y:number)=>void;selectMode?:boolean;picked?:boolean}){
- return <button type="button" aria-pressed={selectMode?picked:undefined} onClick={(e)=>{e.stopPropagation();onOpen();}} onContextMenu={onContextMenu?(e)=>{e.preventDefault();onContextMenu(e.clientX,e.clientY);}:undefined} className={"w-full min-w-0 rounded-xl border bg-background p-4 text-left shadow-sm transition hover:border-primary/50 focus-visible:outline-primary "+(picked?"border-logo-violet ring-2 ring-logo-violet/50":"")}>
+function DispatchCard({doc,unread=false,memberName,history=false,onOpen,onRouteComplete,busy=false,onContextMenu,selectMode=false,picked=false}:{doc:DispatchDocument;unread?:boolean;memberName:(id:string|null)=>string;history?:boolean;onOpen:()=>void;onRouteComplete?:()=>void;busy?:boolean;onContextMenu?:(x:number,y:number)=>void;selectMode?:boolean;picked?:boolean}){
+ return <div role="button" tabIndex={0} aria-pressed={selectMode?picked:undefined} onKeyDown={e=>{if(e.target===e.currentTarget&&(e.key==="Enter"||e.key===" ")){e.preventDefault();e.stopPropagation();onOpen();}}} onClick={(e)=>{e.stopPropagation();onOpen();}} onContextMenu={onContextMenu?(e)=>{e.preventDefault();onContextMenu(e.clientX,e.clientY);}:undefined} className={"w-full min-w-0 rounded-xl border bg-background p-4 text-left shadow-sm transition hover:border-primary/50 focus-visible:outline-primary "+(picked?"border-logo-violet ring-2 ring-logo-violet/50":"")}>
   <div className="flex flex-wrap justify-between gap-2"><span className="flex items-center gap-2 font-bold text-primary">{selectMode&&(picked?<CheckSquare className="h-4 w-4 text-logo-violet"/>:<Square className="h-4 w-4 text-muted-foreground"/>)}{doc.reference}{unread&&<span title="New comments" className="h-2 w-2 animate-pulse rounded-full bg-logo-cyan shadow-[0_0_6px_2px_hsl(var(--logo-cyan)/0.8)]"/>}</span>{doc.urgent&&<span className="rounded-full bg-destructive/10 px-2 py-1 text-xs font-semibold text-destructive">Urgent</span>}</div>
   <p className="mt-2 break-words text-base font-semibold">{doc.contact_name}</p>
   <p className="mt-2 text-sm text-muted-foreground">{remainingUnits(doc)} units remaining · {doc.lines.length} lines</p>
   <p className="mt-1 text-xs text-muted-foreground">{memberName(doc.assigned_to)} · {doc.scheduled_for?displayDate(doc.scheduled_for):"Not scheduled"}</p>
   {history&&<p className="mt-2 text-xs">{doc.source_closed?doc.source_status:doc.status}{doc.review_required?" · source changed, review required":""}</p>}
+  {!history&&doc.status==="on-route"&&onRouteComplete&&<Button className="mt-4 w-full" disabled={busy} onClick={e=>{e.stopPropagation();onRouteComplete();}}><CheckCircle2 className="mr-2 h-4 w-4"/>Route complete</Button>}
   <span className="mt-4 flex items-center justify-between border-t pt-3 text-sm font-semibold">{history?"View record":doc.kind==="collection"?"Open collection":"Open delivery"}<ArrowRight className="h-4 w-4"/></span>
- </button>;
+ </div>;
 }
 
 function DispatchDocumentDialog({doc,members,onClose,onSaved}:{doc:DispatchDocument;members:Member[];onClose:()=>void;onSaved:()=>Promise<void>}){
@@ -229,7 +236,6 @@ function DispatchDocumentDialog({doc,members,onClose,onSaved}:{doc:DispatchDocum
  const [receipts,setReceipts]=useState<any[]|null>(null);
  const recovery=useDraftRecovery("fresh-dispatch:"+doc.id,{snapshot,form,quantities,receiptNote,attempt},dirty,value=>{setSnapshot(value.snapshot);setForm(value.form);setQuantities(value.quantities);setReceiptNote(value.receiptNote);setAttempt(value.attempt);setDirty(true);});
  const active=isActiveDispatch(snapshot);
- const needsCheck=snapshot.status==="on-route"&&(snapshot.source_closed||remainingUnits(snapshot)<=0);
  const markOnRoute=async()=>{
   if(saving||attempt||planChanged)return;
   setSaving(true);setError("");
@@ -248,16 +254,18 @@ function DispatchDocumentDialog({doc,members,onClose,onSaved}:{doc:DispatchDocum
    if(!Object.values(quantities).some(q=>q>0)&&!receiptNote){recovery.clear();setDirty(false);}
   }catch(e:any){setError(e.message);}finally{setSaving(false);}
  };
- const record=async()=>{
+ const record=async(routeComplete=false)=>{
   if(saving)return;
   if(planChanged&&!attempt){setError("Save assignment & instructions before confirming quantities.");return;}
   const selected=Object.fromEntries(Object.entries(quantities).filter(([,qty])=>qty>0));
-  if(!attempt&&!needsCheck&&!Object.keys(selected).length){setError("Enter the quantities completed now.");return;}
-  const request=attempt||{p_id:doc.id,p_revision:snapshot.revision,p_request_id:crypto.randomUUID(),p_quantities:selected,p_notes:receiptNote};
+  if(!attempt&&!routeComplete&&!Object.keys(selected).length){setError("Enter the quantities completed now.");return;}
+  if(!attempt&&routeComplete&&!window.confirm("Finish this stop using only previously confirmed and entered quantities? All items go to History, some to the partial column, and none to Ready to plan."))return;
+  const request=attempt||{routeComplete,p_id:doc.id,p_revision:snapshot.revision,p_request_id:crypto.randomUUID(),p_quantities:selected,p_notes:receiptNote};
   setAttempt(request);setDirty(true);setSaving(true);setError("");
   let confirmed=false;
   try{
-   const {error}=await db.rpc("record_dispatch_receipt",request);
+   const {routeComplete:finish,...args}=request;
+   const {error}=await db.rpc(finish?"finish_dispatch_route_stop":"record_dispatch_receipt",args);
    if(error){if(error.code==="P0001")setAttempt(null);throw error;}
    confirmed=true;
    setAttempt(null);setQuantities({});setReceiptNote("");setReceipts(null);recovery.clear();setDirty(false);await refresh();await onSaved();
@@ -285,8 +293,7 @@ function DispatchDocumentDialog({doc,members,onClose,onSaved}:{doc:DispatchDocum
     </header>
      <div className="flex-1 space-y-6 overflow-y-auto p-4 sm:p-6 animate-order-floating-bubble-content">
      {recovery.banner}
-     {active&&<div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4"><p className="text-sm font-semibold">{snapshot.status==="on-route"?"On route · awaiting confirmation":snapshot.status==="scheduled"?"Planned":snapshot.status==="pending"?"Ready to plan":snapshot.kind==="collection"?"Partially received":"Partially delivered"}</p>{canMarkOnRoute(snapshot)&&<Button onClick={markOnRoute} disabled={saving||!!attempt||planChanged}><Truck className="mr-2 h-4 w-4"/>Mark On route</Button>}{snapshot.status==="on-route"&&<Button disabled={saving||!!attempt||planChanged} onClick={()=>{if(!window.confirm("Confirm this stop is complete? All remaining quantities will be recorded."))return;setDirty(true);setQuantities(Object.fromEntries(snapshot.lines.filter(line=>lineRemaining(snapshot,line)>0).map(line=>[line.id,lineRemaining(snapshot,line)])));}}><CheckCircle2 className="mr-2 h-4 w-4"/>Select all to complete</Button>}</div>}
-     {needsCheck&&<p className="text-sm text-muted-foreground">Zoho shows this stop as closed or fully fulfilled. Check completion to remove it from On route.</p>}
+     {active&&<div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4"><p className="text-sm font-semibold">{snapshot.status==="on-route"?"On route · awaiting confirmation":snapshot.status==="scheduled"?"Planned":snapshot.status==="pending"?"Ready to plan":snapshot.kind==="collection"?"Partially received":"Partially delivered"}</p>{canMarkOnRoute(snapshot)&&<Button onClick={markOnRoute} disabled={saving||!!attempt||planChanged}><Truck className="mr-2 h-4 w-4"/>Mark On route</Button>}</div>}
      {error&&<p role="alert" className="rounded-xl bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
      <div className="grid grid-cols-2 gap-4 rounded-xl border border-border/60 bg-muted/30 p-4 md:grid-cols-4">
       <div><p className="text-[10px] font-bold uppercase text-muted-foreground">Reference</p><p className="mt-0.5 text-sm font-medium">{snapshot.reference}</p></div>
@@ -335,7 +342,8 @@ function DispatchDocumentDialog({doc,members,onClose,onSaved}:{doc:DispatchDocum
       <div className="min-w-0 flex-1"><Input aria-label="Receipt note" placeholder="Add a receipt note for this action…" value={receiptNote} onChange={e=>{setDirty(true);setReceiptNote(e.target.value);}} disabled={saving||!!attempt}/></div>
       <div className="flex gap-3">
        <Button variant="outline" disabled={saving||!!attempt} onClick={async()=>{try{const latest=await refresh();setForm({assigned_to:latest.assigned_to||"",scheduled_for:latest.scheduled_for||"",urgent:latest.urgent,method:latest.method,notes:latest.notes});setQuantities(current=>Object.fromEntries(latest.lines.map(line=>[line.id,Math.min(current[line.id]||0,lineRemaining(latest,line))])));setError("");}catch(e:any){setError(e.message);}}}>Reload</Button>
-       <Button className="min-h-11" disabled={saving||(planChanged&&!attempt)} onClick={record}>{saving?"Saving…":attempt?"Check / retry same receipt":needsCheck?"Check completion":"Confirm selected quantities"}</Button>
+       <Button className="min-h-11" disabled={saving||(planChanged&&!attempt)} onClick={()=>void record()}>{saving?"Saving…":attempt?"Check / retry same receipt":"Confirm selected quantities"}</Button>
+       {snapshot.status==="on-route"&&!attempt&&<Button className="min-h-11" disabled={saving||planChanged} onClick={()=>void record(true)}><CheckCircle2 className="mr-2 h-4 w-4"/>Route complete</Button>}
       </div>
      </div>
     </footer>}
