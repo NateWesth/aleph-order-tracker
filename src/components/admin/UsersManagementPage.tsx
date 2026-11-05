@@ -36,18 +36,30 @@ export default function UsersManagementPage() {
 
   const fetchUsers = async () => {
     try {
-      // Fetch profiles with company information
+      // Fetch profiles and companies separately — the companies(name) embed
+      // fails the whole query when the relationship can't be resolved.
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
-        .select(`
-          *,
-          companies(name)
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
       if (profilesError) {
-        console.error("Profiles fetch error:", profilesError);
+        console.error("Profiles fetch error:", profilesError.message, profilesError.details, profilesError.hint);
         throw profilesError;
+      }
+
+      const companyIds = [...new Set((profiles || []).map(p => p.company_id).filter(Boolean))];
+      let companyNames = new Map<string, string>();
+      if (companyIds.length > 0) {
+        const { data: companies, error: companiesError } = await supabase
+          .from('companies')
+          .select('id, name')
+          .in('id', companyIds);
+        if (companiesError) {
+          console.error("Companies fetch error:", companiesError.message);
+        } else {
+          companyNames = new Map((companies || []).map(c => [c.id, c.name]));
+        }
       }
 
       // Fetch user roles
@@ -64,15 +76,15 @@ export default function UsersManagementPage() {
       const usersWithRoles = profiles?.map(profile => ({
         ...profile,
         role: userRoles?.find(role => role.user_id === profile.id)?.role || 'user',
-        company_name: profile.companies?.name || 'N/A'
+        company_name: (profile.company_id && companyNames.get(profile.company_id)) || 'N/A'
       })) || [];
 
       setUsers(usersWithRoles);
     } catch (error: any) {
-      console.error("Failed to fetch users:", error);
+      console.error("Failed to fetch users:", error?.message || error);
       toast({
         title: "Error",
-        description: "Failed to fetch users. Please try again.",
+        description: `Failed to fetch users: ${error?.message || "please try again"}.`,
         variant: "destructive",
       });
     } finally {
