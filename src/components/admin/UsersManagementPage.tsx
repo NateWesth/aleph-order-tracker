@@ -76,7 +76,7 @@ export default function UsersManagementPage() {
       const usersWithRoles = profiles?.map(profile => ({
         ...profile,
         role: userRoles?.find(role => role.user_id === profile.id)?.role || 'user',
-        company_name: profile.companies?.name || 'N/A'
+        company_name: (profile.company_id && companyNames.get(profile.company_id)) || 'N/A'
       })) || [];
 
       setUsers(usersWithRoles);
