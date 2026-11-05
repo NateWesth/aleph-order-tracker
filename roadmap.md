@@ -1,5 +1,8 @@
 # Roadmap
 
+- [ ] Add On route-only Route complete controls and quantity-based full/partial/none outcomes
+- [ ] Test guarded, retry-safe route completion and verify available preview checks
+
 - [x] Add admin-managed client links for automatic purchasing/invoicing order assignments, separate from reps and dispatch
 - [x] Test assignment scope, permissions, existing orders and future orders; check compilation and deployed triggers
 - [ ] Verify client assignment dialog while signed in — external unmanaged sign-in is unavailable in the sandbox
