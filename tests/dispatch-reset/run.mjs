@@ -70,7 +70,7 @@ assert.equal((await get("collection:org:CLOSED")).status,"completed");assert.equ
 console.log("PASS legacy collected and dismissed PO IDs remain closed after the fresh-source import");
 await db.exec("CREATE ROLE anon;");
 const migrations=new URL("../../supabase/migrations/",import.meta.url);
-for(const file of (await readdir(migrations)).filter(name=>name.startsWith("20261103051444_")||name.startsWith("20261103051532_")).sort())await db.exec(await readFile(new URL(file,migrations),"utf8"));
+for(const file of (await readdir(migrations)).filter(name=>name.startsWith("20261103051444_")||name.startsWith("20261103051532_")||name.startsWith("20261105050506_")).sort())await db.exec(await readFile(new URL(file,migrations),"utf8"));
 for(const initial of ["pending","scheduled"]){
  const id="collection:org:ON-"+initial;
  await call("ingest_dispatch_document",["org","purchase_order",make("2026-09-14T00:00:00+0200","ON-"+initial)]);
@@ -79,10 +79,13 @@ for(const initial of ["pending","scheduled"]){
  await call("save_dispatch_document",[id,current.revision,{status:"on-route"}]);
  assert.equal((await get(id)).status,"on-route",initial+" may enter On route");
  current=await get(id);
- for(const target of ["pending","scheduled","in-progress","dismissed"])await assert.rejects(()=>call("save_dispatch_document",[id,current.revision,{status:target}]),/Confirm quantities/);
+ for(const target of ["pending","scheduled","in-progress","dismissed"])await assert.rejects(()=>call("save_dispatch_document",[id,current.revision,{status:target}]),/Use Route complete/);
  await assert.rejects(()=>call("record_dispatch_receipt",[id,current.revision,crypto.randomUUID(),{},""]),/Enter quantities/);
  const partial=await call("record_dispatch_receipt",[id,current.revision,crypto.randomUUID(),{L1:3},"Checked partial stop"]);
- assert.equal(partial.completed,false);assert.equal((await get(id)).status,"in-progress");
+ assert.equal(partial.completed,false);assert.equal((await get(id)).status,"on-route");
+ current=await get(id);
+ const finishedPartial=await call("finish_dispatch_route_stop",[id,current.revision,crypto.randomUUID(),{},"Route finished"]);
+ assert.equal(finishedPartial.status,"in-progress");assert.equal((await get(id)).status,"in-progress");
  current=await get(id);
  await assert.rejects(()=>call("save_dispatch_document",[id,current.revision,{status:"on-route"}]),/Only active ready or planned/);
 }
@@ -97,8 +100,42 @@ await db.query("UPDATE dispatch_documents SET status='completed' WHERE id=$1",[c
 checking=await get(checkId);assert.equal(checking.status,"on-route");assert.equal(checking.source_closed,true);
 await db.query("SELECT set_config('request.jwt.claim.sub',$1,false)",[uid]);
 const checkedRequest=crypto.randomUUID();
-const checked=await call("record_dispatch_receipt",[checkId,checking.revision,checkedRequest,{},"Driver checked completion"]);
-assert.equal(checked.checked,true);assert.equal((await get(checkId)).status,"completed");
-assert.deepEqual(await call("record_dispatch_receipt",[checkId,checking.revision,checkedRequest,{},"Driver checked completion"]),checked);
+const checked=await call("finish_dispatch_route_stop",[checkId,checking.revision,checkedRequest,{},"Driver checked completion"]);
+assert.equal(checked.route_completed,true);assert.equal((await get(checkId)).status,"completed");
+assert.deepEqual(await call("finish_dispatch_route_stop",[checkId,checking.revision,checkedRequest,{},"Driver checked completion"]),checked);
 console.log("PASS On route entry from only pending/scheduled, explicit partial confirmation, protected source refresh and idempotent final check");
+for(const kind of ["collection","delivery"]){
+ for(const [label,qty,expected] of [["none",0,"pending"],["some",3,"in-progress"],["all",10,"completed"]]){
+  const key=`FINISH-${kind}-${label}`;
+  const payload=kind==="collection"?make("2026-09-14T00:00:00+0200",key):{...invoice,invoice_id:key,invoice_number:key,line_items:[{line_item_id:"L1",description:"Route item",quantity:10,quantity_delivered:0}]};
+  await call("ingest_dispatch_document",["org",kind==="collection"?"purchase_order":"invoice",payload]);
+  const id=kind+":org:"+key;
+  let current=await get(id);
+  await assert.rejects(()=>call("finish_dispatch_route_stop",[id,current.revision,crypto.randomUUID(),{},""]),/only available/);
+  await call("save_dispatch_document",[id,current.revision,{scheduled_for:"2026-11-05",status:"on-route"}]);
+  current=await get(id);
+  if(qty){await call("record_dispatch_receipt",[id,current.revision,crypto.randomUUID(),{L1:qty},""]);assert.equal((await get(id)).status,"on-route");current=await get(id);}
+  await assert.rejects(()=>call("finish_dispatch_route_stop",[id,current.revision-1,crypto.randomUUID(),{},""]),/changed/);
+  const request=crypto.randomUUID();
+  await db.exec("SET ROLE authenticated");
+  const result=await call("finish_dispatch_route_stop",[id,current.revision,request,{},"Finished"]);
+  assert.equal(result.status,expected,`${kind}: ${label} -> ${expected}`);
+  assert.deepEqual(await call("finish_dispatch_route_stop",[id,current.revision,request,{},"Finished"]),result);
+  await assert.rejects(()=>call("finish_dispatch_route_stop",[id,current.revision,request,{},"Changed"]),/different/);
+  current=await get(id);assert.equal(current.status,expected);assert.equal(current.scheduled_for,null);assert.equal(current.completed_quantities.L1||0,qty);
+  await db.exec("RESET ROLE");
+ }
+}
+const atomicId="collection:org:ATOMIC";
+await call("ingest_dispatch_document",["org","purchase_order",make("2026-09-14T00:00:00+0200","ATOMIC")]);
+let atomic=await get(atomicId);await call("save_dispatch_document",[atomicId,atomic.revision,{status:"on-route"}]);atomic=await get(atomicId);
+const atomicRequest=crypto.randomUUID();
+await db.query("UPDATE profiles SET approved=false WHERE id=$1",[uid]);
+await assert.rejects(()=>call("finish_dispatch_route_stop",[atomicId,atomic.revision,atomicRequest,{L1:3},""]),/Approved staff/);
+await db.query("UPDATE profiles SET approved=true WHERE id=$1",[uid]);
+const atomicResult=await call("finish_dispatch_route_stop",[atomicId,atomic.revision,atomicRequest,{L1:3},""]);
+assert.equal(atomicResult.status,"in-progress");assert.equal((await get(atomicId)).completed_quantities.L1,3);
+assert.deepEqual(await call("finish_dispatch_route_stop",[atomicId,atomic.revision,atomicRequest,{L1:3},""]),atomicResult);
+assert.equal((await get(atomicId)).completed_quantities.L1,3);
+console.log("PASS collection/delivery all/some/none outcomes, stay On route before finishing, stale revisions, approved-only access, atomic quantities and retry safety");
 await db.close();
