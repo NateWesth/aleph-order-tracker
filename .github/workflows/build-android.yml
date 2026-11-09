@@ -114,9 +114,25 @@ jobs:
         with:
           node-version: '24'
 
+      - name: Cache Electron downloads
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~\AppData\Local\electron\Cache
+            ~\AppData\Local\electron-builder\Cache
+          key: electron-${{ runner.os }}-${{ hashFiles('desktop/package.json') }}
+          restore-keys: electron-${{ runner.os }}-
+
       - name: Install desktop dependencies
         working-directory: desktop
-        run: npm install --no-audit --no-fund
+        shell: bash
+        run: |
+          for i in 1 2 3 4; do
+            npm install --no-audit --no-fund && exit 0
+            echo "Install attempt $i failed, retrying in $((i*20))s..."
+            sleep $((i*20))
+          done
+          exit 1
 
       - name: Build Windows installer
         working-directory: desktop
