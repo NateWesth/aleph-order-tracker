@@ -71,7 +71,11 @@ jobs:
           fi
 
       - name: Make gradlew executable
-        run: chmod +x android/gradlew
+        run: |
+          chmod +x android/gradlew
+          # Give slow download servers longer than the 10s default
+          sed -i 's/^networkTimeout=.*/networkTimeout=120000/' android/gradle/wrapper/gradle-wrapper.properties
+          grep -q '^networkTimeout=' android/gradle/wrapper/gradle-wrapper.properties || echo 'networkTimeout=120000' >> android/gradle/wrapper/gradle-wrapper.properties
 
       - name: Cache Gradle
         uses: actions/cache@v4
@@ -86,12 +90,13 @@ jobs:
         working-directory: android
         shell: bash
         run: |
-          for i in 1 2 3 4; do
+          for i in 1 2 3 4 5; do
             ./gradlew assembleDebug && exit 0
-            echo "Gradle attempt $i failed, retrying in $((i*20))s..."
-            sleep $((i*20))
+            echo "Gradle attempt $i failed, retrying in $((i*45))s..."
+            sleep $((i*45))
           done
-          exit 1
+          echo "Wrapper download kept failing; falling back to the runner's preinstalled Gradle"
+          gradle --version && gradle assembleDebug
 
       - name: Rename APK
         run: mv android/app/build/outputs/apk/debug/app-debug.apk android/app/build/outputs/apk/debug/aleph-orders.apk
@@ -136,7 +141,14 @@ jobs:
 
       - name: Build Windows installer
         working-directory: desktop
-        run: npm run dist
+        shell: bash
+        run: |
+          for i in 1 2 3 4; do
+            npm run dist && exit 0
+            echo "Installer build attempt $i failed, retrying in $((i*45))s..."
+            sleep $((i*45))
+          done
+          exit 1
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
 
