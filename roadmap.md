@@ -1,5 +1,18 @@
 # Roadmap
 
+- [x] Review foundations and prepare the operations expansion plan
+- [ ] Smart route sequencing and complete Google Maps/Waze export
+- [ ] Temporary purchasing/invoicing delegation preserving master client links
+- [ ] Client portal live progress, delivery receipt downloads and reorder requests
+- [ ] Reviewed draft Zoho PO creation from Buying Sheet recommendations
+- [ ] Stock depletion alerts based on fresh inventory and demand
+- [ ] Dated supplier bill price history and purchasing warnings
+- [ ] Auditable job costs including vendor bills, waste and labour
+- [ ] Driver-consented live GPS, admin fleet map and route ETA
+- [ ] WhatsApp automated status queries — current app setup cannot receive messages; requires a supported receiving architecture decision
+- [ ] Secure client quote and specification change approval links
+- [ ] Technician Start/Pause/Finish time tracking and kiosk view
+
 - [x] Add On route-only Route complete controls and quantity-based full/partial/none outcomes
 - [x] Test guarded, retry-safe route completion and verify available preview checks
 - [ ] Verify Route complete while signed in — external unmanaged authentication prevents authenticated sandbox checks
