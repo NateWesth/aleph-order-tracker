@@ -1874,6 +1874,60 @@ export type Database = {
           },
         ]
       }
+      operational_leave_cover: {
+        Row: {
+          cancelled: boolean
+          created_at: string
+          created_by: string
+          delegate_id: string
+          ends_at: string
+          id: string
+          notes: string | null
+          owner_id: string
+          starts_at: string
+          updated_at: string
+        }
+        Insert: {
+          cancelled?: boolean
+          created_at?: string
+          created_by?: string
+          delegate_id: string
+          ends_at: string
+          id?: string
+          notes?: string | null
+          owner_id: string
+          starts_at: string
+          updated_at?: string
+        }
+        Update: {
+          cancelled?: boolean
+          created_at?: string
+          created_by?: string
+          delegate_id?: string
+          ends_at?: string
+          id?: string
+          notes?: string | null
+          owner_id?: string
+          starts_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "operational_leave_cover_delegate_id_fkey"
+            columns: ["delegate_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "operational_leave_cover_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       operational_rules: {
         Row: {
           action_type: string
@@ -3716,6 +3770,56 @@ export type Database = {
         }
         Relationships: []
       }
+      workshop_timer_sessions: {
+        Row: {
+          accumulated_seconds: number
+          created_at: string
+          entity_id: string
+          entity_type: string
+          hourly_rate: number
+          id: string
+          note: string | null
+          running_since: string | null
+          state: string
+          technician_id: string
+          updated_at: string
+        }
+        Insert: {
+          accumulated_seconds?: number
+          created_at?: string
+          entity_id: string
+          entity_type: string
+          hourly_rate?: number
+          id: string
+          note?: string | null
+          running_since?: string | null
+          state?: string
+          technician_id: string
+          updated_at?: string
+        }
+        Update: {
+          accumulated_seconds?: number
+          created_at?: string
+          entity_id?: string
+          entity_type?: string
+          hourly_rate?: number
+          id?: string
+          note?: string | null
+          running_since?: string | null
+          state?: string
+          technician_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workshop_timer_sessions_technician_id_fkey"
+            columns: ["technician_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       zoho_document_cache: {
         Row: {
           document_id: string
@@ -3907,6 +4011,10 @@ export type Database = {
         Args: { d: Database["public"]["Tables"]["dispatch_documents"]["Row"] }
         Returns: number
       }
+      effective_operational_owner: {
+        Args: { p_owner: string }
+        Returns: string
+      }
       finish_dispatch_route_stop: {
         Args: {
           p_id: string
@@ -3980,6 +4088,7 @@ export type Database = {
         Args: { p_plan: Json; p_request_id: string }
         Returns: string
       }
+      reconcile_operational_leave_cover: { Args: never; Returns: undefined }
       record_dispatch_receipt: {
         Args: {
           p_id: string
@@ -4078,6 +4187,34 @@ export type Database = {
         Returns: boolean
       }
       workflow_po_signature: { Args: { po: Json }; Returns: Json }
+      workshop_timer_command: {
+        Args: {
+          p_action: string
+          p_entity_id: string
+          p_entity_type: string
+          p_hourly_rate?: number
+          p_id: string
+        }
+        Returns: {
+          accumulated_seconds: number
+          created_at: string
+          entity_id: string
+          entity_type: string
+          hourly_rate: number
+          id: string
+          note: string | null
+          running_since: string | null
+          state: string
+          technician_id: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workshop_timer_sessions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
     }
     Enums: {
       app_role: "admin" | "user"
