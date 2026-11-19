@@ -9,9 +9,11 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Package, Clock, ChevronDown, LogOut, Loader2, FileText } from "lucide-react";
 import { format } from "date-fns";
+import PortalReorder from "@/components/PortalReorder";
 
 interface PortalOrder {
   id: string;
+  company_id: string;
   order_number: string;
   description: string | null;
   status: string | null;
@@ -28,6 +30,16 @@ export default function Portal() {
   const [companyName, setCompanyName] = useState("");
   const [loading, setLoading] = useState(true);
   const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
+  const [companyId, setCompanyId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!companyId) return;
+    const channel = supabase.channel(`portal-${crypto.randomUUID()}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "orders", filter: `company_id=eq.${companyId}` }, () => void fetchPortalData())
+      .on("postgres_changes", { event: "*", schema: "public", table: "order_items" }, () => void fetchPortalData()).subscribe();
+    const timer = window.setInterval(() => void fetchPortalData(), 60000);
+    return () => { window.clearInterval(timer); void supabase.removeChannel(channel); };
+  }, [companyId]);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -55,6 +67,7 @@ export default function Portal() {
         setLoading(false);
         return;
       }
+      setCompanyId(profile.company_id);
 
       // Get company name
       const { data: company } = await supabase
@@ -68,7 +81,7 @@ export default function Portal() {
       // Get orders for this company
       const { data: ordersData } = await supabase
         .from("orders")
-        .select("id, order_number, description, status, urgency, created_at, reference")
+        .select("id, company_id, order_number, description, status, urgency, created_at, reference")
         .eq("company_id", profile.company_id)
         .order("created_at", { ascending: false });
 
@@ -370,6 +383,7 @@ function OrderCard({
 
         <CollapsibleContent>
           <div className="px-4 pb-4 space-y-2 border-t pt-3">
+            <PortalReorder orderId={order.id} companyId={order.company_id} items={order.items} />
             {order.items.map((item) => (
               <div
                 key={item.id}

@@ -9,13 +9,13 @@ import { useToast } from "@/hooks/use-toast";
 type Session = { id: string; state: string; accumulated_seconds: number; running_since: string | null; hourly_rate: number };
 export default function WorkshopTimer({ entityType, entityId, label, hourlyRate = 0 }: { entityType: "repair" | "sharpening" | "fabrication"; entityId: string; label: string; hourlyRate?: number }) {
   const { user } = useAuth(); const { toast } = useToast();
-  const [session, setSession] = useState<Session | null>(null), [seconds, setSeconds] = useState(0), [busy, setBusy] = useState(false), [kiosk, setKiosk] = useState(false);
+  const [session, setSession] = useState<Session | null>(null), [seconds, setSeconds] = useState(0), [busy, setBusy] = useState(false), [kiosk, setKiosk] = useState(false), [loading, setLoading] = useState(true);
   const [requestId] = useState(() => crypto.randomUUID());
   const db = supabase as any;
   const load = useCallback(async () => {
     if (!user) return;
     const { data, error } = await db.from("workshop_timer_sessions").select("*").eq("entity_type", entityType).eq("entity_id", entityId).eq("technician_id", user.id).neq("state", "finished").order("created_at", { ascending: false }).limit(1).maybeSingle();
-    if (error) toast({ title: "Timer could not load", description: error.message, variant: "destructive" }); else setSession(data);
+    if (error) toast({ title: "Timer could not load", description: error.message, variant: "destructive" }); else { setSession(data); setLoading(false); }
   }, [entityType, entityId, user?.id, toast]);
   useEffect(() => { void load(); }, [load]);
   useEffect(() => {
@@ -23,7 +23,7 @@ export default function WorkshopTimer({ entityType, entityId, label, hourlyRate 
     update(); const timer = window.setInterval(update, 1000); return () => window.clearInterval(timer);
   }, [session]);
   const command = async (action: string) => {
-    if (!user) return;
+    if (!user || loading) return;
     setBusy(true);
     const { data, error } = await db.rpc("workshop_timer_command", { p_id: session?.id || requestId, p_entity_type: entityType, p_entity_id: entityId, p_action: action, p_hourly_rate: hourlyRate });
     setBusy(false);

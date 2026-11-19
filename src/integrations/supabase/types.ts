@@ -1491,10 +1491,12 @@ export type Database = {
         Row: {
           created_at: string
           created_by: string | null
+          hourly_rate_snapshot: number | null
           hours: number
           id: string
           note: string | null
           project_id: string
+          timer_session_id: string | null
           updated_at: string
           work_date: string
           worker_name: string | null
@@ -1502,10 +1504,12 @@ export type Database = {
         Insert: {
           created_at?: string
           created_by?: string | null
+          hourly_rate_snapshot?: number | null
           hours?: number
           id?: string
           note?: string | null
           project_id: string
+          timer_session_id?: string | null
           updated_at?: string
           work_date?: string
           worker_name?: string | null
@@ -1513,10 +1517,12 @@ export type Database = {
         Update: {
           created_at?: string
           created_by?: string | null
+          hourly_rate_snapshot?: number | null
           hours?: number
           id?: string
           note?: string | null
           project_id?: string
+          timer_session_id?: string | null
           updated_at?: string
           work_date?: string
           worker_name?: string | null
@@ -1527,6 +1533,13 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "fabrication_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fabrication_time_entries_timer_session_id_fkey"
+            columns: ["timer_session_id"]
+            isOneToOne: true
+            referencedRelation: "workshop_timer_sessions"
             referencedColumns: ["id"]
           },
         ]
@@ -2978,6 +2991,57 @@ export type Database = {
           payload?: Json
         }
         Relationships: []
+      }
+      portal_reorder_requests: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          lines: Json
+          notes: string | null
+          requested_by: string
+          source_order_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id: string
+          lines: Json
+          notes?: string | null
+          requested_by?: string
+          source_order_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          lines?: Json
+          notes?: string | null
+          requested_by?: string
+          source_order_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "portal_reorder_requests_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "portal_reorder_requests_source_order_id_fkey"
+            columns: ["source_order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       product_substitutions: {
         Row: {

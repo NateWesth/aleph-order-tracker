@@ -403,7 +403,7 @@ function ProjectPanel({ id, team, onClose, onChange, onDelete }: { id: string; t
       {(() => {
         const rate = Number((p as any).labour_rate || 0), est = (p as any).estimated_cost, quote = (p as any).quoted_price;
         const matCost = materials.reduce((s, m) => s + Number(m.quantity || 0) * Number(m.unit_cost || 0), 0);
-        const labour = totalHours * rate, actual = matCost + labour;
+        const labour = time.reduce((sum, entry) => sum + Number(entry.hours || 0) * Number((entry as any).hourly_rate_snapshot ?? rate), 0), actual = matCost + labour;
         const profit = quote != null ? Number(quote) - actual : null, margin = profit != null && Number(quote) > 0 ? (profit / Number(quote)) * 100 : null;
         const R = (n: number) => "R " + n.toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         const num = (v: string) => v === "" ? null : Number(v);
@@ -461,7 +461,7 @@ function ProjectPanel({ id, team, onClose, onChange, onDelete }: { id: string; t
     </DetailSection>
 
     <DetailSection title={`Hours worked · ${totalHours.toFixed(1)} h total`}>
-      <WorkshopTimer key={id} entityType="fabrication" entityId={id} label={p.project_number} hourlyRate={Number((p as any).labour_rate || 0)} />
+      <WorkshopTimer key={id} entityType="fabrication" entityId={id} label={p.project_number || p.name} hourlyRate={Number((p as any).labour_rate || 0)} />
       <div className="space-y-1.5">
         {time.map((t) => <div key={t.id} className="grid grid-cols-[130px_1fr_70px_1fr_32px] gap-1.5">
           <Input className="h-8 text-xs" type="date" defaultValue={t.work_date} onBlur={(e) => editRow("fabrication_time_entries", t.id, { work_date: e.target.value }, setTime as any)} />

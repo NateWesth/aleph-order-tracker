@@ -3,6 +3,7 @@
 - Client purchasing/invoicing links retain companies.purchasing_invoicing_user_id as master ownership; guarded order writes resolve timed operational_leave_cover, with transactional changes and scheduled restoration; never modify reps or fulfillment assignments. Why: leave cover must preserve master links and end without an app visit.
 - Workshop timers use validated, serialized commands behind a public invoker/private definer boundary and persistent rate snapshots; timer completion is independent of job completion. Why: concurrent devices must not double-count work or bypass technician ownership.
 - Route exports split all stops into mobile-compatible numbered Google Maps legs; Waze links target individual stops. Why: long routes must never silently omit destinations.
+- Portal reorders retain original company/order/item identities in validated staff-review requests and company-scoped RLS; timers capture fabrication hours once with rate snapshots. Why: self-service must not create supplier orders and historical labour must not reprice.
 
 - Order bulk status changes share item-counter updates and verify affected rows; selection uses unique filtered order IDs across lanes. Why: board positions derive from quantities and denied writes must not report success.
 
