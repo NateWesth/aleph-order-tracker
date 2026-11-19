@@ -18,6 +18,7 @@ import { MenuPortal, useViewportMenuPosition } from "@/hooks/useViewportMenuPosi
 import { DetailSection, DetailValue, EmptyWorkshop, formatDate, isOverdue, memberLabel, monthLabel, PRIORITIES, PriorityBadge, PrioritySelect, SERVICE_STATUSES, StatusBadge, TeamMember, WorkshopPanel, WorkshopTabs, WorkshopToolbar } from "@/components/admin/workshop/shared";
 import SharpeningFocusHeader from "@/components/admin/workshop/SharpeningFocusHeader";
 import BoardTable, { BoardCell, BoardPriorityCell, BoardStatusCell, GROUP_SPINES, statusTone } from "@/components/admin/workshop/BoardTable";
+import WorkshopTimer from "./workshop/WorkshopTimer";
 
 interface SharpeningJob {
   id: string; date_received: string; job_number: string; customer_name: string; quantity: number;

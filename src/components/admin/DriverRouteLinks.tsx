@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { isActiveDispatch, type DispatchDocument } from "@/lib/dispatchDocuments";
 import DriverVanMode, { type VanStop } from "./DriverVanMode";
 import FleetTracker from "./FleetTracker";
+import RouteExportLinks from "./RouteExportLinks";
 
 const db = supabase as any;
 export const sastToday = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Johannesburg" }).format(new Date());
@@ -120,10 +121,9 @@ export default function DriverRouteLinks({ docs, open, onClose, members = [], on
                 <p className="font-semibold">{g.name} <span className="text-xs text-muted-foreground">· {g.stops.length + g.missing.length} stop{g.stops.length + g.missing.length === 1 ? "" : "s"}</span></p>
                 {!!g.stops.length && <div className="flex gap-1.5">
                   <Button size="sm" variant="outline" onClick={() => setVan(g.stops)}><Smartphone className="mr-1 h-4 w-4" />Van mode</Button>
-                  <Button size="sm" asChild><a href={googleUrl(g.stops.map((s) => s.addr))} target="_blank" rel="noreferrer"><MapPin className="mr-1 h-4 w-4" />Google Maps</a></Button>
+                  <RouteExportLinks addresses={g.stops.map(s => s.addr)} />
                 </div>}
               </div>
-              {g.stops.length > MAX_WAYPOINTS + 1 && <p className="mb-2 text-xs text-destructive">Google Maps takes up to {MAX_WAYPOINTS + 1} stops per link — open the rest with Waze below.</p>}
               <ol className="space-y-1.5">
                 {g.stops.map((s, i) => <li key={s.doc.id} className="flex items-center gap-2 text-sm">
                   <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-logo-cyan/15 text-[10px] font-bold text-logo-cyan">{i + 1}</span>
@@ -148,7 +148,7 @@ export default function DriverRouteLinks({ docs, open, onClose, members = [], on
                   <p className="font-semibold">{r.name} <span className="text-xs text-muted-foreground">· {new Date(r.route_date).toLocaleDateString("en-ZA")} · {memberName(r.driver_id)} · {r.status}</span></p>
                   {!!withAddr.length && <div className="flex gap-1.5">
                     <Button size="sm" variant="outline" onClick={() => setVan(stops)}><Smartphone className="mr-1 h-4 w-4" />Van mode</Button>
-                    <Button size="sm" asChild><a href={googleUrl(withAddr.map((s) => s.addr))} target="_blank" rel="noreferrer"><MapPin className="mr-1 h-4 w-4" />Google Maps</a></Button>
+                    <RouteExportLinks addresses={withAddr.map(s => s.addr)} />
                   </div>}
                 </div>
                 <ol className="space-y-1">{(r.stops || []).slice().sort((a, b) => a.sequence - b.sequence).map((s: any) => {

@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import EntityComments from "@/components/admin/EntityComments";
+import WorkshopTimer from "./workshop/WorkshopTimer";
 import { MenuPortal, useViewportMenuPosition } from "@/hooks/useViewportMenuPosition";
 import { WorkshopHeader, WorkshopToolbar, WorkshopTabs, WorkshopPanel, DetailSection, PrioritySelect, PriorityBadge, formatDate, isOverdue, type TeamMember, memberLabel } from "@/components/admin/workshop/shared";
 import { FABRICATION_STAGES, stageLabel, stageIndex, generateFabricationPdf, PROJECT_TYPES, typeLabel, type FabProject, type FabMaterial, type FabPart, type FabTime, type FabFile } from "@/lib/fabricationPdf";
@@ -460,6 +461,7 @@ function ProjectPanel({ id, team, onClose, onChange, onDelete }: { id: string; t
     </DetailSection>
 
     <DetailSection title={`Hours worked · ${totalHours.toFixed(1)} h total`}>
+      <WorkshopTimer key={id} entityType="fabrication" entityId={id} label={p.project_number} hourlyRate={Number((p as any).labour_rate || 0)} />
       <div className="space-y-1.5">
         {time.map((t) => <div key={t.id} className="grid grid-cols-[130px_1fr_70px_1fr_32px] gap-1.5">
           <Input className="h-8 text-xs" type="date" defaultValue={t.work_date} onBlur={(e) => editRow("fabrication_time_entries", t.id, { work_date: e.target.value }, setTime as any)} />

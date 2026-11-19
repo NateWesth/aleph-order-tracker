@@ -18,6 +18,7 @@ import { MenuPortal, useViewportMenuPosition } from "@/hooks/useViewportMenuPosi
 import { DetailSection, DetailValue, EmptyWorkshop, formatDate, isOverdue, memberLabel, monthLabel, PRIORITIES, PriorityBadge, PrioritySelect, SERVICE_STATUSES, StatusBadge, TeamMember, WorkshopPanel, WorkshopTabs, WorkshopToolbar } from "@/components/admin/workshop/shared";
 import SharpeningFocusHeader from "@/components/admin/workshop/SharpeningFocusHeader";
 import BoardTable, { BoardCell, BoardPriorityCell, BoardStatusCell, GROUP_SPINES, statusTone } from "@/components/admin/workshop/BoardTable";
+import WorkshopTimer from "./workshop/WorkshopTimer";
 
 interface RepairTicket {
   id: string; ticket_number: string; client: string; tool_code: string; tool_information: string;
@@ -215,6 +216,7 @@ export default function RepairsPage() {
     >
       {selected && <div className="grid gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(320px,.85fr)]">
         <div className="space-y-5">
+          <WorkshopTimer key={selected.id} entityType="repair" entityId={selected.id} label={`Repair ${selected.ticket_number}`} />
           {selected.is_warranty&&<div className="flex gap-3 rounded-xl border border-success/30 bg-success/10 p-4"><ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-success"/><div><p className="text-sm font-bold text-success">Covered warranty repair</p><p className="mt-0.5 text-xs text-success">Automatically matched to {tickets.find(t=>t.id===selected.warranty_source_ticket_id)?.ticket_number||"a previous repair"} by tool code.</p></div></div>}
           <DetailValue label="Tool information" value={<p className="whitespace-pre-wrap font-normal leading-6">{selected.tool_information}</p>} icon={<Hammer className="h-3.5 w-3.5"/>}/>
           <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3"><DetailValue label="Received" value={formatDate(selected.date_received_by_client)} icon={<CalendarClock className="h-3.5 w-3.5"/>}/><DetailValue label="Assigned to" value={memberLabel(selected.assigned_to?memberMap.get(selected.assigned_to):null)} icon={<UserRound className="h-3.5 w-3.5"/>}/><DetailValue label="Deadline" value={formatDate(selected.deadline_date)}/><DetailValue label="Supplier return" value={formatDate(selected.date_received_back_from_supplier)}/><DetailValue label="Warranty" value={selected.warranty_expires_at?`${selected.warranty_months} months · to ${formatDate(selected.warranty_expires_at)}`:"Not set"}/><DetailValue label="Invoice" value={selected.invoiced?selected.invoice_number||"Completed":"Not invoiced"}/></div>
