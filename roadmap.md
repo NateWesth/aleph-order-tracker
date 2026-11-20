@@ -7,7 +7,7 @@
 - [ ] Client portal live progress, delivery receipt downloads and reorder requests
 - [ ] Reviewed draft Zoho PO creation from Buying Sheet recommendations
 - [ ] Stock depletion alerts based on fresh inventory and demand
-- [ ] Dated supplier bill price history and purchasing warnings
+- [x] Dated supplier bill price history and purchasing warnings (from saved bills; supplier names fill in as bills are re-read)
 - [ ] Auditable job costs including vendor bills, waste and labour
 - [ ] Driver-consented live GPS, admin fleet map and route ETA
 - [ ] WhatsApp automated status queries — current app setup cannot receive messages; requires a supported receiving architecture decision

@@ -51,6 +51,7 @@ import { getItemDisplayName, getItemIdentityKey, isMiscellaneousItem } from "@/l
 import type { BuyingSheetRow, SuggestedRestockRow, ZohoStockData, SortField, SortDirection, PriorityFilter, ViewMode, ViewDensity, RecentlyOrderedItem } from "./buying-sheet/types";
 import { getPriorityLevel, NOTES_KEY, SNAPSHOT_KEY, loadNotes, saveNotes, loadPinned, savePinned, loadDensity, saveDensity, loadRecentlyOrdered, saveRecentlyOrdered } from "./buying-sheet/types";
 import { BuyingSheetSummary } from "./buying-sheet/BuyingSheetSummary";
+import SupplierPriceAlerts from "./buying-sheet/SupplierPriceAlerts";
 import { SupplierCardsView } from "./buying-sheet/SupplierCardsView";
 import { QuickOrderView } from "./buying-sheet/QuickOrderView";
 import ProcurementSuggestionsPanel from "./buying-sheet/ProcurementSuggestionsPanel";
@@ -1354,6 +1355,7 @@ export default function BuyingSheetPage() {
         <section className="buying-intelligence-grid grid gap-4 2xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,.65fr)]">
           <FabricationReorderPanel />
           <BuyingSheetSummary totals={totals} avgDaysWaiting={avgDaysWaiting} supplierCount={uniqueSuppliers.length} />
+          <SupplierPriceAlerts rows={rows} />
 
           <ProcurementSuggestionsPanel
             items={rows

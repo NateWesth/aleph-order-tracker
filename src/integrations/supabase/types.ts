@@ -319,6 +319,7 @@ export type Database = {
           fetched_at: string
           last_modified_time: string | null
           line_items: Json
+          vendor_name: string | null
         }
         Insert: {
           bill_date?: string | null
@@ -326,6 +327,7 @@ export type Database = {
           fetched_at?: string
           last_modified_time?: string | null
           line_items?: Json
+          vendor_name?: string | null
         }
         Update: {
           bill_date?: string | null
@@ -333,6 +335,7 @@ export type Database = {
           fetched_at?: string
           last_modified_time?: string | null
           line_items?: Json
+          vendor_name?: string | null
         }
         Relationships: []
       }
@@ -4108,6 +4111,16 @@ export type Database = {
           expires_at: string
           id: string
           status: string
+        }[]
+      }
+      get_supplier_price_history: {
+        Args: { p_skus: string[] }
+        Returns: {
+          bill_date: string
+          bill_id: string
+          sku: string
+          unit_rate: number
+          vendor_name: string
         }[]
       }
       get_unread_updates_count: {

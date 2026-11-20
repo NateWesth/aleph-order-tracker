@@ -1537,6 +1537,7 @@ async function fetchBillCostHistory(
         bill_id: String(bill.bill_id || batch[idx].bill_id),
         bill_date: String(bill.date || bill.bill_date || batch[idx].date || '') || null,
         last_modified_time: String(batch[idx].last_modified_time || bill.last_modified_time || ''),
+        vendor_name: String(bill.vendor_name || batch[idx].vendor_name || '') || null,
         line_items: (bill.line_items || []).map((li: any) => ({
           item_id: li.item_id, name: li.name, description: li.description, sku: li.sku,
           item_code: li.item_code, rate: li.rate, item_rate: li.item_rate,
