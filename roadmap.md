@@ -1,6 +1,7 @@
 # Roadmap
 
 - [x] Review foundations and prepare the operations expansion plan
+- [x] Give step-by-step guidance for the Zoho Books connection
 - [ ] Smart route sequencing and complete Google Maps/Waze export
 - [ ] Temporary purchasing/invoicing delegation preserving master client links
 - [ ] Client portal live progress, delivery receipt downloads and reorder requests
