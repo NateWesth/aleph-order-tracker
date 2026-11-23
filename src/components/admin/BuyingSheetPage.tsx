@@ -1,4 +1,6 @@
 import { copyText } from "@/lib/copyText";
+import { freshStock, depletionDays } from "@/lib/stockDepletion";
+import { FunctionsHttpError } from "@supabase/supabase-js";
 import { readAllRows } from "@/lib/readAllRows";
 import { buyingRequirement, buyingShortfall, isOpenBuyingOrder, buyingOrderQuantity, allocateBuyingQuantity, createQuantityPool, buyingCsvCell } from "@/lib/buyingSheet";
 
@@ -52,6 +54,7 @@ import type { BuyingSheetRow, SuggestedRestockRow, ZohoStockData, SortField, Sor
 import { getPriorityLevel, NOTES_KEY, SNAPSHOT_KEY, loadNotes, saveNotes, loadPinned, savePinned, loadDensity, saveDensity, loadRecentlyOrdered, saveRecentlyOrdered } from "./buying-sheet/types";
 import { BuyingSheetSummary } from "./buying-sheet/BuyingSheetSummary";
 import SupplierPriceAlerts from "./buying-sheet/SupplierPriceAlerts";
+import StockDepletionAlerts from "./buying-sheet/StockDepletionAlerts";
 import { SupplierCardsView } from "./buying-sheet/SupplierCardsView";
 import { QuickOrderView } from "./buying-sheet/QuickOrderView";
 import ProcurementSuggestionsPanel from "./buying-sheet/ProcurementSuggestionsPanel";
@@ -85,6 +88,8 @@ export default function BuyingSheetPage() {
   const hasLoaded = useRef(false);
   const [zohoLoading, setZohoLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [inventoryRefreshing, setInventoryRefreshing] = useState(false);
+  const inventoryRefreshInFlight = useRef(false);
   const [zohoData, setZohoData] = useState<ZohoStockData | null>(null);
   const [search, setSearch] = useState("");
   const [supplierFilter, setSupplierFilter] = useState<string>("all");
@@ -189,6 +194,28 @@ export default function BuyingSheetPage() {
     setRefreshing(true);
     try { await fetchLocalDataRef.current(); }
     finally { setRefreshing(false); }
+  };
+
+  const refreshInventory = async () => {
+    if (inventoryRefreshInFlight.current) return;
+    inventoryRefreshInFlight.current = true;
+    setInventoryRefreshing(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) throw new Error('Please sign in again before refreshing stock.');
+      const { data, error } = await supabase.functions.invoke('buying-sheet-data', {
+        body: { action: 'refresh_inventory' },
+        headers: { Authorization: `Bearer ${token}`, apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
+      });
+      if (error) throw new Error(error instanceof FunctionsHttpError ? await error.context.text() : error.message);
+      if (!data?.inventoryRefreshed || data.stale) throw new Error(data?.warning || data?.error || 'Stock could not refresh; previous figures were retained.');
+      // Read the saved result back through the same shared cache used by other devices.
+      await fetchLocalDataRef.current();
+      toast({ title: 'Zoho stock refreshed', description: `${data.itemCount} catalogue items checked.` });
+    } catch (error) {
+      toast({ title: 'Stock refresh failed', description: error instanceof Error ? error.message : 'Zoho is unavailable. Please retry.', variant: 'destructive' });
+    } finally { inventoryRefreshInFlight.current = false; setInventoryRefreshing(false); }
   };
 
   const copyWithFeedback = async (text: string, description: string) => {
@@ -564,15 +591,18 @@ export default function BuyingSheetPage() {
         const pooled = entry.isMiscellaneous || !live ? 0 : poPool.take(entry.sku, Math.max(0, entry.totalNeeded - entry.allocatedOnPurchaseOrder));
         const onPurchaseOrder = Math.min(entry.totalNeeded, entry.allocatedOnPurchaseOrder + pooled);
         const poVariance = Math.abs(zohoOnPurchaseOrder - onPurchaseOrder);
-        const toOrder = buyingShortfall(entry.totalNeeded, z.stockOnHand, onPurchaseOrder);
+        const verifiedStock = entry.isMiscellaneous ? null : freshStock(zohoStock[entry.sku]);
+        const stockOnHand = Math.max(0, verifiedStock ?? 0);
+        const stockVerified = verifiedStock !== null;
+        const toOrder = buyingShortfall(entry.totalNeeded, stockOnHand, onPurchaseOrder);
         // Zoho vendor (from historical POs) takes priority as the suggested supplier
         const supplierName = z.vendorName || livePO?.vendorName || entry.supplierName;
         const supplierEmail = z.vendorEmail || entry.supplierEmail || undefined;
         const daysWaiting = calendarDaysSince(entry.oldestCreatedAt);
-        const covered = z.stockOnHand + onPurchaseOrder;
+        const covered = stockOnHand + onPurchaseOrder;
         const coveragePercent = entry.totalNeeded > 0 ? Math.min(100, Math.round((covered / entry.totalNeeded) * 100)) : 100;
         const { trend, lastMonth, prevMonth } = getDemandTrend(entry.sku);
-        const stockoutRiskDays = getStockoutRiskDays(entry.sku, z.stockOnHand, onPurchaseOrder);
+        const stockoutRiskDays = depletionDays(verifiedStock, getDailyBurnRate(entry.sku));
         const lastPurchasedDate = z.lastPurchasedDate || lastPurchaseMap.get(entry.sku) || null;
         const seasonalPattern = seasonalMap.get(entry.sku) || null;
         const avgLeadTimeDays = leadTimeMap.get(entry.sku) ?? null;
@@ -601,7 +631,7 @@ export default function BuyingSheetPage() {
         const dailyBurn = getDailyBurnRate(entry.sku);
         const recommendedOrderQty = toOrder > 0 ? toOrder + safetyStock : 0;
         const analytical = computeAnalyticalFields(entry.sku, toOrder, daysWaiting, avgLeadTimeDays, entry.orders, recommendedOrderQty, z.unitCost ?? null, z.costSource ?? null);
-        return { ...entry, supplierName, supplierEmail, stockOnHand: z.stockOnHand, onPurchaseOrder, zohoOnPurchaseOrder, poVariance, waitingSince: entry.oldestCreatedAt, toOrder, daysWaiting, priorityScore, coveragePercent, demandTrend: trend, lastMonthQty: lastMonth, prevMonthQty: prevMonth, stockoutRiskDays, lastPurchasedDate, seasonalPattern, avgLeadTimeDays, safetyStock, dailyBurnRate: dailyBurn, demandVariability: demandVar, distinctCustomers, recommendedOrderQty, ...analytical };
+        return { ...entry, supplierName, supplierEmail, stockOnHand, stockVerified, onPurchaseOrder, zohoOnPurchaseOrder, poVariance, waitingSince: entry.oldestCreatedAt, toOrder, daysWaiting, priorityScore, coveragePercent, demandTrend: trend, lastMonthQty: lastMonth, prevMonthQty: prevMonth, stockoutRiskDays, lastPurchasedDate, seasonalPattern, avgLeadTimeDays, safetyStock, dailyBurnRate: dailyBurn, demandVariability: demandVar, distinctCustomers, recommendedOrderQty, ...analytical };
       });
       buyingRows.sort((a, b) => b.priorityScore - a.priorityScore);
       // ABC classification: top 80% of total demand = A, next 15% = B, rest = C
@@ -1099,7 +1129,7 @@ export default function BuyingSheetPage() {
             </div>
           </TableCell>
           <TableCell className={`text-right font-semibold ${densityPy}`} onClick={() => toggleExpand(row.rowKey)}>{row.totalNeeded}</TableCell>
-          <TableCell className={`text-right font-medium ${densityPy}`} onClick={() => toggleExpand(row.rowKey)}>{row.stockOnHand}</TableCell>
+          <TableCell className={`text-right font-medium ${densityPy}`} onClick={() => toggleExpand(row.rowKey)}>{row.stockVerified ? row.stockOnHand : 'Unknown'}</TableCell>
           <TableCell className={`text-right font-medium ${densityPy}`} onClick={() => toggleExpand(row.rowKey)}>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -1187,7 +1217,7 @@ export default function BuyingSheetPage() {
           {liveCoverageAsOf ? `Open supplier POs and customer invoices current as of ${liveCoverageAsOf.toLocaleString()} — already-invoiced units and units on open POs are deducted.` : "Live supplier PO and invoice figures could not be loaded; quantities may include items already ordered or invoiced."}
           {(!lastRefreshedAt || Date.now() - lastRefreshedAt.getTime() > 86_400_000) && <> {lastRefreshedAt ? `Stock on hand is from ${lastRefreshedAt.toLocaleDateString()} — check the shelf before buying.` : "Stock on hand is not available — check the shelf before buying."}</>}
         </div>
-        {rows.some(row => !row.isMiscellaneous && !zohoData?.[row.sku]) && <div role="status" className="border border-border bg-muted/40 p-3 text-sm text-muted-foreground">Stock is unverified for {rows.filter(row => !row.isMiscellaneous && !zohoData?.[row.sku]).length} items missing from the shared snapshot. Verify availability before purchasing.</div>}
+        {rows.some(row => !row.isMiscellaneous && !row.stockVerified) && <div role="status" className="border border-border bg-muted/40 p-3 text-sm text-muted-foreground">Stock is unverified for {rows.filter(row => !row.isMiscellaneous && !row.stockVerified).length} items with missing or stale inventory. Verify availability before purchasing; suggested quantities exclude unverified stock.</div>}
         {/* ── Sticky Header ── */}
         <div className="sticky top-0 z-20 -mx-1 px-1 pb-3 bg-background/88 backdrop-blur-xl supports-[backdrop-filter]:bg-background/72">
           <div className="procurement-command-center rounded-[24px] border border-border/60 bg-card/92 shadow-xl shadow-black/[0.04] overflow-hidden mb-3">
@@ -1208,6 +1238,7 @@ export default function BuyingSheetPage() {
                 </div>
               </div>
               <div className="flex items-center gap-1.5 flex-wrap">
+                <Button variant="outline" size="sm" disabled={inventoryRefreshing} onClick={() => void refreshInventory()} className="h-9 gap-1.5">{inventoryRefreshing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Package className="h-4 w-4" />}{inventoryRefreshing ? 'Checking Zoho…' : 'Refresh Zoho stock'}</Button>
                 <Button variant="outline" size="sm" disabled={refreshing || zohoLoading} onClick={() => void refreshSheet()} className="h-9 gap-1.5">{refreshing ? <Loader2 className="h-4 w-4 animate-spin" /> : <History className="h-4 w-4" />}{refreshing ? "Refreshing…" : "Refresh"}</Button>
                 <Tooltip><TooltipTrigger asChild>
                   <Button variant="outline" size="icon" onClick={toggleFullscreen} className="h-9 w-9" aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}>
@@ -1356,6 +1387,7 @@ export default function BuyingSheetPage() {
           <FabricationReorderPanel />
           <BuyingSheetSummary totals={totals} avgDaysWaiting={avgDaysWaiting} supplierCount={uniqueSuppliers.length} />
           <SupplierPriceAlerts rows={rows} />
+          <StockDepletionAlerts stock={zohoData} rows={rows} suggested={suggestedRows} />
 
           <ProcurementSuggestionsPanel
             items={rows

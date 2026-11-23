@@ -118,7 +118,7 @@ export function SupplierCardsView({ rows, notes, onGenerateEmail, onCopyEmail }:
                         </div>
                         <div className="grid grid-cols-3 gap-2 text-xs mb-2">
                           <div><span className="text-muted-foreground">Needed:</span> <span className="font-semibold">{item.totalNeeded}</span></div>
-                          <div><span className="text-muted-foreground">Stock:</span> <span className="font-medium">{item.stockOnHand}</span></div>
+                          <div><span className="text-muted-foreground">Stock:</span> <span className="font-medium">{item.stockVerified ? item.stockOnHand : 'Unknown'}</span></div>
                           <div><span className="text-muted-foreground">On PO:</span> <span className="font-medium">{item.onPurchaseOrder}</span></div>
                         </div>
                         <div className="flex items-center justify-between">

@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { mergeInventory, readStock } from '../_shared/inventory.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -18,7 +19,7 @@ const MAX_RECENT_PO_DETAILS = 100
 const MAX_RECENT_BILL_DETAILS = 150
 
 type StockEntry = {
-  stockOnHand: number
+  stockOnHand: number | null
   itemName: string
   vendorName: string
   purchaseRate: number
@@ -98,18 +99,52 @@ Deno.serve(async (req) => {
       })
     }
 
+    const [{ data: approved, error: approvalError }, { data: admin, error: adminError }] = await Promise.all([
+      supabase.rpc('is_user_approved', { user_uuid: user.id }),
+      supabase.rpc('has_role', { _user_id: user.id, _role: 'admin' }),
+    ])
+    if (approvalError || adminError || (!approved && !admin)) {
+      return new Response(JSON.stringify({ error: 'Approved team access required' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
+
     // Normal reads are cache-only. The Zoho webhook updates this shared row and
     // Supabase Realtime pushes the change to every open app. The expensive scan
     // below is now only an explicit admin recovery/bootstrap path.
     let force = false
+    let inventoryOnly = false
     if (req.method === 'POST') {
       try {
         const body = await req.json()
         force = body?.force === true
+        inventoryOnly = body?.action === 'refresh_inventory'
       } catch (_e) { /* no body */ }
     }
 
     const cached = await readCache(supabase)
+    if (inventoryOnly) {
+      const { data: acquired, error: lockError } = await supabase.rpc('try_acquire_zoho_sync_lock', { requested_key: SYNC_LOCK_KEY, lease_seconds: 120 })
+      if (lockError) throw lockError
+      if (acquired !== true) return new Response(JSON.stringify({ error: 'A Zoho refresh is already running. Try again shortly.' }), { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      recoveryLockAcquired = true
+      const accessToken = await getValidAccessToken(supabase, clientId, clientSecret)
+      const orgId = await getOrgId(supabase)
+      const observedAt = new Date().toISOString()
+      const inventory = await fetchInventory(accessToken, orgId)
+      // Read and merge under the same short lock used by item/PO/bill webhooks.
+      const { data: mutationLock, error: mutationError } = await supabase.rpc('try_acquire_zoho_sync_lock', { requested_key: 'zoho-event-cache-mutation', lease_seconds: 30 })
+      if (mutationError) throw mutationError
+      if (mutationLock !== true) throw new Error('Inventory is being updated by Zoho. Please retry.')
+      let payload
+      try {
+        const latest = await readCache(supabase)
+        payload = mergeInventory(latest?.payload || {}, inventory, observedAt)
+        const { error } = await supabase.from('buying_sheet_cache').upsert({ id: CACHE_ID, payload, fetched_at: new Date().toISOString() })
+        if (error) throw error
+      } finally {
+        await supabase.rpc('release_zoho_sync_lock', { requested_key: 'zoho-event-cache-mutation' })
+      }
+      return new Response(JSON.stringify({ success: true, data: payload, itemCount: Object.keys(inventory).length, fetchedAt: observedAt, inventoryRefreshed: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
     if (!force && cached?.payload) {
       return new Response(JSON.stringify({
         success: true,
@@ -171,6 +206,7 @@ Deno.serve(async (req) => {
     const accessToken = await getValidAccessToken(supabase, clientId, clientSecret)
     const orgId = await getOrgId(supabase)
 
+    const stockObservedAt = new Date().toISOString()
     const stockMap = await fetchRelevantItemStock(accessToken, orgId, activeSkus)
     console.log(`Fetched stock for ${stockMap.size} active SKUs from Zoho`)
 
@@ -190,7 +226,8 @@ Deno.serve(async (req) => {
     console.log(`Resolved latest Zoho PO suppliers for ${latestPurchaseOrderVendors.size} remaining SKUs`)
 
     const result: Record<string, {
-      stockOnHand: number
+      stockOnHand: number | null
+      stockUpdatedAt: string | null
       onPurchaseOrder: number
       vendorName: string
       vendorEmail: string
@@ -209,7 +246,8 @@ Deno.serve(async (req) => {
       const unitCost = bill?.unitCost ?? (item?.purchaseRate && item.purchaseRate > 0 ? item.purchaseRate : null)
 
       result[sku] = {
-        stockOnHand: item?.stockOnHand ?? 0,
+        stockOnHand: item?.stockOnHand ?? null,
+        stockUpdatedAt: item?.stockOnHand != null ? stockObservedAt : null,
         onPurchaseOrder: poQtyMap.get(sku) ?? 0,
         // Priority: latest vendor bill > latest PO > open PO > Zoho item vendor
         vendorName: bill?.vendorName || latestPoVendor?.vendorName || openPoVendor?.vendorName || item?.vendorName || '',
@@ -222,11 +260,12 @@ Deno.serve(async (req) => {
     }
 
     const fetchedAt = new Date().toISOString()
-    await supabase.from('buying_sheet_cache').upsert({
+    const { error: saveError } = await supabase.from('buying_sheet_cache').upsert({
       id: CACHE_ID,
       payload: result,
       fetched_at: fetchedAt,
     })
+    if (saveError) throw saveError
 
     return new Response(JSON.stringify({
       success: true,
@@ -304,6 +343,35 @@ async function getActiveBuyingSheetSkus(supabase: any): Promise<{ skus: Set<stri
 }
 
 
+/** Inventory-only refresh: no bill or PO detail calls, no partial cache writes. */
+async function fetchInventory(accessToken: string, orgId: string) {
+  const inventory: Record<string, { stockOnHand: number | null; itemName: string }> = {}
+  const deadline = Date.now() + 40_000
+  const duplicates = new Set<string>()
+  for (let page = 1; page <= 100; page++) {
+    if (Date.now() >= deadline) throw new Error('Inventory refresh timed out; previous stock figures were retained. Please retry.')
+    const response = await fetch(`${ZOHO_API_URL}/books/v3/items?organization_id=${encodeURIComponent(orgId)}&page=${page}&per_page=200`, {
+      headers: { Authorization: `Zoho-oauthtoken ${accessToken}` },
+      signal: AbortSignal.timeout(Math.min(8_000, deadline - Date.now())),
+    })
+    const body = await response.text()
+    if (!response.ok) throw new Error(`Zoho inventory [${response.status}]: ${body}`)
+    const data = JSON.parse(body)
+    if (data.code !== 0 || !Array.isArray(data.items)) throw new Error(`Zoho inventory [${response.status}]: ${body}`)
+    for (const item of data.items) {
+      const sku = normalizeSku(item.sku)
+      if (!sku || isSharedMiscSku(sku)) continue
+      if (inventory[sku]) duplicates.add(sku)
+      inventory[sku] = { stockOnHand: duplicates.has(sku) ? null : readStock(item), itemName: item.description || item.name || sku }
+    }
+    if (!data.page_context?.has_more_page) {
+      if (!Object.keys(inventory).length) throw new Error('Zoho returned no identifiable inventory items; previous stock figures were retained.')
+      return inventory
+    }
+  }
+  throw new Error('Inventory exceeds the refresh page limit; previous stock figures were retained.')
+}
+
 async function fetchRelevantItemStock(accessToken: string, orgId: string, activeSkus: Set<string>): Promise<Map<string, StockEntry>> {
   const stockMap = new Map<string, StockEntry>()
   const remainingSkus = new Set(activeSkus)
@@ -327,7 +395,7 @@ async function fetchRelevantItemStock(accessToken: string, orgId: string, active
       if (!sku || !remainingSkus.has(sku)) continue
 
       stockMap.set(sku, {
-        stockOnHand: item.stock_on_hand ?? item.available_stock ?? 0,
+        stockOnHand: readStock(item),
         itemName: item.name || item.description || '',
         vendorName: item.vendor_name || item.manufacturer || '',
         purchaseRate: Number(item.purchase_rate ?? 0) || 0,

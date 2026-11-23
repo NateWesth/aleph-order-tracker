@@ -7,6 +7,7 @@ export interface BuyingSheetRow {
   orderItemIds: string[];
   totalNeeded: number;
   stockOnHand: number;
+  stockVerified?: boolean;
   /** Quantity allocated by PO webhooks to the exact awaiting order lines in this row. */
   allocatedOnPurchaseOrder: number;
   /** Open quantity reported by the shared Zoho purchase-order cache for this SKU. */
@@ -63,7 +64,9 @@ export interface SuggestedRestockRow {
 
 export interface ZohoStockData {
   [sku: string]: {
-    stockOnHand: number;
+    stockOnHand: number | null;
+    stockUpdatedAt?: string | null;
+    itemName?: string;
     onPurchaseOrder: number;
     vendorName?: string;
     vendorEmail?: string;

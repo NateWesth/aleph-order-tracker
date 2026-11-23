@@ -1,3 +1,5 @@
+import { readStock } from '../_shared/inventory.ts'
+
 const BUYING_CACHE_ID = 'buying-sheet'
 const PO_CACHE_ID = '00000000-0000-0000-0000-000000000003'
 const EXCLUDED_PO_STATUSES = new Set(['cancelled', 'closed', 'rejected', 'draft', 'void'])
@@ -275,6 +277,7 @@ async function updateCachesFromPurchaseOrderUnlocked(supabase: any, previous: an
     const current = buyingPayload[sku] || {}
     const delta = (nextBySku.get(sku) || 0) - (previousBySku.get(sku) || 0)
     buyingPayload[sku] = {
+      ...current,
       stockOnHand: Number(current.stockOnHand || 0),
       onPurchaseOrder: Math.max(0, Number(current.onPurchaseOrder || 0) + delta),
       vendorName: purchaseOrder.vendor_name || current.vendorName || '',
@@ -327,6 +330,7 @@ async function updateCachesFromBillUnlocked(supabase: any, bill: any) {
     const currentDate = current.lastPurchasedDate ? new Date(current.lastPurchasedDate).getTime() : 0
     if (new Date(billDate).getTime() < currentDate) continue
     buyingPayload[sku] = {
+      ...current,
       stockOnHand: Number(current.stockOnHand || 0),
       onPurchaseOrder: Number(current.onPurchaseOrder || 0),
       vendorName: bill.vendor_name || current.vendorName || '',
@@ -354,8 +358,11 @@ async function updateCacheFromItemUnlocked(supabase: any, item: any) {
     .maybeSingle()
   const payload = { ...(row?.payload || {}) }
   const current = payload[sku] || {}
+  const stock = readStock(item)
   payload[sku] = {
-    stockOnHand: Number(item.stock_on_hand ?? item.actual_available_stock ?? item.available_stock ?? current.stockOnHand ?? 0),
+    ...current,
+    stockOnHand: stock ?? current.stockOnHand ?? null,
+    stockUpdatedAt: stock !== null ? new Date().toISOString() : current.stockUpdatedAt ?? null,
     onPurchaseOrder: Number(current.onPurchaseOrder || 0),
     vendorName: item.vendor_name || current.vendorName || '',
     vendorEmail: current.vendorEmail || '',
