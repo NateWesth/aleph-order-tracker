@@ -18,6 +18,8 @@ Deno.serve(async(req)=>{
  const call=async(name:string)=>{
   const response=await fetch(`${url}/functions/v1/${name}`,{method:'POST',headers:{apikey:anon,'Content-Type':'application/json','x-zoho-webhook-secret':secret},body:JSON.stringify({action:name==='buying-sheet-data'?'refresh_inventory':'scheduled_refresh'}),signal:AbortSignal.timeout(55000)});
   if(!response.ok)throw new Error(`${name} [${response.status}]: ${await response.text()}`);
+  const result=await response.json();
+  if(name==='buying-sheet-data'&&(!result.inventoryRefreshed||result.stale))throw new Error(result.warning||result.error||'Stock refresh did not finish; previous figures retained');
  };
  let continueScan=false;
  try{
@@ -30,7 +32,6 @@ Deno.serve(async(req)=>{
    const patch={last_attempt_at:now,error:null,running:true,...(!state.running?{source:'purchase_order',next_page:1,cycle_started_at:now}:{})};
    await checked(db.from('buying_sync_state').update(patch).eq('id',true));
    state={...state,...patch};
-   await call('buying-sheet-data');
   }else if(!state.running)return json({complete:true});
   const token=await checked(db.from('zoho_tokens').select('*').eq('id','00000000-0000-0000-0000-000000000001').single());
   if(!token.organization_id)throw new Error('Zoho Books organization is not connected');
@@ -69,6 +70,8 @@ Deno.serve(async(req)=>{
    }));
   }
   const next=nextRefreshPage(state.source,state.next_page,list.page_context?.has_more_page??summaries.length===20);
+  // Inventory's cache-only fallback is not a successful refresh.
+  if(!next.running)await call('buying-sheet-data');
   await checked(db.from('buying_sync_state').update({...next,error:null,...(!next.running?{last_success_at:new Date().toISOString()}:{})}).eq('id',true));
   continueScan=next.running;
   return json({complete:!next.running,source:state.source,page:state.next_page});
