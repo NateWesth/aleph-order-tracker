@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CalendarClock, CheckCircle2, ClipboardList, Edit3, FileText, Plus, Scissors, Sparkles, UserRound, X } from "lucide-react";
+import { CalendarClock, CheckCircle2, ClipboardList, Edit3, FileText, Plus, RefreshCw, Scissors, Sparkles, UserRound, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -31,6 +31,19 @@ interface SharpeningJob {
 }
 
 type JobDraft = Omit<SharpeningJob, "id" | "completed_at" | "created_at" | "updated_at">;
+type SharpeningView = "all" | "outstanding" | "history";
+
+export function sharpeningJobsForView<T extends Pick<SharpeningJob, "status" | "job_number" | "customer_name" | "order_number" | "invoice_number" | "third_party_reference" | "priority" | "date_received">>(jobs: T[], tab: SharpeningView, query: string): T[] {
+  return jobs.filter((job) => tab === "all" || (tab === "history" ? job.status === "completed" : job.status !== "completed")).filter((job) => {
+    const haystack = `${job.job_number} ${job.customer_name} ${job.order_number || ""} ${job.invoice_number || ""} ${job.third_party_reference || ""}`.toLowerCase();
+    return haystack.includes(query.trim().toLowerCase());
+  }).sort((a, b) => {
+    const urgent = Number(b.priority === "urgent") - Number(a.priority === "urgent");
+    if (urgent) return urgent;
+    return (b.date_received || "").localeCompare(a.date_received || "");
+  });
+}
+
 const STATUS_BUTTON: Record<string, string> = {
   cyan: "border-logo-cyan bg-logo-cyan text-logo-on",
   teal: "border-logo-teal bg-logo-teal text-white",
@@ -50,7 +63,7 @@ export default function SharpeningPage() {
   const [jobs, setJobs] = useState<SharpeningJob[]>([]);
   const [team, setTeam] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<"outstanding" | "history">("outstanding");
+  const [tab, setTab] = useState<SharpeningView>("all");
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<SharpeningJob | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -108,20 +121,13 @@ export default function SharpeningPage() {
   const memberMap = useMemo(() => new Map(team.map((member) => [member.id, member])), [team]);
   const outstanding = jobs.filter((job) => job.status !== "completed");
   const overdueCount = outstanding.filter((job) => isOverdue(job.deadline_date)).length;
-  const visible = jobs.filter((job) => (tab === "history" ? job.status === "completed" : job.status !== "completed")).filter((job) => {
-    const haystack = `${job.job_number} ${job.customer_name} ${job.order_number || ""} ${job.invoice_number || ""} ${job.third_party_reference || ""}`.toLowerCase();
-    return haystack.includes(query.trim().toLowerCase());
-  }).sort((a, b) => {
-    const urgent = Number(b.priority === "urgent") - Number(a.priority === "urgent");
-    if (urgent) return urgent;
-    return (b.date_received || "").localeCompare(a.date_received || "");
-  });
+  const visible = sharpeningJobsForView(jobs, tab, query);
   const monthGroups = useMemo(() => {
     const map = new Map<string, SharpeningJob[]>();
     visible.forEach((job) => {
       const key = (job.date_received || "").slice(0, 7) || "unknown";
       if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(job);
+      map.get(key)?.push(job);
     });
     return Array.from(map.entries())
       .sort((a, b) => b[0].localeCompare(a[0]))
@@ -187,10 +193,15 @@ export default function SharpeningPage() {
     />
 
     <WorkshopToolbar query={query} onQuery={setQuery} placeholder="Search job number, customer, order or invoice…">
-      <WorkshopTabs value={tab} onChange={(value) => setTab(value as "outstanding" | "history")} tabs={[
+      <div className="flex min-w-0 flex-wrap items-center gap-2">
+      <WorkshopTabs value={tab} onChange={(value) => setTab(value as SharpeningView)} tabs={[
+        { id: "all" as const, label: "All jobs", count: jobs.length },
         { id: "outstanding" as const, label: "Outstanding", count: outstanding.length },
         { id: "history" as const, label: "History", count: jobs.length - outstanding.length },
       ]} />
+      <Button variant="outline" size="icon" aria-label="Refresh sharpening jobs" title="Refresh sharpening jobs" disabled={loading} onClick={() => void load()}>
+        <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
+      </Button>
       <Button variant={selectMode ? "default" : "outline"} size="sm" onClick={() => { setSelectMode((value) => !value); setPicked(new Set()); }}>
         {selectMode ? `Done (${picked.size})` : "Select"}
       </Button>
@@ -203,6 +214,7 @@ export default function SharpeningPage() {
           </Button>
         );
       })()}
+      </div>
     </WorkshopToolbar>
 
     {loading ? <div className="space-y-2">{[1,2,3].map((n) => <div key={n} className="h-24 animate-pulse rounded-lg bg-muted/50" />)}</div> : monthGroups.length === 0 ? <EmptyWorkshop history={tab === "history"} /> : <BoardTable

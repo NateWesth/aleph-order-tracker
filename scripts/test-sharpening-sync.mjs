@@ -46,7 +46,7 @@ function componentHarness(path, db) {
   const module = moduleAt(path, imports);
   const Component = module.default ?? module.useNotifications;
   Component({ entityType: "sharpening", entityId: "job-1", label: "Sharpening", references: [], defaultOpen: true });
-  return { values, effects, load: callbacks[0], feed: feeds[0] };
+  return { values, effects, load: callbacks[0], feed: feeds[0], exports: module };
 }
 
 function tableDb(getRows) {
@@ -74,6 +74,22 @@ test("Sharpening reads every saved job without per-user filtering or the 1000-ro
   assert.equal(h.values[0].length, 1001);
   assert.equal(h.values[0][1000].assigned_to, "tech-b");
   assert.deepEqual(h.feed.tables, ["sharpening_jobs", "profiles"]);
+});
+
+test("Sharpening opens with all jobs, including completed jobs saved by another user", async () => {
+  const rows = [
+    { id: "other-completed", created_by: "tech-b", status: "completed", job_number: "NOV26040", customer_name: "Tool Traders", date_received: "2026-11-24", priority: "normal" },
+    { id: "my-active", created_by: "tech-a", status: "not_started", job_number: "NOV26041", customer_name: "Other Customer", date_received: "2026-11-24", priority: "normal" },
+  ];
+  const h = componentHarness("../src/components/admin/SharpeningPage.tsx", tableDb((table, from, to) => Promise.resolve({ data: table === "profiles" ? [] : rows.slice(from, to + 1), error: null })));
+  await h.load();
+  assert.equal(h.values[3], "all");
+  const filter = h.exports.sharpeningJobsForView;
+  assert.deepEqual(Array.from(filter(h.values[0], h.values[3], ""), row => row.id), ["other-completed", "my-active"]);
+  assert.deepEqual(Array.from(filter(h.values[0], "all", " nov26040 "), row => row.id), ["other-completed"]);
+  assert.deepEqual(Array.from(filter(h.values[0], "history", ""), row => row.id), ["other-completed"]);
+  assert.deepEqual(Array.from(filter(h.values[0], "outstanding", ""), row => row.id), ["my-active"]);
+  assert.equal(rows[0].status, "completed");
 });
 
 test("An older sharpening read cannot overwrite a more recent user's edit", async () => {
