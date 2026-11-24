@@ -1,0 +1,1 @@
+ALTER TABLE public.buying_sync_state ADD COLUMN inventory_data jsonb NOT NULL DEFAULT '{}'::jsonb;

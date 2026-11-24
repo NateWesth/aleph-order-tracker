@@ -6,5 +6,6 @@ export function canStartRefresh(lastAttempt: string | null, now: number) {
 export function nextRefreshPage(source: string, page: number, hasMore: boolean) {
   if(hasMore)return {source,next_page:page+1,running:true};
   if(source==='purchase_order')return {source:'invoice',next_page:1,running:true};
+  if(source==='invoice')return {source:'inventory',next_page:1,running:true};
   return {source:'purchase_order',next_page:1,running:false};
 }

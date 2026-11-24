@@ -1,6 +1,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 import { canStartRefresh, nextRefreshPage } from './rules.ts';
+import { mergeInventory, readStock } from '../_shared/inventory.ts';
 
 const json=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers:{...corsHeaders,'Content-Type':'application/json'}});
 async function checked(query:any){const {data,error}=await query;if(error)throw new Error(error.message);return data;}
@@ -15,11 +16,9 @@ Deno.serve(async(req)=>{
  let body:any;try{body=await req.json();}catch{return json({error:'Invalid refresh request'},400);}
  if(body.action!=='scheduled_refresh'||Object.keys(body).some(key=>key!=='action'))return json({error:'Invalid refresh request'},400);
  const db=createClient(url,service);let acquired=false;
- const call=async(name:string)=>{
+  const call=async(name:string)=>{
   const response=await fetch(`${url}/functions/v1/${name}`,{method:'POST',headers:{apikey:anon,'Content-Type':'application/json','x-zoho-webhook-secret':secret},body:JSON.stringify({action:name==='buying-sheet-data'?'refresh_inventory':'scheduled_refresh'}),signal:AbortSignal.timeout(55000)});
   if(!response.ok)throw new Error(`${name} [${response.status}]: ${await response.text()}`);
-  const result=await response.json();
-  if(name==='buying-sheet-data'&&(!result.inventoryRefreshed||result.stale))throw new Error(result.warning||result.error||'Stock refresh did not finish; previous figures retained');
  };
  let continueScan=false;
  try{
@@ -27,9 +26,10 @@ Deno.serve(async(req)=>{
   if(!acquired)return json({busy:true},409);
   let state=await checked(db.from('buying_sync_state').select('*').eq('id',true).single());
   if(!internal){
-   if(!canStartRefresh(state.last_attempt_at,Date.now()))return json({skipped:true,lastSuccess:state.last_success_at});
+   const resumeFailed=state.running&&Boolean(state.error);
+   if(!resumeFailed&&!canStartRefresh(state.last_attempt_at,Date.now()))return json({skipped:true,lastSuccess:state.last_success_at});
    const now=new Date().toISOString();
-   const patch={last_attempt_at:now,error:null,running:true,...(!state.running?{source:'purchase_order',next_page:1,cycle_started_at:now}:{})};
+   const patch={last_attempt_at:now,error:null,running:true,...(!state.running?{source:'purchase_order',next_page:1,cycle_started_at:now,inventory_data:{}}:{})};
    await checked(db.from('buying_sync_state').update(patch).eq('id',true));
    state={...state,...patch};
   }else if(!state.running)return json({complete:true});
@@ -43,6 +43,26 @@ Deno.serve(async(req)=>{
    const text=await response.text();if(!response.ok)throw new Error(`Zoho authorization [${response.status}]: ${text}`);
    const result=JSON.parse(text);if(!result.access_token)throw new Error('Zoho authorization failed');access=result.access_token;
    await checked(db.from('zoho_tokens').update({access_token:access,expires_at:new Date(Date.now()+Number(result.expires_in||3600)*1000).toISOString()}).eq('id',token.id));
+  }
+  if(state.source==='inventory'){
+   const endpoint=new URL((Deno.env.get('ZOHO_API_URL')||'https://www.zohoapis.com')+'/books/v3/items');
+   endpoint.search=new URLSearchParams({organization_id:token.organization_id,page:String(state.next_page),per_page:'200'}).toString();
+   const response=await fetch(endpoint,{headers:{Authorization:'Zoho-oauthtoken '+access},signal:AbortSignal.timeout(15000)});
+   const text=await response.text();if(!response.ok)throw new Error(`Zoho stock [${response.status}]: ${text}`);
+   const data=JSON.parse(text);if(data.code!==0||!Array.isArray(data.items))throw new Error(`Zoho stock: ${text}`);
+   const inventory={...(state.inventory_data||{})};
+   for(const item of data.items){const sku=String(item.sku||'').trim().toUpperCase();if(!sku||/^M-MISC|^MISC/.test(sku))continue;inventory[sku]=inventory[sku]?{...inventory[sku],stockOnHand:null}:{stockOnHand:readStock(item),itemName:item.description||item.name||sku};}
+   const next=nextRefreshPage('inventory',state.next_page,Boolean(data.page_context?.has_more_page));
+   if(!next.running){
+    if(!Object.keys(inventory).length)throw new Error('Zoho returned no identifiable stock; previous figures retained');
+    const lock=await checked(db.rpc('try_acquire_zoho_sync_lock',{requested_key:'zoho-event-cache-mutation',lease_seconds:30}));
+    if(lock!==true)throw new Error('Stock is being updated by Zoho; retry pending');
+    try{const cache=await checked(db.from('buying_sheet_cache').select('payload').eq('id','buying-sheet').maybeSingle());
+     await checked(db.from('buying_sheet_cache').upsert({id:'buying-sheet',payload:mergeInventory(cache?.payload||{},inventory,state.cycle_started_at||new Date().toISOString()),fetched_at:new Date().toISOString()}));}
+    finally{await db.rpc('release_zoho_sync_lock',{requested_key:'zoho-event-cache-mutation'});}
+   }
+   await checked(db.from('buying_sync_state').update({...next,inventory_data:next.running?inventory:{},error:null,...(!next.running?{last_success_at:new Date().toISOString()}:{})}).eq('id',true));
+   continueScan=next.running;return json({complete:!next.running,source:'inventory',page:state.next_page});
   }
   const module=state.source==='purchase_order'?'purchaseorders':'invoices';
   const idField=state.source==='purchase_order'?'purchaseorder_id':'invoice_id';
@@ -69,9 +89,9 @@ Deno.serve(async(req)=>{
     await checked(db.from('zoho_document_cache').upsert({organization_id:token.organization_id,document_type:state.source,document_id:id,payload:document,payload_hash:hash,source_modified_at:document.last_modified_time||document.created_time,synced_at:new Date().toISOString()}));
    }));
   }
-  const next=nextRefreshPage(state.source,state.next_page,list.page_context?.has_more_page??summaries.length===20);
-  // Inventory's cache-only fallback is not a successful refresh.
-  if(!next.running)await call('buying-sheet-data');
+  // Invoices only deduct units for active orders; older history is not rescanned three times daily.
+  const reachedOldInvoices=state.source==='invoice'&&summaries.some((row:any)=>Date.parse(row.created_time||row.date||'')<Date.now()-180*86400000);
+  const next=nextRefreshPage(state.source,state.next_page,!reachedOldInvoices&&(list.page_context?.has_more_page??summaries.length===20));
   await checked(db.from('buying_sync_state').update({...next,error:null,...(!next.running?{last_success_at:new Date().toISOString()}:{})}).eq('id',true));
   continueScan=next.running;
   return json({complete:!next.running,source:state.source,page:state.next_page});
@@ -82,6 +102,12 @@ Deno.serve(async(req)=>{
  }finally{
   if(acquired)await db.rpc('release_zoho_sync_lock',{requested_key:'buying-scheduled-refresh'});
   // Continuation is armed only while this scan has more pages; no permanent polling.
-  if(continueScan)EdgeRuntime.waitUntil(call('buying-sheet-refresh').catch(async(error)=>{await db.from('buying_sync_state').update({error:String(error)}).eq('id',true);}));
+  if(continueScan)EdgeRuntime.waitUntil((async()=>{
+   for(let attempt=0;attempt<4;attempt++){
+    await new Promise(resolve=>setTimeout(resolve,attempt?25000:1500));
+    try{await call('buying-sheet-refresh');return;}
+    catch(error){if(attempt===3||!/429|rate limit/i.test(String(error))){await db.from('buying_sync_state').update({error:String(error)}).eq('id',true);return;}}
+   }
+  })());
  }
 });
