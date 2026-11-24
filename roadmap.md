@@ -1,7 +1,8 @@
 # Roadmap
 
-- [ ] Add shared supplier expected/actual delivery tracking, reliability scores and measured Buying Sheet safety buffers
-- [ ] Test supplier scoring and delivery-date validation; verify available Buying Sheet checks
+- [x] Add shared supplier expected/actual delivery tracking, reliability scores and measured Buying Sheet safety buffers
+- [x] Test supplier scoring, dates, shared staff access and conflict protection; 28 tests and desktop/phone fixture save/readback checks passed
+- [ ] Verify supplier delivery logging with real staff data — external unmanaged staff sign-in is unavailable in the sandbox
 
 - [x] Sweep sharpening-related lists, comments, timers, notifications and reports; fix shared recovery/pagination failures without changing settled records or permissions; 20 regression tests, job-save safety suite and desktop/mobile fixture flows passed
 

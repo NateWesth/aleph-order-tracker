@@ -55,6 +55,9 @@ import { getPriorityLevel, NOTES_KEY, SNAPSHOT_KEY, loadNotes, saveNotes, loadPi
 import { BuyingSheetSummary } from "./buying-sheet/BuyingSheetSummary";
 import SupplierPriceAlerts from "./buying-sheet/SupplierPriceAlerts";
 import StockDepletionAlerts from "./buying-sheet/StockDepletionAlerts";
+import SupplierReliabilityPanel from "./buying-sheet/SupplierReliabilityPanel";
+import { useSupplierReliability } from "@/hooks/useSupplierReliability";
+import { resolveSupplier, supplierSafetyStock } from "@/lib/supplierReliability";
 import { SupplierCardsView } from "./buying-sheet/SupplierCardsView";
 import { QuickOrderView } from "./buying-sheet/QuickOrderView";
 import ProcurementSuggestionsPanel from "./buying-sheet/ProcurementSuggestionsPanel";
@@ -108,7 +111,6 @@ export default function BuyingSheetPage() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showSupplierChart, setShowSupplierChart] = useState(false);
   const [lastPurchaseMap, setLastPurchaseMap] = useState<Map<string, string>>(new Map());
-  const [leadTimeMap, setLeadTimeMap] = useState<Map<string, number>>(new Map());
   const [seasonalMap, setSeasonalMap] = useState<Map<string, "peak" | "low" | "normal">>(new Map());
   const [emailDraftOpen, setEmailDraftOpen] = useState(false);
   const [emailDraftSupplier, setEmailDraftSupplier] = useState<string | null>(null);
@@ -128,11 +130,23 @@ export default function BuyingSheetPage() {
   const [liveCoverageAsOf, setLiveCoverageAsOf] = useState<Date | null>(null);
   const [showRecentlyOrdered, setShowRecentlyOrdered] = useState(false);
   const [adjustedQtys, setAdjustedQtys] = useState<Record<string, number>>({});
+  const supplierData = useSupplierReliability();
   const rows = useMemo(() => rawRows.map(row => {
-    const adjustedOrderQty = buyingOrderQuantity(row, adjustedQtys);
-    return { ...row, adjustedOrderQty, estimatedCost: row.unitCost === null ? null : Math.round(row.unitCost * adjustedOrderQty * 100) / 100 };
-  }), [rawRows, adjustedQtys]);
-  const [supplierReliabilityMap, setSupplierReliabilityMap] = useState<Map<string, number>>(new Map());
+    const vendor = resolveSupplier(supplierData.suppliers, row.supplierName, row.supplierId);
+    const score = !supplierData.error && vendor ? supplierData.scores.get(vendor.id) : undefined;
+    const avgLeadTimeDays = score?.averageLeadDays ?? null;
+    const supplierSafetyDays = score?.safetyDays ?? 0;
+    const h = demandHistory.get(row.sku);
+    const stdDev = h ? Math.abs(h.lastMonth - h.prevMonth) / 2 : 0;
+    const demandBuffer = Math.ceil(1.65 * stdDev * Math.sqrt((avgLeadTimeDays ?? 14) / 30));
+    const safetyStock = supplierSafetyStock(demandBuffer, row.dailyBurnRate, supplierSafetyDays);
+    const recommendedOrderQty = row.toOrder > 0 ? row.toOrder + safetyStock : 0;
+    const adjustedOrderQty = buyingOrderQuantity({ ...row, recommendedOrderQty }, adjustedQtys);
+    return { ...row, avgLeadTimeDays, supplierReliability: score?.onTimePercent ?? null,
+      supplierSafetyDays, supplierDeliverySamples: score?.samples ?? 0, safetyStock, recommendedOrderQty,
+      reorderPoint: Math.ceil(row.dailyBurnRate * (avgLeadTimeDays ?? 14)) + safetyStock,
+      adjustedOrderQty, estimatedCost: row.unitCost === null ? null : Math.round(row.unitCost * adjustedOrderQty * 100) / 100 };
+  }), [rawRows, adjustedQtys, supplierData.suppliers, supplierData.scores, supplierData.error, demandHistory]);
   const [weeklyHistory, setWeeklyHistory] = useState<Map<string, { thisWeek: number; lastWeek: number }>>(new Map());
   const [costHistory, setCostHistory] = useState<Map<string, number>>(new Map());
   const [insightsReady, setInsightsReady] = useState(false);
@@ -147,7 +161,6 @@ export default function BuyingSheetPage() {
     Promise.all([
       fetchDemandHistory(),
       fetchLastPurchaseDates(),
-      fetchLeadTimes(),
       fetchSeasonalPatterns(),
       fetchWeeklyHistory(),
       fetchCostHistory(),
@@ -244,30 +257,6 @@ export default function BuyingSheetPage() {
       new Set([...lastMap.keys(), ...prevMap.keys()]).forEach(sku => { history.set(sku, { lastMonth: lastMap.get(sku) || 0, prevMonth: prevMap.get(sku) || 0 }); });
       setDemandHistory(history);
     } catch (err) { console.error("Failed to fetch demand history:", err); }
-  };
-
-  const fetchLeadTimes = async () => {
-    try {
-      const oneYearAgo = new Date(); oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
-      const data = await readAllRows((from, to) => supabase.from("order_items").select("code, created_at, completed_at, order_id").eq("progress_stage", "completed").not("code", "is", null).not("completed_at", "is", null).gte("completed_at", oneYearAgo.toISOString()).order("id").range(from, to));
-      const skuLeadTimes = new Map<string, number[]>();
-      (data || []).forEach(item => {
-        if (!item.created_at || !item.completed_at) return;
-        const sku = (item.code || "").trim().toUpperCase();
-        const days = Math.max(0, Math.round((new Date(item.completed_at).getTime() - new Date(item.created_at).getTime()) / (1000 * 60 * 60 * 24)));
-        const arr = skuLeadTimes.get(sku) || []; arr.push(days); skuLeadTimes.set(sku, arr);
-      });
-      const map = new Map<string, number>();
-      skuLeadTimes.forEach((days, sku) => { map.set(sku, Math.round(days.reduce((a, b) => a + b, 0) / days.length)); });
-      setLeadTimeMap(map);
-      const reliability = new Map<string, number>();
-      skuLeadTimes.forEach((days, sku) => {
-        const average = map.get(sku) || 14;
-        const onTime = days.filter((daysTaken) => daysTaken <= average * 1.2).length;
-        reliability.set(sku, Math.round((onTime / days.length) * 100));
-      });
-      setSupplierReliabilityMap(reliability);
-    } catch (err) { console.error("Failed to fetch lead times:", err); }
   };
 
   const fetchSeasonalPatterns = async () => {
@@ -476,7 +465,7 @@ export default function BuyingSheetPage() {
     const reorderPoint = Math.ceil(dailyBurn * (avgLeadTimeDays || 14)) + safetyStock;
 
     // Supplier reliability
-    const supplierReliability = supplierReliabilityMap.get(sku) ?? null;
+    const supplierReliability = null; // Filled from measured supplier receipts in the shared row projection.
 
     // Velocity score (orders per week)
     const wh = weeklyHistory.get(sku);
@@ -596,7 +585,7 @@ export default function BuyingSheetPage() {
         const stockoutRiskDays = depletionDays(verifiedStock, getDailyBurnRate(entry.sku));
         const lastPurchasedDate = z.lastPurchasedDate || lastPurchaseMap.get(entry.sku) || null;
         const seasonalPattern = seasonalMap.get(entry.sku) || null;
-        const avgLeadTimeDays = leadTimeMap.get(entry.sku) ?? null;
+        const avgLeadTimeDays = null; // Supplier delivery measurements are applied to all views together.
         let priorityScore = 0;
         if (toOrder > 0) priorityScore += 30;
         if (entry.hasUrgent) priorityScore += 40;
@@ -1055,6 +1044,7 @@ export default function BuyingSheetPage() {
               <div className="flex justify-between"><span className="text-muted-foreground">Demand Pattern:</span><span className={`font-medium ${row.demandVariability === "erratic" ? "text-destructive" : row.demandVariability === "moderate" ? "text-orange-500" : "text-emerald-500"}`}>{row.demandVariability}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Reorder Point:</span><span className="font-medium">{row.reorderPoint}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Safety Stock:</span><span className="font-medium">{row.safetyStock > 0 ? `+${row.safetyStock} buffer` : "—"}</span></div>
+              <div className="flex justify-between gap-3"><span className="text-muted-foreground">Supplier delay buffer:</span><span className="font-medium">+{row.supplierSafetyDays ?? 0} days · {row.supplierDeliverySamples ?? 0} receipts</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Recommended Qty:</span><span className="font-bold text-primary">{row.recommendedOrderQty}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Demand-linked PO:</span><span className="font-medium">{row.allocatedOnPurchaseOrder}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Zoho open PO:</span><span className={`font-medium ${row.poVariance > 0.01 ? "text-amber-600" : "text-emerald-600"}`}>{row.zohoOnPurchaseOrder}{row.poVariance > 0.01 ? ` (Δ ${row.poVariance})` : " ✓"}</span></div>
@@ -1378,6 +1368,7 @@ export default function BuyingSheetPage() {
           <FabricationReorderPanel />
           <BuyingSheetSummary totals={totals} avgDaysWaiting={avgDaysWaiting} supplierCount={uniqueSuppliers.length} />
           <SupplierPriceAlerts rows={rows} />
+          <SupplierReliabilityPanel {...supplierData} />
           <StockDepletionAlerts stock={zohoData} rows={rows} suggested={suggestedRows} />
 
           <ProcurementSuggestionsPanel

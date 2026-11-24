@@ -43,6 +43,8 @@ export interface BuyingSheetRow {
   reorderPoint: number;
   forecastNextMonth: number;
   supplierReliability: number | null; // 0-100%
+  supplierSafetyDays?: number;
+  supplierDeliverySamples?: number;
   velocityScore: number; // orders per week
   ageEscalation: "green" | "yellow" | "orange" | "red";
   conflictingUrgency: boolean; // same SKU has both normal & urgent orders

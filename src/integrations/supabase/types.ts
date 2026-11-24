@@ -3721,6 +3721,59 @@ export type Database = {
         }
         Relationships: []
       }
+      supplier_delivery_tracking: {
+        Row: {
+          cancelled: boolean
+          created_at: string
+          created_by: string
+          expected_date: string
+          id: string
+          notes: string
+          ordered_date: string
+          purchase_order_number: string
+          received_date: string | null
+          supplier_id: string
+          updated_at: string
+          updated_by: string
+        }
+        Insert: {
+          cancelled?: boolean
+          created_at?: string
+          created_by?: string
+          expected_date: string
+          id?: string
+          notes?: string
+          ordered_date: string
+          purchase_order_number: string
+          received_date?: string | null
+          supplier_id: string
+          updated_at?: string
+          updated_by?: string
+        }
+        Update: {
+          cancelled?: boolean
+          created_at?: string
+          created_by?: string
+          expected_date?: string
+          id?: string
+          notes?: string
+          ordered_date?: string
+          purchase_order_number?: string
+          received_date?: string | null
+          supplier_id?: string
+          updated_at?: string
+          updated_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_delivery_tracking_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       suppliers: {
         Row: {
           address: string | null
