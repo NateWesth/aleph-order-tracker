@@ -21,6 +21,9 @@ await db.exec(stamps.slice(stamps.indexOf('CREATE OR REPLACE FUNCTION public.set
 const migrations = new URL('../supabase/migrations/', import.meta.url);
 for (const name of (await readdir(migrations)).sort()) if (name.startsWith('20261124075120') || name.startsWith('20261124075508')) await db.exec(await readFile(new URL(name,migrations),'utf8'));
 for (const name of (await readdir(migrations)).sort()) if (name.startsWith('20261124092136')) await db.exec((await readFile(new URL(name,migrations),'utf8')).split('DO $$')[0]);
+await db.exec('CREATE TABLE fulfillment_settings(id boolean PRIMARY KEY,auto_assign_enabled boolean); ALTER TABLE orders ADD COLUMN fulfillment_method text, ADD COLUMN fulfillment_assigned_to uuid, ADD COLUMN fulfillment_routed_at timestamptz;');
+for (const name of (await readdir(migrations)).sort()) if (name.startsWith('20261124093008')) await db.exec((await readFile(new URL(name,migrations),'utf8')).split('DO $$')[0]);
+await db.exec('CREATE TRIGGER test_auto_route AFTER INSERT OR UPDATE OF qty_invoiced ON order_items FOR EACH ROW EXECUTE FUNCTION auto_route_ready_fulfillment();');
 const newOrder = async () => (await db.query("INSERT INTO orders(status,fulfillment_status) VALUES('ordered','pending') RETURNING id")).rows[0].id;
 test('already delivered orders have no unfinished item records, retain dates and do not confirm driver stops', async () => {
   const item=(await db.query('SELECT * FROM order_items')).rows[0];
@@ -70,5 +73,13 @@ test('editing an already-closed order never rewrites its settled lines',async()=
   await db.query("UPDATE orders SET status='completed' WHERE id=$1",[id]);
   const after=(await db.query('SELECT * FROM order_items WHERE order_id=$1',[id])).rows[0];
   assert.deepEqual(after,before);
+});
+test('automatic routing never changes closed or cancelled orders',async()=>{
+  for(const status of ['completed','delivered','cancelled']){
+    const id=(await db.query('INSERT INTO orders(status,fulfillment_method,fulfillment_status) VALUES($1,$2,$3) RETURNING id',[status,'collection','pending'])).rows[0].id;
+    await db.query('INSERT INTO order_items(order_id,quantity,qty_on_po,qty_received,qty_invoiced) VALUES($1,5,5,5,5)',[id]);
+    const order=(await db.query('SELECT * FROM orders WHERE id=$1',[id])).rows[0];
+    assert.equal(order.fulfillment_method,'collection');assert.equal(order.fulfillment_routed_at,null);assert.equal(order.status,status);
+  }
 });
 test.after(async()=>db.close());

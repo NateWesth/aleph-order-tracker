@@ -1,6 +1,7 @@
 # Roadmap
 
-- [ ] Sweep alternate order views, portal, operational counts/intelligence, Zoho imports and daily reports for completion/purchasing consistency; preserve settled records
+- [x] Sweep alternate order views, portal, operational counts/intelligence, Zoho imports and daily reports; preserve settled records; 60 tests and desktop/phone controlled checks passed
+- [ ] Verify live Zoho events and morning/afternoon email delivery with real staff data — external unmanaged sign-in unavailable; no production emails sent
 
 - [x] Fix completed Orders leaking into active lanes and procurement; saved audit now finds zero unfinished lines on completed orders
 - [x] Audit Buying Sheet coverage, duplicate PO counting, failed reads and purchasing safeguards

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { queryActiveDispatch } from "@/services/dispatchDocuments";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -76,6 +76,7 @@ export default function OperationsControlTower() {
   const [dueAt, setDueAt] = useState("");
   const [savingException, setSavingException] = useState(false);
   const [savedViewName, setSavedViewName] = useState("");
+  const latestRead = useRef(0);
 
   const memberName = useCallback((id: string | null | undefined) => {
     if (!id) return "Unassigned";
@@ -84,7 +85,9 @@ export default function OperationsControlTower() {
   }, [members]);
 
   const fetchData = useCallback(async (quiet = false) => {
+    const request=++latestRead.current;
     if (quiet) setRefreshing(true); else setLoading(true);
+    try {
     const result = await Promise.all([
       supabase.from("dispatch_routes").select("*").order("route_date", { ascending: false }).limit(60),
       supabase.from("operations_exceptions").select("*").order("created_at", { ascending: false }).limit(150),
@@ -96,6 +99,7 @@ export default function OperationsControlTower() {
       queryActiveDispatch(),
     ]);
     const [routeRes, exceptionRes, timelineRes, activityRes, taskRes, memberRes, activeOrderRes, freshDispatchRes] = result;
+    if(request!==latestRead.current)return;
     const firstError = result.find((entry) => entry.error)?.error;
     if (firstError) toast({ title: "Some dispatch data could not load", description: firstError.message, variant: "destructive" });
 
@@ -118,6 +122,7 @@ export default function OperationsControlTower() {
       const allocationRes = itemIds.length
         ? {data:await readRowsByIds(itemIds,(batch,from,to)=>supabase.from("order_item_po_allocations").select("order_item_id,quantity_ordered,quantity_received").in("order_item_id",batch).order("id").range(from,to)),error:null}
         : { data: [], error: null };
+      if(request!==latestRead.current)return;
       setIssues(buildReconciliationIssues((itemRes.data || []) as OrderItemRow[], (allocationRes.data || []) as AllocationRow[], activeOrders as OrderRef[]));
     } else {
       setIssues([]);
@@ -131,11 +136,12 @@ export default function OperationsControlTower() {
       setReadyCollectionCount(documents.filter(doc=>doc.kind==="collection").length);
       setUnassignedCollectionCount(documents.filter(doc=>doc.kind==="collection"&&!doc.assigned_to).length);
     }
-    setLoading(false); setRefreshing(false);
+    } catch(error){if(request===latestRead.current){setDispatchError("Figures could not refresh");toast({title:"Figures could not refresh",description:error instanceof Error?error.message:"Please retry",variant:"destructive"});}}
+    finally{if(request===latestRead.current){setLoading(false);setRefreshing(false);}}
   }, [toast]);
 
   useEffect(() => { void fetchData(); return subscribeOfflineQueue(() => setOfflineCount(pendingOfflineOperationCount())); }, [fetchData]);
-  useLiveData(["dispatch_routes", "operations_exceptions", "fulfillment_timeline_events", "order_activity_log", "team_action_items", "order_items", "order_item_po_allocations", "operational_saved_views", "po_tracking_cache", "dispatch_documents"], () => void fetchData(true), { channelName: "operations-command-centre" });
+  useLiveData(["orders", "dispatch_routes", "operations_exceptions", "fulfillment_timeline_events", "order_activity_log", "team_action_items", "order_items", "order_item_po_allocations", "operational_saved_views", "po_tracking_cache", "dispatch_documents"], () => void fetchData(true), { channelName: "operations-command-centre" });
 
   const activeRoutes = useMemo(() => {
     const yesterday = new Date(); yesterday.setHours(0,0,0,0); yesterday.setDate(yesterday.getDate() - 1);
