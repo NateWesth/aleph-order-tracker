@@ -47,11 +47,12 @@ const CACHE_ID = 'buying-sheet'
 const SYNC_LOCK_KEY = 'buying-sheet-bootstrap'
 
 async function readCache(supabase: any) {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('buying_sheet_cache')
     .select('payload, fetched_at')
     .eq('id', CACHE_ID)
     .maybeSingle()
+  if (error) throw error
   return data as { payload: any; fetched_at: string } | null
 }
 

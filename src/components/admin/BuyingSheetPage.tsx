@@ -371,15 +371,6 @@ export default function BuyingSheetPage() {
     return { trend: "stable", ...h };
   };
 
-  const getStockoutRiskDays = (sku: string, stockOnHand: number, onPO: number): number | null => {
-    const h = demandHistory.get(sku);
-    if (!h || (h.lastMonth === 0 && h.prevMonth === 0)) return null;
-    // Use daily burn rate for more accurate prediction
-    const dailyBurnRate = getDailyBurnRate(sku);
-    if (dailyBurnRate <= 0) return null;
-    return Math.round((stockOnHand + onPO) / dailyBurnRate);
-  };
-
   // Daily burn rate: weighted average favoring recent month
   const getDailyBurnRate = (sku: string): number => {
     const h = demandHistory.get(sku);
@@ -782,7 +773,7 @@ export default function BuyingSheetPage() {
     for (const [supplier, items] of groups.entries()) {
       const st = items.reduce((s, r) => s + buyingOrderQuantity(r, adjustedQtys), 0);
       html += `<h2>${supplier}</h2><table><thead><tr><th>SKU</th><th>Item</th><th class="text-right">Needed</th><th class="text-right">Stock</th><th class="text-right">Allocated PO</th><th class="text-right">Zoho Open PO</th><th class="text-right">To Order</th><th>Orders</th><th>Notes</th></tr></thead><tbody>`;
-      for (const item of items) html += `<tr><td style="font-family:monospace;font-size:10px">${item.sku}</td><td>${item.itemName}</td><td class="text-right">${item.totalNeeded}</td><td class="text-right">${item.stockOnHand}</td><td class="text-right">${item.onPurchaseOrder}</td><td class="text-right ${item.poVariance > 0.01 ? "urgent" : ""}">${item.zohoOnPurchaseOrder}</td><td class="text-right ${item.toOrder > 0 ? "urgent" : ""}">${buyingOrderQuantity(item, adjustedQtys)}</td><td style="font-size:10px">${item.orders.map(o => `${o.orderNumber} (${o.customerName})`).join(", ")}</td><td style="font-style:italic;color:#666;font-size:10px">${notes[item.rowKey] || ""}</td></tr>`;
+      for (const item of items) html += `<tr><td style="font-family:monospace;font-size:10px">${item.sku}</td><td>${item.itemName}</td><td class="text-right">${item.totalNeeded}</td><td class="text-right">${item.stockVerified ? item.stockOnHand : 'Unknown'}</td><td class="text-right">${item.onPurchaseOrder}</td><td class="text-right ${item.poVariance > 0.01 ? "urgent" : ""}">${item.zohoOnPurchaseOrder}</td><td class="text-right ${item.toOrder > 0 ? "urgent" : ""}">${buyingOrderQuantity(item, adjustedQtys)}</td><td style="font-size:10px">${item.orders.map(o => `${o.orderNumber} (${o.customerName})`).join(", ")}</td><td style="font-style:italic;color:#666;font-size:10px">${notes[item.rowKey] || ""}</td></tr>`;
       html += `<tr class="total-row"><td colspan="6">Total for ${supplier}</td><td class="text-right">${st}</td><td colspan="2"></td></tr></tbody></table>`;
     }
     html += `</body></html>`;
@@ -792,7 +783,7 @@ export default function BuyingSheetPage() {
   const handleExportCSV = () => {
     const target = selectedSkus.size > 0 ? sortedRows.filter(r => selectedSkus.has(r.rowKey)) : sortedRows;
     const headers = ["SKU","Item Name","Total Needed","In Stock","Allocated On PO","Zoho Open PO","PO Variance","To Order","Safety Stock","Recommended Qty","Coverage %","Waiting Since","Calendar Days Waiting","Stockout Risk Days","Daily Burn Rate","Demand Variability","Distinct Customers","Priority","Supplier","Lead Time","Trend","Season","Notes","Orders"];
-    const csvRows = target.map(r => [r.sku, r.itemName, r.totalNeeded, r.stockOnHand, r.onPurchaseOrder, r.zohoOnPurchaseOrder, r.poVariance, r.toOrder, r.safetyStock, buyingOrderQuantity(r, adjustedQtys), r.coveragePercent, r.waitingSince, r.daysWaiting, r.stockoutRiskDays ?? "N/A", r.dailyBurnRate.toFixed(1), r.demandVariability, r.distinctCustomers, r.priorityScore, r.supplierName, r.avgLeadTimeDays ?? "N/A", r.demandTrend, r.seasonalPattern || "N/A", notes[r.rowKey] || "", r.orders.map(o => `${o.orderNumber}(${o.customerName}:${o.quantity})`).join("; ")]);
+    const csvRows = target.map(r => [r.sku, r.itemName, r.totalNeeded, r.stockVerified ? r.stockOnHand : "Unknown", r.onPurchaseOrder, r.zohoOnPurchaseOrder, r.poVariance, r.toOrder, r.safetyStock, buyingOrderQuantity(r, adjustedQtys), r.coveragePercent, r.waitingSince, r.daysWaiting, r.stockoutRiskDays ?? "N/A", r.dailyBurnRate.toFixed(1), r.demandVariability, r.distinctCustomers, r.priorityScore, r.supplierName, r.avgLeadTimeDays ?? "N/A", r.demandTrend, r.seasonalPattern || "N/A", notes[r.rowKey] || "", r.orders.map(o => `${o.orderNumber}(${o.customerName}:${o.quantity})`).join("; ")]);
     const csv = [headers, ...csvRows].map(r => r.map(buyingCsvCell).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" }); const url = URL.createObjectURL(blob);
     const a = document.createElement("a"); a.href = url; a.download = `buying-sheet-${new Date().toISOString().split("T")[0]}.csv`; a.click(); URL.revokeObjectURL(url);
@@ -807,7 +798,7 @@ export default function BuyingSheetPage() {
       sections.push([
         ["SUPPLIER: " + supplier],
         ["SKU", "Item Name", "Qty to Order", "In Stock", "Allocated On PO", "Zoho Open PO", "PO Variance", "Notes"],
-        ...items.map(item => [item.sku, item.itemName, buyingOrderQuantity(item, adjustedQtys), item.stockOnHand, item.onPurchaseOrder, item.zohoOnPurchaseOrder, item.poVariance, notes[item.rowKey] || ""]),
+        ...items.map(item => [item.sku, item.itemName, buyingOrderQuantity(item, adjustedQtys), item.stockVerified ? item.stockOnHand : "Unknown", item.onPurchaseOrder, item.zohoOnPurchaseOrder, item.poVariance, notes[item.rowKey] || ""]),
         ["", "TOTAL", items.reduce((sum, row) => sum + buyingOrderQuantity(row, adjustedQtys), 0)],
       ].map(row => row.map(buyingCsvCell).join(",")).join("\n"));
     }
@@ -1215,7 +1206,7 @@ export default function BuyingSheetPage() {
         {loadError && <div role="alert" className="border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">Buying Sheet could not refresh: {loadError}</div>}
         <div role="status" className="border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
           {liveCoverageAsOf ? `Open supplier POs and customer invoices current as of ${liveCoverageAsOf.toLocaleString()} — already-invoiced units and units on open POs are deducted.` : "Live supplier PO and invoice figures could not be loaded; quantities may include items already ordered or invoiced."}
-          {(!lastRefreshedAt || Date.now() - lastRefreshedAt.getTime() > 86_400_000) && <> {lastRefreshedAt ? `Stock on hand is from ${lastRefreshedAt.toLocaleDateString()} — check the shelf before buying.` : "Stock on hand is not available — check the shelf before buying."}</>}
+          {lastRefreshedAt && <> Latest saved Zoho update: {lastRefreshedAt.toLocaleString()}.</>}
         </div>
         {rows.some(row => !row.isMiscellaneous && !row.stockVerified) && <div role="status" className="border border-border bg-muted/40 p-3 text-sm text-muted-foreground">Stock is unverified for {rows.filter(row => !row.isMiscellaneous && !row.stockVerified).length} items with missing or stale inventory. Verify availability before purchasing; suggested quantities exclude unverified stock.</div>}
         {/* ── Sticky Header ── */}

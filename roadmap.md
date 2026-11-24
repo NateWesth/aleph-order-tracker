@@ -6,7 +6,8 @@
 - [ ] Temporary purchasing/invoicing delegation preserving master client links
 - [ ] Client portal live progress, delivery receipt downloads and reorder requests
 - [ ] Reviewed draft Zoho PO creation from Buying Sheet recommendations
-- [ ] Stock depletion alerts based on fresh inventory and demand
+- [x] Manual Zoho inventory refresh and Buying Sheet depletion warnings from fresh stock and demand
+- [ ] Scheduled low-stock notifications — recipient and threshold settings still need to be chosen
 - [x] Dated supplier bill price history and purchasing warnings (from saved bills; supplier names fill in as bills are re-read)
 - [ ] Auditable job costs including vendor bills, waste and labour
 - [ ] Driver-consented live GPS, admin fleet map and route ETA
@@ -56,7 +57,7 @@
 - [x] Fix Buying Sheet loading, quantities, and controls
 - [x] Run Buying Sheet regression checks
 - [x] Deduct invoiced units and live open-PO units on the Buying Sheet
-- [ ] Add an explicit Zoho inventory refresh and fresh-stock depletion warnings (approved 23 Nov); keep missing/stale stock unknown.
+- [x] Add an explicit Zoho inventory refresh and fresh-stock depletion warnings (approved 23 Nov); keep missing/stale stock unknown.
 - [ ] Verify Buying Sheet while signed in — external unmanaged sign-in is unavailable to the test environment.
 
 - [x] Fix phone edits not appearing on desktop
