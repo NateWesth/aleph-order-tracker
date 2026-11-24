@@ -16,6 +16,7 @@ interface NotificationCenterProps {
 }
 
 const typeConfig: Record<string, { icon: typeof Package; color: string }> = {
+  stock_low: { icon: Package, color: 'text-destructive' },
   order_created: { icon: Package, color: 'text-emerald-500' },
   order_status_changed: { icon: ArrowRightLeft, color: 'text-blue-500' },
   order_update_message: { icon: MessageCircle, color: 'text-amber-500' },

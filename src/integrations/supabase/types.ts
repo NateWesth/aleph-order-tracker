@@ -3685,6 +3685,42 @@ export type Database = {
           },
         ]
       }
+      stock_alert_state: {
+        Row: {
+          active: boolean
+          created_at: string
+          daily_demand: number | null
+          days_remaining: number | null
+          episode: string
+          sku: string
+          stock_on_hand: number | null
+          stock_updated_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          daily_demand?: number | null
+          days_remaining?: number | null
+          episode?: string
+          sku: string
+          stock_on_hand?: number | null
+          stock_updated_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          daily_demand?: number | null
+          days_remaining?: number | null
+          episode?: string
+          sku?: string
+          stock_on_hand?: number | null
+          stock_updated_at?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       suppliers: {
         Row: {
           address: string | null
@@ -4082,6 +4118,10 @@ export type Database = {
         Args: { p_owner: string }
         Returns: string
       }
+      emit_stock_depletion_notifications: {
+        Args: { p_payload: Json }
+        Returns: number
+      }
       finish_dispatch_route_stop: {
         Args: {
           p_id: string
@@ -4254,6 +4294,10 @@ export type Database = {
           p_source_order_id: string
         }
         Returns: string
+      }
+      stock_alert_days: {
+        Args: { p_daily: number; p_entry: Json; p_now: string }
+        Returns: number
       }
       try_acquire_zoho_sync_lock: {
         Args: { lease_seconds?: number; requested_key: string }
