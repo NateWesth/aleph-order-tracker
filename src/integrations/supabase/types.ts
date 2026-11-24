@@ -37,6 +37,7 @@ export type Database = {
           cycle_started_at: string | null
           error: string | null
           id: boolean
+          inventory_data: Json
           last_attempt_at: string | null
           last_success_at: string | null
           next_page: number
@@ -48,6 +49,7 @@ export type Database = {
           cycle_started_at?: string | null
           error?: string | null
           id?: boolean
+          inventory_data?: Json
           last_attempt_at?: string | null
           last_success_at?: string | null
           next_page?: number
@@ -59,6 +61,7 @@ export type Database = {
           cycle_started_at?: string | null
           error?: string | null
           id?: boolean
+          inventory_data?: Json
           last_attempt_at?: string | null
           last_success_at?: string | null
           next_page?: number
