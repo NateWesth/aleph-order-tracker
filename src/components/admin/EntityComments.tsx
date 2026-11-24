@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MessageCircle, Send, Loader2, X, CornerUpLeft, SmilePlus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,8 @@ import { bubbleClass, bubbleTime, nameColorClass, markCommentsSeen } from "@/lib
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import EmojiPicker, { QUICK_REACTIONS } from "@/components/orders/components/EmojiPicker";
+import { useLiveData } from "@/hooks/useLiveData";
+import { readEntityCommentData } from "@/lib/entityCommentData";
 
 interface EntityComment {
   id: string;
@@ -64,79 +66,41 @@ export default function EntityComments({ entityType, entityId, orderId, classNam
   const draftRecovery=useDraftRecovery(`entity-comment:${entityType}:${entityId}`,{body,replyTo,mentions:[...mentionedIds.entries()]},!!body.trim(),saved=>{setBody(saved.body);setReplyTo(saved.replyTo);setMentionedIds(new Map(saved.mentions));});
 
   const [count, setCount] = useState(0);
-
-  useEffect(() => {
-    let active = true;
-    void supabase
-      .from("entity_comments")
-      .select("id", { count: "exact", head: true })
-      .eq("entity_type", entityType)
-      .eq("entity_id", entityId)
-      .then(({ count: c, error }) => {
-        if (active && !error) setCount(c || 0);
-      });
-    return () => { active = false; };
-  }, [entityType, entityId]);
+  const loadVersion = useRef(0);
 
   useEffect(() => {
     if (open) markCommentsSeen(`${entityType}:${entityId}`, Math.max(count, comments.length));
   }, [open, count, comments.length, entityType, entityId]);
 
   const fetchThread = useCallback(async () => {
-    setLoading(true);
+    const version = ++loadVersion.current;
+    if (open) setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from("entity_comments")
-        .select("id, entity_type, entity_id, user_id, body, created_at, reply_to_id")
-        .eq("entity_type", entityType)
-        .eq("entity_id", entityId)
-        .order("created_at", { ascending: true });
-      if (error) throw error;
-
-      const rows = data || [];
-      const userIds = [...new Set(rows.map((c) => c.user_id))];
-      const { data: profiles } = userIds.length
-        ? await supabase.from("profiles").select("id, full_name, email").in("id", userIds)
-        : { data: [] };
-      const authorMap = new Map((profiles || []).map((p: any) => [p.id, p]));
-      setComments(rows.map((c) => ({ ...c, author: authorMap.get(c.user_id) || null })) as EntityComment[]);
-      setCount(rows.length);
-
-      const ids = rows.map((c) => c.id);
-      if (ids.length) {
-        const { data: reactionRows } = await supabase
-          .from("entity_comment_reactions")
-          .select("id, comment_id, user_id, emoji")
-          .in("comment_id", ids);
-        setReactions(reactionRows || []);
-      } else {
-        setReactions([]);
+      if (!open) {
+        const { count: total, error } = await supabase.from("entity_comments").select("id", { count: "exact", head: true }).eq("entity_type", entityType).eq("entity_id", entityId);
+        if (error) throw error;
+        if (version === loadVersion.current) setCount(total || 0);
+        return;
       }
+      const { comments: rows, members, reactions: savedReactions } = await readEntityCommentData(supabase, entityType, entityId);
+      if (version !== loadVersion.current) return;
+      const authorMap = new Map(members.map(member => [member.id, member]));
+      setComments(rows.map(comment => ({ ...comment, author: authorMap.get(comment.user_id) || null })));
+      setCount(rows.length); setTeamMembers(members); setReactions(savedReactions);
     } catch (error) {
+      if (version !== loadVersion.current) return;
       console.error("Error loading entity comments:", error);
       toast({ title: "Comments could not load", description: "Please check your connection and try again.", variant: "destructive" });
     } finally {
-      setLoading(false);
+      if (version === loadVersion.current) setLoading(false);
     }
-  }, [entityType, entityId, toast]);
+  }, [entityType, entityId, open, toast]);
 
   useEffect(() => {
-    if (!open) return;
-    fetchThread();
-    void supabase.from("profiles").select("id, full_name, email").order("full_name", { ascending: true })
-      .then(({ data }) => setTeamMembers((data || []) as TeamMember[]));
-
-    const channel = supabase
-      .channel(`entity-comments-${entityType}-${entityId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "entity_comments" }, (payload) => {
-        const row = (payload.new || payload.old) as EntityComment;
-        if (row?.entity_type === entityType && row?.entity_id === entityId) fetchThread();
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "entity_comment_reactions" }, () => fetchThread())
-      .subscribe();
-
-    return () => { supabase.removeChannel(channel); };
-  }, [open, entityType, entityId, fetchThread]);
+    void fetchThread();
+    return () => { loadVersion.current++; };
+  }, [fetchThread]);
+  useLiveData(["entity_comments", "entity_comment_reactions", "profiles"], fetchThread);
 
   const commentById = useMemo(() => {
     const map = new Map<string, EntityComment>();
@@ -180,18 +144,12 @@ export default function EntityComments({ entityType, entityId, orderId, classNam
   const toggleReaction = async (commentId: string, emoji: string) => {
     if (!user) return;
     const existing = reactions.find((r) => r.comment_id === commentId && r.user_id === user.id && r.emoji === emoji);
-    if (existing) {
-      setReactions((prev) => prev.filter((r) => r.id !== existing.id));
-      await supabase.from("entity_comment_reactions").delete().eq("id", existing.id);
-    } else {
-      const tempId = `optimistic-${Date.now()}`;
-      setReactions((prev) => [...prev, { id: tempId, comment_id: commentId, user_id: user.id, emoji }]);
-      const { data, error } = await supabase
-        .from("entity_comment_reactions").insert({ comment_id: commentId, user_id: user.id, emoji })
-        .select("id").maybeSingle();
-      if (error) setReactions((prev) => prev.filter((r) => r.id !== tempId));
-      else if (data?.id) setReactions((prev) => prev.map((r) => (r.id === tempId ? { ...r, id: data.id } : r)));
-    }
+    loadVersion.current++;
+    const { error } = existing
+      ? await supabase.from("entity_comment_reactions").delete().eq("id", existing.id)
+      : await supabase.from("entity_comment_reactions").insert({ comment_id: commentId, user_id: user.id, emoji });
+    if (error) toast({ title: "Reaction not saved", description: "Please try again.", variant: "destructive" });
+    await fetchThread();
   };
 
   const handleSend = async () => {

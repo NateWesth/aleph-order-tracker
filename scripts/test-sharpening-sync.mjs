@@ -13,6 +13,8 @@ function moduleAt(path, imports) {
 }
 const { readAllRows } = moduleAt("../src/lib/readAllRows.ts", {});
 const { savedWorkTotals } = moduleAt("../src/lib/workshopTime.ts", {});
+const { readEntityCommentData } = moduleAt("../src/lib/entityCommentData.ts", { "./readAllRows": { readAllRows } });
+const { readWorkshopReportData, requireWorkshopReportData } = moduleAt("../supabase/functions/_shared/workshop-report-data.ts", {});
 const settle = async () => { for (let n = 0; n < 20; n++) await Promise.resolve(); };
 const deferred = () => { let resolve; const promise = new Promise(r => { resolve = r; }); return { promise, resolve }; };
 
@@ -38,9 +40,12 @@ function componentHarness(path, db) {
     "@/hooks/useLiveData": { useLiveData: (tables, refresh) => feeds.push({ tables: [...tables], refresh }) },
     "@/lib/readAllRows": { readAllRows },
     "@/lib/workshopTime": { savedWorkTotals },
+    "@/lib/entityCommentData": { readEntityCommentData },
+    "@/lib/fabricationPdf": { FABRICATION_STAGES: [], PROJECT_TYPES: [], stageLabel: value => value },
   }, { get: (target, name) => target[name] ?? fallback });
-  const Component = moduleAt(path, imports).default;
-  Component({ entityType: "sharpening", entityId: "job-1", label: "Sharpening" });
+  const module = moduleAt(path, imports);
+  const Component = module.default ?? module.useNotifications;
+  Component({ entityType: "sharpening", entityId: "job-1", label: "Sharpening", references: [], defaultOpen: true });
   return { values, effects, load: callbacks[0], feed: feeds[0] };
 }
 
@@ -161,4 +166,70 @@ test("An edit received during a live read is fetched again after that read compl
   h.handlers[0].fn(); await h.flush(); assert.equal(reads, 1);
   pending.resolve(); await settle(); await h.flush(); assert.equal(reads, 2);
   h.dispose();
+});
+
+test("Repairs uses the same complete, recoverable cross-user snapshot as sharpening", async () => {
+  const rows = Array.from({ length: 1001 }, (_, i) => ({ id: `repair-${i}`, ticket_number: `R-${i}`, status: "not_started", tool_code: "TOOL", date_received_by_client: "2026-11-24" }));
+  const h = componentHarness("../src/components/admin/RepairsPage.tsx", tableDb((table, from, to) => Promise.resolve({ data: table === "profiles" ? [] : rows.slice(from, to + 1), error: null })));
+  await h.load(); assert.equal(h.values[0].length, 1001);
+  assert.deepEqual(h.feed.tables, ["repair_tickets", "profiles"]);
+});
+
+test("Sharpening comment threads retain all comments and reactions with bounded reads", async () => {
+  const comments = Array.from({ length: 1001 }, (_, i) => ({ id: `c-${i}`, entity_type: "sharpening", entity_id: "job-1", user_id: "tech-b", body: `Note ${i}`, created_at: "2026-11-24", reply_to_id: null }));
+  const reactions = comments.flatMap(comment => Array.from({ length: 11 }, (_, i) => ({ id: `${comment.id}-r-${i}`, comment_id: comment.id, user_id: `tech-${i}`, emoji: "👍" })));
+  const batches = [];
+  const db = tableDb((table, from, to, filters) => {
+    let data;
+    if (table === "entity_comments") {
+      assert.ok(filters.some(([key, value]) => key === "entity_type" && value === "sharpening"));
+      assert.ok(filters.some(([key, value]) => key === "entity_id" && value === "job-1"));
+      data = comments;
+    } else if (table === "profiles") data = [{ id: "tech-b", full_name: "Technician B", email: null }];
+    else { const batch = filters.find(([key]) => key === "comment_id")[1]; batches.push(batch); data = reactions.filter(reaction => batch.includes(reaction.comment_id)); }
+    return Promise.resolve({ data: data.slice(from, to + 1), error: null });
+  });
+  const result = await readEntityCommentData(db, "sharpening", "job-1");
+  assert.equal(result.comments.length, 1001); assert.equal(result.reactions.length, 11011);
+  assert.equal(Math.max(...batches.map(batch => batch.length)), 100);
+  assert.equal(result.members[0].full_name, "Technician B");
+  const overview = await readEntityCommentData(tableDb((table, from, to) => Promise.resolve({ data: table === "entity_comments" ? comments.slice(from, to + 1) : [], error: null })), "sharpening", undefined, 60);
+  assert.equal(overview.comments.length, 60);
+});
+
+test("Morning and afternoon workshop snapshots include all active jobs but never mask read errors", async () => {
+  for (const table of ["sharpening_jobs", "repair_tickets"]) {
+    const rows = Array.from({ length: 1001 }, (_, i) => ({ id: `job-${i}`, status: "not_started" }));
+    let fail = false;
+    const db = { from(name) { assert.equal(name, table); const q = { select() { return q; }, neq(key, value) { assert.equal(value, "completed"); return q; }, not(key, op, value) { assert.equal(value, "(completed,scrapped)"); return q; }, order() { return q; }, range(from, to) { return Promise.resolve(fail && from ? { data: null, error: { message: "Offline" } } : { data: rows.slice(from, to + 1), error: null }); } }; return q; } };
+    assert.equal((await readWorkshopReportData(db, table, "id,status")).data.length, 1001);
+    fail = true;
+    const results = await Promise.allSettled([readWorkshopReportData(db, table, "id,status")]);
+    assert.throws(() => requireWorkshopReportData(results), /could not refresh: Offline/);
+  }
+});
+
+test("Fabrication list retains every shared project and the last saved snapshot after failures", async () => {
+  let fail = false;
+  const rows = Array.from({ length: 1001 }, (_, i) => ({ id: `fab-${i}`, name: `Project ${i}`, stage: "stripping", start_date: "2026-11-24" }));
+  const h = componentHarness("../src/components/admin/FabricationPage.tsx", tableDb((table, from, to) => Promise.resolve({ data: fail ? null : table === "profiles" ? [] : rows.slice(from, to + 1), error: fail ? { message: "Disconnected" } : null })));
+  await h.load(); assert.equal(h.values[0].length, 1001);
+  assert.deepEqual(h.feed.tables, ["fabrication_projects", "profiles"]);
+  fail = true; await h.feed.refresh(); assert.equal(h.values[0].length, 1001);
+});
+
+test("Notification recovery reads only the current user's alerts and refreshes remote dismissal/read changes", async () => {
+  let rows = [{ id: "alert-1", user_id: "tech-a", read: false }];
+  const db = { rpc: async () => ({ data: 0, error: null }), from(table) {
+    assert.equal(table, "notifications");
+    const filters = []; let head = false;
+    const q = { select(fields, options) { head = !!options?.head; return q; }, eq(key, value) { filters.push([key, value]); return q; }, order() { return q; }, limit() { return q; }, then(resolve) {
+      assert.ok(filters.some(([key, value]) => key === "user_id" && value === "tech-a"));
+      return Promise.resolve({ data: head ? null : rows, count: rows.filter(row => !row.read).length, error: null }).then(resolve);
+    } }; return q;
+  } };
+  const h = componentHarness("../src/hooks/useNotifications.ts", db);
+  await h.load(); assert.equal(h.values[1], 1);
+  rows = [{ ...rows[0], read: true }]; await h.feed.refresh(); assert.equal(h.values[1], 0); assert.equal(h.values[0][0].read, true);
+  rows = []; await h.feed.refresh(); assert.equal(h.values[0].length, 0);
 });

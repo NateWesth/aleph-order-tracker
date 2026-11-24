@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
 import { buildTextPdf, emailRow, emptyRow, firstName, operationalEmail, sendOperationalEmail, shortDate, zaDate } from "../_shared/operational-email.ts";
+import { readWorkshopReportData, requireWorkshopReportData } from "../_shared/workshop-report-data.ts";
 
 const cors={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type"};
 const json=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers:{...cors,"Content-Type":"application/json"}});
@@ -23,9 +24,10 @@ serve(async(req:Request)=>{
       supabase.from("return_cases").select("id,rma_number,client_name,item_description,status,priority,due_date").not("status","in","(completed,rejected)").order("due_date"),
       supabase.from("loan_assets").select("id,asset_code,tool_name,borrower_name,due_back_at,returned_at").is("returned_at",null).order("due_back_at"),
       supabase.from("calibration_assets").select("id,asset_code,tool_name,next_due_on,status").neq("status","retired").order("next_due_on"),
-      supabase.from("sharpening_jobs").select("id,job_number,customer_name,status,priority,deadline_date").neq("status","completed").order("deadline_date"),
-      supabase.from("repair_tickets").select("id,ticket_number,client,status,priority,deadline_date,is_warranty").not("status","in","(completed,scrapped)").order("deadline_date"),
+      readWorkshopReportData(supabase,"sharpening_jobs","id,job_number,customer_name,status,priority,deadline_date"),
+      readWorkshopReportData(supabase,"repair_tickets","id,ticket_number,client,status,priority,deadline_date,is_warranty"),
     ]);
+    requireWorkshopReportData(results.slice(6,8));
     const [orders,items,pos,returns,loans,calibrations,sharpening,repairs]=results.map(dataOf);
     const urgent=orders.filter((o:any)=>o.urgency==="urgent");
     const stale=orders.filter((o:any)=>o.created_at&&ageDays(o.created_at)>=14);

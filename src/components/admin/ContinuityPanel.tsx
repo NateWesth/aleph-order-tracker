@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowRight, Check, Clock3, History, PlaneTakeoff, Plus, UserRoundCog } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import OperationalLeaveCover from "./OperationalLeaveCover";
 import PortalReorderQueue from "./PortalReorderQueue";
+import { useLiveData } from "@/hooks/useLiveData";
 
 type Profile={id:string;full_name:string|null;email:string|null};
 type Change={id:string;title:string;description:string|null;created_at:string;activity_type:string};
@@ -24,15 +25,17 @@ export default function ContinuityPanel(){
   const db=supabase as any;const {user}=useAuth();const {toast}=useToast();
   const [since,setSince]=useState(new Date(Date.now()-24*3600000).toISOString());const [changes,setChanges]=useState<Change[]>([]);const [notifications,setNotifications]=useState<any[]>([]);const [delegations,setDelegations]=useState<Delegation[]>([]);const [team,setTeam]=useState<Profile[]>([]);const [open,setOpen]=useState(false);const [saving,setSaving]=useState(false);
   const [delegateId,setDelegateId]=useState("");const [startsAt,setStartsAt]=useState(localInput(new Date()));const [endsAt,setEndsAt]=useState(localInput(new Date(Date.now()+7*86400000)));const [notes,setNotes]=useState("");
-  const load=useCallback(async()=>{if(!user?.id)return;const checkpoint=await db.from("user_activity_checkpoints").select("last_seen_at").eq("user_id",user.id).maybeSingle();const from=checkpoint.data?.last_seen_at||new Date(Date.now()-24*3600000).toISOString();setSince(from);const [a,n,d,p]=await Promise.all([
+  const loadVersion=useRef(0);
+  const load=useCallback(async()=>{if(!user?.id)return;const version=++loadVersion.current;const checkpoint=await db.from("user_activity_checkpoints").select("last_seen_at").eq("user_id",user.id).maybeSingle();if(version!==loadVersion.current)return;if(checkpoint.error){toast({title:"Briefing could not refresh",description:checkpoint.error.message,variant:"destructive"});return;}const from=checkpoint.data?.last_seen_at||new Date(Date.now()-24*3600000).toISOString();const [a,n,d,p]=await Promise.all([
     db.from("order_activity_log").select("id,title,description,created_at,activity_type").gt("created_at",from).order("created_at",{ascending:false}).limit(12),
     db.from("notifications").select("id,title,message,created_at,read,type").eq("user_id",user.id).gt("created_at",from).order("created_at",{ascending:false}).limit(20),
     db.from("responsibility_delegations").select("*").or(`owner_id.eq.${user.id},delegate_id.eq.${user.id}`).neq("status","cancelled").order("starts_at",{ascending:false}).limit(20),
     supabase.from("profiles").select("id,full_name,email").eq("approved",true).neq("id",user.id).order("full_name"),
-  ]);const failure=[a,n,d,p].find(result=>result.error);if(failure){toast({title:"Briefing could not refresh",description:failure.error.message,variant:"destructive"});return;}setChanges(a.data||[]);setNotifications(n.data||[]);setDelegations((d.data||[]).map((row:Delegation)=>({...row,status:new Date(row.ends_at).getTime()<=Date.now()?"completed":new Date(row.starts_at).getTime()>Date.now()?"scheduled":"active"})));setTeam((p.data||[]) as Profile[])},[db,user?.id,toast]);
-  useEffect(()=>{void load()},[load]);
+  ]);if(version!==loadVersion.current)return;const failure=[a,n,d,p].find(result=>result.error);if(failure){toast({title:"Briefing could not refresh",description:failure.error.message,variant:"destructive"});return;}setSince(from);setChanges(a.data||[]);setNotifications(n.data||[]);setDelegations((d.data||[]).map((row:Delegation)=>({...row,status:new Date(row.ends_at).getTime()<=Date.now()?"completed":new Date(row.starts_at).getTime()>Date.now()?"scheduled":"active"})));setTeam((p.data||[]) as Profile[])},[db,user?.id,toast]);
+  useEffect(()=>{void load();return()=>{loadVersion.current++}},[load]);
+  useLiveData(["notifications", "user_activity_checkpoints", "order_activity_log", "responsibility_delegations", "profiles"], load, { enabled: !!user?.id, fallbackIntervalMs: 60_000 });
   const nameMap=useMemo(()=>new Map(team.map(p=>[p.id,p.full_name||p.email||"Team member"])),[team]);
-  const caughtUp=async()=>{if(!user?.id)return;const now=new Date().toISOString();const {error}=await db.from("user_activity_checkpoints").upsert({user_id:user.id,last_seen_at:now,updated_at:now});if(error)toast({title:"Checkpoint not saved",description:error.message,variant:"destructive"});else{setSince(now);setChanges([]);setNotifications([]);toast({title:"You’re caught up",description:"The next briefing starts from now."})}};
+  const caughtUp=async()=>{if(!user?.id)return;const now=new Date().toISOString();const {error}=await db.from("user_activity_checkpoints").upsert({user_id:user.id,last_seen_at:now,updated_at:now});if(error)toast({title:"Checkpoint not saved",description:error.message,variant:"destructive"});else{loadVersion.current++;setSince(now);setChanges([]);setNotifications([]);toast({title:"You’re caught up",description:"The next briefing starts from now."})}};
   const saveCover=async()=>{if(!user?.id||!delegateId){toast({title:"Choose a teammate",variant:"destructive"});return;}if(!Number.isFinite(Date.parse(startsAt))||!Number.isFinite(Date.parse(endsAt))||Date.parse(endsAt)<=Date.parse(startsAt)){toast({title:"Choose a valid end time after the start",variant:"destructive"});return;}setSaving(true);const {error}=await db.from("responsibility_delegations").insert({owner_id:user.id,delegate_id:delegateId,starts_at:new Date(startsAt).toISOString(),ends_at:new Date(endsAt).toISOString(),notes:notes.trim()||null,scopes:["all"],created_by:user.id});setSaving(false);if(error)toast({title:"Cover not created",description:error.message,variant:"destructive"});else{setOpen(false);toast({title:"Temporary cover arranged",description:"Your teammate was notified and your assigned work will appear in their My Work page."});await load()}};
   const cancel=async(id:string)=>{const {error}=await db.from("responsibility_delegations").update({status:"cancelled"}).eq("id",id);if(error)toast({title:"Cover not cancelled",description:error.message,variant:"destructive"});else{toast({title:"Temporary cover cancelled"});await load()}};
   const total=changes.length+notifications.length;

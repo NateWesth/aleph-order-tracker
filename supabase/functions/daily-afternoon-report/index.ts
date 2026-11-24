@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
 import { buildTextPdf, emailRow, emptyRow, firstName, operationalEmail, sendOperationalEmail, shortDate, zaDate } from "../_shared/operational-email.ts";
+import { readWorkshopReportData, requireWorkshopReportData } from "../_shared/workshop-report-data.ts";
 
 const cors={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type"};
 const json=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers:{...cors,"Content-Type":"application/json"}});
@@ -22,9 +23,10 @@ serve(async(req:Request)=>{
       supabase.from("loan_assets").select("id,asset_code,tool_name,borrower_name,due_back_at,returned_at,responsible_user_id").is("returned_at",null).order("due_back_at"),
       supabase.from("calibration_assets").select("id,asset_code,tool_name,next_due_on,status,responsible_user_id").neq("status","retired").order("next_due_on"),
       supabase.from("team_action_items").select("id,title,status,priority,due_at,assigned_to,workspace").neq("status","done").order("due_at"),
-      supabase.from("repair_tickets").select("id,ticket_number,client,status,deadline_date,assigned_to").not("status","in","(completed,scrapped)").order("deadline_date"),
-      supabase.from("sharpening_jobs").select("id,job_number,customer_name,status,deadline_date,assigned_to").neq("status","completed").order("deadline_date"),
+      readWorkshopReportData(supabase,"repair_tickets","id,ticket_number,client,status,deadline_date,assigned_to"),
+      readWorkshopReportData(supabase,"sharpening_jobs","id,job_number,customer_name,status,deadline_date,assigned_to"),
     ]);
+    requireWorkshopReportData(results.slice(7,9));
     const [completed,active,activity,returns,loans,calibrations,tasks,repairs,sharpening]=results.map(dataOf);const urgent=active.filter((o:any)=>o.urgency==="urgent");const scheduledTomorrow=active.filter((o:any)=>o.fulfillment_scheduled_for&&new Date(o.fulfillment_scheduled_for)>=end&&new Date(o.fulfillment_scheduled_for)<tomorrow);const now=Date.now();const serviceDue=[...loans.filter((x:any)=>new Date(x.due_back_at).getTime()<now).map((x:any)=>({ref:x.asset_code,detail:`Loan with ${x.borrower_name} · ${x.tool_name}`,owner:x.responsible_user_id,type:"loan"})),...calibrations.filter((x:any)=>x.status==="due"||x.status==="expired").map((x:any)=>({ref:x.asset_code,detail:`Calibration ${shortDate(x.next_due_on)} · ${x.tool_name}`,owner:x.responsible_user_id,type:"calibration"}))];
     const handover=[...repairs.map((x:any)=>({ref:x.ticket_number,detail:`Repair · ${x.client}`,deadline:x.deadline_date,owner:x.assigned_to})),...sharpening.map((x:any)=>({ref:x.job_number,detail:`Sharpening · ${x.customer_name}`,deadline:x.deadline_date,owner:x.assigned_to}))].filter((x:any)=>x.deadline&&new Date(x.deadline).getTime()<tomorrow.getTime());
     const day=zaDate();let sent=0,failed=0;

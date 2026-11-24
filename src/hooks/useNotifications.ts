@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLiveData } from '@/hooks/useLiveData';
 
 export interface Notification {
   id: string;
@@ -20,9 +21,11 @@ export function useNotifications() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const loadVersion = useRef(0);
 
   const fetchNotifications = useCallback(async () => {
     if (!user?.id) return;
+    const version = ++loadVersion.current;
     try {
       // Materialize time-based alerts on demand; the RPC deduplicates each
       // overdue delivery/collection for 24 hours.
@@ -43,17 +46,19 @@ export function useNotifications() {
 
       if (error) throw error;
       if (countError) throw countError;
+      if (version !== loadVersion.current) return;
 
       setNotifications((data || []) as unknown as Notification[]);
       setUnreadCount(count || 0);
     } catch (err) {
       console.error('Error fetching notifications:', err);
     } finally {
-      setLoading(false);
+      if (version === loadVersion.current) setLoading(false);
     }
   }, [user?.id]);
 
   const markAsRead = useCallback(async (notificationId: string) => {
+    loadVersion.current++;
     const { error } = await supabase
       .from('notifications')
       .update({ read: true })
@@ -69,6 +74,7 @@ export function useNotifications() {
 
   const markAllAsRead = useCallback(async () => {
     if (!user?.id) return;
+    loadVersion.current++;
     const { error } = await supabase
       .from('notifications')
       .update({ read: true })
@@ -82,6 +88,7 @@ export function useNotifications() {
   }, [user?.id]);
 
   const markAsUnread = useCallback(async (notificationId: string) => {
+    loadVersion.current++;
     const { error } = await supabase
       .from('notifications')
       .update({ read: false })
@@ -94,6 +101,7 @@ export function useNotifications() {
   }, []);
 
   const dismiss = useCallback(async (notificationId: string) => {
+    loadVersion.current++;
     const existing = notifications.find(item => item.id === notificationId);
     const { error } = await supabase.from('notifications').delete().eq('id', notificationId);
     if (!error) {
@@ -104,6 +112,7 @@ export function useNotifications() {
 
   const clearAll = useCallback(async () => {
     if (!user?.id) return;
+    loadVersion.current++;
     const { error } = await supabase
       .from('notifications')
       .delete()
@@ -116,6 +125,7 @@ export function useNotifications() {
   }, [user?.id]);
 
   useEffect(() => {
+    loadVersion.current++;
     if (!user?.id) {
       setNotifications([]);
       setUnreadCount(0);
@@ -123,49 +133,10 @@ export function useNotifications() {
       return;
     }
 
-    fetchNotifications();
-
-    const channel = supabase
-      .channel(`notifications-${user.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'notifications',
-          filter: `user_id=eq.${user.id}`,
-        },
-        (payload) => {
-          const newNotif = payload.new as Notification;
-          setNotifications(prev => [newNotif, ...prev.filter(item => item.id !== newNotif.id)].slice(0, 100));
-          setUnreadCount(prev => prev + 1);
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'notifications',
-          filter: `user_id=eq.${user.id}`,
-        },
-        (payload) => {
-          const updated = payload.new as Notification;
-          setNotifications(previous => {
-            const existing = previous.find(item => item.id === updated.id);
-            if (existing && existing.read !== updated.read) {
-              setUnreadCount(count => updated.read ? Math.max(0, count - 1) : count + 1);
-            }
-            return previous.map(item => item.id === updated.id ? updated : item);
-          });
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    void fetchNotifications();
+    return () => { loadVersion.current++; };
   }, [user?.id, fetchNotifications]);
+  useLiveData(['notifications'], fetchNotifications, { enabled: !!user?.id, fallbackIntervalMs: 60_000 });
 
   return {
     notifications,

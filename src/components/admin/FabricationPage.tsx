@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Hammer, Plus, Printer, Trash2, Upload, FileText, Image as ImageIcon, CheckSquare, Square, Clock3, Package, Puzzle, Download, ExternalLink, RotateCcw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -67,18 +67,27 @@ export default function FabricationPage() {
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [menu, setMenu] = useState<{ x: number; y: number; id: string } | null>(null);
+  const loadVersion = useRef(0);
 
   const load = useCallback(async () => {
-    const { data, error } = await db.from("fabrication_projects").select("*").order("start_date", { ascending: true });
-    if (error) toast({ title: "Could not load projects", description: error.message, variant: "destructive" });
-    setProjects(data || []); setLoading(false);
+    const version = ++loadVersion.current;
+    try {
+      const [data, profiles] = await Promise.all([
+        readAllRows<FabProject>((from, to) => db.from("fabrication_projects").select("*").order("start_date", { ascending: true }).order("id").range(from, to)),
+        readAllRows<TeamMember>((from, to) => supabase.from("profiles").select("id, full_name, email").order("full_name").order("id").range(from, to)),
+      ]);
+      if (version !== loadVersion.current) return;
+      setProjects(data); setTeam(profiles);
+    } catch (error: any) {
+      if (version === loadVersion.current) toast({ title: "Could not sync projects", description: error.message, variant: "destructive" });
+    } finally { if (version === loadVersion.current) setLoading(false); }
   }, [toast]);
 
   useEffect(() => {
-    load();
-    supabase.from("profiles").select("id, full_name, email").then(({ data }) => setTeam((data as TeamMember[]) || []));
+    void load();
+    return () => { loadVersion.current++; };
   }, [load]);
-  useLiveData(["fabrication_projects"], load, { channelName: "fabrication-projects" });
+  useLiveData(["fabrication_projects", "profiles"], load);
 
   const [typeFilter, setTypeFilter] = useState<"all" | "new_build" | "repair">("all");
   const filtered = useMemo(() => {
@@ -96,6 +105,7 @@ export default function FabricationPage() {
     if (patch.stage) full.completed_at = patch.stage === "completed" ? new Date().toISOString() : null;
     const { error } = await db.from("fabrication_projects").update(full).in("id", ids);
     if (error) return toast({ title: "Update failed", description: error.message, variant: "destructive" });
+    loadVersion.current++;
     setProjects((prev) => prev.map((p) => ids.includes(p.id) ? { ...p, ...full } : p));
     if (patch.stage === "completed") toast({ title: ids.length > 1 ? `${ids.length} projects completed` : "Project completed", description: "Moved to History." });
   };
@@ -248,29 +258,31 @@ function ProjectPanel({ id, team, onClose, onChange, onDelete }: { id: string; t
   const [files, setFiles] = useState<FabFile[]>([]);
   const [uploading, setUploading] = useState(false);
   const [printing, setPrinting] = useState(false);
+  const detailVersion = useRef(0);
 
   const loadAll = useCallback(async () => {
+    const version = ++detailVersion.current;
     try {
     const [pr, m, pa, t, f] = await Promise.all([
       db.from("fabrication_projects").select("*").eq("id", id).single(),
-      db.from("fabrication_materials").select("*").eq("project_id", id).order("created_at"),
-      db.from("fabrication_parts").select("*").eq("project_id", id).order("created_at"),
+      readAllRows<FabMaterial>((from, to) => db.from("fabrication_materials").select("*").eq("project_id", id).order("created_at").order("id").range(from, to)),
+      readAllRows<FabPart>((from, to) => db.from("fabrication_parts").select("*").eq("project_id", id).order("created_at").order("id").range(from, to)),
       readAllRows<FabTime>((from, to) => db.from("fabrication_time_entries").select("*").eq("project_id", id).order("work_date").order("id").range(from, to)),
-      db.from("fabrication_files").select("*").eq("project_id", id).order("created_at"),
+      readAllRows<FabFile>((from, to) => db.from("fabrication_files").select("*").eq("project_id", id).order("created_at").order("id").range(from, to)),
     ]);
-    const error = pr.error || m.error || pa.error || f.error;
+    const error = pr.error;
     if (error) throw error;
-    setP(pr.data); setMaterials(m.data || []); setParts(pa.data || []); setTime(t);
-    const list: FabFile[] = f.data || [];
+    const list: FabFile[] = f;
     if (list.length) {
       const { data: signed } = await supabase.storage.from(BUCKET).createSignedUrls(list.map((x) => x.storage_path), 3600);
       list.forEach((x, i) => { x.url = signed?.[i]?.signedUrl; });
     }
-    setFiles(list);
-    } catch (error: any) { toast({ title: "Project details could not refresh", description: error.message, variant: "destructive" }); }
+    if (version !== detailVersion.current) return;
+    setP(pr.data); setMaterials(m); setParts(pa); setTime(t); setFiles(list);
+    } catch (error: any) { if (version === detailVersion.current) toast({ title: "Project details could not refresh", description: error.message, variant: "destructive" }); }
   }, [id, toast]);
-  useEffect(() => { loadAll(); }, [loadAll]);
-  useLiveData(["fabrication_projects", "fabrication_materials", "fabrication_parts", "fabrication_time_entries", "fabrication_files"], loadAll, { channelName: `fabrication-detail-${id}` });
+  useEffect(() => { void loadAll(); return () => { detailVersion.current++; }; }, [loadAll]);
+  useLiveData(["fabrication_projects", "fabrication_materials", "fabrication_parts", "fabrication_time_entries", "fabrication_files"], loadAll);
 
   const patch = async (change: Partial<FabProject>) => {
     if (!p) return;
@@ -278,6 +290,7 @@ function ProjectPanel({ id, team, onClose, onChange, onDelete }: { id: string; t
     if (change.stage) full.completed_at = change.stage === "completed" ? new Date().toISOString() : null;
     const { data, error } = await db.from("fabrication_projects").update(full).eq("id", id).select().single();
     if (error) return toast({ title: "Save failed — change not saved", description: error.message, variant: "destructive" });
+    detailVersion.current++;
     setP(data); onChange(data);
   };
   const [isAdmin, setIsAdmin] = useState(false);
@@ -310,16 +323,19 @@ function ProjectPanel({ id, team, onClose, onChange, onDelete }: { id: string; t
   const addRow = async (table: string, row: any, setter: (fn: (r: any[]) => any[]) => void) => {
     const { data, error } = await db.from(table).insert({ project_id: id, ...row }).select().single();
     if (error) return toast({ title: "Could not add", description: error.message, variant: "destructive" });
+    detailVersion.current++;
     setter((r) => [...r, data]);
   };
   const editRow = async (table: string, rowId: string, change: any, setter: (fn: (r: any[]) => any[]) => void) => {
     const { data, error } = await db.from(table).update(change).eq("id", rowId).select().single();
     if (error) return toast({ title: "Change not saved", description: error.message, variant: "destructive" });
+    detailVersion.current++;
     setter((r) => r.map((x) => x.id === rowId ? data : x));
   };
   const delRow = async (table: string, rowId: string, setter: (fn: (r: any[]) => any[]) => void) => {
     const { data, error } = await db.from(table).delete().eq("id", rowId).select("id");
     if (error || !data?.length) return toast({ title: "Item not deleted", description: error?.message || "This item is no longer available to you.", variant: "destructive" });
+    detailVersion.current++;
     setter((r) => r.filter((x) => x.id !== rowId));
   };
 
@@ -339,6 +355,7 @@ function ProjectPanel({ id, team, onClose, onChange, onDelete }: { id: string; t
     if (!confirm(`Delete ${f.file_name}?`)) return;
     await supabase.storage.from(BUCKET).remove([f.storage_path]);
     await db.from("fabrication_files").delete().eq("id", f.id);
+    detailVersion.current++;
     setFiles((r) => r.filter((x) => x.id !== f.id));
   };
 

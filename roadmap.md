@@ -1,5 +1,7 @@
 # Roadmap
 
+- [x] Sweep sharpening-related lists, comments, timers, notifications and reports; fix shared recovery/pagination failures without changing settled records or permissions; 20 regression tests, job-save safety suite and desktop/mobile fixture flows passed
+
 - [x] Repair sharpening cross-user sync, reconnect recovery and shared saved-time refresh; 15 regression tests and separate desktop/mobile fixture screens passed
 - [ ] Verify sharpening sync with real signed-in staff accounts — external unmanaged sign-in is unavailable in the sandbox
 

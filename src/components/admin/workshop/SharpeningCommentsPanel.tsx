@@ -8,6 +8,8 @@ import { bubbleClass, bubbleTime, nameColorClass } from "@/lib/commentStyles";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import EmojiPicker, { QUICK_REACTIONS } from "@/components/orders/components/EmojiPicker";
+import { useLiveData } from "@/hooks/useLiveData";
+import { readEntityCommentData } from "@/lib/entityCommentData";
 
 export interface CommentReference {
   id: string;
@@ -59,48 +61,28 @@ export default function SharpeningCommentsPanel({ entityType, title, subtitle, r
   const [jobQuery, setJobQuery] = useState<string | null>(null);
   const [mentionedIds, setMentionedIds] = useState<Map<string, string>>(new Map());
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const loadVersion = useRef(0);
 
   const refMap = useMemo(() => new Map(references.map((ref) => [ref.id, ref])), [references]);
 
   const load = useCallback(async () => {
-    const { data, error } = await supabase
-      .from("entity_comments")
-      .select("id, entity_id, user_id, body, created_at, reply_to_id")
-      .eq("entity_type", entityType)
-      .order("created_at", { ascending: false })
-      .limit(60);
-    if (error) { setLoading(false); return; }
-    const rows = (data || []) as any[];
-    const userIds = [...new Set(rows.map((r) => r.user_id))];
-    const { data: profiles } = userIds.length
-      ? await supabase.from("profiles").select("id, full_name, email").in("id", userIds)
-      : { data: [] as any[] };
-    const authorMap = new Map((profiles || []).map((p: any) => [p.id, p.full_name || p.email || "Team member"]));
-    setComments(rows.map((r) => ({
-      id: r.id, entity_id: r.entity_id, user_id: r.user_id, body: r.body,
-      created_at: r.created_at, reply_to_id: r.reply_to_id,
-      author: authorMap.get(r.user_id) || "Team member",
-    })));
-    const ids = rows.map((r) => r.id);
-    if (ids.length) {
-      const { data: reactionRows } = await supabase
-        .from("entity_comment_reactions").select("id, comment_id, user_id, emoji").in("comment_id", ids);
-      setReactions((reactionRows || []) as ReactionRow[]);
-    } else setReactions([]);
-    setLoading(false);
-  }, [entityType]);
+    const version = ++loadVersion.current;
+    try {
+      const { comments: rows, members, reactions: savedReactions } = await readEntityCommentData(supabase, entityType, undefined, 60);
+      if (version !== loadVersion.current) return;
+      const authorMap = new Map(members.map(member => [member.id, member.full_name || member.email || "Team member"]));
+      setComments(rows.map(row => ({ ...row, author: authorMap.get(row.user_id) || "Team member" })));
+      setTeam(members); setReactions(savedReactions);
+    } catch (error) {
+      if (version === loadVersion.current) toast({ title: "Comments could not sync", description: "Please check your connection and try again.", variant: "destructive" });
+    } finally { if (version === loadVersion.current) setLoading(false); }
+  }, [entityType, toast]);
 
   useEffect(() => {
     void load();
-    void supabase.from("profiles").select("id, full_name, email").order("full_name", { ascending: true })
-      .then(({ data }) => setTeam((data || []) as TeamMember[]));
-    const channel = supabase
-      .channel(`workshop-comment-feed-${entityType}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "entity_comments" }, () => void load())
-      .on("postgres_changes", { event: "*", schema: "public", table: "entity_comment_reactions" }, () => void load())
-      .subscribe();
-    return () => { void supabase.removeChannel(channel); };
+    return () => { loadVersion.current++; };
   }, [load]);
+  useLiveData(["entity_comments", "entity_comment_reactions", "profiles"], load);
 
   const commentById = useMemo(() => new Map(comments.map((c) => [c.id, c])), [comments]);
 
@@ -149,17 +131,12 @@ export default function SharpeningCommentsPanel({ entityType, title, subtitle, r
   const toggleReaction = async (commentId: string, emoji: string) => {
     if (!user) return;
     const existing = reactions.find((r) => r.comment_id === commentId && r.user_id === user.id && r.emoji === emoji);
-    if (existing) {
-      setReactions((prev) => prev.filter((r) => r.id !== existing.id));
-      await supabase.from("entity_comment_reactions").delete().eq("id", existing.id);
-    } else {
-      const tempId = `optimistic-${Date.now()}`;
-      setReactions((prev) => [...prev, { id: tempId, comment_id: commentId, user_id: user.id, emoji }]);
-      const { data, error } = await supabase.from("entity_comment_reactions")
-        .insert({ comment_id: commentId, user_id: user.id, emoji }).select("id").maybeSingle();
-      if (error) setReactions((prev) => prev.filter((r) => r.id !== tempId));
-      else if (data?.id) setReactions((prev) => prev.map((r) => (r.id === tempId ? { ...r, id: data.id } : r)));
-    }
+    loadVersion.current++;
+    const { error } = existing
+      ? await supabase.from("entity_comment_reactions").delete().eq("id", existing.id)
+      : await supabase.from("entity_comment_reactions").insert({ comment_id: commentId, user_id: user.id, emoji });
+    if (error) toast({ title: "Reaction not saved", description: "Please try again.", variant: "destructive" });
+    await load();
   };
 
   const activeJobId = replyTo?.entity_id || targetRef;
@@ -297,7 +274,7 @@ export default function SharpeningCommentsPanel({ entityType, title, subtitle, r
             <span className="min-w-0 truncate">
               {replyTo
                 ? <><span className="font-semibold text-primary">Replying to {replyTo.user_id === user?.id ? "you" : replyTo.author}: </span><span className="text-muted-foreground">{replyTo.body}</span></>
-                : <><span className="font-semibold text-logo-cyan">On job </span><span className="text-muted-foreground">{refMap.get(targetRef!)?.reference}</span></>}
+                : <><span className="font-semibold text-logo-cyan">On job </span><span className="text-muted-foreground">{targetRef ? refMap.get(targetRef)?.reference : ""}</span></>}
             </span>
             <button onClick={() => { setReplyTo(null); setTargetRef(null); }} className="shrink-0 text-muted-foreground hover:text-destructive"><X className="h-3 w-3" /></button>
           </div>

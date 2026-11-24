@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, CalendarClock, CheckCircle2, Edit3, Hammer, ShieldCheck, Trash2, UserRound, Wrench } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -19,6 +19,8 @@ import { DetailSection, DetailValue, EmptyWorkshop, formatDate, isOverdue, membe
 import SharpeningFocusHeader from "@/components/admin/workshop/SharpeningFocusHeader";
 import BoardTable, { BoardCell, BoardPriorityCell, BoardStatusCell, GROUP_SPINES, statusTone } from "@/components/admin/workshop/BoardTable";
 import WorkshopTimer from "./workshop/WorkshopTimer";
+import { useLiveData } from "@/hooks/useLiveData";
+import { readAllRows } from "@/lib/readAllRows";
 
 interface RepairTicket {
   id: string; ticket_number: string; client: string; tool_code: string; tool_information: string;
@@ -58,19 +60,26 @@ export default function RepairsPage() {
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [menu, setMenu] = useState<{ ticket: RepairTicket; x: number; y: number } | null>(null);
   const menuPosition = useViewportMenuPosition(menu?.x ?? 0, menu?.y ?? 0);
+  const loadVersion = useRef(0);
 
   const load = useCallback(async (quiet = false) => {
+    const version = ++loadVersion.current;
     if (!quiet) setLoading(true);
-    const [{ data, error }, { data: profiles }] = await Promise.all([
-      db.from("repair_tickets").select("*").order("date_received_by_client", { ascending: false }),
-      supabase.from("profiles").select("id, full_name, email").order("full_name", { ascending: true }),
-    ]);
-    if (error) toast({ title: "Repair tickets could not load", description: error.message, variant: "destructive" }); else setTickets((data || []) as RepairTicket[]);
-    setTeam((profiles || []) as TeamMember[]); setLoading(false);
+    try {
+      const [data, profiles] = await Promise.all([
+        readAllRows<RepairTicket>((from, to) => db.from("repair_tickets").select("*").order("date_received_by_client", { ascending: false }).order("id").range(from, to)),
+        readAllRows<TeamMember>((from, to) => supabase.from("profiles").select("id, full_name, email").order("full_name", { ascending: true }).order("id").range(from, to)),
+      ]);
+      if (version !== loadVersion.current) return;
+      setTickets(data); setTeam(profiles);
+    } catch (error) {
+      if (version === loadVersion.current) toast({ title: "Repair tickets could not sync", description: error instanceof Error ? error.message : "Please try again", variant: "destructive" });
+    } finally { if (version === loadVersion.current) setLoading(false); }
   }, [db, toast]);
-  useEffect(() => { void load(); const channel = supabase.channel("repair-workspace-live").on("postgres_changes", { event: "*", schema: "public", table: "repair_tickets" }, () => void load(true)).subscribe(); return () => { void supabase.removeChannel(channel); }; }, [load]);
+  useEffect(() => { void load(); return () => { loadVersion.current++; }; }, [load]);
+  useLiveData(["repair_tickets", "profiles"], () => load(true));
   useEffect(() => { const openTicket=(id:string|null)=>{if(!id)return;const ticket=tickets.find(candidate=>candidate.id===id);if(ticket){setSelected(ticket);window.sessionStorage.removeItem("aleph:open-repairs");}};openTicket(window.sessionStorage.getItem("aleph:open-repairs"));const listener=(event:Event)=>openTicket(String((event as CustomEvent<string>).detail||""));window.addEventListener("aleph:open-repairs",listener);return()=>window.removeEventListener("aleph:open-repairs",listener);},[tickets]);
-  useEffect(() => { if (!selected) return; const latest = tickets.find((ticket) => ticket.id === selected.id); if (latest) setSelected(latest); }, [tickets, selected?.id]);
+  useEffect(() => { if (!selected) return; const latest = tickets.find((ticket) => ticket.id === selected.id); setSelected(latest ?? null); }, [tickets, selected?.id]);
 
   const memberMap = useMemo(() => new Map(team.map((member) => [member.id, member])), [team]);
   const active = tickets.filter((ticket) => !["completed", "scrapped"].includes(ticket.status));
