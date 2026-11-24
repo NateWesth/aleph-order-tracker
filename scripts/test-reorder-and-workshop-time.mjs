@@ -5,11 +5,51 @@ import ts from "typescript";
 
 async function load(path) {
   const source = await readFile(new URL(path, import.meta.url), "utf8");
-  const js = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText;
+  let js = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText;
+  if (js.includes('"./readAllRows"')) {
+    const pagingSource = await readFile(new URL("../src/lib/readAllRows.ts", import.meta.url), "utf8");
+    const paging = ts.transpileModule(pagingSource, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText;
+    js = js.replace('"./readAllRows"', JSON.stringify("data:text/javascript;base64," + Buffer.from(paging).toString("base64")));
+  }
   return import("data:text/javascript;base64," + Buffer.from(js).toString("base64"));
 }
-const { resolveReorderLines } = await load("../src/lib/portalReorderDetails.ts");
+const { resolveReorderLines, loadReorderDetails, readOrderItemsForOrders } = await load("../src/lib/portalReorderDetails.ts");
 const { savedWorkTotals } = await load("../src/lib/workshopTime.ts");
+const { saveAssignments } = await load("../src/lib/assignmentSave.ts");
+
+test("More than 100 pending or reviewed reorder requests retain all items and requested quantities", async () => {
+  for (const status of ["pending", "reviewed", "accepted", "declined"]) {
+    const requests = Array.from({ length: 1001 }, (_, i) => ({ id: `r-${i}`, status, source_order_id: `o-${i}`, lines: [{ item_id: `i-${i}`, quantity: i + 2 }] }));
+    const items = requests.map((request, i) => ({ id: `i-${i}`, order_id: request.source_order_id, name: `Part ${i}` }));
+    const batches = [];
+    const db = { from(table) {
+      let batch, selectedStatus;
+      const q = { select() { return q; }, eq(key, value) { selectedStatus = value; return q; }, order() { return q; }, in(key, value) { batch = value; batches.push(value); return q; }, range(from, to) {
+        const data = table === "portal_reorder_requests" ? requests.filter(r => r.status === selectedStatus) : items.filter(i => batch.includes(i.order_id));
+        return Promise.resolve({ data: data.slice(from, to + 1), error: null });
+      } }; return q;
+    } };
+    const details = await loadReorderDetails(db, status);
+    assert.equal(details.requests.length, 1001);
+    assert.equal(details.items.length, 1001);
+    assert.equal(Math.max(...batches.map(batch => batch.length)), 100);
+    assert.equal(resolveReorderLines("o-1000", details.requests[1000].lines, details.items)[0].quantity, 1002);
+    assert.equal(resolveReorderLines("o-1000", details.requests[1000].lines, details.items)[0].item.name, "Part 1000");
+  }
+});
+test("Portal and staff readers include more than 1000 items on a single order", async () => {
+  const items = Array.from({ length: 1001 }, (_, i) => ({ id: `i-${i}`, order_id: "order-1", name: `Part ${i}` }));
+  const db = { from() { const q = { select() { return q; }, in() { return q; }, order() { return q; }, range(from, to) { return Promise.resolve({ data: items.slice(from, to + 1), error: null }); } }; return q; } };
+  const result = await readOrderItemsForOrders(db, ["order-1", "order-1"], "id,name");
+  assert.equal(result.length, 1001);
+  assert.equal(result[1000].name, "Part 1000");
+});
+test("Collection assignment conflicts never become a bulk success or continue applying a failed plan", async () => {
+  const calls = [];
+  await assert.rejects(() => saveAssignments(["a", "b", "c"], async id => { calls.push(id); return id !== "b"; }), /assignment was not saved/);
+  assert.deepEqual(calls, ["a", "b"]);
+  await saveAssignments(["a", "b"], async () => true);
+});
 
 test("Staff receives the requested item identity and client-edited quantity, not original quantity", () => {
   const items = [{ id: "item-1", order_id: "order-1", name: "Cutting disc", code: "DISC-01", description: "115 mm", quantity: 2 }];

@@ -1,5 +1,7 @@
 # Roadmap
 
+- [x] Sweep reorder, timer, assignment screens and background functions; fix sibling failures without changing settled records
+
 - [x] Verify and fix staff reorder item/quantity visibility
 - [x] Verify and fix finished repair/sharpening time visibility
 - [x] Verify and fix misleading bulk assignment success for linked clients

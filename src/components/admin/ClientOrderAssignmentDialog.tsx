@@ -27,7 +27,7 @@ export default function ClientOrderAssignmentDialog({ company, team, teamLoading
         .select("id, purchasing_invoicing_user_id").single();
       if (error) throw error;
       if (data.purchasing_invoicing_user_id !== userId) throw new Error("The client assignment was not saved.");
-      toast({ title: userId ? "Client orders assigned" : "Automatic assignment removed", description: userId ? "Existing and future orders are assigned for purchasing and invoicing." : "Existing order assignments are kept." });
+      toast({ title: userId ? "Client ownership saved" : "Automatic assignment removed", description: userId ? "Open and future orders follow this owner or their active leave delegate. Closed orders are unchanged." : "Existing order assignments are kept." });
       onSaved();
       onClose();
     } catch (error) {

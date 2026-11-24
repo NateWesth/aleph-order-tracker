@@ -27,6 +27,7 @@ import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator,
 import EntityComments from "@/components/admin/EntityComments";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { readAllRows } from "@/lib/readAllRows";
+import { saveAssignments } from "@/lib/assignmentSave";
 import { pendingOfflineOperationCount } from "@/services/offlineOperations";
 import { formatDistanceToNow } from "date-fns";
 import {
@@ -1206,7 +1207,7 @@ export default function FulfillmentPage() {
       if (orderIds.length) {
         await saveBatch(orderIds.map((id) => ({ table: "orders", id, patch: { fulfillment_assigned_to: assigneeId }, updated_at: deliveryOrders.find((row) => row.id === id)?.updated_at || null })));
       }
-      for (const po of collections) await updateCollectionState(po, { assigned_to: assigneeId });
+      await saveAssignments(collections, po => updateCollectionState(po, { assigned_to: assigneeId }));
       await fetchData();
       toast({ title: "Assignment updated", description: `${orderIds.length + collections.length} stop${orderIds.length + collections.length === 1 ? "" : "s"} assigned.` });
       setDeliverySelection(new Set());

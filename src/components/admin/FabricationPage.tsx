@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { cn } from "@/lib/utils";
 import EntityComments from "@/components/admin/EntityComments";
 import WorkshopTimer from "./workshop/WorkshopTimer";
+import { readAllRows } from "@/lib/readAllRows";
 import { MenuPortal, useViewportMenuPosition } from "@/hooks/useViewportMenuPosition";
 import { WorkshopHeader, WorkshopToolbar, WorkshopTabs, WorkshopPanel, DetailSection, PrioritySelect, PriorityBadge, formatDate, isOverdue, type TeamMember, memberLabel } from "@/components/admin/workshop/shared";
 import { FABRICATION_STAGES, stageLabel, stageIndex, generateFabricationPdf, PROJECT_TYPES, typeLabel, type FabProject, type FabMaterial, type FabPart, type FabTime, type FabFile } from "@/lib/fabricationPdf";
@@ -249,21 +250,25 @@ function ProjectPanel({ id, team, onClose, onChange, onDelete }: { id: string; t
   const [printing, setPrinting] = useState(false);
 
   const loadAll = useCallback(async () => {
+    try {
     const [pr, m, pa, t, f] = await Promise.all([
       db.from("fabrication_projects").select("*").eq("id", id).single(),
       db.from("fabrication_materials").select("*").eq("project_id", id).order("created_at"),
       db.from("fabrication_parts").select("*").eq("project_id", id).order("created_at"),
-      db.from("fabrication_time_entries").select("*").eq("project_id", id).order("work_date"),
+      readAllRows<FabTime>((from, to) => db.from("fabrication_time_entries").select("*").eq("project_id", id).order("work_date").order("id").range(from, to)),
       db.from("fabrication_files").select("*").eq("project_id", id).order("created_at"),
     ]);
-    setP(pr.data); setMaterials(m.data || []); setParts(pa.data || []); setTime(t.data || []);
+    const error = pr.error || m.error || pa.error || f.error;
+    if (error) throw error;
+    setP(pr.data); setMaterials(m.data || []); setParts(pa.data || []); setTime(t);
     const list: FabFile[] = f.data || [];
     if (list.length) {
       const { data: signed } = await supabase.storage.from(BUCKET).createSignedUrls(list.map((x) => x.storage_path), 3600);
       list.forEach((x, i) => { x.url = signed?.[i]?.signedUrl; });
     }
     setFiles(list);
-  }, [id]);
+    } catch (error: any) { toast({ title: "Project details could not refresh", description: error.message, variant: "destructive" }); }
+  }, [id, toast]);
   useEffect(() => { loadAll(); }, [loadAll]);
   useLiveData(["fabrication_projects", "fabrication_materials", "fabrication_parts", "fabrication_time_entries", "fabrication_files"], loadAll, { channelName: `fabrication-detail-${id}` });
 
@@ -461,7 +466,7 @@ function ProjectPanel({ id, team, onClose, onChange, onDelete }: { id: string; t
     </DetailSection>
 
     <DetailSection title={`Hours worked · ${totalHours.toFixed(1)} h total`}>
-      <WorkshopTimer key={id} entityType="fabrication" entityId={id} label={p.project_number || p.name} hourlyRate={Number((p as any).labour_rate || 0)} />
+      <WorkshopTimer key={id} entityType="fabrication" entityId={id} label={p.project_number || p.name} hourlyRate={Number((p as any).labour_rate || 0)} onFinished={() => void loadAll()} />
       <div className="space-y-1.5">
         {time.map((t) => <div key={t.id} className="grid grid-cols-[130px_1fr_70px_1fr_32px] gap-1.5">
           <Input className="h-8 text-xs" type="date" defaultValue={t.work_date} onBlur={(e) => editRow("fabrication_time_entries", t.id, { work_date: e.target.value }, setTime as any)} />

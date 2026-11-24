@@ -10,7 +10,7 @@ import { savedWorkTotals, type SavedWorkSession } from "@/lib/workshopTime";
 
 type Session = { id: string; state: string; accumulated_seconds: number; running_since: string | null; hourly_rate: number };
 type FinishedSession = SavedWorkSession & { technician_id: string; updated_at: string; profiles: { full_name: string | null } | null };
-export default function WorkshopTimer({ entityType, entityId, label, hourlyRate = 0 }: { entityType: "repair" | "sharpening" | "fabrication"; entityId: string; label: string; hourlyRate?: number }) {
+export default function WorkshopTimer({ entityType, entityId, label, hourlyRate = 0, onFinished }: { entityType: "repair" | "sharpening" | "fabrication"; entityId: string; label: string; hourlyRate?: number; onFinished?: () => void }) {
   const { user } = useAuth(); const { toast } = useToast();
   const [session, setSession] = useState<Session | null>(null), [seconds, setSeconds] = useState(0), [busy, setBusy] = useState(false), [kiosk, setKiosk] = useState(false), [loading, setLoading] = useState(true);
   const [requestId, setRequestId] = useState(() => crypto.randomUUID());
@@ -42,7 +42,7 @@ export default function WorkshopTimer({ entityType, entityId, label, hourlyRate 
       const { data, error } = await db.rpc("workshop_timer_command", { p_id: session?.id || requestId, p_entity_type: entityType, p_entity_id: entityId, p_action: action, p_hourly_rate: hourlyRate });
       if (error) throw error;
       setSession(data);
-      if (action === "finish") { setRequestId(crypto.randomUUID()); toast({ title: "Work time saved" }); await load(); }
+      if (action === "finish") { setRequestId(crypto.randomUUID()); toast({ title: "Work time saved" }); await load(); onFinished?.(); }
     } catch (error: any) { toast({ title: "Timer not changed", description: error.message, variant: "destructive" }); }
     finally { setBusy(false); }
   };

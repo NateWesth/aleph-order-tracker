@@ -10,6 +10,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Package, Clock, ChevronDown, LogOut, Loader2, FileText } from "lucide-react";
 import { format } from "date-fns";
 import PortalReorder from "@/components/PortalReorder";
+import { readAllRows } from "@/lib/readAllRows";
+import { readOrderItemsForOrders } from "@/lib/portalReorderDetails";
 
 interface PortalOrder {
   id: string;
@@ -79,11 +81,10 @@ export default function Portal() {
       setCompanyName(company?.name || "Your Company");
 
       // Get orders for this company
-      const { data: ordersData } = await supabase
-        .from("orders")
+      const ordersData = await readAllRows<Omit<PortalOrder, "items">>((from, to) => supabase.from("orders")
         .select("id, company_id, order_number, description, status, urgency, created_at, reference")
         .eq("company_id", profile.company_id)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false }).order("id").range(from, to));
 
       if (!ordersData || ordersData.length === 0) {
         setOrders([]);
@@ -93,10 +94,7 @@ export default function Portal() {
 
       // Get items for all orders
       const orderIds = ordersData.map((o) => o.id);
-      const { data: itemsData } = await supabase
-        .from("order_items")
-        .select("id, name, quantity, stock_status, progress_stage, order_id")
-        .in("order_id", orderIds);
+      const itemsData = await readOrderItemsForOrders<PortalOrder["items"][number] & { order_id: string }>(supabase, orderIds, "id, name, quantity, stock_status, progress_stage, order_id");
 
       const ordersWithItems: PortalOrder[] = ordersData.map((order) => ({
         ...order,
