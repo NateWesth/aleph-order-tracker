@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Check, Maximize, Pause, Play, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { readAllRows } from "@/lib/readAllRows";
 import { savedWorkTotals, type SavedWorkSession } from "@/lib/workshopTime";
+import { useLiveData } from "@/hooks/useLiveData";
 
 type Session = { id: string; state: string; accumulated_seconds: number; running_since: string | null; hourly_rate: number };
 type FinishedSession = SavedWorkSession & { technician_id: string; updated_at: string; profiles: { full_name: string | null } | null };
@@ -16,21 +17,26 @@ export default function WorkshopTimer({ entityType, entityId, label, hourlyRate 
   const [requestId, setRequestId] = useState(() => crypto.randomUUID());
   const [finished, setFinished] = useState<FinishedSession[]>([]), [loadError, setLoadError] = useState("");
   const db = supabase as any;
-  const load = useCallback(async () => {
+  const loadVersion = useRef(0);
+  const load = useCallback(async (quiet = false) => {
     if (!user) return;
-    setLoading(true);
+    const version = ++loadVersion.current;
+    if (!quiet) setLoading(true);
     try {
       const [active, saved] = await Promise.all([
         db.from("workshop_timer_sessions").select("*").eq("entity_type", entityType).eq("entity_id", entityId).eq("technician_id", user.id).in("state", ["running", "paused"]).order("created_at", { ascending: false }).limit(1).maybeSingle(),
         readAllRows<FinishedSession>((from, to) => db.from("workshop_timer_sessions").select("id,state,accumulated_seconds,hourly_rate,technician_id,updated_at,profiles(full_name)").eq("entity_type", entityType).eq("entity_id", entityId).eq("state", "finished").order("updated_at", { ascending: false }).order("id").range(from, to)),
       ]);
       if (active.error) throw active.error;
+      if (version !== loadVersion.current) return;
       setSession(active.data); setFinished(saved); setLoadError("");
     } catch (error: any) {
+      if (version !== loadVersion.current) return;
       setLoadError(error.message); toast({ title: "Work time could not load", description: error.message, variant: "destructive" });
-    } finally { setLoading(false); }
+    } finally { if (version === loadVersion.current) setLoading(false); }
   }, [entityType, entityId, user?.id, toast]);
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void load(); return () => { loadVersion.current++; }; }, [load]);
+  useLiveData(["workshop_timer_sessions", "profiles"], () => load(true), { enabled: !!user });
   useEffect(() => {
     const update = () => setSeconds(Number(session?.accumulated_seconds || 0) + (session?.state === "running" && session.running_since ? Math.max(0, (Date.now() - Date.parse(session.running_since)) / 1000) : 0));
     update(); const timer = window.setInterval(update, 1000); return () => window.clearInterval(timer);
@@ -41,6 +47,9 @@ export default function WorkshopTimer({ entityType, entityId, label, hourlyRate 
     try {
       const { data, error } = await db.rpc("workshop_timer_command", { p_id: session?.id || requestId, p_entity_type: entityType, p_entity_id: entityId, p_action: action, p_hourly_rate: hourlyRate });
       if (error) throw error;
+      // Invalidate reads started before this command so they cannot restore old state.
+      loadVersion.current++;
+      setLoading(false);
       setSession(data);
       if (action === "finish") { setRequestId(crypto.randomUUID()); toast({ title: "Work time saved" }); await load(); onFinished?.(); }
     } catch (error: any) { toast({ title: "Timer not changed", description: error.message, variant: "destructive" }); }

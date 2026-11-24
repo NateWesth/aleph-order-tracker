@@ -1,5 +1,8 @@
 # Roadmap
 
+- [x] Repair sharpening cross-user sync, reconnect recovery and shared saved-time refresh; 15 regression tests and separate desktop/mobile fixture screens passed
+- [ ] Verify sharpening sync with real signed-in staff accounts — external unmanaged sign-in is unavailable in the sandbox
+
 - [x] Sweep reorder, timer, assignment screens and background functions; fix sibling failures without changing settled records
 
 - [x] Verify and fix staff reorder item/quantity visibility

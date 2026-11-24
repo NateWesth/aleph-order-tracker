@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CalendarClock, CheckCircle2, ClipboardList, Edit3, FileText, Plus, Scissors, Sparkles, UserRound, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -19,6 +19,8 @@ import { DetailSection, DetailValue, EmptyWorkshop, formatDate, isOverdue, membe
 import SharpeningFocusHeader from "@/components/admin/workshop/SharpeningFocusHeader";
 import BoardTable, { BoardCell, BoardPriorityCell, BoardStatusCell, GROUP_SPINES, statusTone } from "@/components/admin/workshop/BoardTable";
 import WorkshopTimer from "./workshop/WorkshopTimer";
+import { useLiveData } from "@/hooks/useLiveData";
+import { readAllRows } from "@/lib/readAllRows";
 
 interface SharpeningJob {
   id: string; date_received: string; job_number: string; customer_name: string; quantity: number;
@@ -63,24 +65,31 @@ export default function SharpeningPage() {
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [menu, setMenu] = useState<{ job: SharpeningJob; x: number; y: number } | null>(null);
   const menuPosition = useViewportMenuPosition(menu?.x ?? 0, menu?.y ?? 0);
+  const loadVersion = useRef(0);
 
   const load = useCallback(async (quiet = false) => {
+    const version = ++loadVersion.current;
     if (!quiet) setLoading(true);
-    const [{ data, error }, { data: profiles }] = await Promise.all([
-      db.from("sharpening_jobs").select("*").order("date_received", { ascending: false }),
-      supabase.from("profiles").select("id, full_name, email").order("full_name", { ascending: true }),
-    ]);
-    if (error) toast({ title: "Sharpening jobs could not load", description: error.message, variant: "destructive" });
-    else setJobs((data || []) as SharpeningJob[]);
-    setTeam((profiles || []) as TeamMember[]);
-    setLoading(false);
+    try {
+      const [data, profiles] = await Promise.all([
+        readAllRows<SharpeningJob>((from, to) => db.from("sharpening_jobs").select("*").order("date_received", { ascending: false }).order("id").range(from, to)),
+        readAllRows<TeamMember>((from, to) => supabase.from("profiles").select("id, full_name, email").order("full_name", { ascending: true }).order("id").range(from, to)),
+      ]);
+      if (version !== loadVersion.current) return;
+      setJobs(data);
+      setTeam(profiles);
+    } catch (error) {
+      if (version === loadVersion.current) toast({ title: "Sharpening jobs could not sync", description: error instanceof Error ? error.message : "Please try again", variant: "destructive" });
+    } finally {
+      if (version === loadVersion.current) setLoading(false);
+    }
   }, [db, toast]);
 
   useEffect(() => {
     void load();
-    const channel = supabase.channel("sharpening-workspace-live").on("postgres_changes", { event: "*", schema: "public", table: "sharpening_jobs" }, () => void load(true)).subscribe();
-    return () => { void supabase.removeChannel(channel); };
+    return () => { loadVersion.current++; };
   }, [load]);
+  useLiveData(["sharpening_jobs", "profiles"], () => load(true));
 
   useEffect(() => {
     const openJob = (id: string | null) => { if (!id) return; const job = jobs.find((candidate) => candidate.id === id); if (job) { setSelected(job); window.sessionStorage.removeItem("aleph:open-sharpening"); } };
@@ -93,7 +102,7 @@ export default function SharpeningPage() {
   useEffect(() => {
     if (!selected) return;
     const latest = jobs.find((job) => job.id === selected.id);
-    if (latest) setSelected(latest);
+    setSelected(latest ?? null);
   }, [jobs, selected?.id]);
 
   const memberMap = useMemo(() => new Map(team.map((member) => [member.id, member])), [team]);
