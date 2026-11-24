@@ -31,10 +31,10 @@ interface SharpeningJob {
 }
 
 type JobDraft = Omit<SharpeningJob, "id" | "completed_at" | "created_at" | "updated_at">;
-type SharpeningView = "all" | "outstanding" | "history";
+type SharpeningView = "all" | "history";
 
 export function sharpeningJobsForView<T extends Pick<SharpeningJob, "status" | "job_number" | "customer_name" | "order_number" | "invoice_number" | "third_party_reference" | "priority" | "date_received">>(jobs: T[], tab: SharpeningView, query: string): T[] {
-  return jobs.filter((job) => tab === "all" || (tab === "history" ? job.status === "completed" : job.status !== "completed")).filter((job) => {
+  return jobs.filter((job) => tab === "history" ? job.status === "completed" : job.status !== "completed").filter((job) => {
     const haystack = `${job.job_number} ${job.customer_name} ${job.order_number || ""} ${job.invoice_number || ""} ${job.third_party_reference || ""}`.toLowerCase();
     return haystack.includes(query.trim().toLowerCase());
   }).sort((a, b) => {
@@ -195,8 +195,7 @@ export default function SharpeningPage() {
     <WorkshopToolbar query={query} onQuery={setQuery} placeholder="Search job number, customer, order or invoice…">
       <div className="flex min-w-0 flex-wrap items-center gap-2">
       <WorkshopTabs value={tab} onChange={(value) => setTab(value as SharpeningView)} tabs={[
-        { id: "all" as const, label: "All jobs", count: jobs.length },
-        { id: "outstanding" as const, label: "Outstanding", count: outstanding.length },
+        { id: "all" as const, label: "All jobs", count: outstanding.length },
         { id: "history" as const, label: "History", count: jobs.length - outstanding.length },
       ]} />
       <Button variant="outline" size="icon" aria-label="Refresh sharpening jobs" title="Refresh sharpening jobs" disabled={loading} onClick={() => void load()}>
