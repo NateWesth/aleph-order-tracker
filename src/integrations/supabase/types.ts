@@ -32,6 +32,30 @@ export type Database = {
         }
         Relationships: []
       }
+      buying_sync_state: {
+        Row: {
+          error: string | null
+          id: boolean
+          last_attempt_at: string | null
+          last_success_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          error?: string | null
+          id?: boolean
+          last_attempt_at?: string | null
+          last_success_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          error?: string | null
+          id?: boolean
+          last_attempt_at?: string | null
+          last_success_at?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       calibration_assets: {
         Row: {
           asset_code: string
