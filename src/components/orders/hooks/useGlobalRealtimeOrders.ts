@@ -2,6 +2,7 @@
 import { useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { isOrderHistory } from '@/lib/orderLifecycle';
 
 interface UseGlobalRealtimeOrdersProps {
   onOrdersChange: () => void;
@@ -34,7 +35,7 @@ export const useGlobalRealtimeOrders = ({
     
     const updatedOrder = payload.new;
     const orderId = updatedOrder.id;
-    const newStatus = updatedOrder.status;
+    const newStatus = isOrderHistory(updatedOrder) ? 'completed' : updatedOrder.status;
     
     // Helper function to update order in localStorage array
     const updateOrderInStorage = (storageKey: string, shouldInclude: boolean) => {

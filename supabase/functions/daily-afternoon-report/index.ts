@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
 import { buildTextPdf, emailRow, emptyRow, firstName, operationalEmail, sendOperationalEmail, shortDate, zaDate } from "../_shared/operational-email.ts";
 import { readWorkshopReportData, requireWorkshopReportData } from "../_shared/workshop-report-data.ts";
+import { readActiveOrderReport, readOrderRows, requireOrderReportResults } from "../_shared/order-data.ts";
 
 const cors={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type"};
 const json=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers:{...cors,"Content-Type":"application/json"}});
@@ -16,8 +17,8 @@ serve(async(req:Request)=>{
     const {data:recipients,error}=await supabase.from("profiles").select("id,email,full_name").eq("daily_afternoon_report",true).eq("approved",true);if(error)throw error;if(!recipients?.length)return json({message:"No opted-in recipients",sent:0});
     const {start,end}=sastRange();const tomorrow=new Date(end.getTime()+86400000);
     const results=await Promise.allSettled([
-      supabase.from("orders").select("id,order_number,status,urgency,assigned_to,fulfillment_assigned_to,completed_date,fulfillment_scheduled_for,companies(name)").gte("completed_date",start.toISOString()).lt("completed_date",end.toISOString()).order("completed_date",{ascending:false}),
-      supabase.from("orders").select("id,order_number,status,urgency,assigned_to,fulfillment_assigned_to,created_at,fulfillment_scheduled_for,companies(name)").neq("status","delivered").order("created_at",{ascending:false}).limit(500),
+      readOrderRows((from,to)=>supabase.from("orders").select("id,order_number,status,urgency,assigned_to,fulfillment_assigned_to,completed_date,fulfillment_scheduled_for,companies(name)").gte("completed_date",start.toISOString()).lt("completed_date",end.toISOString()).order("completed_date",{ascending:false}).order("id").range(from,to)).then(data=>({data})),
+      readActiveOrderReport(supabase,"id,order_number,status,completed_date,urgency,assigned_to,fulfillment_assigned_to,created_at,fulfillment_scheduled_for,companies(name)"),
       supabase.from("order_activity_log").select("id,title,description,activity_type,order_id,created_at").gte("created_at",start.toISOString()).lt("created_at",end.toISOString()).order("created_at",{ascending:false}).limit(100),
       supabase.from("return_cases").select("id,rma_number,client_name,item_description,status,priority,due_date,assigned_to").not("status","in","(completed,rejected)").order("due_date"),
       supabase.from("loan_assets").select("id,asset_code,tool_name,borrower_name,due_back_at,returned_at,responsible_user_id").is("returned_at",null).order("due_back_at"),
@@ -27,6 +28,7 @@ serve(async(req:Request)=>{
       readWorkshopReportData(supabase,"sharpening_jobs","id,job_number,customer_name,status,deadline_date,assigned_to"),
     ]);
     requireWorkshopReportData(results.slice(7,9));
+    requireOrderReportResults(results);
     const [completed,active,activity,returns,loans,calibrations,tasks,repairs,sharpening]=results.map(dataOf);const urgent=active.filter((o:any)=>o.urgency==="urgent");const scheduledTomorrow=active.filter((o:any)=>o.fulfillment_scheduled_for&&new Date(o.fulfillment_scheduled_for)>=end&&new Date(o.fulfillment_scheduled_for)<tomorrow);const now=Date.now();const serviceDue=[...loans.filter((x:any)=>new Date(x.due_back_at).getTime()<now).map((x:any)=>({ref:x.asset_code,detail:`Loan with ${x.borrower_name} · ${x.tool_name}`,owner:x.responsible_user_id,type:"loan"})),...calibrations.filter((x:any)=>x.status==="due"||x.status==="expired").map((x:any)=>({ref:x.asset_code,detail:`Calibration ${shortDate(x.next_due_on)} · ${x.tool_name}`,owner:x.responsible_user_id,type:"calibration"}))];
     const handover=[...repairs.map((x:any)=>({ref:x.ticket_number,detail:`Repair · ${x.client}`,deadline:x.deadline_date,owner:x.assigned_to})),...sharpening.map((x:any)=>({ref:x.job_number,detail:`Sharpening · ${x.customer_name}`,deadline:x.deadline_date,owner:x.assigned_to}))].filter((x:any)=>x.deadline&&new Date(x.deadline).getTime()<tomorrow.getTime());
     const day=zaDate();let sent=0,failed=0;

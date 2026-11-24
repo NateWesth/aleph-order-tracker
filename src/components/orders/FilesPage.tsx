@@ -7,6 +7,7 @@ import { File, Download, Printer, Search, Plus, FileText, Eye } from "lucide-rea
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLiveData } from "@/hooks/useLiveData";
+import { readAllRows } from "@/lib/readAllRows";
 import {
   Collapsible,
   CollapsibleContent,
@@ -67,20 +68,15 @@ export default function FilesPage({ isAdmin }: FilesPageProps) {
             code
           )
         `)
-        .eq('status', 'completed')
-        .order('completed_date', { ascending: false });
+        .or('status.in.(completed,delivered),completed_date.not.is.null')
+        .order('completed_date', { ascending: false }).order('id');
 
       // If user is not admin, fetch only user's orders
       if (!isAdmin) {
         ordersQuery = ordersQuery.eq('user_id', user.id);
       }
 
-      const { data: orders, error: ordersError } = await ordersQuery;
-
-      if (ordersError) {
-        console.error("Error fetching completed orders:", ordersError);
-        return;
-      }
+      const orders = await readAllRows((from,to)=>ordersQuery.range(from,to));
 
 
       // For each completed order, fetch its files

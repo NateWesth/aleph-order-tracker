@@ -9,7 +9,7 @@
 // Buckets shown on the board are the differences between these counters, so a
 // single order line can appear in several columns at once.
 
-import { activeOrderIds, activeOrderQuery, readOrderRowsByIds } from '../_shared/order-data.ts'
+import { activeOrderIds, readOrderRowsByIds } from '../_shared/order-data.ts'
 
 export const norm = (v: unknown) => String(v ?? '').trim().toLowerCase()
 

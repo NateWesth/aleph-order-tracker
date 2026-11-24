@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
 import { buildTextPdf, emailRow, emptyRow, firstName, operationalEmail, sendOperationalEmail, shortDate, zaDate } from "../_shared/operational-email.ts";
 import { readWorkshopReportData, requireWorkshopReportData } from "../_shared/workshop-report-data.ts";
+import { readActiveOrderReport, readActiveOrderLines, requireOrderReportResults } from "../_shared/order-data.ts";
 
 const cors={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type"};
 const json=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers:{...cors,"Content-Type":"application/json"}});
@@ -18,9 +19,9 @@ serve(async(req:Request)=>{
     if(error)throw error;if(!recipients?.length)return json({message:"No opted-in recipients",sent:0});
 
     const results=await Promise.allSettled([
-      supabase.from("orders").select("id,order_number,status,urgency,description,created_at,assigned_to,fulfillment_status,companies(name)").neq("status","delivered").order("created_at",{ascending:false}).limit(500),
-      supabase.from("order_items").select("id,order_id,name,code,description,quantity,stock_status,qty_on_po,qty_received,qty_invoiced,qty_completed"),
-      supabase.from("order_purchase_orders").select("order_id,purchase_order_number"),
+      readActiveOrderReport(supabase,"id,order_number,status,completed_date,urgency,description,created_at,assigned_to,fulfillment_status,companies(name)"),
+      readActiveOrderLines(supabase,"order_items","id,order_id,name,code,description,quantity,stock_status,qty_on_po,qty_received,qty_invoiced,qty_completed"),
+      readActiveOrderLines(supabase,"order_purchase_orders","id,order_id,purchase_order_number"),
       supabase.from("return_cases").select("id,rma_number,client_name,item_description,status,priority,due_date").not("status","in","(completed,rejected)").order("due_date"),
       supabase.from("loan_assets").select("id,asset_code,tool_name,borrower_name,due_back_at,returned_at").is("returned_at",null).order("due_back_at"),
       supabase.from("calibration_assets").select("id,asset_code,tool_name,next_due_on,status").neq("status","retired").order("next_due_on"),
@@ -28,11 +29,12 @@ serve(async(req:Request)=>{
       readWorkshopReportData(supabase,"repair_tickets","id,ticket_number,client,status,priority,deadline_date,is_warranty"),
     ]);
     requireWorkshopReportData(results.slice(6,8));
+    requireOrderReportResults(results);
     const [orders,items,pos,returns,loans,calibrations,sharpening,repairs]=results.map(dataOf);
     const urgent=orders.filter((o:any)=>o.urgency==="urgent");
     const stale=orders.filter((o:any)=>o.created_at&&ageDays(o.created_at)>=14);
     const ready=orders.filter((o:any)=>o.status==="ready"||o.fulfillment_status==="ready"||items.some((i:any)=>i.order_id===o.id&&Number(i.qty_invoiced)>Number(i.qty_completed)));
-    const missingStock=orders.filter((o:any)=>items.some((i:any)=>i.order_id===o.id&&Number(i.qty_on_po)<Number(i.quantity)));
+    const missingStock=orders.filter((o:any)=>items.some((i:any)=>i.order_id===o.id&&Math.max(Number(i.qty_on_po)||0,Number(i.qty_received)||0,Number(i.qty_invoiced)||0,Number(i.qty_completed)||0)<Number(i.quantity)));
     const now=Date.now();const overdueLoans=loans.filter((x:any)=>new Date(x.due_back_at).getTime()<now);const dueCalibration=calibrations.filter((x:any)=>x.status==="due"||x.status==="expired"||new Date(x.next_due_on).getTime()<now+30*86400000);
     const overdueWorkshop=[...sharpening.map((x:any)=>({...x,ref:x.job_number,client:x.customer_name,type:"Sharpening"})),...repairs.map((x:any)=>({...x,ref:x.ticket_number,type:x.is_warranty?"Warranty repair":"Repair"}))].filter((x:any)=>x.deadline_date&&new Date(x.deadline_date).getTime()<now);
     const attention=urgent.length+overdueLoans.length+dueCalibration.length+overdueWorkshop.length;

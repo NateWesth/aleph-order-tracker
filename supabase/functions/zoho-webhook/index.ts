@@ -1,4 +1,4 @@
-import { activeOrderIds, activeOrderQuery, readOrderRows, readOrderRowsByIds } from '../_shared/order-data.ts'
+import { activeOrderIds } from '../_shared/order-data.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { allocatePurchaseOrder, applyBillReceipt, applyInvoiceQuantities, isExcludedSku } from './quantity-flow.ts'
 import {
@@ -1018,6 +1018,9 @@ async function handleSalesOrderWebhook(
   const orderNumber = salesOrder.reference_number || zohoSONumber
 
   if (existingOrder) {
+    if (!(await activeOrderIds(supabase, [existingOrder.id])).length) {
+      return new Response(JSON.stringify({ success: true, order_id: existingOrder.id, message: 'Closed order preserved', items_synced: 0 }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
     console.log('Order already exists for SO:', zohoSONumber, '- updating items and company')
     
     // UPDATE existing order: fix company_id if missing, and sync items
@@ -1556,155 +1559,9 @@ async function handleItemWebhook(
 // ─── FULL QUANTITY RECONCILIATION (POs -> receipts -> invoices) ────────────────
 
 async function handleReconcileQuantities(
-  supabase: any, clientId: string, clientSecret: string, sinceDays = 120
+  _supabase: any, _clientId: string, _clientSecret: string, _sinceDays = 120
 ) {
-  console.log('=== RECONCILING ITEM QUANTITIES FROM ZOHO ===')
-
-  const accessToken = await getValidAccessToken(supabase, clientId, clientSecret)
-  const orgId = await getOrgId(supabase)
-  const since = new Date(Date.now() - sinceDays * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-  const authHeaders = { 'Authorization': `Zoho-oauthtoken ${accessToken}` }
-
-  const zohoGet = async (path: string) => {
-    const resp = await fetch(`${ZOHO_API_URL}/books/v3/${path}`, { headers: authHeaders })
-    const data = await resp.json()
-    if (data.code !== 0) throw new Error(data.message || `Zoho request failed: ${path}`)
-    return data
-  }
-  const key = (v: unknown) => String(v ?? '').trim().toLowerCase()
-
-  // 1. Active orders + every reference that can point at them
-  const activeOrders = await readOrderRows((from, to) => activeOrderQuery(supabase.from('orders').select('id, order_number, reference')).order('id').range(from, to))
-
-  const orderIds = (activeOrders || []).map((o: any) => o.id)
-  if (!orderIds.length) {
-    return new Response(JSON.stringify({ success: true, message: 'No active orders to reconcile' }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    })
-  }
-
-  const refToOrders = new Map<string, string[]>()
-  const addRef = (ref: unknown, id: string) => {
-    const k = key(ref)
-    if (!k) return
-    refToOrders.set(k, [...new Set([...(refToOrders.get(k) || []), id])])
-  }
-  for (const o of activeOrders || []) {
-    addRef(o.order_number, o.id)
-    addRef(o.reference, o.id)
-  }
-
-  // App-linked supplier PO numbers also point at an order
-  const { data: linkedPos } = await supabase
-    .from('order_purchase_orders')
-    .select('order_id, purchase_order_number')
-    .in('order_id', orderIds)
-  for (const l of linkedPos || []) addRef(l.purchase_order_number, l.order_id)
-
-  const matchRefs = (refs: unknown[]) => {
-    const ids = new Set<string>()
-    for (const r of refs) (refToOrders.get(key(r)) || []).forEach(id => ids.add(id))
-    return [...ids]
-  }
-
-  // The legacy rebuild clears confirmed stock before network reads complete.
-  // It is not a safe recovery mechanism; normal event sync remains available.
-  throw new Error('Quantity rebuild is unavailable because it can erase confirmed stock when Zoho times out. Normal PO, bill and invoice updates remain active.')
-
-  // 2. Reset counters so everything is rebuilt from Zoho.
-  //    Manual completions (qty_completed) are user decisions Zoho knows nothing
-  //    about, so snapshot them and restore after the rebuild.
-  const { data: completedSnapshot } = await supabase
-    .from('order_items')
-    .select('id, qty_completed')
-    .in('order_id', orderIds)
-    .gt('qty_completed', 0)
-
-  await supabase.from('order_item_po_allocations').delete().in('order_id', orderIds)
-  await supabase
-    .from('order_items')
-    .update({ qty_on_po: 0, qty_received: 0, qty_invoiced: 0, qty_completed: 0, updated_at: new Date().toISOString() })
-    .in('order_id', orderIds)
-
-  // 3. Purchase orders -> "In Progress", plus billed/received qty -> "In Stock"
-  let poAllocated = 0
-  let poCount = 0
-  let receivedUnits = 0
-  const poList = await zohoGet(`purchaseorders?organization_id=${orgId}&date_after=${since}&per_page=200`)
-  for (const summary of poList.purchaseorders || []) {
-    if (String(summary.status || '').toLowerCase() === 'cancelled') continue
-    if (!matchRefs([summary.reference_number, summary.purchaseorder_number]).length) continue
-
-    const detail = await zohoGet(`purchaseorders/${summary.purchaseorder_id}?organization_id=${orgId}`)
-    const po = detail.purchaseorder
-    if (!po) continue
-
-    const result = await allocatePurchaseOrder(supabase, po)
-    poAllocated += result.allocated || 0
-    poCount++
-
-    // Anything already billed/received on the PO means the stock landed
-    const receivedLines = (po.line_items || [])
-      .map((l: any) => ({
-        sku: l.sku || l.item_code,
-        quantity: Math.max(Number(l.quantity_received || 0), Number(l.quantity_billed || 0)),
-      }))
-      .filter((l: any) => l.quantity > 0)
-
-    if (receivedLines.length) {
-      const r = await applyBillReceipt(supabase, {
-        purchaseorder_id: String(po.purchaseorder_id),
-        line_items: receivedLines,
-      })
-      receivedUnits += r.received || 0
-    }
-  }
-
-  // 4. Customer invoices -> "Ready for Delivery"
-  let invoiceUpdated = 0
-  let invoiceCount = 0
-  const invList = await zohoGet(`invoices?organization_id=${orgId}&date_after=${since}&per_page=200`)
-  for (const inv of invList.invoices || []) {
-    if (String(inv.status || '').toLowerCase() === 'void') continue
-    const matchedIds = matchRefs([inv.reference_number, inv.purchase_order, (inv as any).purchaseorder_number])
-    if (!matchedIds.length) continue
-
-    const detail = await zohoGet(`invoices/${inv.invoice_id}?organization_id=${orgId}`)
-    const lineItems = detail.invoice?.line_items || []
-    const result = await applyInvoiceQuantities(supabase, matchedIds, lineItems)
-    invoiceUpdated += result.updated || 0
-    invoiceCount++
-  }
-
-  // 5. Restore manual completions (trigger caps them at qty_invoiced)
-  for (const row of completedSnapshot || []) {
-    await supabase
-      .from('order_items')
-      .update({ qty_completed: row.qty_completed, updated_at: new Date().toISOString() })
-      .eq('id', row.id)
-  }
-
-
-
-  await supabase.from('zoho_sync_log').insert({
-    sync_type: 'reconcile_quantities',
-    status: 'completed',
-    items_synced: poAllocated + invoiceUpdated,
-    completed_at: new Date().toISOString(),
-  })
-
-  const summary = {
-    success: true,
-    orders_reset: orderIds.length,
-    purchase_orders_matched: poCount,
-    units_on_po: poAllocated,
-    units_received: receivedUnits,
-    invoices_matched: invoiceCount,
-    units_invoiced: invoiceUpdated,
-  }
-  console.log('=== RECONCILE COMPLETE ===', JSON.stringify(summary))
-
-  return new Response(JSON.stringify(summary), {
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-  })
+  return new Response(JSON.stringify({
+    error: 'Quantity rebuild is unavailable because it can erase confirmed stock when Zoho times out. Normal PO, bill and invoice updates remain active.',
+  }), { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
 }

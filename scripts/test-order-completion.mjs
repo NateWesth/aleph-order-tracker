@@ -20,6 +20,7 @@ const stamps = await readFile(new URL('../supabase/migrations/20260225051330_25f
 await db.exec(stamps.slice(stamps.indexOf('CREATE OR REPLACE FUNCTION public.set_order_item_completed_at()')));
 const migrations = new URL('../supabase/migrations/', import.meta.url);
 for (const name of (await readdir(migrations)).sort()) if (name.startsWith('20261124075120') || name.startsWith('20261124075508')) await db.exec(await readFile(new URL(name,migrations),'utf8'));
+for (const name of (await readdir(migrations)).sort()) if (name.startsWith('20261124092136')) await db.exec((await readFile(new URL(name,migrations),'utf8')).split('DO $$')[0]);
 const newOrder = async () => (await db.query("INSERT INTO orders(status,fulfillment_status) VALUES('ordered','pending') RETURNING id")).rows[0].id;
 test('already delivered orders have no unfinished item records, retain dates and do not confirm driver stops', async () => {
   const item=(await db.query('SELECT * FROM order_items')).rows[0];
@@ -61,5 +62,13 @@ test('cancelled and empty orders never auto-complete from item changes', async (
 test('completion trigger helpers cannot be called directly by signed-in users', async () => {
   const result=(await db.query("SELECT has_function_privilege('authenticated','public.complete_order_from_item_counters()','EXECUTE') as allowed")).rows[0];
   assert.equal(result.allowed,false);
+});
+test('editing an already-closed order never rewrites its settled lines',async()=>{
+  const id=(await db.query("INSERT INTO orders(status,completed_date) VALUES('completed','2026-10-02') RETURNING id")).rows[0].id;
+  await db.query('INSERT INTO order_items(order_id,quantity,qty_on_po,qty_received,qty_invoiced,qty_completed,completed_at) VALUES($1,5,2,2,2,2,$2)',[id,'2026-10-01']);
+  const before=(await db.query('SELECT * FROM order_items WHERE order_id=$1',[id])).rows[0];
+  await db.query("UPDATE orders SET status='completed' WHERE id=$1",[id]);
+  const after=(await db.query('SELECT * FROM order_items WHERE order_id=$1',[id])).rows[0];
+  assert.deepEqual(after,before);
 });
 test.after(async()=>db.close());

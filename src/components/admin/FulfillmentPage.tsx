@@ -27,6 +27,8 @@ import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator,
 import EntityComments from "@/components/admin/EntityComments";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { readAllRows } from "@/lib/readAllRows";
+import { readRowsByIds } from "@/lib/readRowsByIds";
+import { isActiveOrder } from "@/lib/orderLifecycle";
 import { saveAssignments } from "@/lib/assignmentSave";
 import { pendingOfflineOperationCount } from "@/services/offlineOperations";
 import { formatDistanceToNow } from "date-fns";
@@ -406,11 +408,9 @@ export default function FulfillmentPage() {
     try {
       const historyCutoff = new Date(Date.now() - FULFILLMENT_WINDOW_MS).toISOString();
       const [ordersRes, deliveryHistoryRes, profilesRes, settingsRes, cacheRes, statesRes, eventsRes, areaRes, areaLinksRes, timelineRes, dismissalsRes] = await Promise.all([
-        supabase
-          .from("orders")
+        readAllRows((from,to)=>supabase.from("orders")
           .select("id, order_number, reference, urgency, company_id, created_at, updated_at, completed_date, status, fulfillment_method, fulfillment_status, fulfillment_assigned_to, fulfillment_scheduled_for, fulfillment_notes, fulfillment_routed_at")
-          .is("completed_date", null)
-          .order("created_at", { ascending: true }),
+          .is("completed_date", null).order("created_at", { ascending: true }).order("id").range(from,to)).then(data=>({data,error:null})),
         supabase
           .from("orders")
           .select("id, order_number, reference, urgency, company_id, created_at, updated_at, completed_date, fulfillment_method, fulfillment_status, fulfillment_assigned_to, fulfillment_scheduled_for, fulfillment_notes, fulfillment_routed_at")
@@ -453,7 +453,7 @@ export default function FulfillmentPage() {
       // Active work must never disappear because it is old. It stays on the
       // board until the underlying quantities are completed or the order is
       // explicitly delivered/closed. The time window is for History only.
-      const activeBase = ordersRes.data || [];
+      const activeBase = (ordersRes.data || []).filter(isActiveOrder);
       const historicBase = deliveryHistoryRes.data || [];
       const allOrderRows = [...activeBase, ...historicBase];
       const ids = [...new Set(allOrderRows.map((order) => order.id))];
@@ -461,10 +461,10 @@ export default function FulfillmentPage() {
 
       const [itemsRes, companiesRes] = await Promise.all([
         ids.length
-          ? supabase.from("order_items").select("id, order_id, name, code, description, notes, quantity, qty_invoiced, qty_completed").in("order_id", ids)
+          ? readRowsByIds(ids,(batch,from,to)=>supabase.from("order_items").select("id, order_id, name, code, description, notes, quantity, qty_invoiced, qty_completed").in("order_id",batch).order("id").range(from,to)).then(data=>({data,error:null}))
           : Promise.resolve({ data: [], error: null } as any),
         companyIds.length
-          ? supabase.from("companies").select("id, name, address").in("id", companyIds)
+          ? readRowsByIds(companyIds,(batch,from,to)=>supabase.from("companies").select("id, name, address").in("id",batch).order("id").range(from,to)).then(data=>({data,error:null}))
           : Promise.resolve({ data: [], error: null } as any),
       ]);
       if (itemsRes.error) throw itemsRes.error;

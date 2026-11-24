@@ -23,3 +23,16 @@ export async function activeOrderIds(db: any, ids: string[]) {
   const rows = await readOrderRowsByIds(ids, (batch, from, to) => activeOrderQuery(db.from('orders').select('id').in('id', batch)).order('id').range(from, to));
   return rows.map(row => row.id) as string[];
 }
+export async function readActiveOrderReport(db: any, fields: string) {
+  return { data: await readOrderRows((from,to)=>activeOrderQuery(db.from('orders').select(fields)).order('id').range(from,to)) };
+}
+export async function readActiveOrderLines(db: any, table: 'order_items' | 'order_purchase_orders', fields: string) {
+  const orders = await readActiveOrderReport(db, 'id');
+  return { data: await readOrderRowsByIds(orders.data.map(o=>o.id),(batch,from,to)=>db.from(table).select(fields).in('order_id',batch).order('id').range(from,to)) };
+}
+export function requireOrderReportResults(results: PromiseSettledResult<any>[]) {
+  for (const result of results) {
+    if (result.status==='rejected') throw result.reason;
+    if (result.value.error) throw new Error(result.value.error.message);
+  }
+}

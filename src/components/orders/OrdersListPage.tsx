@@ -18,6 +18,7 @@ import BulkActionsBar from "./components/BulkActionsBar";
 import { Trash2, Users, CheckSquare } from "lucide-react";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { readAllRows } from "@/lib/readAllRows";
+import { isActiveOrder } from "@/lib/orderLifecycle";
 import { MenuPortal, useViewportMenuPosition } from "@/hooks/useViewportMenuPosition";
 
 interface Company {
@@ -124,12 +125,12 @@ export const OrdersListPage: React.FC = () => {
       const monthEnd = endOfMonth(now);
 
       const ordersData = await readAllRows<any>((from, to) => supabase.from('orders').select('*')
-        .eq('company_id', selectedCompanyId).gte('created_at', monthStart.toISOString()).lte('created_at', monthEnd.toISOString())
+        .eq('company_id', selectedCompanyId).is('completed_date',null)
         .order('created_at', { ascending: false }).order('id').range(from, to));
 
       // Get company names
       const ordersWithCompanies = await Promise.all(
-        (ordersData || []).map(async (order) => {
+        (ordersData || []).filter(isActiveOrder).map(async (order) => {
           const company = companies.find(c => c.id === order.company_id);
           const companyName = company?.name || 'Unknown Company';
           return {

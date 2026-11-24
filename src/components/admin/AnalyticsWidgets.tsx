@@ -50,7 +50,7 @@ export default function AnalyticsWidgets() {
 
       const [allOrders, completedOrders, companies, pos] = await Promise.all([
         supabase.from("orders").select("id, created_at, company_id, status").gte("created_at", thirtyDaysAgo.toISOString()),
-        supabase.from("orders").select("id, completed_date").eq("status", "delivered").gte("completed_date", thirtyDaysAgo.toISOString()),
+        supabase.from("orders").select("id, completed_date").gte("completed_date", thirtyDaysAgo.toISOString()),
         supabase.from("orders").select("company_id, companies(name)").not("company_id", "is", null),
         supabase.from("order_purchase_orders").select("supplier_id, suppliers(name)").gte("created_at", thirtyDaysAgo.toISOString()),
       ]);
