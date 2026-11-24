@@ -1,5 +1,7 @@
 # Roadmap
 
+- [ ] Refresh Buying Sheet Zoho stock, open supplier POs and customer invoices at least three times daily; show verified refresh times
+
 - [x] Sweep alternate order views, portal, operational counts/intelligence, Zoho imports and daily reports; preserve settled records; 60 tests and desktop/phone controlled checks passed
 - [ ] Verify live Zoho events and morning/afternoon email delivery with real staff data — external unmanaged sign-in unavailable; no production emails sent
 
