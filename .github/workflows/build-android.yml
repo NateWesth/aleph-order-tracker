@@ -30,6 +30,10 @@ jobs:
           node -e "const p=require('./package-lock.json'); console.log('package-lock root jspdf:', p.packages[''].dependencies.jspdf, 'locked jspdf:', p.packages['node_modules/jspdf']?.version)"
 
       - name: Install dependencies
+        # The APK packages a browser app, not Node CUDA/TensorRT inference.
+        # Skip only ONNX's external GPU download; keep required install scripts.
+        env:
+          ONNXRUNTIME_NODE_INSTALL: skip
         run: npm ci
 
       - name: Build web app
