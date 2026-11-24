@@ -426,7 +426,7 @@ export default function ProgressPage({
             name,
             code
           )
-        `).in('status', ['received', 'in-progress']).order('created_at', {
+        `).in('status', ['received', 'in-progress']).is('completed_date', null).order('created_at', {
         ascending: true
       });
 

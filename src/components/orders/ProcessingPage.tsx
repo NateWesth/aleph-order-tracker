@@ -159,7 +159,7 @@ export default function ProcessingPage({
             name,
             code
           )
-        `).eq('status', 'processing').order('created_at', {
+        `).eq('status', 'processing').is('completed_date', null).order('created_at', {
         ascending: true
       });
 

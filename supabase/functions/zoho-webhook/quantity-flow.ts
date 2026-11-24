@@ -9,6 +9,8 @@
 // Buckets shown on the board are the differences between these counters, so a
 // single order line can appear in several columns at once.
 
+import { activeOrderIds, activeOrderQuery, readOrderRowsByIds } from '../_shared/order-data.ts'
+
 export const norm = (v: unknown) => String(v ?? '').trim().toLowerCase()
 
 type Supa = any
@@ -20,11 +22,11 @@ export async function findOrderIdsForReferences(supabase: Supa, refs: string[]):
     if (!ref) continue
 
     const { data: byNumber } = await supabase
-      .from('orders').select('id').ilike('order_number', ref)
+      .from('orders').select('id').ilike('order_number', ref).is('completed_date', null).or('status.is.null,status.not.in.(completed,delivered,cancelled,canceled)')
     byNumber?.forEach((o: any) => ids.add(o.id))
 
     const { data: byRef } = await supabase
-      .from('orders').select('id').ilike('reference', ref)
+      .from('orders').select('id').ilike('reference', ref).is('completed_date', null).or('status.is.null,status.not.in.(completed,delivered,cancelled,canceled)')
     byRef?.forEach((o: any) => ids.add(o.id))
   }
   return [...ids]
@@ -41,13 +43,10 @@ export async function findOrderIdsForPoNumber(supabase: Supa, poNumber: string):
 }
 
 async function loadItems(supabase: Supa, orderIds: string[]) {
-  if (!orderIds.length) return []
-  const { data } = await supabase
-    .from('order_items')
+  const activeIds = await activeOrderIds(supabase, orderIds)
+  return readOrderRowsByIds(activeIds, (batch, from, to) => supabase.from('order_items')
     .select('id, order_id, name, code, description, notes, quantity, qty_on_po, qty_received, qty_invoiced, qty_completed, created_at')
-    .in('order_id', orderIds)
-    .order('created_at', { ascending: true })
-  return data || []
+    .in('order_id', batch).order('created_at', { ascending: true }).order('id').range(from, to))
 }
 
 export const isExcludedSku = (sku: unknown) => {
@@ -188,10 +187,12 @@ export async function applyBillReceipt(supabase: Supa, bill: any) {
 
       const { data: item } = await supabase
         .from('order_items')
-        .select('id, qty_received, qty_on_po')
+        .select('id, order_id, qty_received, qty_on_po')
         .eq('id', alloc.order_item_id)
         .maybeSingle()
       if (!item) continue
+      // A later bill must not edit an already-closed customer job or its allocation.
+      if (!(await activeOrderIds(supabase, [item.order_id])).length) continue
 
       const nextReceived = Math.min((item.qty_received || 0) + take, item.qty_on_po || 0)
       await supabase

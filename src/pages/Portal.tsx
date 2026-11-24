@@ -11,9 +11,11 @@ import { Package, Clock, ChevronDown, LogOut, Loader2, FileText } from "lucide-r
 import { format } from "date-fns";
 import PortalReorder from "@/components/PortalReorder";
 import { readAllRows } from "@/lib/readAllRows";
+import { isActiveOrder, isOrderHistory } from "@/lib/orderLifecycle";
 import { readOrderItemsForOrders } from "@/lib/portalReorderDetails";
 
 interface PortalOrder {
+  completed_date: string | null;
   id: string;
   company_id: string;
   order_number: string;
@@ -82,7 +84,7 @@ export default function Portal() {
 
       // Get orders for this company
       const ordersData = await readAllRows<Omit<PortalOrder, "items">>((from, to) => supabase.from("orders")
-        .select("id, company_id, order_number, description, status, urgency, created_at, reference")
+        .select("id, company_id, order_number, description, status, completed_date, urgency, created_at, reference")
         .eq("company_id", profile.company_id)
         .order("created_at", { ascending: false }).order("id").range(from, to));
 
@@ -178,10 +180,10 @@ export default function Portal() {
 
   // Separate active and completed orders
   const activeOrders = orders.filter(
-    (o) => o.status !== "completed" && o.status !== "delivered"
+    isActiveOrder
   );
   const completedOrders = orders.filter(
-    (o) => o.status === "completed" || o.status === "delivered"
+    isOrderHistory
   );
 
   return (

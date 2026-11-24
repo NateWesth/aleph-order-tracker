@@ -1,5 +1,7 @@
 # Roadmap
 
+- [ ] Sweep alternate order views, portal, operational counts/intelligence, Zoho imports and daily reports for completion/purchasing consistency; preserve settled records
+
 - [x] Fix completed Orders leaking into active lanes and procurement; saved audit now finds zero unfinished lines on completed orders
 - [x] Audit Buying Sheet coverage, duplicate PO counting, failed reads and purchasing safeguards
 - [x] Replace My Work with complete personally assigned purchasing, workshop and dispatch work; preserve scoped temporary cover and handover/client request access

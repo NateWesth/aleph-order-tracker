@@ -1,3 +1,4 @@
+import { activeOrderIds, activeOrderQuery, readOrderRows, readOrderRowsByIds } from '../_shared/order-data.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { allocatePurchaseOrder, applyBillReceipt, applyInvoiceQuantities, isExcludedSku } from './quantity-flow.ts'
 import {
@@ -525,7 +526,7 @@ async function handleInvoiceWebhook(
       .from('orders')
       .select('id, order_number, status')
       .ilike('order_number', ref)
-      .or('status.is.null,status.neq.delivered')
+      .is('completed_date', null).or('status.is.null,status.not.in.(completed,delivered,cancelled,canceled)')
     
     if (orders && orders.length > 0) {
       matchedOrders.push(...orders)
@@ -538,7 +539,7 @@ async function handleInvoiceWebhook(
       .from('orders')
       .select('id, order_number, status')
       .ilike('reference', soNum)
-      .or('status.is.null,status.neq.delivered')
+      .is('completed_date', null).or('status.is.null,status.not.in.(completed,delivered,cancelled,canceled)')
     
     if (orders && orders.length > 0) {
       matchedOrders.push(...orders)
@@ -551,7 +552,7 @@ async function handleInvoiceWebhook(
       .from('orders')
       .select('id, order_number, status')
       .ilike('reference', ref)
-      .or('status.is.null,status.neq.delivered')
+      .is('completed_date', null).or('status.is.null,status.not.in.(completed,delivered,cancelled,canceled)')
     
     if (orders && orders.length > 0) {
       matchedOrders.push(...orders)
@@ -821,14 +822,14 @@ async function handleScanAllInvoices(
         .from('orders')
         .select('id, order_number')
         .ilike('order_number', r)
-        .or('status.is.null,status.neq.delivered')
+        .is('completed_date', null).or('status.is.null,status.not.in.(completed,delivered,cancelled,canceled)')
       if (byOrderNum?.length) orders.push(...byOrderNum)
 
       const { data: byRef } = await supabase
         .from('orders')
         .select('id, order_number')
         .ilike('reference', r)
-        .or('status.is.null,status.neq.delivered')
+        .is('completed_date', null).or('status.is.null,status.not.in.(completed,delivered,cancelled,canceled)')
       if (byRef?.length) orders.push(...byRef)
     }
 
@@ -1131,6 +1132,7 @@ function salesLineDescription(lineItem: any): string {
 }
 
 async function syncOrderItems(supabase: any, orderId: string, lineItems: any[]): Promise<number> {
+  if (!(await activeOrderIds(supabase, [orderId])).length) return 0
   // Get existing order items
   const { data: existingItems } = await supabase
     .from('order_items')
@@ -1572,10 +1574,7 @@ async function handleReconcileQuantities(
   const key = (v: unknown) => String(v ?? '').trim().toLowerCase()
 
   // 1. Active orders + every reference that can point at them
-  const { data: activeOrders } = await supabase
-    .from('orders')
-    .select('id, order_number, reference')
-    .not('status', 'in', '("completed","delivered")')
+  const activeOrders = await readOrderRows((from, to) => activeOrderQuery(supabase.from('orders').select('id, order_number, reference')).order('id').range(from, to))
 
   const orderIds = (activeOrders || []).map((o: any) => o.id)
   if (!orderIds.length) {
@@ -1607,6 +1606,10 @@ async function handleReconcileQuantities(
     for (const r of refs) (refToOrders.get(key(r)) || []).forEach(id => ids.add(id))
     return [...ids]
   }
+
+  // The legacy rebuild clears confirmed stock before network reads complete.
+  // It is not a safe recovery mechanism; normal event sync remains available.
+  throw new Error('Quantity rebuild is unavailable because it can erase confirmed stock when Zoho times out. Normal PO, bill and invoice updates remain active.')
 
   // 2. Reset counters so everything is rebuilt from Zoho.
   //    Manual completions (qty_completed) are user decisions Zoho knows nothing

@@ -12,6 +12,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserData } from "@/hooks/useUserData";
 import { useLiveData } from "@/hooks/useLiveData";
+import { readAllRows } from "@/lib/readAllRows";
+import { readRowsByIds } from "@/lib/readRowsByIds";
 import { useIsMobile } from "@/hooks/use-mobile";
 import OrderItemComments from "./components/OrderItemComments";
 import { getItemDisplayName, getItemSecondaryDescription } from "@/lib/itemDisplay";
@@ -292,6 +294,7 @@ export default function ItemProgressBoard({ isAdmin }: ItemProgressBoardProps) {
           companies (name)
         `)
         .in('status', ['received', 'in-progress', 'processing'])
+        .is('completed_date', null)
         .order('created_at', { ascending: true });
 
       if (userRole === 'user' && userCompanyId) {
@@ -300,8 +303,7 @@ export default function ItemProgressBoard({ isAdmin }: ItemProgressBoardProps) {
         ordersQuery = ordersQuery.eq('user_id', user.id);
       }
 
-      const { data: ordersData, error: ordersError } = await ordersQuery;
-      if (ordersError) throw ordersError;
+      const ordersData = await readAllRows((from, to) => ordersQuery.range(from, to));
 
       if (!ordersData || ordersData.length === 0) {
         setOrders([]);
@@ -310,12 +312,7 @@ export default function ItemProgressBoard({ isAdmin }: ItemProgressBoardProps) {
       }
 
       const orderIds = ordersData.map(o => o.id);
-      const { data: itemsData, error: itemsError } = await supabase
-        .from('order_items')
-        .select('*')
-        .in('order_id', orderIds);
-
-      if (itemsError) throw itemsError;
+      const itemsData = await readRowsByIds(orderIds, (batch, from, to) => supabase.from('order_items').select('*').in('order_id', batch).order('id').range(from, to));
 
       const userIds = [...new Set(ordersData.map(o => (o as any).user_id).filter(Boolean))] as string[];
       let userMap = new Map<string, string>();

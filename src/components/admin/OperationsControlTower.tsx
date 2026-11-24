@@ -4,6 +4,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { useLiveData } from "@/hooks/useLiveData";
+import { isActiveOrder } from "@/lib/orderLifecycle";
+import { readAllRows } from "@/lib/readAllRows";
+import { readRowsByIds } from "@/lib/readRowsByIds";
 import { pendingOfflineOperationCount, subscribeOfflineQueue } from "@/services/offlineOperations";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -89,7 +92,7 @@ export default function OperationsControlTower() {
       supabase.from("order_activity_log").select("id,order_id,activity_type,title,description,user_id,created_at").order("created_at", { ascending: false }).limit(120),
       supabase.from("team_action_items").select("id,title,priority,status,assigned_to,due_at,workspace").neq("status", "done").order("created_at", { ascending: false }).limit(80),
       supabase.from("profiles").select("id,full_name,email").eq("approved", true).order("full_name"),
-      supabase.from("orders").select("id,order_number,status,completed_date,fulfillment_method,fulfillment_status,fulfillment_assigned_to,fulfillment_scheduled_for").is("completed_date", null).limit(5000),
+      readAllRows((from,to)=>supabase.from("orders").select("id,order_number,status,completed_date,fulfillment_method,fulfillment_status,fulfillment_assigned_to,fulfillment_scheduled_for").is("completed_date", null).order("id").range(from,to)).then(data=>({data,error:null})),
       queryActiveDispatch(),
     ]);
     const [routeRes, exceptionRes, timelineRes, activityRes, taskRes, memberRes, activeOrderRes, freshDispatchRes] = result;
@@ -104,16 +107,16 @@ export default function OperationsControlTower() {
     setMembers((memberRes.data || []) as TeamMember[]);
 
     const activeOrders = (activeOrderRes.data || []).filter((order: any) =>
-      String(order.status || "").toLowerCase() !== "delivered" &&
+      isActiveOrder(order) &&
       !order.completed_date &&
       order.fulfillment_method !== "collection" &&
       order.fulfillment_status !== "completed"
     );
     if (activeOrders.length) {
-      const itemRes = await supabase.from("order_items").select("id,order_id,name,code,quantity,qty_on_po,qty_received,qty_invoiced,qty_completed").in("order_id", activeOrders.map((order: any) => order.id));
+      const itemRes = {data:await readRowsByIds(activeOrders.map((order: any)=>order.id),(batch,from,to)=>supabase.from("order_items").select("id,order_id,name,code,quantity,qty_on_po,qty_received,qty_invoiced,qty_completed").in("order_id",batch).order("id").range(from,to))};
       const itemIds = (itemRes.data || []).map((item: any) => item.id);
       const allocationRes = itemIds.length
-        ? await supabase.from("order_item_po_allocations").select("order_item_id,quantity_ordered,quantity_received").in("order_item_id", itemIds)
+        ? {data:await readRowsByIds(itemIds,(batch,from,to)=>supabase.from("order_item_po_allocations").select("order_item_id,quantity_ordered,quantity_received").in("order_item_id",batch).order("id").range(from,to)),error:null}
         : { data: [], error: null };
       setIssues(buildReconciliationIssues((itemRes.data || []) as OrderItemRow[], (allocationRes.data || []) as AllocationRow[], activeOrders as OrderRef[]));
     } else {
