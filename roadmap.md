@@ -1,9 +1,11 @@
 # Roadmap
 
-- [ ] Fix completed Orders leaking into active lanes and procurement
-- [ ] Audit Buying Sheet coverage, stale/failed reads and purchasing recommendations
-- [ ] Replace My Work with complete personally assigned purchasing, workshop and dispatch work
-- [ ] Test accuracy rules and available end-to-end checks
+- [x] Fix completed Orders leaking into active lanes and procurement; saved audit now finds zero unfinished lines on completed orders
+- [x] Audit Buying Sheet coverage, duplicate PO counting, failed reads and purchasing safeguards
+- [x] Replace My Work with complete personally assigned purchasing, workshop and dispatch work; preserve scoped temporary cover and handover/client request access
+- [x] Test accuracy rules; 41 tests and desktop/phone controlled checks for My Work, Orders, History and Buying passed
+- [ ] Compare Buying Sheet against the user's specific wrong quantity — awaiting an example SKU and expected quantity
+- [ ] Verify these accuracy fixes with real signed-in staff data — external unmanaged staff sign-in is unavailable in the sandbox
 
 - [x] Add shared supplier expected/actual delivery tracking, reliability scores and measured Buying Sheet safety buffers
 - [x] Test supplier scoring, dates, shared staff access and conflict protection; 28 tests and desktop/phone fixture save/readback checks passed

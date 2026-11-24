@@ -5,6 +5,17 @@ import { orderItemBuckets, isActiveOrder, isFullyCompleted } from '@/lib/orderLi
 import { isMyActiveWork, type WorkRow } from '@/lib/myWork';
 import { queryActiveDispatch } from '@/services/dispatchDocuments';
 
+export async function myWorkCoverOwners(userId: string) {
+  const now = new Date().toISOString();
+  return readAllRows((from, to) => supabase.from('responsibility_delegations').select('id,owner_id,scopes').eq('delegate_id', userId).neq('status', 'cancelled').lte('starts_at', now).gte('ends_at', now).order('id').range(from, to));
+}
+
+export async function loadCoveredMyWork(userId: string, category: WorkRow['category'], loader: (id: string) => Promise<WorkRow[]>, covers: Awaited<ReturnType<typeof myWorkCoverOwners>>): Promise<WorkRow[]> {
+  const owners = [...new Set(covers.filter(c => c.scopes.includes('all') || c.scopes.includes(category)).map(c => c.owner_id))].filter(id => id !== userId);
+  const [mine, ...covered] = await Promise.all([loader(userId), ...owners.map(id => loader(id))]);
+  return [...mine, ...covered.flat().map(row => ({ ...row, subtitle: `Temporary cover · ${row.subtitle}` }))];
+}
+
 export async function loadMyOrders(userId: string): Promise<WorkRow[]> {
   const orders = await readAllRows((from, to) => supabase.from('orders').select('id,order_number,company_id,status,completed_date,assigned_to,urgency').eq('assigned_to', userId).is('completed_date', null).order('id').range(from, to));
   const active = orders.filter(isActiveOrder);
@@ -21,7 +32,7 @@ export async function loadMyOrders(userId: string): Promise<WorkRow[]> {
     const waiting = counters.reduce((sum, c) => sum + c.ordered, 0);
     const invoice = counters.reduce((sum, c) => sum + c['in-stock'], 0);
     const ready = counters.reduce((sum, c) => sum + c['ready-for-delivery'], 0);
-    const stages = [purchase ? `${purchase} to purchase` : '', waiting ? `${waiting} on PO` : '', invoice ? `${invoice} to invoice` : '', ready ? `${ready} ready for dispatch` : ''].filter(Boolean);
+    const stages = [purchase ? `${purchase} awaiting stock` : '', waiting ? `${waiting} on PO` : '', invoice ? `${invoice} to invoice` : '', ready ? `${ready} ready for dispatch` : ''].filter(Boolean);
     return [{ id: order.id, title: order.order_number, subtitle: order.company_id ? names.get(order.company_id) ?? 'Unknown client' : 'No client', status: stages.join(' · ') || 'No item lines', priority: order.urgency, view: 'orders', entityType: 'order', category: 'orders' as const }];
   });
 }

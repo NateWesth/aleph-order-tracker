@@ -186,7 +186,7 @@ export default function CompletedPage({
   useLiveData(["orders", "order_items", "order_purchase_orders", "order_files"], () => fetchCompletedOrders(), {
     channelName: "completed-orders-live-data",
     debounceMs: 400,
-    fallbackIntervalMs: 0,
+    fallbackIntervalMs: 15_000,
   });
 
   useEffect(() => {
@@ -196,10 +196,10 @@ export default function CompletedPage({
   }, [user?.id]);
 
   useEffect(() => {
-    if (user?.id && (userRole === 'admin' || userCompanyId !== null)) {
+    if (user?.id && (isAdmin || userRole === 'admin' || userCompanyId !== null)) {
       fetchCompletedOrders();
     }
-  }, [user?.id, userRole, userCompanyId]);
+  }, [user?.id, userRole, userCompanyId, isAdmin]);
 
   const filteredOrders = orders.filter(order => {
     const matchesSearch = 

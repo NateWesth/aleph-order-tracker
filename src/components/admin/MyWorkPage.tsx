@@ -7,6 +7,9 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { loadMyOrders, loadMyWorkshop, loadMyDispatch, loadMyTasks } from "@/services/myWork";
+import { myWorkCoverOwners, loadCoveredMyWork } from '@/services/myWork';
+import ContinuityPanel from '@/components/admin/ContinuityPanel';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { sortMyWork, type WorkRow } from "@/lib/myWork";
 import { supplierToday } from "@/lib/supplierReliability";
 
@@ -26,11 +29,19 @@ export default function MyWorkPage({ onNavigate }: MyWorkPageProps) {
   const [tab, setTab] = useState('all');
   const [search, setSearch] = useState('');
   const [checkedAt, setCheckedAt] = useState<Date | null>(null);
+  const [handoverOpen, setHandoverOpen] = useState(false);
   const read = useRef(0);
   const load = useCallback(async () => {
     if (!user?.id) return;
     const generation = ++read.current;
-    const result = await Promise.allSettled(categories.map(category => category.load(user.id)));
+    let covers: Awaited<ReturnType<typeof myWorkCoverOwners>>;
+    try { covers = await myWorkCoverOwners(user.id); }
+    catch (error) {
+      if (generation !== read.current) return;
+      setErrors(Object.fromEntries(categories.map(c => [c.id, error instanceof Error ? error.message : 'Temporary assignments could not load'])));
+      setLoading(false); return;
+    }
+    const result = await Promise.allSettled(categories.map(category => loadCoveredMyWork(user.id, category.id, category.load, covers)));
     if (generation !== read.current) return;
     setRows(previous => {
       const next = { ...previous };
@@ -42,7 +53,7 @@ export default function MyWorkPage({ onNavigate }: MyWorkPageProps) {
     setErrors(failures); setLoading(false); setCheckedAt(new Date());
   }, [user?.id]);
   useEffect(() => { setRows({}); setErrors({}); setLoading(true); void load(); return () => { read.current++; }; }, [load]);
-  useLiveData(['orders', 'order_items', 'companies', 'sharpening_jobs', 'repair_tickets', 'fabrication_projects', 'dispatch_documents', 'team_action_items', 'operations_exceptions', 'dispatch_routes', 'operational_leave_cover'], load, { fallbackIntervalMs: 15000 });
+  useLiveData(['orders', 'order_items', 'companies', 'sharpening_jobs', 'repair_tickets', 'fabrication_projects', 'dispatch_documents', 'team_action_items', 'operations_exceptions', 'dispatch_routes', 'operational_leave_cover', 'responsibility_delegations'], load, { fallbackIntervalMs: 15000 });
   const open = (row: WorkRow) => {
     if (row.entityType) window.sessionStorage.setItem(`aleph:open-${row.entityType}`, row.id);
     onNavigate(row.view);
@@ -53,7 +64,7 @@ export default function MyWorkPage({ onNavigate }: MyWorkPageProps) {
   return <div className="mx-auto max-w-6xl space-y-5">
     <header className="flex flex-wrap items-center justify-between gap-3">
       <div><h1 className="text-3xl font-bold">My Work</h1><p className="mt-1 text-sm text-muted-foreground">{user?.email}</p></div>
-      <div className="flex items-center gap-2"><Badge variant={incomplete ? 'destructive' : 'secondary'}>{loading ? 'Loading…' : incomplete ? 'Some work unavailable' : `${total} assigned`}</Badge><Button size="icon" variant="outline" aria-label="Refresh my work" onClick={() => void load()}><RefreshCw className="h-4 w-4" /></Button></div>
+      <div className="flex flex-wrap items-center gap-2"><Button size="sm" variant="outline" onClick={() => setHandoverOpen(true)}>Handover & requests</Button><Badge variant={incomplete ? 'destructive' : 'secondary'}>{loading ? 'Loading…' : incomplete ? 'Some work unavailable' : `${total} assigned`}</Badge><Button size="icon" variant="outline" aria-label="Refresh my work" onClick={() => void load()}><RefreshCw className="h-4 w-4" /></Button></div>
     </header>
     <div className="flex flex-col gap-3"><Tabs value={tab} onValueChange={setTab}><TabsList className="flex h-auto flex-wrap justify-start gap-1"><TabsTrigger value="all">All work</TabsTrigger>{categories.map(c => <TabsTrigger key={c.id} value={c.id}><c.icon className="mr-2 h-4 w-4" />{c.title}</TabsTrigger>)}</TabsList></Tabs><div className="relative max-w-md"><Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" /><Input aria-label="Search my work" placeholder="Search jobs, clients or orders" className="pl-9" value={search} onChange={e => setSearch(e.target.value)} /></div></div>
     {checkedAt && <p className="text-xs text-muted-foreground">Last checked {checkedAt.toLocaleTimeString()}</p>}
@@ -67,5 +78,6 @@ export default function MyWorkPage({ onNavigate }: MyWorkPageProps) {
         </Button>)}</div>}
       </section>;
     })}
+    <Dialog open={handoverOpen} onOpenChange={setHandoverOpen}><DialogContent className="max-h-[85dvh] max-w-4xl overflow-y-auto"><DialogHeader><DialogTitle>Handover & client requests</DialogTitle></DialogHeader>{handoverOpen && <ContinuityPanel />}</DialogContent></Dialog>
   </div>;
 }
