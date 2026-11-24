@@ -1,5 +1,10 @@
 # Roadmap
 
+- [ ] Fix completed Orders leaking into active lanes and procurement
+- [ ] Audit Buying Sheet coverage, stale/failed reads and purchasing recommendations
+- [ ] Replace My Work with complete personally assigned purchasing, workshop and dispatch work
+- [ ] Test accuracy rules and available end-to-end checks
+
 - [x] Add shared supplier expected/actual delivery tracking, reliability scores and measured Buying Sheet safety buffers
 - [x] Test supplier scoring, dates, shared staff access and conflict protection; 28 tests and desktop/phone fixture save/readback checks passed
 - [ ] Verify supplier delivery logging with real staff data — external unmanaged staff sign-in is unavailable in the sandbox
