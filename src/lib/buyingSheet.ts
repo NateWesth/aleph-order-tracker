@@ -3,12 +3,12 @@
  * customer belong in the procurement requirement. Invoiced units have already
  * left the building, so they can never need purchasing again.
  */
-export function buyingRequirement(line: { quantity: number; qty_received?: number | null; qty_on_po?: number | null }, invoiced = 0) {
+export function buyingRequirement(line: { quantity: number; qty_received?: number | null; qty_on_po?: number | null; qty_invoiced?: number | null; qty_completed?: number | null; progress_stage?: string | null }, invoiced = 0) {
   const quantity = Math.max(0, line.quantity || 0);
   const received = Math.min(quantity, Math.max(0, line.qty_received || 0));
-  const fulfilled = Math.max(received, Math.min(quantity, Math.max(0, invoiced || 0)));
+  const fulfilled = line.progress_stage === 'completed' ? quantity : Math.max(received, Math.min(quantity, Math.max(0, invoiced || 0, line.qty_invoiced || 0, line.qty_completed || 0)));
   const totalNeeded = quantity - fulfilled;
-  return { totalNeeded, allocatedOnPurchaseOrder: Math.min(totalNeeded, Math.max(0, (line.qty_on_po || 0) - received)) };
+  return { totalNeeded, allocatedOnPurchaseOrder: Math.min(totalNeeded, Math.max(0, (line.qty_on_po || 0) - fulfilled)) };
 }
 
 /** A shared quantity pool (invoiced units per order+SKU, or open PO units per SKU) consumed line by line so nothing is counted twice. */
@@ -55,4 +55,9 @@ export function buyingCsvCell(value: unknown) {
 
 export function buyingSelectedKeys(rows: Array<{ rowKey: string }>, selected: Set<string>) {
   return rows.filter(row => selected.has(row.rowKey)).map(row => row.rowKey);
+}
+
+/** Saved open PO quantities already include linked allocations; do not add the same units again. */
+export function buyingPOCoverage(needed: number, linked: number, available: number, miscellaneous = false) {
+  return Math.min(Math.max(0, needed), Math.max(0, miscellaneous ? linked : available));
 }

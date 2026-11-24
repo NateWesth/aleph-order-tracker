@@ -2,7 +2,8 @@ import { copyText } from "@/lib/copyText";
 import { freshStock, depletionDays } from "@/lib/stockDepletion";
 import { FunctionsHttpError } from "@supabase/supabase-js";
 import { readAllRows } from "@/lib/readAllRows";
-import { buyingRequirement, buyingShortfall, isOpenBuyingOrder, buyingOrderQuantity, allocateBuyingQuantity, createQuantityPool, buyingCsvCell } from "@/lib/buyingSheet";
+import { readRowsByIds } from "@/lib/readRowsByIds";
+import { buyingRequirement, buyingPOCoverage, buyingShortfall, isOpenBuyingOrder, buyingOrderQuantity, allocateBuyingQuantity, createQuantityPool, buyingCsvCell } from "@/lib/buyingSheet";
 
 type LiveCoverage = {
   asOf: string | null;
@@ -13,7 +14,7 @@ type LiveCoverage = {
 /** Current supplier-PO and customer-invoice quantities from the Zoho documents already stored in the app (no Zoho API calls). */
 async function fetchLiveCoverage(): Promise<LiveCoverage | null> {
   const { data, error } = await (supabase.rpc as unknown as (fn: string) => Promise<{ data: unknown; error: unknown }>)("get_buying_sheet_live_coverage");
-  if (error || !data) { console.error("Live PO/invoice coverage unavailable:", error); return null; }
+  if (error || !data) throw new Error('Open PO and invoice coverage could not be verified. Previous figures were retained.');
   return data as LiveCoverage;
 }
 import FabricationReorderPanel from "@/components/admin/buying-sheet/FabricationReorderPanel";
@@ -318,8 +319,7 @@ export default function BuyingSheetPage() {
       setLastRefreshedAt(payload?.fetched_at ? new Date(payload.fetched_at) : new Date());
       return next;
     } catch (error) {
-      toast({ title: "Error", description: "Failed to load the shared Zoho snapshot", variant: "destructive" });
-      return zohoData;
+      throw new Error('The shared stock snapshot could not be verified. Refresh before ordering.');
     } finally { setZohoLoading(false); }
   };
 
@@ -493,14 +493,14 @@ export default function BuyingSheetPage() {
       const [snapshot, live] = await Promise.all([fetchZohoData(), fetchLiveCoverage()]);
       setLiveCoverageAsOf(live?.asOf ? new Date(live.asOf) : null);
       const invoicedPool = createQuantityPool((live?.invoiced || []).map(i => [`${i.orderId}|${(i.sku || "").trim().toUpperCase()}`, i.qty] as [string, number]));
-      const orderItems = await readAllRows((from, to) => supabase.from("order_items").select("id, name, code, description, notes, quantity, qty_on_po, qty_received, progress_stage, order_id, created_at").eq("progress_stage", "awaiting-stock").order("created_at").order("id").range(from, to));
+      const orderItems = await readAllRows((from, to) => supabase.from("order_items").select("id, name, code, description, notes, quantity, qty_on_po, qty_received, qty_invoiced, qty_completed, progress_stage, order_id, created_at").or('progress_stage.is.null,progress_stage.neq.completed').order("created_at").order("id").range(from, to));
       const activeSkus = new Set<string>();
       if (!orderItems.length) { setRows([]); setLoadError(null); hasLoaded.current = true; await fetchSuggestedRestock(activeSkus); return; }
 
       const orderIds = [...new Set(orderItems.map(i => i.order_id))];
       const [ordersResult, poResult] = await Promise.all([
-        supabase.from("orders").select("id, order_number, company_id, supplier_id, urgency, created_at, status, completed_date").in("id", orderIds),
-        supabase.from("order_purchase_orders").select("order_id, supplier_id").in("order_id", orderIds),
+        readRowsByIds(orderIds, (batch, from, to) => supabase.from("orders").select("id, order_number, company_id, supplier_id, urgency, created_at, status, completed_date").in("id", batch).order('id').range(from, to)).then(data => ({ data, error: null })),
+        readRowsByIds(orderIds, (batch, from, to) => supabase.from("order_purchase_orders").select("id, order_id, supplier_id").in("order_id", batch).order('id').range(from, to)).then(data => ({ data, error: null })),
       ]);
       if (ordersResult.error) throw ordersResult.error;
       if (poResult.error) throw poResult.error;
@@ -510,8 +510,8 @@ export default function BuyingSheetPage() {
       const supplierIdsFromOrders = [...new Set((orders || []).map(o => o.supplier_id).filter(Boolean))] as string[];
       const allSupplierIds = [...new Set([...supplierIdsFromOrders, ...(orderPOs || []).map(p => p.supplier_id)])];
       const [companiesRes, suppliersRes] = await Promise.all([
-        companyIds.length > 0 ? supabase.from("companies").select("id, name").in("id", companyIds) : { data: [] },
-        allSupplierIds.length > 0 ? supabase.from("suppliers").select("id, name, email").in("id", allSupplierIds) : { data: [] },
+        readRowsByIds(companyIds, (batch, from, to) => supabase.from("companies").select("id, name").in("id", batch).order('id').range(from, to)).then(data => ({ data })),
+        readRowsByIds(allSupplierIds, (batch, from, to) => supabase.from("suppliers").select("id, name, email").in("id", batch).order('id').range(from, to)).then(data => ({ data })),
       ]);
       const companiesMap = new Map((companiesRes.data || []).map(c => [c.id, c.name]));
       const suppliersMap = new Map((suppliersRes.data || []).map(s => [s.id, { name: s.name, email: s.email }]));
@@ -526,7 +526,8 @@ export default function BuyingSheetPage() {
       for (const item of orderItems) {
         const order = ordersMap.get(item.order_id);
         if (!order || !isOpenBuyingOrder(order)) continue;
-        const invoicedQty = invoicedPool.take(`${item.order_id}|${(item.code || "").trim().toUpperCase()}`, item.quantity || 0);
+        const sharedItem = isMiscellaneousItem(item.code ?? '') || isMiscellaneousItem(item.name);
+        const invoicedQty = sharedItem ? 0 : invoicedPool.take(`${item.order_id}|${(item.code || "").trim().toUpperCase()}`, item.quantity || 0);
         const requirement = buyingRequirement(item, invoicedQty);
         const requested = requirement.totalNeeded;
         const allocatedOnPO = requirement.allocatedOnPurchaseOrder;
@@ -560,7 +561,8 @@ export default function BuyingSheetPage() {
       // POs). Each unit covers demand once, oldest waiting lines first.
       const livePOs = live?.purchaseOrders || {};
       const poPool = createQuantityPool(Object.entries(livePOs).map(([sku, p]) => [sku.trim().toUpperCase(), p.outstanding] as [string, number]));
-      const buyingRows: BuyingSheetRow[] = Array.from(skuMap.values()).map(entry => {
+      const stockPool = createQuantityPool(Object.entries(zohoStock).map(([sku, stock]) => [sku.trim().toUpperCase(), freshStock(stock) ?? 0] as [string, number]));
+      const buyingRows: BuyingSheetRow[] = Array.from(skuMap.values()).sort((a, b) => a.oldestCreatedAt.localeCompare(b.oldestCreatedAt) || a.rowKey.localeCompare(b.rowKey)).map(entry => {
         // Shared miscellaneous SKUs are not fungible inventory. Applying the
         // catalogue's combined stock to every custom line would falsely hide
         // demand, so only exact order-linked allocations cover those rows.
@@ -568,18 +570,19 @@ export default function BuyingSheetPage() {
         const livePO = entry.isMiscellaneous ? undefined : livePOs[entry.sku];
         // Live open-PO total for this SKU replaces the old snapshot figure.
         const zohoOnPurchaseOrder = live ? Math.max(0, livePO?.outstanding || 0) : Math.max(0, z.onPurchaseOrder || 0);
-        const pooled = entry.isMiscellaneous || !live ? 0 : poPool.take(entry.sku, Math.max(0, entry.totalNeeded - entry.allocatedOnPurchaseOrder));
-        const onPurchaseOrder = Math.min(entry.totalNeeded, entry.allocatedOnPurchaseOrder + pooled);
+        const pooled = entry.isMiscellaneous ? 0 : poPool.take(entry.sku, entry.totalNeeded);
+        const onPurchaseOrder = buyingPOCoverage(entry.totalNeeded, entry.allocatedOnPurchaseOrder, pooled, entry.isMiscellaneous);
         const poVariance = Math.abs(zohoOnPurchaseOrder - onPurchaseOrder);
         const verifiedStock = entry.isMiscellaneous ? null : freshStock(zohoStock[entry.sku]);
         const stockOnHand = Math.max(0, verifiedStock ?? 0);
+        const availableStock = entry.isMiscellaneous ? 0 : stockPool.take(entry.sku, Math.max(0, entry.totalNeeded - onPurchaseOrder));
         const stockVerified = verifiedStock !== null;
-        const toOrder = buyingShortfall(entry.totalNeeded, stockOnHand, onPurchaseOrder);
+        const toOrder = buyingShortfall(entry.totalNeeded, availableStock, onPurchaseOrder);
         // Zoho vendor (from historical POs) takes priority as the suggested supplier
         const supplierName = z.vendorName || livePO?.vendorName || entry.supplierName;
         const supplierEmail = z.vendorEmail || entry.supplierEmail || undefined;
         const daysWaiting = calendarDaysSince(entry.oldestCreatedAt);
-        const covered = stockOnHand + onPurchaseOrder;
+        const covered = availableStock + onPurchaseOrder;
         const coveragePercent = entry.totalNeeded > 0 ? Math.min(100, Math.round((covered / entry.totalNeeded) * 100)) : 100;
         const { trend, lastMonth, prevMonth } = getDemandTrend(entry.sku);
         const stockoutRiskDays = depletionDays(verifiedStock, getDailyBurnRate(entry.sku));
@@ -666,7 +669,9 @@ export default function BuyingSheetPage() {
     if (bulkOrdering || targetSkus.length === 0) return;
     setBulkOrdering(true);
     try {
+      if (loadError || loading || refreshing) throw new Error('Refresh and verify Buying Sheet figures before marking items ordered.');
       const targetRows = sortedRows.filter(r => targetSkus.includes(r.rowKey) && r.toOrder > 0);
+      if (targetRows.some(row => !row.isMiscellaneous && !row.stockVerified)) throw new Error('Some selected stock figures are unknown or stale. Refresh Zoho stock before ordering.');
       if (!targetRows.length) throw new Error("Select an item that still needs ordering.");
       const orderItemIds = [...new Set(targetRows.flatMap((row) => row.orderItemIds))];
       if (!orderItemIds.length) throw new Error("No outstanding order lines are available for these items.");
@@ -1472,7 +1477,7 @@ export default function BuyingSheetPage() {
                 <Button variant="outline" size="sm" onClick={handleCopySelectedPOLines} className="h-7 text-xs gap-1"><ClipboardCopy className="h-3 w-3" />PO Lines</Button>
                 <Button variant="outline" size="sm" onClick={handleCopySupplierEmails} className="h-7 text-xs gap-1"><Mail className="h-3 w-3" />Emails</Button>
                 <Button variant="outline" size="sm" onClick={handlePrint} className="h-7 text-xs gap-1"><Printer className="h-3 w-3" />Print</Button>
-                <Button size="sm" onClick={() => handleBulkMarkOrdered()} disabled={bulkOrdering} className="h-7 text-xs gap-1">
+                <Button size="sm" onClick={() => handleBulkMarkOrdered()} disabled={bulkOrdering || !!loadError || refreshing} className="h-7 text-xs gap-1">
                   {bulkOrdering ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckSquare className="h-3 w-3" />}Mark Ordered
                 </Button>
                 <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setSelectedSkus(new Set())}>Clear</Button>

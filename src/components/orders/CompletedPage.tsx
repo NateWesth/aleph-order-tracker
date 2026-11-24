@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
+import { readAllRows } from '@/lib/readAllRows';
 import { useLiveData } from "@/hooks/useLiveData";
 import { PullToRefresh } from "@/components/ui/PullToRefresh";
 import { useToast } from "@/hooks/use-toast";
@@ -56,6 +57,7 @@ export default function CompletedPage({
   const [userCompanyId, setUserCompanyId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [openMonths, setOpenMonths] = useState<Set<string>>(new Set());
+  const historyRead = useRef(0);
 
   const fetchUserInfo = async () => {
     if (!user?.id) return;
@@ -79,8 +81,9 @@ export default function CompletedPage({
     if (!user?.id) return;
     
     setLoading(true);
+    const generation = ++historyRead.current;
     try {
-      if (userRole === 'admin') {
+      if (isAdmin || userRole === 'admin') {
         const { data: companiesData } = await supabase
           .from('companies')
           .select('id, name')
@@ -90,24 +93,21 @@ export default function CompletedPage({
         }
       }
       
+      const data = await readAllRows((from, to) => {
       let query = supabase
         .from('orders')
         .select(`*, companies (id, name, code), suppliers (id, name)`)
-        .eq('status', 'delivered')
-        .order('completed_date', { ascending: false });
+        .or('status.in.(delivered,completed),completed_date.not.is.null')
+        .order('completed_date', { ascending: false }).order('id').range(from, to);
 
-      if (userRole === 'user' && userCompanyId) {
+      if (!isAdmin && userRole === 'user' && userCompanyId) {
         query = query.eq('company_id', userCompanyId);
-      } else if (userRole === 'user' && !userCompanyId) {
+      } else if (!isAdmin && userRole === 'user' && !userCompanyId) {
         query = query.eq('user_id', user.id);
       }
 
-      const { data, error } = await query;
-      
-      if (error) {
-        console.error("Error fetching completed orders:", error);
-        return;
-      }
+      return query;
+      });
       
       const transformedOrders: OrderWithCompany[] = (data || []).map(order => ({
         id: order.id,
@@ -130,6 +130,7 @@ export default function CompletedPage({
         supplierName: order.suppliers?.name || null
       }));
       
+      if (generation !== historyRead.current) return;
       setOrders(transformedOrders);
       
       // Auto-open the first month
@@ -144,7 +145,7 @@ export default function CompletedPage({
     } catch (error) {
       console.error("Failed to fetch completed orders:", error);
     } finally {
-      setLoading(false);
+      if (generation === historyRead.current) setLoading(false);
     }
   };
 

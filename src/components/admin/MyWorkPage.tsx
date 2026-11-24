@@ -1,64 +1,71 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { ChevronRight, Navigation, Route } from "lucide-react";
-import { queryActiveDispatch } from "@/services/dispatchDocuments";
-import { supabase } from "@/integrations/supabase/client";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ChevronRight, RefreshCw, ShoppingCart, Wrench, Truck, ListChecks, Search } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLiveData } from "@/hooks/useLiveData";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import ContinuityPanel from "@/components/admin/ContinuityPanel";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { loadMyOrders, loadMyWorkshop, loadMyDispatch, loadMyTasks } from "@/services/myWork";
+import { sortMyWork, type WorkRow } from "@/lib/myWork";
+import { supplierToday } from "@/lib/supplierReliability";
 
+const categories = [
+  { id: 'orders', title: 'Purchasing & invoicing', icon: ShoppingCart, load: loadMyOrders },
+  { id: 'workshop', title: 'Workshop jobs', icon: Wrench, load: loadMyWorkshop },
+  { id: 'dispatch', title: 'Collections & deliveries', icon: Truck, load: loadMyDispatch },
+  { id: 'tasks', title: 'Tasks & issues', icon: ListChecks, load: loadMyTasks },
+] as const;
+type Category = typeof categories[number]['id'];
 interface MyWorkPageProps { onNavigate: (view: string) => void; }
 export default function MyWorkPage({ onNavigate }: MyWorkPageProps) {
   const { user } = useAuth();
-  const [dispatchError,setDispatchError]=useState("");
-  const [deliveries,setDeliveries]=useState<any[]>([]); const [collections,setCollections]=useState<any[]>([]); const [tasks,setTasks]=useState<any[]>([]); const [exceptions,setExceptions]=useState<any[]>([]); const [routes,setRoutes]=useState<any[]>([]); const [loading,setLoading]=useState(true);
-  const load=useCallback(async()=>{ if(!user?.id)return; const s=supabase as any;
-    const now=new Date().toISOString();
-    const cover=await s.from("responsibility_delegations").select("owner_id").eq("delegate_id",user.id).neq("status","cancelled").lte("starts_at",now).gte("ends_at",now);
-    const coveredIds=[user.id,...(cover.data||[]).map((row:any)=>row.owner_id).filter(Boolean)];
-    const [d,c,t,e,r]=await Promise.all([
-      queryActiveDispatch("delivery",coveredIds),
-      queryActiveDispatch("collection",coveredIds),
-      s.from("team_action_items").select("*").in("assigned_to",coveredIds).neq("status","done").order("due_at",{ascending:true}),
-      s.from("operations_exceptions").select("*").in("assigned_to",coveredIds).neq("status","resolved").order("created_at",{ascending:false}),
-      s.from("dispatch_routes").select("*").in("driver_id",coveredIds).not("status","in","(completed,cancelled)").order("route_date",{ascending:true}),
-    ]); setDispatchError(d.error?.message||c.error?.message||""); if(!d.error)setDeliveries((d.data||[]).map(doc=>({...doc,order_number:doc.reference,companies:{name:doc.contact_name},fulfillment_scheduled_for:doc.scheduled_for})));if(!c.error)setCollections((c.data||[]).map(doc=>({...doc,purchase_order_id:doc.id,purchase_order_number:doc.reference,vendor_name:doc.contact_name})));setTasks(t.data||[]);setExceptions(e.data||[]);setRoutes(r.data||[]);setLoading(false);},[user?.id]);
-  useEffect(()=>{void load()},[load]); useLiveData(["orders","dispatch_documents","team_action_items","operations_exceptions","dispatch_routes"],()=>void load(),{channelName:"my-work-live"});
-  const total=deliveries.length+collections.length+tasks.length+exceptions.length;
-  const nextRoute=routes[0]; const stops=useMemo(()=>Array.isArray(nextRoute?.stops)?nextRoute.stops:[],[nextRoute]);
-  const nowItems = [
-    ...exceptions.map((item:any) => ({ id:`e-${item.id}`, kind:"Exception", title:item.title, subtitle:item.description||item.category, meta:item.severity, view:"control-tower" })),
-    ...tasks.filter((item:any) => item.priority === "urgent" || (item.due_at && new Date(item.due_at) <= new Date())).map((item:any) => ({ id:`t-${item.id}`, kind:"Task", title:item.title, subtitle:item.workspace||"Operations", meta:item.due_at ? `Due ${new Date(item.due_at).toLocaleDateString()}` : item.priority, view:"control-tower" })),
-  ];
-  const nextItems = [
-    ...deliveries.map((item:any) => ({ id:`d-${item.id}`, kind:"Delivery", title:item.order_number, subtitle:item.companies?.name||"Customer", meta:item.fulfillment_scheduled_for ? new Date(item.fulfillment_scheduled_for).toLocaleString() : "Ready to plan", view:"fulfillment", entityType:"delivery", entityId:item.id })),
-    ...collections.map((item:any) => ({ id:`c-${item.purchase_order_id}`, kind:"Collection", title:item.purchase_order_number, subtitle:item.vendor_name||"Supplier", meta:item.scheduled_for ? new Date(item.scheduled_for).toLocaleString() : "Ready to plan", view:"fulfillment", entityType:"collection", entityId:item.purchase_order_id })),
-  ];
-  const urgentTaskIds = new Set(nowItems.filter((item:any)=>item.id.startsWith("t-")).map((item:any)=>item.id.slice(2)));
-  const waitingItems = tasks.filter((item:any)=>!urgentTaskIds.has(item.id)).map((item:any)=>({ id:`w-${item.id}`, kind:"Task", title:item.title, subtitle:item.workspace||"Operations", meta:item.due_at ? `Due ${new Date(item.due_at).toLocaleDateString()}` : (item.priority||"Waiting"), view:"control-tower" }));
-
-  return <div className="mx-auto max-w-6xl space-y-5 animate-in fade-in duration-300">
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-      <div><p className="text-xs font-bold uppercase tracking-[.18em] text-primary">Personal workspace</p><h1 className="mt-1 text-3xl font-black tracking-tight">My Work</h1><p className="mt-1 text-sm text-muted-foreground">What needs your attention, in the order it matters.</p></div>
-      <Badge variant="secondary" className="w-fit rounded-full px-3 py-1">{loading?"…":total} assigned</Badge>
-    </div>
-    {dispatchError&&<p role="alert" className="rounded-xl border border-destructive/40 p-3 text-sm">Assigned dispatch could not refresh: {dispatchError}. Previous records may be stale.</p>}
-    <ContinuityPanel />
-    {nextRoute && <Card className="border-primary/15 bg-primary/[.035] shadow-sm"><CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0"><div className="flex items-center gap-2"><Route className="h-4 w-4 text-primary"/><p className="truncate font-bold">{nextRoute.name}</p><Badge variant="outline" className="text-[10px]">{stops.length} stops</Badge></div><p className="mt-1 text-xs text-muted-foreground">{nextRoute.completed_stops||0} completed · active dispatch run</p></div>{nextRoute.map_url && <Button asChild size="sm" className="rounded-xl"><a href={nextRoute.map_url} target="_blank" rel="noreferrer"><Navigation className="mr-2 h-4 w-4"/>Navigate</a></Button>}</CardContent></Card>}
-    <div className="grid gap-4 lg:grid-cols-[1.15fr_.85fr]">
-      <WorkLane title="Now" description="Overdue, urgent or blocked" count={nowItems.length} emphasis>{nowItems.map((item:any)=><FocusRow key={item.id} {...item} onOpen={()=>onNavigate(item.view)}/>)}</WorkLane>
-      <div className="space-y-4">
-        <WorkLane title="Next" description="Ready for you to action" count={nextItems.length}>{nextItems.slice(0,8).map((item:any)=><FocusRow key={item.id} {...item} onOpen={()=>{ if(item.entityType&&item.entityId) window.sessionStorage.setItem(`aleph:open-${item.entityType}`,item.entityId); onNavigate(item.view); window.setTimeout(()=>window.dispatchEvent(new CustomEvent(`aleph:open-${item.entityType}`,{detail:item.entityId})),80); }}/>)}</WorkLane>
-        <WorkLane title="Waiting" description="Assigned, but not urgent yet" count={waitingItems.length}>{waitingItems.slice(0,6).map((item:any)=><FocusRow key={item.id} {...item} onOpen={()=>onNavigate(item.view)}/>)}</WorkLane>
-      </div>
-    </div>
+  const [rows, setRows] = useState<Partial<Record<Category, WorkRow[]>>>({});
+  const [errors, setErrors] = useState<Partial<Record<Category, string>>>({});
+  const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState('all');
+  const [search, setSearch] = useState('');
+  const [checkedAt, setCheckedAt] = useState<Date | null>(null);
+  const read = useRef(0);
+  const load = useCallback(async () => {
+    if (!user?.id) return;
+    const generation = ++read.current;
+    const result = await Promise.allSettled(categories.map(category => category.load(user.id)));
+    if (generation !== read.current) return;
+    setRows(previous => {
+      const next = { ...previous };
+      result.forEach((entry, i) => { if (entry.status === 'fulfilled') next[categories[i].id] = entry.value; });
+      return next;
+    });
+    const failures: Partial<Record<Category, string>> = {};
+    result.forEach((entry, i) => { if (entry.status === 'rejected') failures[categories[i].id] = entry.reason instanceof Error ? entry.reason.message : 'Could not refresh'; });
+    setErrors(failures); setLoading(false); setCheckedAt(new Date());
+  }, [user?.id]);
+  useEffect(() => { setRows({}); setErrors({}); setLoading(true); void load(); return () => { read.current++; }; }, [load]);
+  useLiveData(['orders', 'order_items', 'companies', 'sharpening_jobs', 'repair_tickets', 'fabrication_projects', 'dispatch_documents', 'team_action_items', 'operations_exceptions', 'dispatch_routes', 'operational_leave_cover'], load, { fallbackIntervalMs: 15000 });
+  const open = (row: WorkRow) => {
+    if (row.entityType) window.sessionStorage.setItem(`aleph:open-${row.entityType}`, row.id);
+    onNavigate(row.view);
+    if (row.entityType) window.setTimeout(() => window.dispatchEvent(new CustomEvent(`aleph:open-${row.entityType}`, { detail: row.id })), 80);
+  };
+  const total = Object.values(rows).reduce((sum, items) => sum + (items?.length ?? 0), 0);
+  const incomplete = Object.keys(errors).length > 0;
+  return <div className="mx-auto max-w-6xl space-y-5">
+    <header className="flex flex-wrap items-center justify-between gap-3">
+      <div><h1 className="text-3xl font-bold">My Work</h1><p className="mt-1 text-sm text-muted-foreground">{user?.email}</p></div>
+      <div className="flex items-center gap-2"><Badge variant={incomplete ? 'destructive' : 'secondary'}>{loading ? 'Loading…' : incomplete ? 'Some work unavailable' : `${total} assigned`}</Badge><Button size="icon" variant="outline" aria-label="Refresh my work" onClick={() => void load()}><RefreshCw className="h-4 w-4" /></Button></div>
+    </header>
+    <div className="flex flex-col gap-3"><Tabs value={tab} onValueChange={setTab}><TabsList className="flex h-auto flex-wrap justify-start gap-1"><TabsTrigger value="all">All work</TabsTrigger>{categories.map(c => <TabsTrigger key={c.id} value={c.id}><c.icon className="mr-2 h-4 w-4" />{c.title}</TabsTrigger>)}</TabsList></Tabs><div className="relative max-w-md"><Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" /><Input aria-label="Search my work" placeholder="Search jobs, clients or orders" className="pl-9" value={search} onChange={e => setSearch(e.target.value)} /></div></div>
+    {checkedAt && <p className="text-xs text-muted-foreground">Last checked {checkedAt.toLocaleTimeString()}</p>}
+    {categories.filter(c => tab === 'all' || c.id === tab).map(category => {
+      const visible = sortMyWork((rows[category.id] ?? []).filter(r => `${r.title} ${r.subtitle} ${r.status}`.toLowerCase().includes(search.toLowerCase())), supplierToday());
+      return <section key={category.id} className="min-w-0 border-t border-border pt-4">
+        <div className="mb-3 flex items-center justify-between gap-2"><h2 className="flex items-center gap-2 text-base font-semibold"><category.icon className="h-4 w-4 text-primary" />{category.title}</h2><Badge variant="outline">{errors[category.id] ? 'Unavailable' : visible.length}</Badge></div>
+        {errors[category.id] && <p role="alert" className="mb-3 text-sm text-destructive">Could not verify this work: {errors[category.id]}. Any previous entries may be stale.</p>}
+        {loading ? <p className="py-5 text-sm text-muted-foreground">Loading assigned work…</p> : !visible.length && !errors[category.id] ? <p className="py-5 text-sm text-muted-foreground">{search ? 'No matching work.' : 'Nothing assigned to you here.'}</p> : <div className="divide-y divide-border">{visible.map(row => <Button key={`${row.category}-${row.id}-${row.status}`} variant="ghost" className="h-auto w-full justify-start gap-3 rounded-none px-2 py-3 text-left" onClick={() => open(row)}>
+          <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><span className="break-words text-sm font-semibold">{row.title}</span>{['urgent','critical','high'].includes(row.priority ?? '') && <Badge variant="destructive">{row.priority}</Badge>}</div><p className="mt-1 whitespace-normal break-words text-xs text-muted-foreground">{row.subtitle}</p><p className="mt-1 whitespace-normal break-words text-xs">{row.status}</p>{row.due && <p className={`mt-1 text-xs ${row.due.slice(0,10) < supplierToday() ? 'text-destructive' : 'text-muted-foreground'}`}>Due {row.due.slice(0,10)}</p>}</div><ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+        </Button>)}</div>}
+      </section>;
+    })}
   </div>;
-}
-function WorkLane({title,description,count,emphasis=false,children}:{title:string;description:string;count:number;emphasis?:boolean;children:React.ReactNode}) {
-  return <Card className={emphasis ? "border-primary/20 shadow-sm" : "border-border/50"}><CardContent className="p-4"><div className="mb-3 flex items-start justify-between gap-3"><div><h2 className="text-base font-black">{title}</h2><p className="text-xs text-muted-foreground">{description}</p></div><Badge variant={emphasis && count ? "default" : "secondary"} className="rounded-full">{count}</Badge></div><div className="space-y-2">{count?children:<div className="rounded-xl border border-dashed border-border/60 p-5 text-center text-xs text-muted-foreground">Nothing here right now.</div>}</div></CardContent></Card>
-}
-function FocusRow({kind,title,subtitle,meta,onOpen}:{kind:string;title:string;subtitle:string;meta:string;onOpen:()=>void}) {
-  return <button type="button" onClick={onOpen} className="group flex w-full items-center gap-3 rounded-xl border border-border/45 bg-background/60 p-3 text-left transition-colors hover:bg-muted/45"><div className="min-w-0 flex-1"><div className="flex items-center gap-2"><span className="text-[10px] font-bold uppercase tracking-wide text-primary">{kind}</span><p className="truncate text-sm font-bold">{title}</p></div><p className="mt-0.5 truncate text-xs text-muted-foreground">{subtitle}</p></div><span className="hidden max-w-[140px] text-right text-[10px] font-semibold text-muted-foreground sm:block">{meta}</span><ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"/></button>
 }

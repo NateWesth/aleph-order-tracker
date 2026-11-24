@@ -38,6 +38,8 @@ import BulkActionsBar from "./components/BulkActionsBar";
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import { cn } from "@/lib/utils";
 import { readAllRows } from "@/lib/readAllRows";
+import { readRowsByIds } from "@/lib/readRowsByIds";
+import { isActiveOrder, isFullyCompleted, orderItemBuckets } from "@/lib/orderLifecycle";
 import { selectAllOrderIds } from "@/lib/orderBulkActions";
 import { getItemDisplayName, getItemSecondaryDescription } from "@/lib/itemDisplay";
 
@@ -79,6 +81,7 @@ interface Order {
   company_id: string | null;
   user_id: string | null;
   created_at: string | null;
+  completed_date?: string | null;
   companyName?: string;
   creatorName?: string;
   items?: OrderItem[];
@@ -113,19 +116,7 @@ const COLUMN_STAGE: Record<string, ItemStage> = {
 };
 
 const bucketsFor = (item: OrderItem): Record<ItemStage, number> => {
-  const qty = item.totalQuantity ?? item.quantity ?? 0;
-  const onPo = Math.min(item.qty_on_po ?? 0, qty);
-  const received = Math.min(item.qty_received ?? 0, onPo);
-  const invoiced = Math.min(item.qty_invoiced ?? 0, received);
-  const completed = Math.min(item.qty_completed ?? 0, invoiced);
-
-  return {
-    "awaiting-stock": Math.max(0, qty - onPo),
-    ordered: Math.max(0, onPo - received),
-    "in-stock": Math.max(0, received - invoiced),
-    "ready-for-delivery": Math.max(0, invoiced - completed),
-    completed,
-  };
+  return orderItemBuckets(item);
 };
 
 const countersAfterMove = (item: OrderItem, from: ItemStage, to: ItemStage, qty: number) => {
@@ -360,11 +351,14 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
     setActiveOrderId(String(event.active.id));
   }, []);
 
+  const orderReadGeneration = useRef(0);
   const fetchOrders = useCallback(async () => {
+    const generation = ++orderReadGeneration.current;
     try {
-      const data = await readAllRows<any>((from, to) => supabase.from("orders")
-        .select("id, order_number, description, status, urgency, company_id, user_id, created_at, supplier_id, purchase_order_number")
-        .or("status.is.null,status.neq.delivered").order("created_at", { ascending: false }).order("id").range(from, to));
+      const saved = await readAllRows<any>((from, to) => supabase.from("orders")
+        .select("id, order_number, description, status, urgency, company_id, user_id, created_at, supplier_id, purchase_order_number, completed_date")
+        .is('completed_date', null).or("status.is.null,status.not.in.(delivered,completed,cancelled,canceled)").order("created_at", { ascending: false }).order("id").range(from, to));
+      const data = saved.filter(isActiveOrder);
 
       const companyIds = [...new Set(data?.map((o) => o.company_id).filter(Boolean))];
       const orderIds = data?.map((o) => o.id) || [];
@@ -374,21 +368,21 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
       // for companies, then items/comments, then POs/suppliers, then profiles.
       const [companiesResult, itemsResult, posResult, profilesResult] = await Promise.all([
         companyIds.length > 0
-          ? supabase.from("companies").select("id, name").in("id", companyIds)
+          ? readRowsByIds<any>(companyIds, (batch, from, to) => supabase.from("companies").select("id, name").in("id", batch).order('id').range(from, to)).then(data => ({ data, error: null }))
           : Promise.resolve({ data: [], error: null }),
         orderIds.length > 0
-          ? readAllRows<any>((from, to) => supabase.from("order_items")
+          ? readRowsByIds<any>(orderIds, (batch, from, to) => supabase.from("order_items")
               .select("id, order_id, name, code, description, notes, quantity, stock_status, qty_on_po, qty_received, qty_invoiced, qty_completed")
-              .in("order_id", orderIds).order("id").range(from, to)).then(data => ({ data, error: null }))
+              .in("order_id", batch).order("id").range(from, to)).then(data => ({ data, error: null }))
           : Promise.resolve({ data: [], error: null }),
         orderIds.length > 0
-          ? supabase
+          ? readRowsByIds<any>(orderIds, (batch, from, to) => supabase
               .from("order_purchase_orders")
               .select("id, order_id, supplier_id, purchase_order_number")
-              .in("order_id", orderIds)
+              .in("order_id", batch).order('id').range(from, to)).then(data => ({ data, error: null }))
           : Promise.resolve({ data: [], error: null }),
         userIds.length > 0
-          ? supabase.from("profiles").select("id, full_name").in("id", userIds)
+          ? readRowsByIds<any>(userIds, (batch, from, to) => supabase.from("profiles").select("id, full_name").in("id", batch).order('id').range(from, to)).then(data => ({ data, error: null }))
           : Promise.resolve({ data: [], error: null }),
       ]);
 
@@ -508,7 +502,8 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
           .at(-1),
       }));
 
-      setOrders(ordersWithData);
+      if (generation !== orderReadGeneration.current) return;
+      setOrders(ordersWithData.filter(order => !isFullyCompleted(order.items)));
       setSelectedOrderIds(previous => new Set([...previous].filter(id => ordersWithData.some(order => order.id === id))));
 
       /*
@@ -525,7 +520,7 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
         variant: "destructive",
       });
     } finally {
-      setLoading(false);
+      if (generation === orderReadGeneration.current) setLoading(false);
     }
   }, [toast]);
 
@@ -886,6 +881,7 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
     const placedOrderIds = new Set<string>();
 
     filteredOrders.forEach((order) => {
+      if (!isActiveOrder(order) || isFullyCompleted(order.items ?? [])) return;
       const items = order.items || [];
 
       Object.entries(COLUMN_STAGE).forEach(([columnKey, stage]) => {
@@ -925,7 +921,7 @@ export default function OrdersPage({ isAdmin = false, searchTerm = "" }: OrdersP
     // Rather than silently vanishing from the board, place it somewhere
     // sensible so it's never lost from view.
     filteredOrders.forEach((order) => {
-      if (placedOrderIds.has(order.id)) {
+      if (!isActiveOrder(order) || isFullyCompleted(order.items ?? []) || placedOrderIds.has(order.id)) {
         return;
       }
 
