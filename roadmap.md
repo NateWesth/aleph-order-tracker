@@ -7,7 +7,7 @@
 - [ ] Client portal live progress, delivery receipt downloads and reorder requests
 - [ ] Reviewed draft Zoho PO creation from Buying Sheet recommendations
 - [x] Manual Zoho inventory refresh and Buying Sheet depletion warnings from fresh stock and demand
-- [ ] Scheduled low-stock notifications — recipient and threshold settings still need to be chosen
+- [ ] Scheduled low-stock notifications to all approved staff — recipients confirmed; warning threshold still needs to be chosen
 - [x] Dated supplier bill price history and purchasing warnings (from saved bills; supplier names fill in as bills are re-read)
 - [ ] Auditable job costs including vendor bills, waste and labour
 - [ ] Driver-consented live GPS, admin fleet map and route ETA
