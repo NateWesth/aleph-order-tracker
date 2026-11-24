@@ -1,11 +1,11 @@
 # Project implementation rules
 
 - Client purchasing/invoicing links retain companies.purchasing_invoicing_user_id as master ownership; guarded order writes resolve timed operational_leave_cover, with transactional changes and scheduled restoration; never modify reps or fulfillment assignments. Why: leave cover must preserve master links and end without an app visit.
-- Workshop timers use validated, serialized commands behind a public invoker/private definer boundary and persistent rate snapshots; timer completion is independent of job completion. Why: concurrent devices must not double-count work or bypass technician ownership.
+- Workshop timers use validated, serialized commands behind a public invoker/private definer boundary; show the paginated finished-session ledger and total hours on every job, using saved rate snapshots for recorded labour. Timer completion is independent of job completion. Why: concurrent devices must not double-count work, hide saved hours, reprice historical labour or bypass technician ownership.
 - Route exports split all stops into mobile-compatible numbered Google Maps legs; Waze links target individual stops. Why: long routes must never silently omit destinations.
-- Portal reorders retain original company/order/item identities in validated staff-review requests and company-scoped RLS; timers capture fabrication hours once with rate snapshots. Why: self-service must not create supplier orders and historical labour must not reprice.
+- Portal reorders retain original company/order/item identities in validated staff-review requests and company-scoped RLS; staff resolve original-order items and display requested quantities, with explicit unavailable-item feedback. Timers capture fabrication hours once with rate snapshots. Why: self-service must not create supplier orders, hide the client's request or reprice historical labour.
 
-- Order bulk status changes share item-counter updates and verify affected rows; selection uses unique filtered order IDs across lanes. Why: board positions derive from quantities and denied writes must not report success.
+- Order bulk status changes share item-counter updates and verify affected rows; assignment verifies returned assignees, not just IDs, without bypassing client ownership or timed delegation. Selection uses unique filtered order IDs across lanes. Why: board positions derive from quantities and denied or overridden writes must not report success.
 
 - Dispatch On route entry uses revision-checked saves; receipts retain On route until the idempotent finish_dispatch_route_stop RPC derives full/partial/none from cumulative quantities. Why: explicit completion must not invent deliveries or let source refreshes remove unchecked stops.
 

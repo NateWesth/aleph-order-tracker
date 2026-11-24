@@ -8,7 +8,7 @@ import { CheckSquare, Loader2, Tag as TagIcon, Flame, UserRound, CheckCircle2 } 
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import { updateSelectedOrderStatus, verifyOrderMutation, mutateSelectedOrders } from "@/lib/orderBulkActions";
+import { updateSelectedOrderStatus, updateSelectedOrderAssignment, mutateSelectedOrders } from "@/lib/orderBulkActions";
 import { OrderWithCompany } from "../types/orderTypes";
 
 interface BulkActionsBarProps {
@@ -180,13 +180,14 @@ export default function BulkActionsBar({ selectedOrders, onClearSelection, onAct
   const handleBulkAssignment = async () => {
     setLoading(true);
     try {
-      await mutateSelectedOrders(ids, batch => supabase.from("orders").update({ assigned_to: assignee === "unassigned" ? null : assignee, updated_at: new Date().toISOString() } as any).in("id", batch).select("id"));
+      await updateSelectedOrderAssignment(supabase, ids, assignee === "unassigned" ? null : assignee);
       toast({ title: "Orders assigned", description: `${ids.length} order${ids.length === 1 ? "" : "s"} updated.` });
       setShowAssignDialog(false);
       onClearSelection();
       onActionComplete();
     } catch (error: any) {
       toast({ title: "Assignment failed", description: error.message, variant: "destructive" });
+      onActionComplete();
     } finally {
       setLoading(false);
     }
@@ -328,7 +329,7 @@ export default function BulkActionsBar({ selectedOrders, onClearSelection, onAct
         </DialogContent>
       </Dialog>
       <Dialog open={showAssignDialog} onOpenChange={setShowAssignDialog}>
-        <DialogContent className="max-w-sm"><DialogHeader><DialogTitle>Assign {selectedOrders.length} orders</DialogTitle></DialogHeader><Select value={assignee} onValueChange={setAssignee}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="unassigned">Unassigned</SelectItem>{team.map((member) => <SelectItem key={member.id} value={member.id}>{member.full_name || member.email || "Team member"}</SelectItem>)}</SelectContent></Select><DialogFooter><Button variant="outline" onClick={() => setShowAssignDialog(false)}>Cancel</Button><Button onClick={() => void handleBulkAssignment()} disabled={loading}>{loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Assign</Button></DialogFooter></DialogContent>
+        <DialogContent className="max-w-sm"><DialogHeader><DialogTitle>Assign {selectedOrders.length} orders</DialogTitle></DialogHeader><p className="text-sm text-muted-foreground">Linked clients keep their purchasing/invoicing owner or current leave delegate. To hand over that work, an admin must change the client link or Temporary coverage.</p><Select value={assignee} onValueChange={setAssignee}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="unassigned">Unassigned</SelectItem>{team.map((member) => <SelectItem key={member.id} value={member.id}>{member.full_name || member.email || "Team member"}</SelectItem>)}</SelectContent></Select><DialogFooter><Button variant="outline" onClick={() => setShowAssignDialog(false)}>Cancel</Button><Button onClick={() => void handleBulkAssignment()} disabled={loading}>{loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Assign</Button></DialogFooter></DialogContent>
       </Dialog>
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <DialogContent className="max-w-sm"><DialogHeader><DialogTitle>Delete {selectedOrders.length} orders?</DialogTitle></DialogHeader><p className="text-sm text-muted-foreground">This permanently deletes the selected orders and cannot be undone.</p><DialogFooter><Button variant="outline" onClick={() => setShowDeleteDialog(false)}>Cancel</Button><Button variant="destructive" onClick={() => void handleBulkDelete()} disabled={loading}>{loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Delete orders</Button></DialogFooter></DialogContent>

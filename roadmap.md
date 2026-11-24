@@ -1,5 +1,10 @@
 # Roadmap
 
+- [x] Verify and fix staff reorder item/quantity visibility
+- [x] Verify and fix finished repair/sharpening time visibility
+- [x] Verify and fix misleading bulk assignment success for linked clients
+- [ ] Verify these three fixes with real signed-in staff data — external unmanaged sign-in is unavailable; regression tests, compilation and desktop/mobile fixture flows passed
+
 - [x] Review foundations and prepare the operations expansion plan
 - [x] Give step-by-step guidance for the Zoho Books connection
 - [ ] Smart route sequencing and complete Google Maps/Waze export

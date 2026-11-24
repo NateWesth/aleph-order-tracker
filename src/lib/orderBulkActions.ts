@@ -28,6 +28,21 @@ export async function mutateSelectedOrders(ids: string[], mutate: (batch: string
   }
 }
 
+export function verifyOrderAssignment(ids: string[], rows: Array<{ id: string; assigned_to: string | null }> | null, assignee: string | null) {
+  verifyOrderMutation(ids, rows);
+  const requested = new Set(ids);
+  const unchanged = (rows || []).filter(row => requested.has(row.id) && row.assigned_to !== assignee);
+  if (unchanged.length) throw new Error(`${unchanged.length} selected order(s) kept their linked client owner or leave delegate. Change the client's purchasing/invoicing link or Temporary coverage instead. Other selected orders may have changed; your selection is kept.`);
+}
+
+export async function updateSelectedOrderAssignment(db: any, ids: string[], assignee: string | null) {
+  await mutateSelectedOrders(ids, async batch => {
+    const result = await db.from("orders").update({ assigned_to: assignee, updated_at: new Date().toISOString() }).in("id", batch).select("id,assigned_to");
+    if (!result.error) verifyOrderAssignment(batch, result.data, assignee);
+    return result;
+  });
+}
+
 export async function updateSelectedOrderStatus(db: any, ids: string[], status: string) {
   if (!["ordered", "in-progress", "in-stock", "ready", "delivered"].includes(status)) throw new Error("Choose a valid order status.");
   for (const id of [...new Set(ids)]) {
