@@ -6,6 +6,7 @@ export const VAPID_PUBLIC_KEY =
   "BAwX0AT4VpA5BM1eniYDcUoFTTurLjgbV7fgCySl2Pxfe2ZxmOJnSApjm3B5MBi2jWSwEDdr7NMBX1DCKQ67GnQ";
 
 export const PUSH_TYPES = new Set([
+  "stock_low",
   "entity_comment", "comment_reply", "comment_mention", "item_comment",
   "mention", "new_message", "order_update", "comment_reaction",
 ]);
@@ -53,7 +54,7 @@ export async function enablePush(userId: string): Promise<PushStatus> {
     const { LocalNotifications } = await import("@capacitor/local-notifications");
     const p = await LocalNotifications.requestPermissions();
     if (p.display === "granted") {
-      await LocalNotifications.createChannel({ id: "aleph-comments", name: "Comments and replies", importance: 5, visibility: 1, vibration: true });
+      await LocalNotifications.createChannel({ id: "aleph-comments", name: "Aleph notifications", importance: 5, visibility: 1, vibration: true });
       setDeviceNotificationsAllowed(true);
     }
     return p.display === "granted" ? "enabled" : "denied";

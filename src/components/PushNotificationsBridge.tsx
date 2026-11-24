@@ -15,7 +15,7 @@ function openOrder(orderId: string) {
   window.setTimeout(() => window.dispatchEvent(new CustomEvent("aleph:open-order", { detail: orderId })), 300);
 }
 
-/** Shows system notifications for new comment alerts and offers a one-time enable prompt. */
+/** Shows system notifications for comments and stock alerts, respecting device preferences. */
 export default function PushNotificationsBridge() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -78,7 +78,7 @@ export default function PushNotificationsBridge() {
     try {
       const s = await enablePush(user.id);
       setStatus(s);
-      if (s === "enabled") toast({ title: "Notifications on", description: Capacitor.isNativePlatform() ? "Comment and reply alerts are enabled while the app is open." : "You'll get comment and reply alerts on this device." });
+      if (s === "enabled") toast({ title: "Notifications on", description: Capacitor.isNativePlatform() ? "Comment, reply and stock alerts are enabled while the app is open." : "You'll get comment, reply and stock alerts on this device." });
       else if (s === "denied") toast({ title: "Notifications blocked", description: "Allow notifications in your phone's app settings or browser site settings.", variant: "destructive" });
       else if (s === "update-required") toast({ title: "Update the Android app", description: "Install the latest APK; this version is missing notification support.", variant: "destructive" });
     } catch (e) {
@@ -89,7 +89,7 @@ export default function PushNotificationsBridge() {
   return (
     <div className="fixed bottom-4 right-4 z-[60] flex max-w-sm items-center gap-3 rounded-2xl border border-logo-cyan/30 bg-card/95 p-3 shadow-lg backdrop-blur">
       <BellRing className="h-5 w-5 shrink-0 text-logo-cyan" />
-      <p className="text-xs text-foreground">Get a notification when someone comments, replies or mentions you.</p>
+      <p className="text-xs text-foreground">Turn on comment, reply and low-stock notifications.</p>
       <Button size="sm" onClick={turnOn}>Turn on</Button>
       <button aria-label="Dismiss" className="text-muted-foreground hover:text-foreground"
         onClick={() => { localStorage.setItem(DISMISS_KEY, "1"); setDismissed(true); }}>

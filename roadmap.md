@@ -7,7 +7,8 @@
 - [ ] Client portal live progress, delivery receipt downloads and reorder requests
 - [ ] Reviewed draft Zoho PO creation from Buying Sheet recommendations
 - [x] Manual Zoho inventory refresh and Buying Sheet depletion warnings from fresh stock and demand
-- [ ] Enable automatic low-stock notifications to all approved staff at seven days of remaining stock; deduplicate unresolved warnings and ignore stale inventory
+- [x] Enable automatic low-stock notifications to all approved staff at seven days of remaining stock after fresh Zoho updates; deduplicate unresolved warnings and ignore stale inventory
+- [ ] Verify seven-day stock notifications in the signed-in app and on staff devices — external unmanaged sign-in and physical devices are unavailable in the sandbox
 - [x] Dated supplier bill price history and purchasing warnings (from saved bills; supplier names fill in as bills are re-read)
 - [ ] Auditable job costs including vendor bills, waste and labour
 - [ ] Driver-consented live GPS, admin fleet map and route ETA
