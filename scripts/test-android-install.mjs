@@ -10,6 +10,18 @@ const require = createRequire(import.meta.url);
 const workflow = parse(readFileSync(new URL("../.github/workflows/build-android.yml", import.meta.url), "utf8"));
 const step = workflow.jobs.build.steps.find(step => step.name === "Install dependencies");
 
+test("Windows retains its required Electron installation without depending on Node ONNX", () => {
+  const desktop = JSON.parse(readFileSync(new URL("../desktop/package.json", import.meta.url), "utf8"));
+  assert.ok(desktop.devDependencies.electron);
+  assert.equal(desktop.dependencies?.["onnxruntime-node"], undefined);
+  assert.equal(desktop.devDependencies["@huggingface/transformers"], undefined);
+  const install = workflow.jobs.windows.steps.find(step => step.name === "Install desktop dependencies");
+  assert.equal(install.working_directory ?? install["working-directory"], "desktop");
+  assert.equal(install.env?.ELECTRON_SKIP_BINARY_DOWNLOAD, undefined);
+  assert.ok(install.run.includes("npm install --no-audit --no-fund"));
+  assert.ok(!install.run.includes("--ignore-scripts"));
+});
+
 test("Android skips only ONNX's external binary download, retaining npm ci and other install scripts", () => {
   assert.equal(step?.env?.ONNXRUNTIME_NODE_INSTALL, "skip");
   assert.equal(step.run, "npm ci");

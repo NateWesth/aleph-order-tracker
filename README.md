@@ -29,12 +29,35 @@ git clone <YOUR_GIT_URL>
 # Step 2: Navigate to the project directory.
 cd <YOUR_PROJECT_NAME>
 
-# Step 3: Install the necessary dependencies.
-npm i
+# Step 3: Install the locked dependencies without unused Node GPU downloads.
+ONNXRUNTIME_NODE_INSTALL=skip npm ci
 
 # Step 4: Start the development server with auto-reloading and an instant preview.
 npm run dev
 ```
+
+The web app uses browser inference for image processing, not Node CUDA/TensorRT
+binaries. The flag skips only ONNX's external GPU download; other dependency
+installation scripts still run. It does not disable HTTPS certificate checks.
+
+For PowerShell, set the flag only for installation and restore its prior value:
+
+```powershell
+$previousOnnxInstall = $env:ONNXRUNTIME_NODE_INSTALL
+try {
+  $env:ONNXRUNTIME_NODE_INSTALL = "skip"
+  npm ci
+} finally {
+  $env:ONNXRUNTIME_NODE_INSTALL = $previousOnnxInstall
+}
+```
+
+If using Bun or pnpm to install this root web project on Linux, apply the same
+command-scoped flag: `ONNXRUNTIME_NODE_INSTALL=skip bun install --frozen-lockfile`
+or `ONNXRUNTIME_NODE_INSTALL=skip pnpm install --frozen-lockfile`.
+Do not disable all installation scripts: Vite's native tooling still needs them.
+The separate `desktop/` project requires Electron binaries and keeps its normal
+installation, caching and retry steps.
 
 **Edit a file directly in GitHub**
 
