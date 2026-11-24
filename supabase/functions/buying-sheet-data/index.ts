@@ -1,10 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors'
 import { mergeInventory, readStock } from '../_shared/inventory.ts'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
 
 const ZOHO_AUTH_URL = 'https://accounts.zoho.com/oauth/v2'
 const ZOHO_API_URL = 'https://www.zohoapis.com'
@@ -79,30 +76,32 @@ Deno.serve(async (req) => {
   }
 
   try {
+    const scheduledSecret = Deno.env.get('ZOHO_WEBHOOK_SECRET')
+    const internalInventory = Boolean(scheduledSecret && req.headers.get('x-zoho-webhook-secret') === scheduledSecret)
     const authHeader = req.headers.get('Authorization')
-    if (!authHeader) {
+    if (!authHeader && !internalInventory) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
-    const token = authHeader.replace('Bearer ', '')
+    const token = (authHeader || '').replace('Bearer ', '')
     const {
       data: { user },
       error: authError,
-    } = await supabase.auth.getUser(token)
+    } = internalInventory ? { data: { user: null }, error: null } : await supabase.auth.getUser(token)
 
-    if (authError || !user) {
+    if (!internalInventory && (authError || !user)) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
-    const [{ data: approved, error: approvalError }, { data: admin, error: adminError }] = await Promise.all([
-      supabase.rpc('is_user_approved', { user_uuid: user.id }),
-      supabase.rpc('has_role', { _user_id: user.id, _role: 'admin' }),
+    const [{ data: approved, error: approvalError }, { data: admin, error: adminError }] = internalInventory ? [{data:true,error:null},{data:false,error:null}] : await Promise.all([
+      supabase.rpc('is_user_approved', { user_uuid: user?.id }),
+      supabase.rpc('has_role', { _user_id: user?.id, _role: 'admin' }),
     ])
     if (approvalError || adminError || (!approved && !admin)) {
       return new Response(JSON.stringify({ error: 'Approved team access required' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
@@ -122,6 +121,7 @@ Deno.serve(async (req) => {
     }
 
     const cached = await readCache(supabase)
+    if (internalInventory && (!inventoryOnly || force)) return new Response(JSON.stringify({error:'Scheduled calls may only refresh inventory'}),{status:400,headers:{...corsHeaders,'Content-Type':'application/json'}})
     if (inventoryOnly) {
       const { data: acquired, error: lockError } = await supabase.rpc('try_acquire_zoho_sync_lock', { requested_key: SYNC_LOCK_KEY, lease_seconds: 120 })
       if (lockError) throw lockError
@@ -161,7 +161,7 @@ Deno.serve(async (req) => {
       const { data: role } = await supabase
         .from('user_roles')
         .select('role')
-        .eq('user_id', user.id)
+        .eq('user_id', user?.id)
         .maybeSingle()
       if (role?.role !== 'admin') {
         return new Response(JSON.stringify({ error: 'Only administrators can run a full Zoho recovery sync' }), {

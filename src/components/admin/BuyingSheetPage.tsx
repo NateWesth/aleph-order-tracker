@@ -129,6 +129,7 @@ export default function BuyingSheetPage() {
   const [recentlyOrdered, setRecentlyOrdered] = useState<RecentlyOrderedItem[]>(loadRecentlyOrdered);
   const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(null);
   const [liveCoverageAsOf, setLiveCoverageAsOf] = useState<Date | null>(null);
+  const [automaticRefresh, setAutomaticRefresh] = useState<{last_success_at:string|null;running:boolean;error:string|null}|null>(null);
   const [showRecentlyOrdered, setShowRecentlyOrdered] = useState(false);
   const [adjustedQtys, setAdjustedQtys] = useState<Record<string, number>>({});
   const supplierData = useSupplierReliability();
@@ -178,7 +179,7 @@ export default function BuyingSheetPage() {
     fetchLastPurchaseDates();
   }, { enabled: insightsReady, fallbackIntervalMs: 15_000, debounceMs: 1500, channelName: "buying-sheet-local-live-data" });
 
-  useLiveData(["buying_sheet_cache"], () => {
+  useLiveData(["buying_sheet_cache", "buying_sync_state", "zoho_document_cache"], () => {
     void fetchLocalDataRef.current();
   }, { enabled: insightsReady, fallbackIntervalMs: 30_000, debounceMs: 1500, channelName: "buying-sheet-cache-live-data" });
 
@@ -490,7 +491,9 @@ export default function BuyingSheetPage() {
     loadInFlight.current = true;
     if (!hasLoaded.current) setLoading(true);
     try {
-      const [snapshot, live] = await Promise.all([fetchZohoData(), fetchLiveCoverage()]);
+      const [snapshot, live, syncStatus] = await Promise.all([fetchZohoData(), fetchLiveCoverage(),supabase.from('buying_sync_state').select('last_success_at,running,error').eq('id',true).maybeSingle()]);
+      if(syncStatus.error)throw syncStatus.error;
+      setAutomaticRefresh(syncStatus.data);
       setLiveCoverageAsOf(live?.asOf ? new Date(live.asOf) : null);
       const invoicedPool = createQuantityPool((live?.invoiced || []).map(i => [`${i.orderId}|${(i.sku || "").trim().toUpperCase()}`, i.qty] as [string, number]));
       const orderItems = await readAllRows((from, to) => supabase.from("order_items").select("id, name, code, description, notes, quantity, qty_on_po, qty_received, qty_invoiced, qty_completed, progress_stage, order_id, created_at").or('progress_stage.is.null,progress_stage.neq.completed').order("created_at").order("id").range(from, to));
@@ -1200,8 +1203,9 @@ export default function BuyingSheetPage() {
       <div className={`procurement-page aleph-page-workspace aleph-buying-workspace app-no-x-scroll min-w-0 w-full max-w-full space-y-5 overflow-x-hidden ${isFullscreen ? "fixed inset-0 z-40 h-[100dvh] bg-background p-3 sm:p-5 overflow-y-auto overflow-x-hidden overscroll-contain" : ""}`} ref={printRef}>
         {loadError && <div role="alert" className="border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">Buying Sheet could not refresh: {loadError}</div>}
         <div role="status" className="border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
-          {liveCoverageAsOf ? `Open supplier POs and customer invoices current as of ${liveCoverageAsOf.toLocaleString()} — already-invoiced units and units on open POs are deducted.` : "Live supplier PO and invoice figures could not be loaded; quantities may include items already ordered or invoiced."}
+          {automaticRefresh?.last_success_at ? `Open supplier POs and customer invoices fully checked ${new Date(automaticRefresh.last_success_at).toLocaleString()} — already-invoiced units and units on open POs are deducted.` : liveCoverageAsOf ? `Latest saved supplier PO or invoice update: ${liveCoverageAsOf.toLocaleString()} — already-invoiced units and units on open POs are deducted; a complete automatic check has not finished yet.` : "Live supplier PO and invoice figures could not be loaded; quantities may include items already ordered or invoiced."}
           {lastRefreshedAt && <> Latest saved Zoho update: {lastRefreshedAt.toLocaleString()}.</>}
+          <span className="block">Automatic checks: 07:00, 12:00 and 17:00 South African time.{automaticRefresh?.running && !automaticRefresh.error && ' Update in progress…'}{automaticRefresh?.error && ' Last automatic check failed; previous figures retained.'}</span>
         </div>
         {rows.some(row => !row.isMiscellaneous && !row.stockVerified) && <div role="status" className="border border-border bg-muted/40 p-3 text-sm text-muted-foreground">Stock is unverified for {rows.filter(row => !row.isMiscellaneous && !row.stockVerified).length} items with missing or stale inventory. Verify availability before purchasing; suggested quantities exclude unverified stock.</div>}
         {/* ── Sticky Header ── */}

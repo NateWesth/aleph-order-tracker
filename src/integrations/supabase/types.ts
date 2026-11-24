@@ -34,24 +34,36 @@ export type Database = {
       }
       buying_sync_state: {
         Row: {
+          cycle_started_at: string | null
           error: string | null
           id: boolean
           last_attempt_at: string | null
           last_success_at: string | null
+          next_page: number
+          running: boolean
+          source: string
           updated_at: string
         }
         Insert: {
+          cycle_started_at?: string | null
           error?: string | null
           id?: boolean
           last_attempt_at?: string | null
           last_success_at?: string | null
+          next_page?: number
+          running?: boolean
+          source?: string
           updated_at?: string
         }
         Update: {
+          cycle_started_at?: string | null
           error?: string | null
           id?: boolean
           last_attempt_at?: string | null
           last_success_at?: string | null
+          next_page?: number
+          running?: boolean
+          source?: string
           updated_at?: string
         }
         Relationships: []

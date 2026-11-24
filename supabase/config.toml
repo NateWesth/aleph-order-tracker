@@ -21,6 +21,12 @@ verify_jwt = false
 [functions.dispatch-sync]
 verify_jwt = false
 
+[functions.buying-sheet-refresh]
+verify_jwt = false
+
+[functions.buying-sheet-data]
+verify_jwt = false
+
 [functions.zoho-sync]
 verify_jwt = false
 

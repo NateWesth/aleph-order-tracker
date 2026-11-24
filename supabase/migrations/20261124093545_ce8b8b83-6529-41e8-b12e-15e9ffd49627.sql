@@ -1,0 +1,1 @@
+ALTER TABLE public.buying_sync_state ADD COLUMN source text NOT NULL DEFAULT 'purchase_order', ADD COLUMN next_page integer NOT NULL DEFAULT 1, ADD COLUMN cycle_started_at timestamptz, ADD COLUMN running boolean NOT NULL DEFAULT false;

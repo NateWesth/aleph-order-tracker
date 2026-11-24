@@ -30,4 +30,4 @@
 - Stock shortage notifications are emitted by the saved-inventory trigger and deduplicated in system-owned stock_alert_state until fresh inventory confirms recovery; notification delivery reuses the existing push pipeline. Why: alerts must work without an open app, cannot be forged by staff, and must not repeat after dismissal.
 - Order lifecycle uses terminal status/date and counters across views, reports and Zoho; _shared/order-data.ts mirrors frontend guards. Completion archives without driver receipts; routing/imports skip closed orders. Why: active work and History must agree.
 - My Work reads paginated actual assignments and scoped timed cover, with per-category errors and no list truncation. Why: staff must see their entire workload.
-- Buying coverage pools saved open POs once, never adds linked allocations twice, and blocks ordering after failed reads or stale stock. Why: unknown or duplicated supply must not produce purchasing success.
+- Buying coverage pools POs once and blocks unsafe ordering; buying-sheet-refresh tracks paginated scheduled scans in buying_sync_state with secret-only continuations. Why: supply and freshness must be verified.
